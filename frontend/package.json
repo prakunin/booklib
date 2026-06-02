@@ -12,6 +12,8 @@
     "test": "ng test --watch=false",
     "coverage": "ng test --watch=false --coverage",
     "coverage:summary": "node ./scripts/coverage-summary.mjs",
+    "i18n:check": "node ./scripts/i18n-check.mjs",
+    "i18n:check:test": "node --test ./scripts/i18n-check.test.mjs",
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",

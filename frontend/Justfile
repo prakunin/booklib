@@ -74,6 +74,10 @@ stylelint:
 stylelint-fix:
     {{ yarn }} lint:styles:fix
 
+# Validate i18n structure while leaving translation cleanup to Weblate.
+i18n-check:
+    {{ yarn }} i18n:check
+
 # Run the frontend TypeScript typechecker without emitting build output.
 typecheck:
     {{ yarn }} typecheck
@@ -91,7 +95,7 @@ audit-ci:
     {{ yarn }} npm audit --severity critical
 
 # Run the standard local frontend verification pass.
-check: deps typecheck lint stylelint build test
+check: deps i18n-check typecheck lint stylelint build test
 
 # Run the frontend CI-style verification sequence from a clean install.
 ci-check: install-ci audit-ci deps typecheck lint stylelint build test
