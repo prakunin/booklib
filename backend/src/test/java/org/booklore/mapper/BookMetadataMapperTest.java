@@ -79,5 +79,18 @@ public class BookMetadataMapperTest {
 
         assertEquals(List.of("Zylocke, Aaron", "Adams, Zachary"), dto.getAuthorSortNames());
     }
+
+    @Test
+    void mapsAuthorSortNamesFallsBackToNameWhenSortNameIsNull() {
+        AuthorEntity withSortName = AuthorEntity.builder().name("Aaron Zylocke").sortName("Zylocke, Aaron").build();
+        AuthorEntity withoutSortName = AuthorEntity.builder().name("Zachary Adams").build();
+        BookMetadataEntity entity = new BookMetadataEntity();
+        entity.setAuthors(List.of(withSortName, withoutSortName));
+        when(authorMapper.toAuthorNamesList(anyList())).thenReturn(List.of("Aaron Zylocke", "Zachary Adams"));
+
+        BookMetadata dto = bookMetadataMapper.toBookMetadata(entity);
+
+        assertEquals(List.of("Zylocke, Aaron", "Zachary Adams"), dto.getAuthorSortNames());
+    }
 }
 
