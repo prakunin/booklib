@@ -46,6 +46,13 @@ class LinksBuilderTest {
     }
 
     @Test
+    void facetLinkCarriesPreservedQuery() {
+        Link facet = withRel(builder.build(context(0, 20, 100, "facet=genre%3AFiction")), "facet");
+        assertEquals("/api/v1/books/facets?facet=genre%3AFiction", facet.href());
+        assertEquals(Link.JSON_TYPE, facet.type());
+    }
+
+    @Test
     void firstPageOmitsPreviousButHasNext() {
         List<Link> links = builder.build(context(0, 20, 100, ""));
         assertFalse(hasRel(links, "previous"));

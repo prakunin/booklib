@@ -29,7 +29,11 @@ public class LinksBuilder {
 
     public List<Link> build(Context ctx) {
         List<Link> links = new ArrayList<>();
-        links.add(Link.json(List.of("facet"), ctx.facetPath()));
+        String facetHref = ctx.facetPath();
+        if (ctx.preservedQuery() != null && !ctx.preservedQuery().isBlank()) {
+            facetHref = facetHref + "?" + ctx.preservedQuery();
+        }
+        links.add(Link.json(List.of("facet"), facetHref));
         links.add(pageLink(List.of("self"), ctx, ctx.offset()));
         links.add(pageLink(List.of("first"), ctx, 0));
 
