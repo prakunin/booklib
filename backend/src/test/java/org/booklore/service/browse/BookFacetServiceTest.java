@@ -225,4 +225,65 @@ class BookFacetServiceTest {
         assertThat(sort.metadata().rel()).isEqualTo("sort");
         assertThat(sort.links()).extracting(FacetLink::value).contains("title", "-title");
     }
+
+    @Test
+    void emptyFacetListBehavesLikeNullFacet() {
+        book("A", "Horror", "Alice");
+        book("B", "Romance", "Bob");
+        em.flush();
+
+        FacetGroupsResponse withNull = facetService.getFacets(null, null, null);
+        FacetGroupsResponse withEmpty = facetService.getFacets(List.of(), null, null);
+
+        assertThat(count(group(withEmpty, "genre"), "Horror")).isEqualTo(count(group(withNull, "genre"), "Horror"));
+        assertThat(count(group(withEmpty, "genre"), "Romance")).isEqualTo(count(group(withNull, "genre"), "Romance"));
+        assertThat(count(group(withEmpty, "genre"), "Horror")).isEqualTo(1);
+    }
+
+    @Test
+    void multipleSelectionsFilterAcrossFacets() {
+        book("A", "Horror", "Alice");
+        book("B", "Horror", "Bob");
+        book("C", "Romance", "Alice");
+        em.flush();
+
+        FacetGroupsResponse response = facetService.getFacets(List.of("genre:Horror", "author:Alice"), null, null);
+
+        assertThat(count(group(response, "genre"), "Horror")).isEqualTo(1);
+        assertThat(count(group(response, "genre"), "Romance")).isEqualTo(1);
+
+        assertThat(count(group(response, "author"), "Alice")).isEqualTo(1);
+        assertThat(count(group(response, "author"), "Bob")).isEqualTo(1);
+    }
+
+    @Test
+    void facetLogicCombinesSelectedValues() {
+        book("A", "Horror", "Alice");
+        book("B", "Romance", "Bob");
+        book("C", "Fantasy", "Cara");
+        em.flush();
+
+        List<String> genres = List.of("genre:Horror", "genre:Romance");
+
+        assertThat(group(facetService.getFacets(genres, "or", null), "author").links())
+                .extracting(FacetLink::value).containsExactlyInAnyOrder("Alice", "Bob");
+
+        assertThat(group(facetService.getFacets(genres, "and", null), "author").links()).isEmpty();
+
+        assertThat(group(facetService.getFacets(genres, "not", null), "author").links())
+                .extracting(FacetLink::value).containsExactly("Cara");
+    }
+
+    @Test
+    void truncatesValuesAtMax() {
+        for (int i = 0; i < 101; i++) {
+            book("T" + i, "Genre" + i, "Author" + i);
+        }
+        em.flush();
+
+        FacetGroupsResponse response = facetService.getFacets(null, null, null);
+
+        assertThat(group(response, "genre").links()).hasSize(100);
+        assertThat(group(response, "author").links()).hasSize(100);
+    }
 }
