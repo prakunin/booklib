@@ -95,6 +95,7 @@ class BookFacetServiceTest {
 
     @BeforeEach
     void seed() {
+        facetService.clearCache();
         userEntity = BookLoreUserEntity.builder().username("reader").passwordHash("x").name("Reader").build();
         em.persist(userEntity);
         library = LibraryEntity.builder().name("Lib").icon("book").watch(false)

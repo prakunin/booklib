@@ -62,6 +62,7 @@ public class BookFacetService {
 
     private final Cache<String, FacetGroupsResponse> cache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
+            .maximumSize(200)
             .build();
 
     public FacetGroupsResponse getFacets(List<String> facet, String facetLogicParam, String query) {
@@ -74,22 +75,21 @@ public class BookFacetService {
         FacetLogic facetLogic = FacetLogic.from(facetLogicParam);
 
         String cacheKey = userId + ":" + ParamsHash.compute(query, facets, facetLogic);
-        FacetGroupsResponse cached = cache.getIfPresent(cacheKey);
-        if (cached != null) {
-            return cached;
-        }
+        return cache.get(cacheKey, key -> {
+            String preserved = BrowseParams.preserved(facet, facetLogicParam, query);
+            List<FacetGroup> groups = new ArrayList<>();
+            groups.add(sortGroup(preserved));
+            for (FacetDef def : FACETS) {
+                Specification<BookEntity> base = filterSpecifications.base(query, facets, facetLogic, userId, isAdmin, libraryIds, def.key());
+                groups.add(toGroup(def, count(def, base), preserved));
+            }
+            return new FacetGroupsResponse(groups);
+        });
+    }
 
-        String preserved = BrowseParams.preserved(facet, facetLogicParam, query);
-        List<FacetGroup> groups = new ArrayList<>();
-        groups.add(sortGroup(preserved));
-        for (FacetDef def : FACETS) {
-            Specification<BookEntity> base = filterSpecifications.base(query, facets, facetLogic, userId, isAdmin, libraryIds, def.key());
-            groups.add(toGroup(def, count(def, base), preserved));
-        }
-
-        FacetGroupsResponse response = new FacetGroupsResponse(groups);
-        cache.put(cacheKey, response);
-        return response;
+    // Package-private: lets tests reset the shared singleton cache between runs.
+    void clearCache() {
+        cache.invalidateAll();
     }
 
     private List<FacetCount> count(FacetDef def, Specification<BookEntity> base) {
