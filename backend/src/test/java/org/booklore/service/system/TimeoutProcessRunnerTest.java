@@ -53,8 +53,11 @@ class TimeoutProcessRunnerTest {
 
             Duration elapsed = Duration.between(start, Instant.now());
             assertThat(result).isEmpty();
-            // Well under the 60s sleep: proves the read is bounded, not just the exit wait.
-            assertThat(elapsed).isLessThan(Duration.ofSeconds(10));
+            // The read and the exit wait share one TEST_TIMEOUT_SECONDS budget, so the whole call
+            // must land comfortably under 2x the timeout (the old, un-shared bound) and close to
+            // 1x it instead. Well under the 60s sleep either way, but this proves the tighter,
+            // shared-budget bound rather than merely eventual termination.
+            assertThat(elapsed).isLessThan(Duration.ofMillis(1500));
         }
 
         @Test

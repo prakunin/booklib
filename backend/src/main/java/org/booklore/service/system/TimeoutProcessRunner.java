@@ -40,10 +40,13 @@ public class TimeoutProcessRunner implements ProcessRunner {
         Process process = null;
         try {
             process = new ProcessBuilder(command).redirectErrorStream(true).start();
-            // Both the read and the exit wait get their own bound: a child that never prints a
-            // line must not hang the request any longer than one that never exits.
-            String line = readFirstLine(process);
-            boolean exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            // The read and the exit wait share a single deadline: a child that never prints a
+            // line, or one that prints promptly but exits slowly, must not hang the request any
+            // longer than timeoutSeconds in total.
+            long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds);
+            String line = readFirstLine(process, deadlineNanos);
+            long remainingNanos = deadlineNanos - System.nanoTime();
+            boolean exited = process.waitFor(Math.max(0, remainingNanos), TimeUnit.NANOSECONDS);
             if (!exited) {
                 log.warn("Timed out waiting for {} to exit", binary);
             }
@@ -70,12 +73,15 @@ public class TimeoutProcessRunner implements ProcessRunner {
     }
 
     /**
-     * Reads the first line of the process's stdout on a dedicated virtual thread, bounded by
-     * {@link #timeoutSeconds}. If the child never writes a line, the read stays blocked past the
-     * deadline, but the caller destroys the process shortly after regardless, which unblocks the
-     * pipe and lets the thread exit on its own.
+     * Reads the first line of the process's stdout on a dedicated virtual thread, bounded by the
+     * given {@code deadlineNanos} (a {@link System#nanoTime()} instant, shared with the caller's
+     * subsequent {@code waitFor}, so the two stages never add up to more than
+     * {@link #timeoutSeconds} combined). If the child never writes a line, the read stays blocked
+     * past the deadline, but the caller destroys the process in its {@code finally} block once
+     * that same deadline is exhausted, which unblocks the pipe and lets the thread exit on its
+     * own.
      */
-    private String readFirstLine(Process process) throws InterruptedException {
+    private String readFirstLine(Process process, long deadlineNanos) throws InterruptedException {
         AtomicReference<String> result = new AtomicReference<>();
         Thread reader = Thread.ofVirtual().unstarted(() -> {
             try (BufferedReader bufferedReader = new BufferedReader(
@@ -86,7 +92,8 @@ public class TimeoutProcessRunner implements ProcessRunner {
             }
         });
         reader.start();
-        reader.join(TimeUnit.SECONDS.toMillis(timeoutSeconds));
+        long remainingMillis = TimeUnit.NANOSECONDS.toMillis(deadlineNanos - System.nanoTime());
+        reader.join(Math.max(0, remainingMillis));
         return result.get();
     }
 }
