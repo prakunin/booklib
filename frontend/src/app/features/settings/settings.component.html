@@ -53,6 +53,11 @@
                 <i class="pi pi-history"></i> {{ t('auditLogs') }}
               </p-tab>
             }
+            @if (canOpenTab(SettingsTab.System)) {
+              <p-tab [value]="SettingsTab.System">
+                <i class="pi pi-server"></i> {{ t('system') }}
+              </p-tab>
+            }
             @if (canOpenTab(SettingsTab.OpdsV2)) {
               <p-tab [value]="SettingsTab.OpdsV2">
                 <i class="pi pi-globe"></i> {{ t('opds') }}
@@ -140,6 +145,14 @@
               <p-tabpanel [value]="SettingsTab.AuditLogs">
                 @if (visitedTabs().has(SettingsTab.AuditLogs)) {
                   <app-audit-logs></app-audit-logs>
+                }
+              </p-tabpanel>
+            }
+
+            @if (canOpenTab(SettingsTab.System)) {
+              <p-tabpanel [value]="SettingsTab.System">
+                @if (visitedTabs().has(SettingsTab.System)) {
+                  <app-system-info></app-system-info>
                 }
               </p-tabpanel>
             }

@@ -1,0 +1,54 @@
+{
+  "title": "System",
+  "description": "A read-only snapshot of the server's application, runtime, and storage state. Renders whatever the server could gather, even if parts of it are down.",
+  "loading": "Loading system information...",
+  "loadError": "Could not load system information. Try refreshing.",
+  "notAvailable": "Not available",
+  "copied": "System info copied to clipboard",
+  "copyFailed": "Could not copy system info to clipboard",
+  "actions": {
+    "refresh": "Refresh",
+    "copy": "Copy"
+  },
+  "application": {
+    "title": "Application",
+    "version": "Version",
+    "springBootVersion": "Spring Boot"
+  },
+  "runtime": {
+    "title": "Runtime",
+    "javaVersion": "Java version",
+    "javaVendor": "Java vendor",
+    "uptime": "Uptime",
+    "processors": "Available processors",
+    "heap": "Heap usage"
+  },
+  "os": {
+    "title": "Operating System",
+    "name": "Name",
+    "version": "Version",
+    "arch": "Architecture"
+  },
+  "database": {
+    "title": "Database",
+    "status": "Status",
+    "vendor": "Vendor",
+    "version": "Version",
+    "downNote": "The database is unreachable. Values above may be stale or unavailable."
+  },
+  "storage": {
+    "title": "Storage",
+    "diskType": "Disk type",
+    "filesystems": "Filesystems",
+    "noFilesystems": "No filesystem information is available.",
+    "free": "free",
+    "total": "total",
+    "libraryPaths": "Library Paths",
+    "noLibraryPaths": "No library paths are configured."
+  },
+  "tools": {
+    "title": "Tools",
+    "ffprobe": "ffprobe",
+    "kepubify": "kepubify"
+  }
+}
