@@ -25,6 +25,7 @@ public class SystemInfoService {
 
     private final VersionService versionService;
     private final DataSource dataSource;
+    private final StorageInfoService storageInfoService;
 
     public SystemInfoDto getSystemInfo() {
         return SystemInfoDto.builder()
@@ -32,6 +33,9 @@ public class SystemInfoService {
                 .runtime(runtimeInfo())
                 .os(osInfo())
                 .database(databaseInfo())
+                .storage(storageInfoService.storageInfo())
+                .filesystems(storageInfoService.filesystems())
+                .libraryPaths(storageInfoService.libraryPaths())
                 .build();
     }
 

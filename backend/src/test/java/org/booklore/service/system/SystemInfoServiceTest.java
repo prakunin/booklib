@@ -27,6 +27,9 @@ class SystemInfoServiceTest {
     @Mock
     private DataSource dataSource;
 
+    @Mock
+    private StorageInfoService storageInfoService;
+
     private SystemInfoService service;
 
     @BeforeEach
@@ -38,7 +41,7 @@ class SystemInfoServiceTest {
         lenient().when(dataSource.getConnection()).thenReturn(defaultConnection);
         lenient().when(defaultConnection.getMetaData()).thenReturn(defaultMetaData);
 
-        service = new SystemInfoService(versionService, dataSource);
+        service = new SystemInfoService(versionService, dataSource, storageInfoService);
     }
 
     @Nested
