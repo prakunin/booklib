@@ -54,7 +54,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-4200}:4200"
   backend_db:
-    image: mariadb:11.4
+    image: mariadb:12.3.2
     volumes:
       - backend_db:/var/lib/mysql
     restart: unless-stopped
