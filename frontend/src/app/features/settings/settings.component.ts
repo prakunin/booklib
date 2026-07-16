@@ -17,6 +17,7 @@ import {DeviceSettingsComponent} from './device-settings/device-settings-compone
 import {LibraryMetadataSettingsComponent} from './library-metadata-settings/library-metadata-settings.component';
 import {PageTitleService} from "../../shared/service/page-title.service";
 import {EmailV2Component} from './email-v2/email-v2.component';
+import {SystemInfoComponent} from './system-info/system-info.component';
 import {TranslocoDirective} from '@jsverse/transloco';
 
 export enum SettingsTab {
@@ -33,6 +34,7 @@ export enum SettingsTab {
   OpdsV2 = 'opds',
   Tasks = 'task',
   AuditLogs = 'audit-logs',
+  System = 'system',
 }
 
 @Component({
@@ -56,6 +58,7 @@ export enum SettingsTab {
     TaskManagementComponent,
     AuditLogsComponent,
     EmailV2Component,
+    SystemInfoComponent,
     TranslocoDirective
   ],
   templateUrl: './settings.component.html',
@@ -148,6 +151,7 @@ export class SettingsComponent implements OnInit {
       case SettingsTab.UserManagement:
       case SettingsTab.AuthenticationSettings:
       case SettingsTab.AuditLogs:
+      case SettingsTab.System:
         return !!permissions?.admin;
       case SettingsTab.EmailSettingsV2:
         return !!(permissions?.admin || permissions?.canEmailBook);

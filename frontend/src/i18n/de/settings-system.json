@@ -1,0 +1,57 @@
+{
+    "title": "System",
+    "description": "Eine schreibgeschützte Momentaufnahme des Anwendungs-, Laufzeit- und Speicherzustands des Servers. Zeigt alles an, was der Server erfassen konnte, selbst wenn Teile davon ausgefallen sind.",
+    "loading": "Systeminformationen werden geladen...",
+    "loadError": "Systeminformationen konnten nicht geladen werden. Bitte aktualisieren.",
+    "refreshError": "Systeminformationen konnten nicht aktualisiert werden. Zeigt die zuletzt bekannten Werte.",
+    "staleDataNote": "Zeigt Daten aus dem letzten erfolgreichen Laden; die letzte Aktualisierung ist fehlgeschlagen.",
+    "notAvailable": "Nicht verfügbar",
+    "copied": "Systeminformationen in die Zwischenablage kopiert",
+    "copyFailed": "Systeminformationen konnten nicht in die Zwischenablage kopiert werden",
+    "actions": {
+        "refresh": "Aktualisieren",
+        "copy": "Kopieren"
+    },
+    "application": {
+        "title": "Anwendung",
+        "version": "Version",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Laufzeitumgebung",
+        "javaVersion": "Java-Version",
+        "javaVendor": "Java-Anbieter",
+        "uptime": "Betriebszeit",
+        "processors": "Verfügbare Prozessoren",
+        "heap": "Heap-Nutzung"
+    },
+    "os": {
+        "title": "Betriebssystem",
+        "name": "Name",
+        "version": "Version",
+        "arch": "Architektur"
+    },
+    "database": {
+        "title": "Datenbank",
+        "status": "Status",
+        "vendor": "Anbieter",
+        "version": "Version",
+        "downNote": "Die Datenbank ist nicht erreichbar. Die obigen Werte können veraltet oder nicht verfügbar sein."
+    },
+    "storage": {
+        "title": "Speicher",
+        "diskType": "Datenträgertyp",
+        "filesystems": "Dateisysteme",
+        "noFilesystems": "Es sind keine Dateisysteminformationen verfügbar.",
+        "free": "frei",
+        "total": "gesamt",
+        "libraryPaths": "Bibliothekspfade",
+        "noLibraryPaths": "Es sind keine Bibliothekspfade konfiguriert.",
+        "libraryPathsUnavailable": "Bibliothekspfade konnten nicht ermittelt werden; die Datenbank ist nicht erreichbar."
+    },
+    "tools": {
+        "title": "Werkzeuge",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

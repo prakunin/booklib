@@ -1,0 +1,57 @@
+{
+    "title": "系统",
+    "description": "服务器应用程序、运行时和存储状态的只读快照。即使部分数据不可用，也会显示服务器能够收集到的所有信息。",
+    "loading": "正在加载系统信息...",
+    "loadError": "无法加载系统信息。请尝试刷新。",
+    "refreshError": "无法刷新系统信息。显示最后已知的值。",
+    "staleDataNote": "显示的是最后一次成功加载的数据；最近一次刷新失败。",
+    "notAvailable": "不可用",
+    "copied": "系统信息已复制到剪贴板",
+    "copyFailed": "无法将系统信息复制到剪贴板",
+    "actions": {
+        "refresh": "刷新",
+        "copy": "复制"
+    },
+    "application": {
+        "title": "应用程序",
+        "version": "版本",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "运行时",
+        "javaVersion": "Java 版本",
+        "javaVendor": "Java 供应商",
+        "uptime": "运行时间",
+        "processors": "可用处理器",
+        "heap": "堆使用情况"
+    },
+    "os": {
+        "title": "操作系统",
+        "name": "名称",
+        "version": "版本",
+        "arch": "架构"
+    },
+    "database": {
+        "title": "数据库",
+        "status": "状态",
+        "vendor": "供应商",
+        "version": "版本",
+        "downNote": "数据库不可访问。上面的值可能已过时或不可用。"
+    },
+    "storage": {
+        "title": "存储",
+        "diskType": "磁盘类型",
+        "filesystems": "文件系统",
+        "noFilesystems": "没有可用的文件系统信息。",
+        "free": "可用",
+        "total": "总计",
+        "libraryPaths": "库路径",
+        "noLibraryPaths": "未配置任何库路径。",
+        "libraryPathsUnavailable": "无法确定库路径；数据库不可访问。"
+    },
+    "tools": {
+        "title": "工具",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

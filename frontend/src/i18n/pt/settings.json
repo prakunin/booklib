@@ -12,6 +12,7 @@
         "tasks": "Tarefas",
         "auditLogs": "Logs de Auditoria",
         "opds": "OPDS",
-        "devices": "Dispositivos"
+        "devices": "Dispositivos",
+        "system": "Sistema"
     }
 }

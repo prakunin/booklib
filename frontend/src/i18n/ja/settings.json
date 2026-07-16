@@ -12,6 +12,7 @@
         "tasks": "タスク",
         "auditLogs": "監査ログ",
         "opds": "OPDS",
-        "devices": "デバイス"
+        "devices": "デバイス",
+        "system": "システム"
     }
 }

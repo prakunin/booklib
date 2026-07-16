@@ -1,0 +1,57 @@
+{
+  "title": "Systém",
+  "description": "Snímek jen pro čtení stavu aplikace, běhového prostředí a úložiště serveru. Zobrazuje vše, co se serveru podařilo získat, i když některé části nejsou dostupné.",
+  "loading": "Načítání systémových informací...",
+  "loadError": "Nepodařilo se načíst systémové informace. Zkuste obnovit stránku.",
+  "refreshError": "Nepodařilo se obnovit informace o systému. Zobrazují se poslední známé hodnoty.",
+  "staleDataNote": "Zobrazují se data z posledního úspěšného načtení; poslední obnovení selhalo.",
+  "notAvailable": "Nedostupné",
+  "copied": "Systémové informace zkopírovány do schránky",
+  "copyFailed": "Nepodařilo se zkopírovat systémové informace do schránky",
+  "actions": {
+    "refresh": "Obnovit",
+    "copy": "Kopírovat"
+  },
+  "application": {
+    "title": "Aplikace",
+    "version": "Verze",
+    "springBootVersion": "Spring Boot"
+  },
+  "runtime": {
+    "title": "Běhové prostředí",
+    "javaVersion": "Verze Java",
+    "javaVendor": "Poskytovatel Java",
+    "uptime": "Doba provozu",
+    "processors": "Dostupné procesory",
+    "heap": "Využití haldy"
+  },
+  "os": {
+    "title": "Operační systém",
+    "name": "Název",
+    "version": "Verze",
+    "arch": "Architektura"
+  },
+  "database": {
+    "title": "Databáze",
+    "status": "Stav",
+    "vendor": "Poskytovatel",
+    "version": "Verze",
+    "downNote": "Databáze je nedostupná. Hodnoty výše mohou být zastaralé nebo nedostupné."
+  },
+  "storage": {
+    "title": "Úložiště",
+    "diskType": "Typ disku",
+    "filesystems": "Souborové systémy",
+    "noFilesystems": "Informace o souborových systémech nejsou k dispozici.",
+    "free": "volné",
+    "total": "celkem",
+    "libraryPaths": "Cesty knihoven",
+    "noLibraryPaths": "Nejsou nakonfigurovány žádné cesty knihoven.",
+    "libraryPathsUnavailable": "Nepodařilo se zjistit cesty knihoven; databáze je nedostupná."
+  },
+  "tools": {
+    "title": "Nástroje",
+    "ffprobe": "ffprobe",
+    "kepubify": "kepubify"
+  }
+}

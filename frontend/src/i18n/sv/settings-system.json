@@ -1,0 +1,57 @@
+{
+    "title": "System",
+    "description": "En skrivskyddad ögonblicksbild av serverns applikations-, körnings- och lagringsstatus. Visar allt som servern kunde samla in, även om delar av det är nedstängt.",
+    "loading": "Läser in systeminformation...",
+    "loadError": "Det gick inte att läsa in systeminformation. Försök att uppdatera.",
+    "refreshError": "Det gick inte att uppdatera systeminformationen. Visar de senast kända värdena.",
+    "staleDataNote": "Visar data från senaste lyckade inläsning; senaste uppdateringen misslyckades.",
+    "notAvailable": "Ej tillgänglig",
+    "copied": "Systeminformation kopierad till urklipp",
+    "copyFailed": "Det gick inte att kopiera systeminformation till urklipp",
+    "actions": {
+        "refresh": "Uppdatera",
+        "copy": "Kopiera"
+    },
+    "application": {
+        "title": "Applikation",
+        "version": "Version",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Körmiljö",
+        "javaVersion": "Java-version",
+        "javaVendor": "Java-leverantör",
+        "uptime": "Drifttid",
+        "processors": "Tillgängliga processorer",
+        "heap": "Heap-användning"
+    },
+    "os": {
+        "title": "Operativsystem",
+        "name": "Namn",
+        "version": "Version",
+        "arch": "Arkitektur"
+    },
+    "database": {
+        "title": "Databas",
+        "status": "Status",
+        "vendor": "Leverantör",
+        "version": "Version",
+        "downNote": "Databasen är oåtkomlig. Värdena ovan kan vara inaktuella eller otillgängliga."
+    },
+    "storage": {
+        "title": "Lagring",
+        "diskType": "Disktyp",
+        "filesystems": "Filsystem",
+        "noFilesystems": "Ingen filsysteminformation är tillgänglig.",
+        "free": "fritt",
+        "total": "totalt",
+        "libraryPaths": "Biblioteksökvägar",
+        "noLibraryPaths": "Inga biblioteksökvägar är konfigurerade.",
+        "libraryPathsUnavailable": "Det gick inte att fastställa bibliotekssökvägar; databasen är inte nåbar."
+    },
+    "tools": {
+        "title": "Verktyg",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

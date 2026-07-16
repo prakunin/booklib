@@ -12,6 +12,7 @@
         "tasks": "Opravila",
         "auditLogs": "Dnevniki revizije",
         "opds": "OPDS",
-        "devices": "Naprave"
+        "devices": "Naprave",
+        "system": "Sistem"
     }
 }

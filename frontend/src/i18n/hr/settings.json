@@ -12,6 +12,7 @@
         "tasks": "Zadaci",
         "auditLogs": "Revizijski zapisi",
         "opds": "OPDS",
-        "devices": "Uređaji"
+        "devices": "Uređaji",
+        "system": "Sustav"
     }
 }

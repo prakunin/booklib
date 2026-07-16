@@ -1,0 +1,57 @@
+{
+    "title": "Sistem",
+    "description": "Cuplikan hanya-baca dari status aplikasi, runtime, dan penyimpanan server. Menampilkan semua yang berhasil dikumpulkan server, meskipun sebagian tidak berfungsi.",
+    "loading": "Memuat informasi sistem...",
+    "loadError": "Tidak dapat memuat informasi sistem. Coba segarkan.",
+    "refreshError": "Tidak dapat menyegarkan informasi sistem. Menampilkan nilai terakhir yang diketahui.",
+    "staleDataNote": "Menampilkan data dari pemuatan terakhir yang berhasil; penyegaran terakhir gagal.",
+    "notAvailable": "Tidak tersedia",
+    "copied": "Informasi sistem disalin ke clipboard",
+    "copyFailed": "Tidak dapat menyalin informasi sistem ke clipboard",
+    "actions": {
+        "refresh": "Segarkan",
+        "copy": "Salin"
+    },
+    "application": {
+        "title": "Aplikasi",
+        "version": "Versi",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Runtime",
+        "javaVersion": "Versi Java",
+        "javaVendor": "Vendor Java",
+        "uptime": "Waktu aktif",
+        "processors": "Prosesor yang tersedia",
+        "heap": "Penggunaan heap"
+    },
+    "os": {
+        "title": "Sistem Operasi",
+        "name": "Nama",
+        "version": "Versi",
+        "arch": "Arsitektur"
+    },
+    "database": {
+        "title": "Basis Data",
+        "status": "Status",
+        "vendor": "Vendor",
+        "version": "Versi",
+        "downNote": "Basis data tidak dapat diakses. Nilai di atas mungkin sudah usang atau tidak tersedia."
+    },
+    "storage": {
+        "title": "Penyimpanan",
+        "diskType": "Jenis disk",
+        "filesystems": "Sistem berkas",
+        "noFilesystems": "Tidak ada informasi sistem berkas yang tersedia.",
+        "free": "bebas",
+        "total": "total",
+        "libraryPaths": "Jalur pustaka",
+        "noLibraryPaths": "Tidak ada jalur pustaka yang dikonfigurasi.",
+        "libraryPathsUnavailable": "Tidak dapat menentukan jalur pustaka; basis data tidak dapat dijangkau."
+    },
+    "tools": {
+        "title": "Alat",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

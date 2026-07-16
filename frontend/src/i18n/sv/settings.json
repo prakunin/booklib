@@ -12,6 +12,7 @@
         "tasks": "Uppgifter",
         "auditLogs": "Granskningsloggar",
         "opds": "OPDS",
-        "devices": "Enheter"
+        "devices": "Enheter",
+        "system": "System"
     }
 }

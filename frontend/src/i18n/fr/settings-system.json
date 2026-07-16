@@ -1,0 +1,57 @@
+{
+    "title": "Système",
+    "description": "Un instantané en lecture seule de l'état de l'application, de l'environnement d'exécution et du stockage du serveur. Affiche tout ce que le serveur a pu recueillir, même si certaines parties sont en panne.",
+    "loading": "Chargement des informations système...",
+    "loadError": "Impossible de charger les informations système. Essayez d'actualiser.",
+    "refreshError": "Impossible d'actualiser les informations système. Affichage des dernières valeurs connues.",
+    "staleDataNote": "Affichage des données du dernier chargement réussi ; la dernière actualisation a échoué.",
+    "notAvailable": "Non disponible",
+    "copied": "Informations système copiées dans le presse-papiers",
+    "copyFailed": "Impossible de copier les informations système dans le presse-papiers",
+    "actions": {
+        "refresh": "Actualiser",
+        "copy": "Copier"
+    },
+    "application": {
+        "title": "Application",
+        "version": "Version",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Environnement d'exécution",
+        "javaVersion": "Version Java",
+        "javaVendor": "Fournisseur Java",
+        "uptime": "Temps de fonctionnement",
+        "processors": "Processeurs disponibles",
+        "heap": "Utilisation de la mémoire tas"
+    },
+    "os": {
+        "title": "Système d'exploitation",
+        "name": "Nom",
+        "version": "Version",
+        "arch": "Architecture"
+    },
+    "database": {
+        "title": "Base de données",
+        "status": "Statut",
+        "vendor": "Fournisseur",
+        "version": "Version",
+        "downNote": "La base de données est inaccessible. Les valeurs ci-dessus peuvent être obsolètes ou indisponibles."
+    },
+    "storage": {
+        "title": "Stockage",
+        "diskType": "Type de disque",
+        "filesystems": "Systèmes de fichiers",
+        "noFilesystems": "Aucune information sur les systèmes de fichiers n'est disponible.",
+        "free": "libre",
+        "total": "total",
+        "libraryPaths": "Chemins des bibliothèques",
+        "noLibraryPaths": "Aucun chemin de bibliothèque n'est configuré.",
+        "libraryPathsUnavailable": "Impossible de déterminer les chemins de bibliothèque ; la base de données est inaccessible."
+    },
+    "tools": {
+        "title": "Outils",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

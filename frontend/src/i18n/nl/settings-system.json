@@ -1,0 +1,57 @@
+{
+    "title": "Systeem",
+    "description": "Een alleen-lezen momentopname van de applicatie-, runtime- en opslagstatus van de server. Toont alles wat de server kon verzamelen, ook als delen ervan niet werken.",
+    "loading": "Systeeminformatie wordt geladen...",
+    "loadError": "Kan systeeminformatie niet laden. Probeer te vernieuwen.",
+    "refreshError": "Kan systeeminformatie niet vernieuwen. De laatst bekende waarden worden weergegeven.",
+    "staleDataNote": "Gegevens van de laatst geslaagde keer laden worden weergegeven; de laatste vernieuwing is mislukt.",
+    "notAvailable": "Niet beschikbaar",
+    "copied": "Systeeminformatie gekopieerd naar klembord",
+    "copyFailed": "Kan systeeminformatie niet naar klembord kopiëren",
+    "actions": {
+        "refresh": "Vernieuwen",
+        "copy": "Kopiëren"
+    },
+    "application": {
+        "title": "Applicatie",
+        "version": "Versie",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Runtime",
+        "javaVersion": "Java-versie",
+        "javaVendor": "Java-leverancier",
+        "uptime": "Uptime",
+        "processors": "Beschikbare processoren",
+        "heap": "Heapgebruik"
+    },
+    "os": {
+        "title": "Besturingssysteem",
+        "name": "Naam",
+        "version": "Versie",
+        "arch": "Architectuur"
+    },
+    "database": {
+        "title": "Database",
+        "status": "Status",
+        "vendor": "Leverancier",
+        "version": "Versie",
+        "downNote": "De database is niet bereikbaar. Bovenstaande waarden kunnen verouderd of niet beschikbaar zijn."
+    },
+    "storage": {
+        "title": "Opslag",
+        "diskType": "Schijftype",
+        "filesystems": "Bestandssystemen",
+        "noFilesystems": "Er is geen bestandssysteeminformatie beschikbaar.",
+        "free": "vrij",
+        "total": "totaal",
+        "libraryPaths": "Bibliotheekpaden",
+        "noLibraryPaths": "Er zijn geen bibliotheekpaden geconfigureerd.",
+        "libraryPathsUnavailable": "Kan bibliotheekpaden niet bepalen; de database is onbereikbaar."
+    },
+    "tools": {
+        "title": "Hulpmiddelen",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

@@ -1,0 +1,213 @@
+@use '../../../shared/styles/settings-shared' as settings;
+
+.main-container {
+  @include settings.settings-page-container;
+}
+
+@include settings.settings-page-header;
+
+.settings-title {
+  @include settings.settings-page-title;
+
+  margin-bottom: 0.6563rem;
+}
+
+.settings-description {
+  @include settings.settings-page-description;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.6563rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4375rem;
+}
+
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4375rem;
+  padding: 2.625rem 1.75rem;
+  text-align: center;
+  color: var(--p-text-muted-color);
+
+  .pi {
+    font-size: 1.75rem;
+  }
+}
+
+.error-state .pi {
+  color: var(--p-red-400);
+}
+
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.3125rem;
+}
+
+// A failed refresh keeps the last successful snapshot visible (TanStack Query does not clear
+// `data` on error) — dim it so it reads as "stale", not "current", alongside the error banner.
+.settings-content-stale {
+  opacity: 0.72;
+}
+
+.stale-note {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  margin: 0;
+  font-size: settings.$settings-description-size;
+  color: var(--p-amber-400, #f59e0b);
+}
+
+.settings-card {
+  @include settings.settings-card;
+}
+
+.section-header {
+  @include settings.settings-section-header;
+}
+
+.section-title {
+  @include settings.settings-section-title;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6563rem 1.3125rem;
+}
+
+.info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1094rem;
+  min-width: 0;
+}
+
+.info-row-wide {
+  grid-column: 1 / -1;
+}
+
+.usage-bar-wide {
+  grid-column: 1 / -1;
+}
+
+.info-label {
+  font-size: settings.$settings-description-size;
+  color: var(--p-text-muted-color);
+}
+
+.info-value {
+  font-size: settings.$settings-label-size;
+  font-weight: settings.$settings-label-weight;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  flex-wrap: wrap;
+}
+
+.info-subvalue {
+  font-size: settings.$settings-description-size;
+  font-weight: 400;
+  color: var(--p-text-muted-color);
+}
+
+.warning-note {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  margin: 0.875rem 0 0;
+  font-size: settings.$settings-description-size;
+  color: var(--p-red-400);
+}
+
+.subsection {
+  margin-top: 1.0938rem;
+  padding-top: 0.875rem;
+  border-top: 1px dashed var(--p-content-border-color);
+}
+
+.subsection-title {
+  margin: 0 0 0.6563rem;
+  font-size: settings.$settings-label-size;
+  font-weight: settings.$settings-label-weight;
+  color: var(--color-text);
+}
+
+.empty-note {
+  margin: 0;
+  font-size: settings.$settings-description-size;
+  color: var(--p-text-muted-color);
+  font-style: italic;
+}
+
+.entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6563rem;
+}
+
+.entry-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4375rem;
+  padding: 0.6563rem 0.875rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-card) 35%, var(--color-page));
+  border: 1px solid var(--p-content-border-color);
+}
+
+.entry-item-inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6563rem;
+}
+
+.entry-paths {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2188rem;
+}
+
+.entry-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2188rem;
+  font-size: settings.$settings-description-size;
+  color: var(--p-text-muted-color);
+}
+
+.path-chip {
+  font-family: var(--app-font-mono, monospace);
+  font-size: settings.$settings-description-size;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  border-radius: 4px;
+  padding: 0.1563rem 0.4375rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.usage-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+  overflow: hidden;
+}
+
+.usage-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+}

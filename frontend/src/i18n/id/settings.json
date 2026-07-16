@@ -12,6 +12,7 @@
         "opds": "OPDS",
         "devices": "Perangkat",
         "auditLogs": "",
-        "metadata2": ""
+        "metadata2": "",
+        "system": "Sistem"
     }
 }

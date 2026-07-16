@@ -1,0 +1,247 @@
+<ng-container *transloco="let t; prefix: 'settingsSystem'">
+<p-toast position="top-right"></p-toast>
+<div class="main-container">
+  <div class="settings-header">
+    <h2 class="settings-title">
+      <i class="pi pi-server"></i>
+      {{ t('title') }}
+    </h2>
+    <p class="settings-description">{{ t('description') }}</p>
+  </div>
+
+  <div class="toolbar">
+    <p-button
+      [label]="t('actions.refresh')"
+      icon="pi pi-refresh"
+      severity="secondary"
+      [outlined]="true"
+      [loading]="loading()"
+      (onClick)="refresh()">
+    </p-button>
+    <p-button
+      [label]="t('actions.copy')"
+      icon="pi pi-copy"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="!data()"
+      (onClick)="copy()">
+    </p-button>
+  </div>
+
+  @if (loading() && !data()) {
+    <div class="loading-state">
+      <i class="pi pi-spin pi-spinner"></i>
+      <span>{{ t('loading') }}</span>
+    </div>
+  }
+
+  @if (error()) {
+    <div class="error-state">
+      <i class="pi pi-exclamation-triangle"></i>
+      <span>{{ data() ? t('refreshError') : t('loadError') }}</span>
+    </div>
+  }
+
+  @if (data(); as info) {
+    <div class="settings-content" [class.settings-content-stale]="stale()">
+      @if (stale()) {
+        <p class="stale-note">
+          <i class="pi pi-info-circle"></i>
+          {{ t('staleDataNote') }}
+        </p>
+      }
+
+      <div class="settings-card">
+        <div class="section-header">
+          <h3 class="section-title">
+            <i class="pi pi-info-circle"></i>
+            {{ t('application.title') }}
+          </h3>
+        </div>
+        <div class="info-grid">
+          <div class="info-row">
+            <span class="info-label">{{ t('application.version') }}</span>
+            <span class="info-value">{{ info.application.version ?? t('notAvailable') }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('application.springBootVersion') }}</span>
+            <span class="info-value">{{ info.application.springBootVersion ?? t('notAvailable') }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="section-header">
+          <h3 class="section-title">
+            <i class="pi pi-microchip"></i>
+            {{ t('runtime.title') }}
+          </h3>
+        </div>
+        <div class="info-grid">
+          @let heapPercent = heapUsagePercent(info.runtime);
+          <div class="info-row">
+            <span class="info-label">{{ t('runtime.javaVersion') }}</span>
+            <span class="info-value">{{ info.runtime.javaVersion ?? t('notAvailable') }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('runtime.javaVendor') }}</span>
+            <span class="info-value">{{ info.runtime.javaVendor ?? t('notAvailable') }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('runtime.uptime') }}</span>
+            <span class="info-value">{{ formatUptime(info.runtime.jvmUptimeMillis) }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('runtime.processors') }}</span>
+            <span class="info-value">{{ info.runtime.availableProcessors ?? t('notAvailable') }}</span>
+          </div>
+          <div class="info-row info-row-wide">
+            <span class="info-label">{{ t('runtime.heap') }}</span>
+            <span class="info-value">
+              {{ formatBytes(info.runtime.heapUsedBytes) }} / {{ formatBytes(info.runtime.heapMaxBytes) }}
+              @if (heapPercent !== null) {
+                <span class="info-subvalue">({{ heapPercent }}%)</span>
+              }
+            </span>
+          </div>
+          @if (heapPercent !== null) {
+            <div class="usage-bar usage-bar-wide" [attr.aria-label]="t('runtime.heap')">
+              <div class="usage-bar-fill" [style.width.%]="heapPercent"></div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="section-header">
+          <h3 class="section-title">
+            <i class="pi pi-desktop"></i>
+            {{ t('os.title') }}
+          </h3>
+        </div>
+        <div class="info-grid">
+          <div class="info-row">
+            <span class="info-label">{{ t('os.name') }}</span>
+            <span class="info-value">{{ info.os.name ?? t('notAvailable') }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('os.version') }}</span>
+            <span class="info-value">{{ info.os.version ?? t('notAvailable') }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('os.arch') }}</span>
+            <span class="info-value">{{ info.os.arch ?? t('notAvailable') }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="section-header">
+          <h3 class="section-title">
+            <i class="pi pi-database"></i>
+            {{ t('database.title') }}
+          </h3>
+        </div>
+        <div class="info-grid">
+          <div class="info-row">
+            <span class="info-label">{{ t('database.status') }}</span>
+            <span class="info-value">
+              <app-tag [color]="info.database.status === 'UP' ? 'green' : 'red'" variant="pill" size="s">{{ info.database.status }}</app-tag>
+            </span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('database.vendor') }}</span>
+            <span class="info-value">{{ info.database.vendor ?? t('notAvailable') }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('database.version') }}</span>
+            <span class="info-value">{{ info.database.version ?? t('notAvailable') }}</span>
+          </div>
+        </div>
+        @if (info.database.status === 'DOWN') {
+          <p class="warning-note">
+            <i class="pi pi-exclamation-triangle"></i>
+            {{ t('database.downNote') }}
+          </p>
+        }
+      </div>
+
+      <div class="settings-card">
+        <div class="section-header">
+          <h3 class="section-title">
+            <i class="pi pi-hdd"></i>
+            {{ t('storage.title') }}
+          </h3>
+        </div>
+        <div class="info-grid">
+          <div class="info-row">
+            <span class="info-label">{{ t('storage.diskType') }}</span>
+            <span class="info-value">{{ info.storage.diskType ?? t('notAvailable') }}</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4 class="subsection-title">{{ t('storage.filesystems') }}</h4>
+          @if (info.filesystems.length === 0) {
+            <p class="empty-note">{{ t('storage.noFilesystems') }}</p>
+          } @else {
+            <div class="entry-list">
+              @for (fs of info.filesystems; track $index) {
+                <div class="entry-item">
+                  <div class="entry-paths">
+                    @for (path of fs.paths; track path) {
+                      <code class="path-chip">{{ path }}</code>
+                    }
+                  </div>
+                  <div class="entry-meta">
+                    <span>{{ formatBytes(fs.usableBytes) }} {{ t('storage.free') }} / {{ formatBytes(fs.totalBytes) }} {{ t('storage.total') }}</span>
+                    <div class="usage-bar">
+                      <div class="usage-bar-fill" [style.width.%]="filesystemUsagePercent(fs)"></div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="subsection">
+          <h4 class="subsection-title">{{ t('storage.libraryPaths') }}</h4>
+          @if (info.libraryPaths.length === 0) {
+            <p class="empty-note">{{ t(noLibraryPathsKey(info)) }}</p>
+          } @else {
+            <div class="entry-list">
+              @for (lp of info.libraryPaths; track lp.path) {
+                <div class="entry-item entry-item-inline">
+                  <code class="path-chip">{{ lp.path }}</code>
+                  <app-tag [color]="pathStatusColor(lp.status)" variant="pill" size="s">{{ lp.status }}</app-tag>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="section-header">
+          <h3 class="section-title">
+            <i class="pi pi-wrench"></i>
+            {{ t('tools.title') }}
+          </h3>
+        </div>
+        <div class="info-grid">
+          <div class="info-row">
+            <span class="info-label">{{ t('tools.ffprobe') }}</span>
+            <span class="info-value">{{ info.tools.ffprobeVersion ?? t('notAvailable') }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('tools.kepubify') }}</span>
+            <span class="info-value">{{ info.tools.kepubifyVersion ?? t('notAvailable') }}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  }
+</div>
+</ng-container>
