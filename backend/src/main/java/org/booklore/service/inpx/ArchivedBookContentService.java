@@ -3,6 +3,7 @@ package org.booklore.service.inpx;
 import lombok.RequiredArgsConstructor;
 import org.booklore.config.AppProperties;
 import org.booklore.exception.ApiError;
+import org.booklore.exception.ArchiveEntryMissingException;
 import org.booklore.model.entity.BookFileEntity;
 import org.springframework.stereotype.Service;
 
@@ -28,12 +29,35 @@ public class ArchivedBookContentService {
     private final AppProperties appProperties;
     private final ConcurrentMap<Long, CompletableFuture<Path>> extractionFlights = new ConcurrentHashMap<>();
 
+    /** Resolves for reading, serving the extraction cache whenever it looks current. */
     public Path resolve(BookFileEntity bookFile) {
+        return resolve(bookFile, false);
+    }
+
+    /**
+     * Resolves without trusting the extraction cache, re-reading the archive itself.
+     * <p>
+     * For the per-archive full scan, which is the documented repair for a replaced archive. The
+     * cache is keyed on the archive being newer than the cached copy, and a restore that preserves
+     * timestamps (rsync -a, cp -p, tar -x) is not - so the cached read path cannot notice either a
+     * vanished entry or one whose content was swapped. The repair must look for itself.
+     */
+    public Path resolveRevalidated(BookFileEntity bookFile) {
+        return resolve(bookFile, true);
+    }
+
+    private Path resolve(BookFileEntity bookFile, boolean revalidate) {
         if (!bookFile.isArchivedSource()) {
             return bookFile.getFullFilePath();
         }
         if (bookFile.getId() == null || bookFile.getBook() == null || bookFile.getBook().getLibrary() == null) {
             throw ApiError.FILE_NOT_FOUND.createException("Archived book source is incomplete");
+        }
+        if (revalidate) {
+            // Deliberately outside the in-flight dedup: joining a concurrent reader's flight would
+            // hand back the very cached result this call exists to distrust. Concurrent extraction
+            // is safe - extract() stages to a temp file and atomically replaces the target.
+            return resolveLocked(bookFile, true);
         }
 
         CompletableFuture<Path> flight = new CompletableFuture<>();
@@ -43,7 +67,7 @@ public class ArchivedBookContentService {
         }
 
         try {
-            Path resolved = resolveLocked(bookFile);
+            Path resolved = resolveLocked(bookFile, false);
             flight.complete(resolved);
             return resolved;
         } catch (RuntimeException | Error e) {
@@ -68,7 +92,7 @@ public class ArchivedBookContentService {
         }
     }
 
-    private Path resolveLocked(BookFileEntity bookFile) {
+    private Path resolveLocked(BookFileEntity bookFile, boolean revalidate) {
         var library = bookFile.getBook().getLibrary();
         Path archiveRoot = Path.of(library.getInpxArchivePath()).toAbsolutePath().normalize();
         String archiveName = safeLeaf(bookFile.getSourceArchive(), ".zip");
@@ -82,13 +106,15 @@ public class ArchivedBookContentService {
                 String.valueOf(library.getId()), String.valueOf(bookFile.getId()));
         Path cached = cacheDirectory.resolve(entryName);
         try {
-            if (Files.isRegularFile(cached)
+            if (!revalidate && Files.isRegularFile(cached)
                     && Files.getLastModifiedTime(cached).compareTo(Files.getLastModifiedTime(archivePath)) >= 0) {
                 return cached;
             }
             Files.createDirectories(cacheDirectory);
             extract(archivePath, entryName, cached);
             return cached;
+        } catch (MissingEntryException e) {
+            throw new ArchiveEntryMissingException(entryName);
         } catch (IOException e) {
             throw ApiError.FILE_READ_ERROR.createException("Unable to read archived book: " + e.getMessage());
         }
@@ -98,7 +124,7 @@ public class ArchivedBookContentService {
         try (ZipFile archive = new ZipFile(archivePath.toFile())) {
             ZipEntry entry = archive.getEntry(entryName);
             if (entry == null || entry.isDirectory()) {
-                throw new IOException("Entry is missing: " + entryName);
+                throw new MissingEntryException(entryName);
             }
             Path temporary = Files.createTempFile(target.getParent(), ".inpx-", ".tmp");
             try {
@@ -138,5 +164,12 @@ public class ArchivedBookContentService {
             throw ApiError.FILE_NOT_FOUND.createException("Unsafe archived book path");
         }
         return value;
+    }
+
+    /** Internal marker so a vanished entry is not mistaken for a generic read failure. */
+    private static final class MissingEntryException extends IOException {
+        private MissingEntryException(String entryName) {
+            super("Entry is missing: " + entryName);
+        }
     }
 }

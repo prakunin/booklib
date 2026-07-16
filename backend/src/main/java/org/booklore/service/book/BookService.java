@@ -19,6 +19,7 @@ import org.booklore.service.audit.AuditService;
 import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
+import org.booklore.service.annotation.InvalidateUserStats;
 import org.booklore.service.progress.ReadingProgressService;
 import org.booklore.util.BookUtils;
 import org.booklore.util.FileService;
@@ -267,11 +268,17 @@ public class BookService {
         bookUpdateService.updateBookViewerSetting(bookId, bookViewerSettings);
     }
 
+    // Annotated here rather than on the inner service: UserStatsCacheAspect invalidates
+    // @AfterReturning, which only lands after commit when it wraps the outermost transactional
+    // boundary. Saving progress can flip readStatus and stamp dateFinished, which the completion
+    // timeline and heatmap aggregate over.
+    @InvalidateUserStats
     @Transactional
-    public void updateReadProgress(ReadProgressRequest request) {
-        readingProgressService.updateReadProgress(request);
+    public BookStatusUpdateResponse updateReadProgress(ReadProgressRequest request) {
+        return readingProgressService.updateReadProgress(request);
     }
 
+    @InvalidateUserStats
     @Transactional
     public List<BookStatusUpdateResponse> updateReadStatus(List<Long> bookIds, String status) {
         return bookUpdateService.updateReadStatus(bookIds, status);

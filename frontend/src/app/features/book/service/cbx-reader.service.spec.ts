@@ -5,6 +5,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AuthService} from '../../../shared/service/auth.service';
 import {CbxPageInfo, CbxReaderService} from './cbx-reader.service';
+import {API_CONFIG} from '../../../core/config/api-config';
 
 describe('CbxReaderService', () => {
   let service: CbxReaderService;
@@ -67,7 +68,7 @@ describe('CbxReaderService', () => {
   it('returns page image urls with both book type and token when provided', () => {
     const url = service.getPageImageUrl(12, 4, 'CBX');
 
-    expect(url).toBe('http://localhost:6060/api/v1/media/book/12/cbx/pages/4?bookType=CBX&token=token-123');
+    expect(url).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/book/12/cbx/pages/4?bookType=CBX&token=token-123`);
   });
 
   it('returns unmodified urls when no auth token is available', () => {
@@ -75,6 +76,6 @@ describe('CbxReaderService', () => {
 
     const url = service.getPageImageUrl(12, 4);
 
-    expect(url).toBe('http://localhost:6060/api/v1/media/book/12/cbx/pages/4');
+    expect(url).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/book/12/cbx/pages/4`);
   });
 });

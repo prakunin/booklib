@@ -1,6 +1,7 @@
 package org.booklore.service.inpx;
 
 import org.booklore.exception.APIException;
+import org.booklore.exception.ArchiveEntryMissingException;
 import org.booklore.model.dto.inpx.InpxBookDto;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
@@ -117,6 +119,34 @@ class InpxArchiveFullScanServiceTest {
 
         verify(bookRefreshService).refresh(12L);
         verify(catalogService).progress(7L, "new.zip", 2, 1, 1);
+        verify(catalogService).completed(7L, "new.zip");
+    }
+
+    @Test
+    void retiresABookWhoseArchiveEntryVanishedInsteadOfOnlyCountingItFailed() {
+        LibraryEntity library = LibraryEntity.builder()
+                .id(7L)
+                .inpxArchivePath("/books")
+                .libraryPaths(new ArrayList<>(List.of(LibraryPathEntity.builder().id(3L).build())))
+                .build();
+        InpxArchiveScanner.ArchiveCandidate candidate = new InpxArchiveScanner.ArchiveCandidate(
+                Path.of("/books/new.zip"), "new.zip", 2);
+        when(catalogService.requireInpxLibrary(7L)).thenReturn(library);
+        when(archiveScanner.inspectArchive("/books", "new.zip")).thenReturn(candidate);
+        when(archiveScanner.discoveryForArchive(7L, candidate)).thenReturn(
+                new InpxArchiveScanner.Discovery(List.of(candidate), 0, 7L));
+        when(catalogService.queue(7L, "new.zip", 2)).thenReturn(true);
+        when(bookFileRepository.findBookIdsByArchive(7L, "new.zip")).thenReturn(List.of(11L, 12L));
+        // The archive was rewritten: 11's entry is gone, 12 still resolves.
+        doThrow(new ArchiveEntryMissingException("old.fb2")).when(bookRefreshService).refresh(11L);
+        when(bookRefreshService.refresh(12L)).thenReturn(true);
+
+        service.start(7L, "new.zip");
+
+        verify(bookRefreshService).retireOrphan(11L);
+        verify(bookRefreshService, never()).retireOrphan(12L);
+        // A retired orphan is not a failure: both books processed, one cover, zero failures.
+        verify(catalogService).progress(7L, "new.zip", 2, 1, 0);
         verify(catalogService).completed(7L, "new.zip");
     }
 

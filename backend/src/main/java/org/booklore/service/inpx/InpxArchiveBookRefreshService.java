@@ -30,6 +30,20 @@ public class InpxArchiveBookRefreshService {
     private final BookCoverService bookCoverService;
     private final TransactionTemplate transactionTemplate;
 
+    /**
+     * Soft-deletes a book whose archive entry no longer exists, mirroring how the filesystem
+     * watcher retires books whose file vanished. Soft rather than hard so the row can be restored
+     * if the archive is put back.
+     */
+    public void retireOrphan(long bookId) {
+        transactionTemplate.executeWithoutResult(status ->
+                bookRepository.findById(bookId).ifPresent(book -> {
+                    book.setDeleted(true);
+                    book.setDeletedAt(Instant.now());
+                    bookRepository.save(book);
+                }));
+    }
+
     public boolean refresh(long bookId) {
         BookEntity book = bookRepository.findByIdForInpxArchiveRefresh(bookId).orElse(null);
         if (book == null) {
@@ -40,7 +54,9 @@ public class InpxArchiveBookRefreshService {
             return false;
         }
 
-        File fb2File = archivedBookContentService.resolve(bookFile).toFile();
+        // Revalidated, not cached: this is the repair path for a replaced archive, so it must read
+        // the archive itself rather than a cached copy that may predate the replacement.
+        File fb2File = archivedBookContentService.resolveRevalidated(bookFile).toFile();
         try {
             BookMetadata metadata = fb2MetadataExtractor.extractMetadata(fb2File);
             transactionTemplate.executeWithoutResult(status -> {

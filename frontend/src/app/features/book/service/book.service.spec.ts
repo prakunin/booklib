@@ -244,6 +244,26 @@ describe('BookService', () => {
     expect(service.books()).toEqual([]);
     expect(service.isBooksLoading()).toBe(false);
     expect(service.booksError()).toBe('Failed to load books');
+    // A server-side failure is not the size cap.
+    expect(service.legacyCatalogTooLarge()).toBe(false);
+  });
+
+  it('flags the legacy catalog as too large when the server refuses it', async () => {
+    setup();
+
+    service.books();
+    await flushBooksQuery();
+
+    const request = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books'));
+    request.flush(
+      {message: 'The flat books endpoint is disabled for catalogs over 10000 books'},
+      {status: 400, statusText: 'Bad Request'}
+    );
+    await flushBooksQuery();
+
+    // Screens must be able to say why they are blank instead of rendering an empty library.
+    expect(service.legacyCatalogTooLarge()).toBe(true);
+    expect(service.books()).toEqual([]);
   });
 
   it('removes a shelf from the cached books query without disturbing other shelf assignments', async () => {

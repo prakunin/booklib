@@ -33,6 +33,7 @@ import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
 import org.booklore.repository.UserContentRestrictionRepository;
 import org.booklore.security.policy.ContentRestrictionSpecification;
+import org.booklore.service.annotation.InvalidateUserStats;
 import org.booklore.service.book.BookService;
 import org.booklore.service.browse.BookSortRegistry;
 import org.booklore.service.inpx.InpxCoverGenerationRequestedEvent;
@@ -391,6 +392,9 @@ public class AppBookService {
         return mobileBookMapper.toProgressResponse(progress, fileProgress);
     }
 
+    // The app path opens its own transaction around BookService.updateReadProgress, so this is the
+    // outermost boundary here and the one the invalidation must hang off to land after commit.
+    @InvalidateUserStats
     @Transactional
     public void updateBookProgress(Long bookId, UpdateProgressRequest request) {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
@@ -629,21 +633,18 @@ public class AppBookService {
             return cached;
         }
 
-        // Validate magic-shelf access. Its arbitrary rule Specification cannot be embedded in
-        // the JPQL facet aggregates without first materializing every matching ID, so facets
-        // remain library-scoped while the paginated book query applies the shelf rule itself.
+        // Access check only. A magic shelf's arbitrary rule Specification cannot be embedded in the
+        // JPQL facet aggregates without first materializing every matching id, which is exactly the
+        // cost this endpoint avoids on large catalogs. Facets therefore stay library-scoped while
+        // the paginated book query applies the shelf rule itself - so on a magic shelf the counts
+        // describe the library, not the shelf.
         if (magicShelfId != null) {
-            magicShelfBookService.toSpecification(userId, magicShelfId);
+            assertMagicShelfAccessible(userId, magicShelfId);
         }
-
-        Set<Long> magicBookIds = null;
 
         String libraryClause = "";
         String shelfClause = "";
-        String magicBookClause = "";
-        if (magicBookIds != null) {
-            magicBookClause = "AND b.id IN :magicBookIds";
-        } else if (shelfId != null) {
+        if (shelfId != null) {
             shelfClause = "AND b.id IN (SELECT sb.id FROM ShelfEntity s JOIN s.bookEntities sb WHERE s.id = :shelfId)";
         }
         if (libraryId != null) {
@@ -654,17 +655,17 @@ public class AppBookService {
         RestrictionQueryScope restrictionScope = user.getPermissions().isAdmin()
                 ? new RestrictionQueryScope("", Map.of())
                 : restrictionQueryScope(userId);
-        String scopeClause = buildScopeClause(libraryClause, shelfClause, magicBookClause)
+        String scopeClause = buildScopeClause(libraryClause, shelfClause)
                 + restrictionScope.clause();
 
         List<AppFilterOptions.CountedOption> authors = queryCountedOptions(
                 "a.name", "JOIN b.metadata m JOIN m.authors a", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.LanguageOption> languages = queryCountedOptions(
                 "m.language", "JOIN b.metadata m",
                 "AND m.language IS NOT NULL AND m.language <> ''",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds).stream()
+                scopeClause, accessibleLibraryIds, libraryId, shelfId).stream()
                 .map(c -> new AppFilterOptions.LanguageOption(
                         c.name(),
                         Locale.forLanguageTag(c.name()).getDisplayLanguage(Locale.ENGLISH),
@@ -673,37 +674,37 @@ public class AppBookService {
 
         List<AppFilterOptions.CountedOption> fileTypes = queryCountedOptions(
                 "bf.bookType", "JOIN b.bookFiles bf", "AND bf.isBookFormat = true",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> categories = queryCountedOptions(
                 "c.name", "JOIN b.metadata m JOIN m.categories c", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> publishers = queryCountedOptions(
                 "m.publisher", "JOIN b.metadata m",
                 "AND m.publisher IS NOT NULL AND m.publisher <> ''",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> seriesOptions = queryCountedOptions(
                 "m.seriesName", "JOIN b.metadata m",
                 "AND m.seriesName IS NOT NULL AND m.seriesName <> ''",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> tags = queryCountedOptions(
                 "t.name", "JOIN b.metadata m JOIN m.tags t", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> moods = queryCountedOptions(
                 "mo.name", "JOIN b.metadata m JOIN m.moods mo", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> narrators = queryCountedOptions(
                 "m.narrator", "JOIN b.metadata m",
                 "AND m.narrator IS NOT NULL AND m.narrator <> ''",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> readStatuses = queryReadStatusCounts(
-                userId, scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                userId, scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> ageRatings = queryGroupedCount(
                 "CASE " +
@@ -716,12 +717,12 @@ public class AppBookService {
                 "  WHEN m.ageRating >= 21 THEN '21' " +
                 "END",
                 "JOIN b.metadata m", "AND m.ageRating IS NOT NULL",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> contentRatings = queryCountedOptions(
                 "m.contentRating", "JOIN b.metadata m",
                 "AND m.contentRating IS NOT NULL AND m.contentRating <> ''",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> matchScores = queryGroupedCount(
                 "CASE " +
@@ -734,12 +735,12 @@ public class AppBookService {
                 "  WHEN b.metadataMatchScore >= 0.00 THEN '6' " +
                 "END",
                 "", "AND b.metadataMatchScore IS NOT NULL",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> publishedYears = queryCountedOptions(
                 "CAST(YEAR(m.publishedDate) AS string)", "JOIN b.metadata m",
                 "AND m.publishedDate IS NOT NULL",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> fileSizes = queryGroupedCount(
                 "CASE " +
@@ -753,7 +754,7 @@ public class AppBookService {
                 "  ELSE '7' " +
                 "END",
                 "JOIN b.bookFiles bf", "AND bf.isBookFormat = true",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         String personalRatingQuery = "SELECT CAST(ubp.personalRating AS string), COUNT(DISTINCT ubp.book.id) " +
                 "FROM UserBookProgressEntity ubp " +
@@ -764,17 +765,17 @@ public class AppBookService {
                 "GROUP BY 1 ORDER BY 1 DESC";
         var prQ = entityManager.createQuery(personalRatingQuery, Tuple.class);
         prQ.setParameter("userId", userId);
-        setFilterQueryParams(prQ, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+        setFilterQueryParams(prQ, accessibleLibraryIds, libraryId, shelfId);
         List<AppFilterOptions.CountedOption> personalRatings = prQ.getResultList().stream()
                 .map(t -> new AppFilterOptions.CountedOption(t.get(0, String.class), t.get(1, Long.class)))
                 .toList();
 
-        List<AppFilterOptions.CountedOption> amazonRatings = queryRatingBuckets("m.amazonRating", scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
-        List<AppFilterOptions.CountedOption> goodreadsRatings = queryRatingBuckets("m.goodreadsRating", scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
-        List<AppFilterOptions.CountedOption> hardcoverRatings = queryRatingBuckets("m.hardcoverRating", scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
-        List<AppFilterOptions.CountedOption> lubimyczytacRatings = queryRatingBuckets("m.lubimyczytacRating", scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
-        List<AppFilterOptions.CountedOption> ranobedbRatings = queryRatingBuckets("m.ranobedbRating", scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
-        List<AppFilterOptions.CountedOption> audibleRatings = queryRatingBuckets("m.audibleRating", scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+        List<AppFilterOptions.CountedOption> amazonRatings = queryRatingBuckets("m.amazonRating", scopeClause, accessibleLibraryIds, libraryId, shelfId);
+        List<AppFilterOptions.CountedOption> goodreadsRatings = queryRatingBuckets("m.goodreadsRating", scopeClause, accessibleLibraryIds, libraryId, shelfId);
+        List<AppFilterOptions.CountedOption> hardcoverRatings = queryRatingBuckets("m.hardcoverRating", scopeClause, accessibleLibraryIds, libraryId, shelfId);
+        List<AppFilterOptions.CountedOption> lubimyczytacRatings = queryRatingBuckets("m.lubimyczytacRating", scopeClause, accessibleLibraryIds, libraryId, shelfId);
+        List<AppFilterOptions.CountedOption> ranobedbRatings = queryRatingBuckets("m.ranobedbRating", scopeClause, accessibleLibraryIds, libraryId, shelfId);
+        List<AppFilterOptions.CountedOption> audibleRatings = queryRatingBuckets("m.audibleRating", scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> pageCounts = queryGroupedCount(
                 "CASE " +
@@ -787,24 +788,24 @@ public class AppBookService {
                 "  ELSE '6' " +
                 "END",
                 "JOIN b.metadata m", "AND m.pageCount IS NOT NULL",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> shelfStatuses = queryGroupedCount(
                 "CASE WHEN (SELECT COUNT(s) FROM b.shelves s) > 0 THEN 'shelved' ELSE 'unshelved' END",
                 "", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> comicCharacters = queryCountedOptions(
                 "c.name", "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.characters c", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> comicTeams = queryCountedOptions(
                 "t.name", "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.teams t", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> comicLocations = queryCountedOptions(
                 "l.name", "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.locations l", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         // Comic Creators — uses creatorMappings join table with role enum
         String creatorJpql = "SELECT cr.name, mapping.role, COUNT(DISTINCT b.id) FROM BookEntity b"
@@ -814,7 +815,7 @@ public class AppBookService {
                 + " " + scopeClause
                 + " GROUP BY cr.name, mapping.role ORDER BY COUNT(DISTINCT b.id) DESC";
         var creatorQ = entityManager.createQuery(creatorJpql, Tuple.class);
-        setFilterQueryParams(creatorQ, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+        setFilterQueryParams(creatorQ, accessibleLibraryIds, libraryId, shelfId);
         creatorQ.setMaxResults(1000);
         List<AppFilterOptions.CountedOption> allCreators = creatorQ.getResultList().stream()
                 .map(t -> {
@@ -827,11 +828,11 @@ public class AppBookService {
 
         List<AppFilterOptions.CountedOption> shelves = queryCountedOptions(
                 "CAST(s.id AS string) || ':' || s.name", "JOIN b.shelves s", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> libraries = queryCountedOptions(
                 "CAST(l.id AS string) || ':' || l.name", "JOIN b.library l", "",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         AppFilterOptions result = AppFilterOptions.builder()
                 .authors(authors)
@@ -869,43 +870,8 @@ public class AppBookService {
         return result;
     }
 
-    private AppFilterOptions emptyFilterOptions(String cacheKey) {
-        AppFilterOptions empty = AppFilterOptions.builder()
-                .authors(Collections.emptyList())
-                .languages(Collections.emptyList())
-                .fileTypes(Collections.emptyList())
-                .readStatuses(Collections.emptyList())
-                .categories(Collections.emptyList())
-                .publishers(Collections.emptyList())
-                .series(Collections.emptyList())
-                .tags(Collections.emptyList())
-                .moods(Collections.emptyList())
-                .narrators(Collections.emptyList())
-                .ageRatings(Collections.emptyList())
-                .contentRatings(Collections.emptyList())
-                .matchScores(Collections.emptyList())
-                .publishedYears(Collections.emptyList())
-                .fileSizes(Collections.emptyList())
-                .personalRatings(Collections.emptyList())
-                .amazonRatings(Collections.emptyList())
-                .goodreadsRatings(Collections.emptyList())
-                .hardcoverRatings(Collections.emptyList())
-                .lubimyczytacRatings(Collections.emptyList())
-                .ranobedbRatings(Collections.emptyList())
-                .audibleRatings(Collections.emptyList())
-                .pageCounts(Collections.emptyList())
-                .shelfStatuses(Collections.emptyList())
-                .comicCharacters(Collections.emptyList())
-                .comicTeams(Collections.emptyList())
-                .comicLocations(Collections.emptyList())
-                .comicCreators(Collections.emptyList())
-                .shelves(Collections.emptyList())
-                .libraries(Collections.emptyList())
-                .build();
-        filterOptionsCache.put(cacheKey, empty);
-        return empty;
-    }
 
+    @InvalidateUserStats
     @Transactional
     public void updateReadStatus(Long bookId, ReadStatus status) {
         UserBookProgressEntity progress = validateAccessAndGetProgress(bookId);
@@ -1377,7 +1343,7 @@ public class AppBookService {
     private List<AppFilterOptions.CountedOption> queryCountedOptions(
             String selectExpr, String joins, String extraWhere,
             String scopeClause, Set<Long> accessibleLibraryIds,
-            Long libraryId, Long shelfId, Set<Long> magicBookIds) {
+            Long libraryId, Long shelfId) {
         String jpql = "SELECT " + selectExpr + ", COUNT(DISTINCT b.id) FROM BookEntity b"
                 + " " + joins
                 + " WHERE (b.deleted IS NULL OR b.deleted = false)"
@@ -1386,32 +1352,37 @@ public class AppBookService {
                 + " " + scopeClause
                 + " GROUP BY " + selectExpr + " ORDER BY COUNT(DISTINCT b.id) DESC";
         var q = entityManager.createQuery(jpql, Tuple.class);
-        setFilterQueryParams(q, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+        setFilterQueryParams(q, accessibleLibraryIds, libraryId, shelfId);
         q.setMaxResults(1000);
         return q.getResultList().stream()
                 .map(this::mapToCountedOption)
                 .toList();
     }
 
-    private String buildScopeClause(String libraryClause, String shelfClause, String magicBookClause) {
+    /**
+     * Asserts the caller may read a magic shelf, without materializing the books it matches.
+     * {@code toSpecification} throws when the shelf is missing or forbidden; its returned
+     * Specification is deliberately unused here.
+     */
+    private void assertMagicShelfAccessible(Long userId, Long magicShelfId) {
+        magicShelfBookService.toSpecification(userId, magicShelfId);
+    }
+
+    private String buildScopeClause(String libraryClause, String shelfClause) {
         var sb = new StringBuilder();
         if (!libraryClause.isEmpty()) sb.append(" ").append(libraryClause);
         if (!shelfClause.isEmpty()) sb.append(" ").append(shelfClause);
-        if (!magicBookClause.isEmpty()) sb.append(" ").append(magicBookClause);
         return sb.toString();
     }
 
-    private void setFilterQueryParams(Query query, Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId, Set<Long> magicBookIds) {
+    private void setFilterQueryParams(Query query, Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
         if (libraryId != null) {
             query.setParameter("libraryId", libraryId);
         } else if (accessibleLibraryIds != null) {
             query.setParameter("libraryIds", accessibleLibraryIds);
         }
-        if (shelfId != null && magicBookIds == null) {
+        if (shelfId != null) {
             query.setParameter("shelfId", shelfId);
-        }
-        if (magicBookIds != null) {
-            query.setParameter("magicBookIds", magicBookIds);
         }
         Set<String> parameterNames = query.getParameters().stream()
                 .map(parameter -> parameter.getName())
@@ -1533,7 +1504,7 @@ public class AppBookService {
 
     private List<AppFilterOptions.CountedOption> queryReadStatusCounts(
             Long userId, String scopeClause, Set<Long> accessibleLibraryIds,
-            Long libraryId, Long shelfId, Set<Long> magicBookIds) {
+            Long libraryId, Long shelfId) {
         String jpql = "SELECT ubp.readStatus, COUNT(DISTINCT ubp.book.id) FROM UserBookProgressEntity ubp"
                 + " WHERE ubp.user.id = :userId"
                 + " AND ubp.readStatus <> org.booklore.model.enums.ReadStatus.UNSET"
@@ -1546,7 +1517,7 @@ public class AppBookService {
                 + " GROUP BY ubp.readStatus ORDER BY COUNT(DISTINCT ubp.book.id) DESC";
         var q = entityManager.createQuery(jpql, Tuple.class);
         q.setParameter("userId", userId);
-        setFilterQueryParams(q, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+        setFilterQueryParams(q, accessibleLibraryIds, libraryId, shelfId);
         List<AppFilterOptions.CountedOption> options = q.getResultList().stream()
                 .map(t -> new AppFilterOptions.CountedOption(
                         t.get(0, ReadStatus.class).name(),
@@ -1562,7 +1533,7 @@ public class AppBookService {
                 + " " + scopeClause;
         var baseQ = entityManager.createQuery(baseQuery, Long.class);
         baseQ.setParameter("userId", userId);
-        setFilterQueryParams(baseQ, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+        setFilterQueryParams(baseQ, accessibleLibraryIds, libraryId, shelfId);
         long unsetCount = baseQ.getSingleResult();
 
         if (unsetCount > 0) {
@@ -1575,7 +1546,7 @@ public class AppBookService {
 
     private List<AppFilterOptions.CountedOption> queryRatingBuckets(
             String ratingExpr, String scopeClause, Set<Long> accessibleLibraryIds,
-            Long libraryId, Long shelfId, Set<Long> magicBookIds) {
+            Long libraryId, Long shelfId) {
         return queryGroupedCount(
                 "CASE " +
                 "  WHEN " + ratingExpr + " >= 4.5 THEN '5' " +
@@ -1586,19 +1557,19 @@ public class AppBookService {
                 "  ELSE '0' " +
                 "END",
                 "JOIN b.metadata m", "AND " + ratingExpr + " IS NOT NULL",
-                scopeClause, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+                scopeClause, accessibleLibraryIds, libraryId, shelfId);
     }
 
     private List<AppFilterOptions.CountedOption> queryGroupedCount(
             String caseExpr, String joins, String extraWhere,
             String scopeClause, Set<Long> accessibleLibraryIds,
-            Long libraryId, Long shelfId, Set<Long> magicBookIds) {
+            Long libraryId, Long shelfId) {
         String jpql = "SELECT " + caseExpr + ", COUNT(DISTINCT b.id) FROM BookEntity b " + joins +
                 " WHERE (b.deleted IS NULL OR b.deleted = false) AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true) "
                 + extraWhere + " " + scopeClause +
                 " GROUP BY 1";
         var q = entityManager.createQuery(jpql, Tuple.class);
-        setFilterQueryParams(q, accessibleLibraryIds, libraryId, shelfId, magicBookIds);
+        setFilterQueryParams(q, accessibleLibraryIds, libraryId, shelfId);
         return q.getResultList().stream()
                 .filter(t -> t.get(0) != null)
                 .map(this::mapToCountedOption)

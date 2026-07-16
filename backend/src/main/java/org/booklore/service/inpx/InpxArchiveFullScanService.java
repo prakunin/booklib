@@ -2,6 +2,7 @@ package org.booklore.service.inpx;
 
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.exception.ApiError;
+import org.booklore.exception.ArchiveEntryMissingException;
 import org.booklore.model.dto.inpx.InpxBookDto;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
@@ -91,11 +92,28 @@ public class InpxArchiveFullScanService {
             catalogService.refreshing(libraryId, archiveName, bookIds.size(), addedBooks[0]);
             long covered = 0;
             long failed = 0;
+            long removed = 0;
             long processed = 0;
             for (Long bookId : bookIds) {
                 try {
                     if (bookRefreshService.refresh(bookId)) {
                         covered++;
+                    }
+                } catch (ArchiveEntryMissingException e) {
+                    // The archive was rewritten and no longer holds this entry. Incremental
+                    // discovery is additive and cannot notice, so retiring the row here is the
+                    // only repair: left in place it stays listed and fails on every read.
+                    // The retire opens its own transaction; a failure there must degrade this one
+                    // book to `failed` like any other, never escape and abort the whole scan.
+                    try {
+                        bookRefreshService.retireOrphan(bookId);
+                        removed++;
+                        log.info("Retired orphaned INPX archive book {} in {}: {}",
+                                bookId, archiveName, e.getMessage());
+                    } catch (RuntimeException retireFailure) {
+                        failed++;
+                        log.warn("Failed to retire orphaned INPX archive book {} in {}: {}",
+                                bookId, archiveName, retireFailure.getMessage());
                     }
                 } catch (RuntimeException e) {
                     failed++;
@@ -107,8 +125,8 @@ public class InpxArchiveFullScanService {
             }
             catalogService.completed(libraryId, archiveName);
             notificationService.sendMessage(Topic.LIBRARY_SCAN_COMPLETE, libraryId);
-            log.info("Fully rescanned INPX archive {} in library {}: books={}, covers={}, failed={}",
-                    archiveName, libraryId, bookIds.size(), covered, failed);
+            log.info("Fully rescanned INPX archive {} in library {}: books={}, covers={}, removed={}, failed={}",
+                    archiveName, libraryId, bookIds.size(), covered, removed, failed);
         } catch (RuntimeException e) {
             catalogService.failed(libraryId, archiveName, e.getMessage());
             log.error("Failed to rescan INPX archive {} in library {}: {}",

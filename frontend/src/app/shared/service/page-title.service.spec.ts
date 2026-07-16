@@ -30,7 +30,7 @@ describe('PageTitleService', () => {
   it('appends the application name to a page title', () => {
     service.setPageTitle('Dashboard');
 
-    expect(titleService.setTitle).toHaveBeenCalledWith('Dashboard - Grimmory');
+    expect(titleService.setTitle).toHaveBeenCalledWith('Dashboard - BookLib');
   });
 
   it('builds a book page title from the available book metadata', () => {
@@ -50,7 +50,7 @@ describe('PageTitleService', () => {
     service.setBookPageTitle(book);
 
     expect(titleService.setTitle).toHaveBeenCalledWith(
-      'Central/Dune (Chronicles series) - by Frank Herbert and Brian Herbert (EPUB) - Grimmory'
+      'Central/Dune (Chronicles series) - by Frank Herbert and Brian Herbert (EPUB) - BookLib'
     );
   });
 
@@ -66,6 +66,6 @@ describe('PageTitleService', () => {
 
     service.setBookPageTitle(book);
 
-    expect(titleService.setTitle).toHaveBeenCalledWith('Central/fallback.epub (PDF) - Grimmory');
+    expect(titleService.setTitle).toHaveBeenCalledWith('Central/fallback.epub (PDF) - BookLib');
   });
 });

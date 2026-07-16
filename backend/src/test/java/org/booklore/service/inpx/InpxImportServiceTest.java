@@ -1,10 +1,14 @@
 package org.booklore.service.inpx;
 
+import org.booklore.config.security.service.LibraryAccessGuard;
+import org.booklore.exception.APIException;
+import org.booklore.exception.ApiError;
 import org.booklore.model.dto.inpx.InpxBookReference;
 import org.booklore.model.dto.inpx.InpxImportRequest;
 import org.booklore.model.dto.inpx.InpxImportResult;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.repository.LibraryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +25,10 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class InpxImportServiceTest {
@@ -32,12 +39,16 @@ class InpxImportServiceTest {
     Path tempDir;
 
     private LibraryRepository libraryRepository;
+    private LibraryAccessGuard libraryAccessGuard;
+    private InpxSourceResolver inpxSourceResolver;
     private InpxImportService service;
 
     @BeforeEach
     void setUp() {
         libraryRepository = mock(LibraryRepository.class);
-        service = new InpxImportService(new InpxParser(), libraryRepository);
+        libraryAccessGuard = mock(LibraryAccessGuard.class);
+        inpxSourceResolver = mock(InpxSourceResolver.class);
+        service = new InpxImportService(new InpxParser(), libraryRepository, libraryAccessGuard, inpxSourceResolver);
     }
 
     @Test
@@ -47,19 +58,12 @@ class InpxImportServiceTest {
         Path index = createIndex(source);
         createBookArchive(source);
 
-        LibraryEntity library = LibraryEntity.builder().id(7L).libraryPaths(new ArrayList<>()).build();
-        LibraryPathEntity libraryPath = LibraryPathEntity.builder()
-                .id(9L)
-                .library(library)
-                .path(destination.toString())
-                .build();
-        library.getLibraryPaths().add(libraryPath);
-        when(libraryRepository.findById(7L)).thenReturn(Optional.of(library));
+        givenDestinationLibrary(destination, LibrarySourceType.FILESYSTEM);
+        givenResolvedSource(index, source);
+        InpxImportRequest request = request();
 
-        InpxImportRequest request = request(index, source);
-
-        InpxImportResult first = service.importBooks(request);
-        InpxImportResult second = service.importBooks(request);
+        InpxImportResult first = service.importBooks(7L, request);
+        InpxImportResult second = service.importBooks(7L, request);
 
         Path imported = destination.resolve("INPX/fb2-000001-000999/123.fb2");
         assertThat(first.getImported()).isEqualTo(1);
@@ -69,16 +73,56 @@ class InpxImportServiceTest {
         assertThat(destination.resolve("INPX/fb2-000001-000999/124.fb2")).doesNotExist();
     }
 
-    private InpxImportRequest request(Path index, Path source) {
+    @Test
+    void rejectsALibraryTheUserIsNotAssignedTo() throws IOException {
+        Path destination = Files.createDirectory(tempDir.resolve("destination"));
+        givenDestinationLibrary(destination, LibrarySourceType.FILESYSTEM);
+        doThrow(ApiError.FORBIDDEN.createException("nope")).when(libraryAccessGuard).requireAccess(7L);
+
+        assertThatThrownBy(() -> service.importBooks(7L, request()))
+                .isInstanceOf(APIException.class)
+                .hasMessageContaining("nope");
+        verifyNoInteractions(inpxSourceResolver);
+    }
+
+    @Test
+    void rejectsImportingIntoAnInpxLibraryBecauseItsRescanIgnoresLooseFiles() throws IOException {
+        Path destination = Files.createDirectory(tempDir.resolve("destination"));
+        givenDestinationLibrary(destination, LibrarySourceType.INPX);
+
+        assertThatThrownBy(() -> service.importBooks(7L, request()))
+                .isInstanceOf(APIException.class)
+                .hasMessageContaining("select a filesystem library");
+        verifyNoInteractions(inpxSourceResolver);
+    }
+
+    private void givenDestinationLibrary(Path destination, LibrarySourceType sourceType) {
+        LibraryEntity library = LibraryEntity.builder()
+                .id(7L)
+                .sourceType(sourceType)
+                .libraryPaths(new ArrayList<>())
+                .build();
+        LibraryPathEntity libraryPath = LibraryPathEntity.builder()
+                .id(9L)
+                .library(library)
+                .path(destination.toString())
+                .build();
+        library.getLibraryPaths().add(libraryPath);
+        when(libraryRepository.findById(7L)).thenReturn(Optional.of(library));
+    }
+
+    private void givenResolvedSource(Path index, Path source) {
+        when(inpxSourceResolver.resolve(null, null, null))
+                .thenReturn(new InpxSourceResolver.InpxSource(index.toString(), source.toString()));
+    }
+
+    private InpxImportRequest request() {
         InpxBookReference reference = new InpxBookReference();
         reference.setArchiveName("fb2-000001-000999.zip");
         reference.setFileName("123");
         reference.setExtension("fb2");
 
         InpxImportRequest request = new InpxImportRequest();
-        request.setInpxPath(index.toString());
-        request.setArchivePath(source.toString());
-        request.setLibraryId(7L);
         request.setLibraryPathId(9L);
         request.setBooks(List.of(reference));
         return request;

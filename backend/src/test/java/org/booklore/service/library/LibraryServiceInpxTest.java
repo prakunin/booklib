@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -215,5 +216,57 @@ class LibraryServiceInpxTest {
 
         libraryService.rescanLibrary(libraryId);
         taskCaptor.getValue().run();
+    }
+
+    @Test
+    void cancelScan_survivesWhenItArrivesBeforeTheScannerReachesItsFirstBatch() throws Exception {
+        long libraryId = 7L;
+        LibraryEntity library = LibraryEntity.builder().id(libraryId).name("Flibusta").build();
+        when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
+
+        ArgumentCaptor<Runnable> taskCaptor = ArgumentCaptor.forClass(Runnable.class);
+        org.mockito.Mockito.doNothing().when(taskExecutor).execute(taskCaptor.capture());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            libraryService.cancelScan(libraryId);
+            return null;
+        }).when(libraryProcessingService).rescanLibrary(any());
+
+        libraryService.rescanLibrary(libraryId);
+        taskCaptor.getValue().run();
+
+        // The leftover-flag clear must happen while the guard is still closed - before any cancel
+        // can be accepted. Anything clearing afterwards would swallow this cancellation.
+        InOrder inOrder = org.mockito.Mockito.inOrder(inpxScanControl);
+        inOrder.verify(inpxScanControl).clear(libraryId);
+        inOrder.verify(inpxScanControl).requestCancel(libraryId);
+        verify(inpxScanControl, org.mockito.Mockito.times(1)).clear(libraryId);
+    }
+
+    @Test
+    void rescanLibrary_duplicateRequestDoesNotWipeARunningScansAcceptedCancellation() throws Exception {
+        long libraryId = 7L;
+        LibraryEntity library = LibraryEntity.builder().id(libraryId).name("Flibusta").build();
+        when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
+
+        List<Runnable> tasks = new java.util.ArrayList<>();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            tasks.add(invocation.getArgument(0));
+            return null;
+        }).when(taskExecutor).execute(any(Runnable.class));
+
+        org.mockito.Mockito.doAnswer(invocation -> {
+            libraryService.cancelScan(libraryId);
+            // A duplicate rescan arriving mid-scan is rejected by the guard, and must not clear
+            // the cancellation the running scan just accepted.
+            libraryService.rescanLibrary(libraryId);
+            tasks.get(1).run();
+            return null;
+        }).when(libraryProcessingService).rescanLibrary(any());
+
+        libraryService.rescanLibrary(libraryId);
+        tasks.get(0).run();
+
+        verify(inpxScanControl, org.mockito.Mockito.times(1)).clear(libraryId);
+        verify(inpxScanControl).requestCancel(libraryId);
     }
 }

@@ -77,7 +77,8 @@ class InpxArchiveBookRefreshServiceTest {
 
         when(bookRepository.findByIdForInpxArchiveRefresh(42L))
                 .thenReturn(Optional.of(detachedBook), Optional.of(managedBook));
-        when(archivedBookContentService.resolve(archivedFile)).thenReturn(Path.of("book.fb2"));
+        // Revalidated, not cached: the refresh is the repair path for a replaced archive.
+        when(archivedBookContentService.resolveRevalidated(archivedFile)).thenReturn(Path.of("book.fb2"));
         when(fb2MetadataExtractor.extractMetadata(Path.of("book.fb2").toFile()))
                 .thenReturn(extractedMetadata);
         when(bookRepository.findById(42L)).thenReturn(Optional.of(managedBook));

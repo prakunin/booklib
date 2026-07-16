@@ -26,10 +26,17 @@ export interface InpxImportResult {
   errors: string[];
 }
 
-export interface InpxImportRequest {
-  inpxPath: string;
-  archivePath: string | null;
-  libraryId: number;
+/**
+ * Where an index is read from. A registered INPX library is preferred; a raw path is
+ * administrator-only, because the server has no allowlist for client-supplied paths.
+ */
+export interface InpxSource {
+  sourceLibraryId?: number | null;
+  inpxPath?: string | null;
+  archivePath?: string | null;
+}
+
+export interface InpxImportRequest extends InpxSource {
   libraryPathId: number;
   books: {
     archiveName: string;
@@ -43,15 +50,19 @@ export class InpxImportService {
   private readonly http = inject(HttpClient);
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/inpx`;
 
-  search(inpxPath: string, query: string, limit = 200): Observable<InpxSearchResult> {
-    const params = new HttpParams()
-      .set('inpxPath', inpxPath)
+  search(source: InpxSource, query: string, limit = 200): Observable<InpxSearchResult> {
+    let params = new HttpParams()
       .set('query', query)
       .set('limit', limit);
+    if (source.sourceLibraryId != null) {
+      params = params.set('sourceLibraryId', source.sourceLibraryId);
+    } else if (source.inpxPath) {
+      params = params.set('inpxPath', source.inpxPath);
+    }
     return this.http.get<InpxSearchResult>(`${this.url}/books`, {params});
   }
 
-  importBooks(request: InpxImportRequest): Observable<InpxImportResult> {
-    return this.http.post<InpxImportResult>(`${this.url}/import`, request);
+  importBooks(libraryId: number, request: InpxImportRequest): Observable<InpxImportResult> {
+    return this.http.post<InpxImportResult>(`${this.url}/libraries/${libraryId}/import`, request);
   }
 }

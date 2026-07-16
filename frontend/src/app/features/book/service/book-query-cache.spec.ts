@@ -1,7 +1,7 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {InfiniteData, QueryClient} from '@tanstack/angular-query-experimental';
 
-import {Book, BookMetadata} from '../model/book.model';
+import {Book, BookMetadata, ReadStatus} from '../model/book.model';
 import {AppBookSummary, AppPageResponse} from '../model/app-book.model';
 import {
   addBookToCache,
@@ -288,7 +288,7 @@ describe('book-query-cache', () => {
     // Capture the predicate passed to the app-books invalidateQueries call so we can assert
     // exactly which views the reconcile step would refetch.
     function capturedAppBooksPredicate(spy: ReturnType<typeof vi.spyOn>): (q: {queryKey: readonly unknown[]}) => boolean {
-      const call = spy.mock.calls.find(c => {
+      const call = spy.mock.calls.find((c: unknown[]) => {
         const arg = c[0] as {queryKey?: readonly unknown[]; predicate?: unknown};
         return arg?.queryKey?.[0] === 'app-books' && typeof arg.predicate === 'function';
       });
@@ -300,12 +300,12 @@ describe('book-query-cache', () => {
       const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
       patchBookFieldsInCache(queryClient, [
-        {bookId: 1, fields: {readStatus: 'READ', personalRating: 5, lastReadTime: '2026-01-01T00:00:00Z'}},
+        {bookId: 1, fields: {readStatus: ReadStatus.READ, personalRating: 5, lastReadTime: '2026-01-01T00:00:00Z'}},
         {bookId: 2, fields: {epubProgress: {cfi: 'x', percentage: 42}}}
       ]);
 
       const content = contentOf();
-      expect(content[0]).toMatchObject({readStatus: 'READ', personalRating: 5, lastReadTime: '2026-01-01T00:00:00Z'});
+      expect(content[0]).toMatchObject({readStatus: ReadStatus.READ, personalRating: 5, lastReadTime: '2026-01-01T00:00:00Z'});
       expect(content[1]).toMatchObject({readProgress: 42, personalRating: 3});
 
       // The heavy list is never blanket-invalidated; reconcile is gated by a predicate...
@@ -322,7 +322,7 @@ describe('book-query-cache', () => {
       seedAppBooks(makeSummary(1));
       const spy = vi.spyOn(queryClient, 'invalidateQueries');
 
-      patchBookFieldsInCache(queryClient, [{bookId: 1, fields: {readStatus: 'READ'}}]);
+      patchBookFieldsInCache(queryClient, [{bookId: 1, fields: {readStatus: ReadStatus.READ}}]);
       const predicate = capturedAppBooksPredicate(spy);
 
       // A view filtered by read status must refetch (the book may no longer belong)...
@@ -346,14 +346,47 @@ describe('book-query-cache', () => {
       expect(predicate({queryKey: ['app-books', {}, {field: 'addedOn', dir: 'desc'}, '']})).toBe(false);
     });
 
-    it('never reconciles for a progress-only update', () => {
+    it('reconciles views depending on the fields the server derives from a progress-only update', () => {
       seedAppBooks(makeSummary(1));
       const spy = vi.spyOn(queryClient, 'invalidateQueries');
 
-      patchBookFieldsInCache(queryClient, [{bookId: 1, fields: {epubProgress: {cfi: 'x', percentage: 10}}}]);
+      patchBookFieldsInCache(queryClient, [{bookId: 1, fields: {epubProgress: {cfi: 'x', percentage: 100}}}]);
       const predicate = capturedAppBooksPredicate(spy);
 
-      expect(predicate({queryKey: ['app-books', {status: ['UNREAD']}, {field: 'readStatus', dir: 'asc'}, '']})).toBe(false);
+      // The server recalculates readStatus from the saved progress, so a status-filtered view
+      // must refetch even though the client only sent the progress field.
+      expect(predicate({queryKey: ['app-books', {status: ['UNREAD']}, {field: 'addedOn', dir: 'desc'}, '']})).toBe(true);
+      // ...and it stamps dateFinished once the book completes.
+      expect(predicate({queryKey: ['app-books', {}, {field: 'dateFinished', dir: 'desc'}, '']})).toBe(true);
+      // A view sorted by progress must reorder.
+      expect(predicate({queryKey: ['app-books', {}, {field: 'readingProgress', dir: 'desc'}, '']})).toBe(true);
+      // An unrelated view still keeps the cheap in-place patch.
+      expect(predicate({queryKey: ['app-books', {libraryId: 1}, {field: 'addedOn', dir: 'desc'}, '']})).toBe(false);
+    });
+
+    it('reconciles a magic-shelf view on any change, since its rule is opaque to the client', () => {
+      seedAppBooks(makeSummary(1));
+      const spy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      patchBookFieldsInCache(queryClient, [{bookId: 1, fields: {readStatus: ReadStatus.READ}}]);
+      const predicate = capturedAppBooksPredicate(spy);
+
+      // A magic shelf's rule lives server-side and may match on any field, so membership cannot be
+      // decided here — the view has to refetch.
+      expect(predicate({queryKey: ['app-books', {magicShelfId: 3}, {field: 'addedOn', dir: 'desc'}, '']})).toBe(true);
+      // A plain shelf holds explicit book ids, so a field change cannot alter membership.
+      expect(predicate({queryKey: ['app-books', {shelfId: 3}, {field: 'addedOn', dir: 'desc'}, '']})).toBe(false);
+    });
+
+    it('reconciles a dateFinished-sorted view when dateFinished changes', () => {
+      seedAppBooks(makeSummary(1));
+      const spy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      patchBookFieldsInCache(queryClient, [{bookId: 1, fields: {dateFinished: '2026-01-01T00:00:00Z'}}]);
+      const predicate = capturedAppBooksPredicate(spy);
+
+      expect(predicate({queryKey: ['app-books', {}, {field: 'dateFinished', dir: 'desc'}, '']})).toBe(true);
+      expect(predicate({queryKey: ['app-books', {}, {field: 'addedOn', dir: 'desc'}, '']})).toBe(false);
     });
 
     it('clears readProgress when a progress reset is patched', () => {

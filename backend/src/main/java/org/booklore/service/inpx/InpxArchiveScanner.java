@@ -35,6 +35,13 @@ import java.util.zip.ZipFile;
  * Finds FB2 books in ZIP archives that are not yet fully represented by an INPX library.
  * This supplements (rather than replaces) the INPX index, allowing newly downloaded ZIPs
  * to be added without waiting for a new .inpx file.
+ * <p>
+ * Incremental discovery is <em>additive and count-gated</em>: an archive is only considered when it
+ * holds more entries than are persisted for it, and nothing here ever removes a row. Replacing an
+ * archive's contents without changing its entry count is therefore invisible to a normal rescan,
+ * and books whose entry vanished keep their rows. A per-archive full scan
+ * ({@link InpxArchiveFullScanService}) is the repair: it re-adds missing entries and retires the
+ * orphans.
  */
 @Slf4j
 @Component

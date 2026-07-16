@@ -27,8 +27,10 @@ class MockCommandPaletteService {
   readonly query = signal('');
   readonly isSearching = signal(false);
   readonly items = signal<PaletteItem[]>([]);
+  // Mirrors the real service, which only emits a group once it actually has items — an empty
+  // group would hide the template's empty state.
   readonly groups = computed<PaletteGroup[]>(() =>
-    this.query().trim()
+    this.query().trim() && this.items().length > 0
       ? [{ kind: 'page', items: this.items() }]
       : []
   );

@@ -42,12 +42,9 @@ public class InpxLibraryScanner {
         Counters counters = new Counters();
         String[] libraryNameHolder = {null};
 
-        // Defensive: clear any cancellation flag left over from a previous scan of this
-        // library before the first batch. Normally the finally block below always clears it,
-        // but should a flag ever leak (e.g. a cancel that arrived between scans), a fresh
-        // scan must never inherit it and abort at its first batch boundary.
-        scanControl.clear(libraryId);
-
+        // No defensive clear here: LibraryService.beginScan already cleared any leftover flag
+        // atomically with opening the scan guard. Clearing again would wipe a cancellation that
+        // legitimately arrived after the guard opened but before this scan reached its first batch.
         try {
             LibraryEntity library = libraryRepository.findByIdWithPaths(libraryId)
                     .orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));

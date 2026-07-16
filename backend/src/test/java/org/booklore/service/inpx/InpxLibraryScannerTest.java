@@ -149,8 +149,9 @@ class InpxLibraryScannerTest {
         ArgumentCaptor<InpxScanProgress> captor = ArgumentCaptor.forClass(InpxScanProgress.class);
         verify(notificationService, times(2)).sendMessage(eq(Topic.LIBRARY_SCAN_PROGRESS), captor.capture());
         assertThat(captor.getAllValues().getLast().status()).isEqualTo(InpxScanStatus.CANCELLED);
-        // Once defensively at the very start of scan(), once in the finally block.
-        verify(scanControl, times(2)).clear(LIBRARY_ID);
+        // Only in the finally block: clearing on entry would wipe a cancellation that arrived
+        // after LibraryService opened the scan guard. LibraryService.beginScan clears instead.
+        verify(scanControl, times(1)).clear(LIBRARY_ID);
     }
 
     @Test
@@ -230,8 +231,9 @@ class InpxLibraryScannerTest {
         assertThat(failedEvent.processed()).isEqualTo(500);
         assertThat(failedEvent.added()).isEqualTo(500);
         assertThat(failedEvent.skipped()).isZero();
-        // Once defensively at the very start of scan(), once in the finally block.
-        verify(scanControl, times(2)).clear(LIBRARY_ID);
+        // Only in the finally block: clearing on entry would wipe a cancellation that arrived
+        // after LibraryService opened the scan guard. LibraryService.beginScan clears instead.
+        verify(scanControl, times(1)).clear(LIBRARY_ID);
     }
 
     @Test
@@ -249,8 +251,9 @@ class InpxLibraryScannerTest {
         assertThat(failedEvent.libraryId()).isEqualTo(LIBRARY_ID);
         assertThat(failedEvent.total()).isZero();
         assertThat(failedEvent.processed()).isZero();
-        // Once defensively at the very start of scan(), once in the finally block.
-        verify(scanControl, times(2)).clear(LIBRARY_ID);
+        // Only in the finally block: clearing on entry would wipe a cancellation that arrived
+        // after LibraryService opened the scan guard. LibraryService.beginScan clears instead.
+        verify(scanControl, times(1)).clear(LIBRARY_ID);
         verify(inpxParser, never()).forEach(any(), any());
     }
 

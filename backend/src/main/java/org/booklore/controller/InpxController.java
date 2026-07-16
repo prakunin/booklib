@@ -15,6 +15,8 @@ import org.booklore.service.inpx.InpxArchiveCatalogService;
 import org.booklore.service.inpx.InpxArchiveFullScanService;
 import org.booklore.service.inpx.InpxImportService;
 import org.booklore.service.inpx.InpxParser;
+import org.booklore.service.inpx.InpxSourceResolver;
+import org.booklore.service.inpx.InpxSourceResolver.InpxSource;
 import org.booklore.service.library.LibraryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -40,24 +42,30 @@ public class InpxController {
     private final LibraryService libraryService;
     private final InpxArchiveCatalogService archiveCatalogService;
     private final InpxArchiveFullScanService archiveFullScanService;
+    private final InpxSourceResolver inpxSourceResolver;
 
     @GetMapping("/books")
     @PreAuthorize("@securityUtil.isAdmin() or @securityUtil.canUpload()")
-    @Operation(summary = "Search an INPX catalog")
+    @Operation(summary = "Search an INPX catalog",
+            description = "Reads a registered INPX library when sourceLibraryId is given; a raw inpxPath is administrator-only.")
     public ResponseEntity<InpxSearchResult> search(
-            @RequestParam String inpxPath,
+            @RequestParam(required = false) Long sourceLibraryId,
+            @RequestParam(required = false) String inpxPath,
             @RequestParam(defaultValue = "") String query,
             @RequestParam(defaultValue = "100") int limit) {
-        return ResponseEntity.ok(inpxParser.search(inpxPath, query, limit));
+        InpxSource source = inpxSourceResolver.resolve(sourceLibraryId, inpxPath, null);
+        return ResponseEntity.ok(inpxParser.search(source.inpxPath(), query, limit));
     }
 
-    @PostMapping("/import")
+    @PostMapping("/libraries/{libraryId}/import")
+    @CheckLibraryAccess(libraryIdParam = "libraryId")
     @PreAuthorize("@securityUtil.isAdmin() or @securityUtil.canUpload()")
     @Operation(summary = "Extract selected INPX books into a library")
-    public ResponseEntity<InpxImportResult> importBooks(@Valid @RequestBody InpxImportRequest request) {
-        InpxImportResult result = inpxImportService.importBooks(request);
+    public ResponseEntity<InpxImportResult> importBooks(@PathVariable long libraryId,
+                                                        @Valid @RequestBody InpxImportRequest request) {
+        InpxImportResult result = inpxImportService.importBooks(libraryId, request);
         if (result.getImported() > 0) {
-            libraryService.rescanLibrary(request.getLibraryId());
+            libraryService.rescanLibrary(libraryId);
         }
         return ResponseEntity.ok(result);
     }

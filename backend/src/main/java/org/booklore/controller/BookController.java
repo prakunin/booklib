@@ -263,13 +263,13 @@ public class BookController {
         return ResponseEntity.ok(bookService.assignShelvesToBooks(request.getBookIds(), request.getShelvesToAssign(), request.getShelvesToUnassign()));
     }
 
-    @Operation(summary = "Update read progress", description = "Update the read progress for a book.")
-    @ApiResponse(responseCode = "204", description = "Read progress updated successfully")
+    @Operation(summary = "Update read progress",
+            description = "Update the read progress for a book. Returns the read status the server derived from it.")
+    @ApiResponse(responseCode = "200", description = "Read progress updated successfully")
     @PostMapping("/progress")
-    public ResponseEntity<Void> addBookToProgress(
+    public ResponseEntity<BookStatusUpdateResponse> addBookToProgress(
             @Parameter(description = "Read progress request") @RequestBody @Valid ReadProgressRequest request) {
-        bookService.updateReadProgress(request);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(bookService.updateReadProgress(request));
     }
 
     @Operation(summary = "Get book recommendations", description = "Get recommended books based on a specific book.")

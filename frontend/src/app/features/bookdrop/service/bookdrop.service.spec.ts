@@ -4,6 +4,7 @@ import {TestBed} from '@angular/core/testing';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 
 import {BookdropService} from './bookdrop.service';
+import {API_CONFIG} from '../../../core/config/api-config';
 
 describe('BookdropService', () => {
   let service: BookdropService;
@@ -31,7 +32,7 @@ describe('BookdropService', () => {
     service.getPendingFiles().subscribe();
 
     const request = httpTestingController.expectOne(
-      'http://localhost:6060/api/v1/bookdrop/files?status=pending&page=0&size=50'
+      `${API_CONFIG.BASE_URL}/api/v1/bookdrop/files?status=pending&page=0&size=50`
     );
     expect(request.request.method).toBe('GET');
     request.flush({content: [], page: {totalElements: 0, totalPages: 0, number: 0, size: 50}});

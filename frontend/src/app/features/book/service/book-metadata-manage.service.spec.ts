@@ -10,6 +10,7 @@ import {Book, BookMetadata, MetadataUpdateWrapper} from '../model/book.model';
 import {BOOKS_QUERY_KEY} from './book-query-keys';
 import {BookMetadataManageService} from './book-metadata-manage.service';
 import {TranslocoService} from '@jsverse/transloco';
+import {API_CONFIG} from '../../../core/config/api-config';
 
 function makeBook(id: number, metadata: Partial<BookMetadata> = {}): Book {
   return {
@@ -138,7 +139,7 @@ describe('BookMetadataManageService', () => {
   });
 
   it('returns stable upload URLs for ebook and audiobook cover endpoints', () => {
-    expect(service.getUploadCoverUrl(9)).toBe('http://localhost:6060/api/v1/books/9/metadata/cover/upload');
-    expect(service.getUploadAudiobookCoverUrl(9)).toBe('http://localhost:6060/api/v1/books/9/metadata/audiobook-cover/upload');
+    expect(service.getUploadCoverUrl(9)).toBe(`${API_CONFIG.BASE_URL}/api/v1/books/9/metadata/cover/upload`);
+    expect(service.getUploadAudiobookCoverUrl(9)).toBe(`${API_CONFIG.BASE_URL}/api/v1/books/9/metadata/audiobook-cover/upload`);
   });
 });

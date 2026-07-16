@@ -1,4 +1,4 @@
-import {ChangeDetectorRef, Component, inject, ViewChild, effect, signal} from '@angular/core';
+import {ChangeDetectorRef, Component, computed, inject, ViewChild, effect, signal} from '@angular/core';
 import {FileSelectEvent, FileUpload, FileUploadHandlerEvent} from 'primeng/fileupload';
 import {Button} from 'primeng/button';
 import {FormsModule} from '@angular/forms';
@@ -16,7 +16,8 @@ import {DynamicDialogRef} from 'primeng/dynamicdialog';
 import {ProgressBar} from 'primeng/progressbar';
 import {InputText} from 'primeng/inputtext';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
-import {InpxBook, InpxImportResult, InpxImportService, InpxSearchResult} from './inpx-import.service';
+import {InpxBook, InpxImportResult, InpxImportService, InpxSearchResult, InpxSource} from './inpx-import.service';
+import {UserService} from '../../../features/settings/user-management/user.service';
 
 interface UploadingFile {
   file: File;
@@ -59,6 +60,7 @@ export class BookUploaderComponent {
   inpxImportResult = signal<InpxImportResult | null>(null);
   _selectedLibrary: Library | null = null;
   selectedPath: LibraryPath | null = null;
+  inpxSourceLibrary: Library | null = null;
   inpxPath = '';
   inpxArchivePath = '';
   inpxQuery = '';
@@ -68,11 +70,18 @@ export class BookUploaderComponent {
   private readonly appSettingsService = inject(AppSettingsService);
   private readonly http = inject(HttpClient);
   private readonly inpxImportService = inject(InpxImportService);
+  private readonly userService = inject(UserService);
   private readonly ref = inject(DynamicDialogRef);
   private readonly t = inject(TranslocoService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly libraries = this.libraryService.libraries;
+  // An INPX library's rescan only reads its index and archives, so extracted loose files would
+  // never surface there - it can be an import source, never an import destination.
+  readonly destinationLibraries = computed(() => this.libraries().filter(library => library.sourceType !== 'INPX'));
+  readonly inpxSourceLibraries = computed(() => this.libraries().filter(library => library.sourceType === 'INPX'));
+  // A raw index path is unconstrained filesystem access, so the server accepts it from admins only.
+  readonly canUseManualInpxPath = computed(() => this.userService.currentUser()?.permissions?.admin === true);
   maxFileSizeBytes?: number;
   maxFileSizeDisplay: string = '100 MB';
   stateOptions = [
@@ -82,12 +91,21 @@ export class BookUploaderComponent {
   ];
   value = 'library';
   private readonly selectSingleLibraryEffect = effect(() => {
-    const libraries = this.libraries();
+    const libraries = this.destinationLibraries();
     if (libraries.length !== 1 || this.selectedLibrary) {
       return;
     }
 
     this.selectedLibrary = libraries[0];
+  });
+
+  private readonly selectSingleInpxSourceEffect = effect(() => {
+    const sources = this.inpxSourceLibraries();
+    if (sources.length !== 1 || this.inpxSourceLibrary) {
+      return;
+    }
+
+    this.inpxSourceLibrary = sources[0];
   });
 
   private readonly loadSettingsEffect = effect(() => {
@@ -211,8 +229,20 @@ export class BookUploaderComponent {
     this.uploadBatch(filesToUpload, 0, 1, destination, libraryId, pathId);
   }
 
+  /** The chosen INPX library, or an admin's manually entered path when no library is selected. */
+  inpxSource(): InpxSource | null {
+    if (this.inpxSourceLibrary?.id != null) {
+      return {sourceLibraryId: this.inpxSourceLibrary.id};
+    }
+    if (this.canUseManualInpxPath() && this.inpxPath.trim()) {
+      return {inpxPath: this.inpxPath.trim(), archivePath: this.inpxArchivePath.trim() || null};
+    }
+    return null;
+  }
+
   searchInpx(): void {
-    if (!this.inpxPath.trim()) {
+    const source = this.inpxSource();
+    if (!source) {
       this.messageService.add({
         severity: 'warn',
         summary: this.t.translate('shared.bookUploader.toast.missingDataSummary'),
@@ -223,7 +253,7 @@ export class BookUploaderComponent {
 
     this.isSearchingInpx.set(true);
     this.inpxImportResult.set(null);
-    this.inpxImportService.search(this.inpxPath.trim(), this.inpxQuery.trim()).subscribe({
+    this.inpxImportService.search(source, this.inpxQuery.trim()).subscribe({
       next: result => {
         this.inpxBooks.set(result.books);
         this.inpxSearchResult.set(result);
@@ -262,7 +292,8 @@ export class BookUploaderComponent {
   }
 
   importSelectedInpxBooks(): void {
-    if (!this.selectedLibrary?.id || !this.selectedPath?.id || this.selectedInpxIds().size === 0) {
+    const source = this.inpxSource();
+    if (!this.selectedLibrary?.id || !this.selectedPath?.id || this.selectedInpxIds().size === 0 || !source) {
       this.messageService.add({
         severity: 'warn',
         summary: this.t.translate('shared.bookUploader.toast.missingDataSummary'),
@@ -282,10 +313,8 @@ export class BookUploaderComponent {
 
     this.isUploading.set(true);
     this.inpxImportResult.set(null);
-    this.inpxImportService.importBooks({
-      inpxPath: this.inpxPath.trim(),
-      archivePath: this.inpxArchivePath.trim() || null,
-      libraryId: this.selectedLibrary.id,
+    this.inpxImportService.importBooks(this.selectedLibrary.id, {
+      ...source,
       libraryPathId: this.selectedPath.id,
       books
     }).subscribe({

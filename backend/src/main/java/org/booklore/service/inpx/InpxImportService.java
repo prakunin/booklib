@@ -2,6 +2,7 @@ package org.booklore.service.inpx;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.booklore.config.security.service.LibraryAccessGuard;
 import org.booklore.exception.ApiError;
 import org.booklore.model.dto.inpx.InpxBookDto;
 import org.booklore.model.dto.inpx.InpxBookReference;
@@ -9,7 +10,9 @@ import org.booklore.model.dto.inpx.InpxImportRequest;
 import org.booklore.model.dto.inpx.InpxImportResult;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.repository.LibraryRepository;
+import org.booklore.service.inpx.InpxSourceResolver.InpxSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,20 +42,33 @@ public class InpxImportService {
 
     private final InpxParser inpxParser;
     private final LibraryRepository libraryRepository;
+    private final LibraryAccessGuard libraryAccessGuard;
+    private final InpxSourceResolver inpxSourceResolver;
 
     @Transactional(readOnly = true)
-    public InpxImportResult importBooks(InpxImportRequest request) {
-        LibraryEntity library = libraryRepository.findById(request.getLibraryId())
-                .orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(request.getLibraryId()));
+    public InpxImportResult importBooks(long libraryId, InpxImportRequest request) {
+        // Defence in depth: the controller's @CheckLibraryAccess covers the path variable, but the
+        // destination is re-checked here so no future caller can reach this with an unowned library.
+        libraryAccessGuard.requireAccess(libraryId);
+        LibraryEntity library = libraryRepository.findById(libraryId)
+                .orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
+        if (library.getSourceType() == LibrarySourceType.INPX) {
+            // An INPX library's rescan only reads its index and archives, so extracted loose files
+            // would never be picked up and the import would silently appear to do nothing.
+            throw ApiError.GENERIC_BAD_REQUEST.createException(
+                    "Cannot import into an INPX library; select a filesystem library");
+        }
         LibraryPathEntity libraryPath = library.getLibraryPaths().stream()
                 .filter(path -> path.getId().equals(request.getLibraryPathId()))
                 .findFirst()
                 .orElseThrow(() -> ApiError.GENERIC_BAD_REQUEST.createException(
                         "Library path does not belong to the selected library"));
 
+        InpxSource source = inpxSourceResolver.resolve(
+                request.getSourceLibraryId(), request.getInpxPath(), request.getArchivePath());
         Path destinationRoot = normalizeDirectory(libraryPath.getPath(), true);
-        Path archiveRoot = resolveArchiveRoot(request);
-        Map<String, InpxBookDto> resolved = inpxParser.resolve(request.getInpxPath(), request.getBooks());
+        Path archiveRoot = resolveArchiveRoot(source);
+        Map<String, InpxBookDto> resolved = inpxParser.resolve(source.inpxPath(), request.getBooks());
 
         int imported = 0;
         int skipped = 0;
@@ -158,13 +174,17 @@ public class InpxImportService {
         }
     }
 
-    private Path resolveArchiveRoot(InpxImportRequest request) {
-        if (request.getArchivePath() != null && !request.getArchivePath().isBlank()) {
-            return normalizeDirectory(request.getArchivePath(), false);
+    private Path resolveArchiveRoot(InpxSource source) {
+        if (source.archivePath() != null && !source.archivePath().isBlank()) {
+            return normalizeDirectory(source.archivePath(), false);
         }
         try {
-            Path index = Path.of(request.getInpxPath()).toAbsolutePath().normalize();
-            return normalizeDirectory(index.getParent().toString(), false);
+            Path index = Path.of(source.inpxPath()).toAbsolutePath().normalize();
+            Path parent = index.getParent();
+            if (parent == null) {
+                throw ApiError.GENERIC_BAD_REQUEST.createException("INPX index has no parent directory");
+            }
+            return normalizeDirectory(parent.toString(), false);
         } catch (InvalidPathException e) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid INPX path");
         }

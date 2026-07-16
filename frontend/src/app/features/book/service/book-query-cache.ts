@@ -114,7 +114,7 @@ export function patchBookFieldsInCache(queryClient: QueryClient, updates: {bookI
   // ...then reconcile only those app-books views whose active filter or sort actually
   // depends on a changed field, so e.g. a status tab drops a book that no longer matches.
   // Views that don't filter/sort by the changed field keep the cheap in-place patch.
-  const changedFields = new Set(updates.flatMap(u => Object.keys(u.fields)));
+  const changedFields = withServerDerivedFields(new Set(updates.flatMap(u => Object.keys(u.fields))));
   void queryClient.invalidateQueries({
     queryKey: APP_BOOKS_QUERY_PREFIX,
     predicate: query => appBooksViewDependsOn(query.queryKey, changedFields),
@@ -124,13 +124,24 @@ export function patchBookFieldsInCache(queryClient: QueryClient, updates: {bookI
 
 const PROGRESS_KEYS = ['epubProgress', 'pdfProgress', 'cbxProgress', 'audiobookProgress'] as const;
 
-// Book fields whose server-side sort key shares a name with an AppBookSort.field token.
+// Book fields mapped onto the AppBookSort.field token their value drives server-side.
 const SORT_FIELD_BY_BOOK_FIELD: Record<string, string> = {
   readStatus: 'readStatus',
   personalRating: 'personalRating',
   metadataMatchScore: 'matchScore',
   lastReadTime: 'lastReadTime',
+  dateFinished: 'dateFinished',
+  // Every per-format progress field feeds the single readingProgress sort key.
+  ...Object.fromEntries(PROGRESS_KEYS.map(key => [key, 'readingProgress'])),
 };
+
+// Saving progress makes the server recalculate readStatus and stamp dateFinished on completion
+// (ReadingProgressService.calculateReadStatus). The client never sends those fields back, so a
+// view filtered or sorted by them must reconcile off the progress write alone.
+function withServerDerivedFields(changedFields: Set<string>): Set<string> {
+  if (!PROGRESS_KEYS.some(key => changedFields.has(key))) return changedFields;
+  return new Set([...changedFields, 'readStatus', 'dateFinished']);
+}
 
 // True when an app-books query's filter membership or sort order depends on one of the
 // changed Book fields — i.e. patching in place is not enough and it must be refetched.
@@ -139,6 +150,9 @@ function appBooksViewDependsOn(queryKey: readonly unknown[], changedFields: Set<
   const sort = queryKey[2] as AppBookSort | undefined;
 
   if (filters) {
+    // A magic shelf's rule is evaluated server-side and can match on any field, so membership after
+    // a change is not decidable here. A plain shelfId holds explicit book ids and is unaffected.
+    if (filters.magicShelfId != null) return true;
     if (changedFields.has('readStatus') && filters.status?.length) return true;
     if (changedFields.has('personalRating') &&
       (filters.personalRating?.length || filters.minRating != null || filters.maxRating != null)) return true;

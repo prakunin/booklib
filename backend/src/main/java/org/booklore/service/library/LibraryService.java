@@ -46,6 +46,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
@@ -71,7 +72,7 @@ public class LibraryService {
     private final LibraryProcessingService libraryProcessingService;
     private final Executor taskExecutor;
     private final InpxScanControl inpxScanControl;
-    private final Set<Long> scanningLibraries = ConcurrentHashMap.newKeySet();
+    private final ConcurrentMap<Long, Boolean> scanningLibraries = new ConcurrentHashMap<>();
 
     @Transactional
     @EventListener(ApplicationReadyEvent.class)
@@ -220,7 +221,7 @@ public class LibraryService {
         auditService.log(AuditAction.LIBRARY_SCANNED, "Library", libraryId, "Scanned library: " + lib.getName());
 
         taskExecutor.execute(() -> {
-            if (!scanningLibraries.add(libraryId)) {
+            if (!beginScan(libraryId)) {
                 log.warn("Library {} is already being scanned, skipping duplicate rescan request", libraryId);
                 return;
             }
@@ -240,12 +241,34 @@ public class LibraryService {
         });
     }
 
+    /**
+     * Opens the scan guard for a library, clearing any leftover cancellation flag as part of the
+     * same atomic step.
+     * <p>
+     * Doing both inside the mapping function is what makes cancellation safe. {@link #cancelScan}
+     * only accepts a cancellation once the key is visible, and the map publishes the key only after
+     * the mapping function returns, so a cancellation can never be accepted before the clear (it
+     * would be silently wiped) nor wiped after being accepted. Clearing here also disarms a flag
+     * stranded by a cancellation that raced a finishing scan, which would otherwise abort the next
+     * scan at its first batch boundary. A duplicate request does not run the mapping function, so a
+     * running scan's accepted cancellation survives.
+     *
+     * @return false when a scan is already running for this library.
+     */
+    private boolean beginScan(long libraryId) {
+        boolean[] opened = {false};
+        scanningLibraries.computeIfAbsent(libraryId, id -> {
+            inpxScanControl.clear(id);
+            opened[0] = true;
+            return Boolean.TRUE;
+        });
+        return opened[0];
+    }
+
     public void cancelScan(long libraryId) {
-        // Only forward the cancellation while a scan is actually running. Otherwise a cancel
-        // that races the scan's terminal COMPLETED event would set a flag that nothing ever
-        // clears, poisoning the *next* scan of this library (it would see the stale flag at
-        // its first batch boundary and abort immediately, reporting CANCELLED).
-        if (!scanningLibraries.contains(libraryId)) {
+        // Only forward the cancellation while a scan is actually running, so a cancel that races a
+        // scan's terminal event cannot strand a flag. beginScan clears any that slips through.
+        if (!scanningLibraries.containsKey(libraryId)) {
             log.info("Ignoring cancellation for library {}: no scan is currently running", libraryId);
             return;
         }
@@ -458,7 +481,7 @@ public class LibraryService {
 
     private void startBackgroundScan(long libraryId) {
         taskExecutor.execute(() -> {
-            if (!scanningLibraries.add(libraryId)) {
+            if (!beginScan(libraryId)) {
                 log.warn("Library {} is already being scanned, skipping duplicate process request", libraryId);
                 return;
             }

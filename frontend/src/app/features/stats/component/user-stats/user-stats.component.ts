@@ -3,6 +3,8 @@ import {CdkDragDrop, DragDropModule} from '@angular/cdk/drag-drop';
 import {Dialog} from 'primeng/dialog';
 import {Button} from 'primeng/button';
 import {UserService} from '../../../settings/user-management/user.service';
+import {BookService} from '../../../book/service/book.service';
+import {AppMessageComponent} from '../../../../shared/ui/message/app-message.component';
 import {TranslocoDirective} from '@jsverse/transloco';
 import {PeakHoursChartComponent} from './charts/peak-hours-chart/peak-hours-chart.component';
 import {FavoriteDaysChartComponent} from './charts/favorite-days-chart/favorite-days-chart.component';
@@ -40,6 +42,7 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
     DragDropModule,
     Dialog,
     Button,
+    AppMessageComponent,
     ReadingSessionHeatmapComponent,
     ReadingSessionTimelineComponent,
     GenreStatsChartComponent,
@@ -73,7 +76,11 @@ export class UserStatsComponent {
   private userService = inject(UserService);
   private chartConfigService = inject(UserChartConfigService);
   private readonly chartTheme = inject(StatsChartThemeService);
+  private readonly bookService = inject(BookService);
 
+  // These charts aggregate the whole catalog client-side and have no paginated equivalent yet,
+  // so on an oversized catalog they must say so instead of rendering as an empty history.
+  public readonly catalogTooLarge = this.bookService.legacyCatalogTooLarge;
   public currentYear = new Date().getFullYear();
   public readonly userName = computed(() => {
     const user = this.userService.currentUser();

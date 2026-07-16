@@ -53,7 +53,7 @@
               <label for="library-select" class="field-label">{{ t('libraryLabel') }}</label>
               <p-select
                 inputId="library-select"
-                [options]="libraries"
+                [options]="destinationLibraries()"
                 optionLabel="name"
                 [placeholder]="t('selectLibrary')"
                 [(ngModel)]="selectedLibrary"
@@ -89,24 +89,42 @@
 
           <div class="inpx-fields">
             <div class="field-group">
-              <label for="inpx-path" class="field-label">{{ t('inpxPathLabel') }}</label>
-              <input
-                pInputText
-                id="inpx-path"
-                [(ngModel)]="inpxPath"
-                [placeholder]="t('inpxPathPlaceholder')"/>
-              <small>{{ t('inpxPathHint') }}</small>
-            </div>
-            <div class="field-group">
-              <label for="inpx-archive-path" class="field-label">{{ t('inpxArchivePathLabel') }}</label>
-              <input
-                pInputText
-                id="inpx-archive-path"
-                [(ngModel)]="inpxArchivePath"
-                [placeholder]="t('inpxArchivePathPlaceholder')"/>
-              <small>{{ t('inpxArchivePathHint') }}</small>
+              <label for="inpx-source-select" class="field-label">{{ t('inpxSourceLibraryLabel') }}</label>
+              <p-select
+                inputId="inpx-source-select"
+                [options]="inpxSourceLibraries()"
+                optionLabel="name"
+                [placeholder]="t('inpxSourceLibraryPlaceholder')"
+                [(ngModel)]="inpxSourceLibrary"
+                [showClear]="canUseManualInpxPath()"
+                class="full-width">
+              </p-select>
+              <small>{{ t('inpxSourceLibraryHint') }}</small>
             </div>
           </div>
+
+          @if (canUseManualInpxPath() && !inpxSourceLibrary) {
+            <div class="inpx-fields">
+              <div class="field-group">
+                <label for="inpx-path" class="field-label">{{ t('inpxPathLabel') }}</label>
+                <input
+                  pInputText
+                  id="inpx-path"
+                  [(ngModel)]="inpxPath"
+                  [placeholder]="t('inpxPathPlaceholder')"/>
+                <small>{{ t('inpxPathHint') }}</small>
+              </div>
+              <div class="field-group">
+                <label for="inpx-archive-path" class="field-label">{{ t('inpxArchivePathLabel') }}</label>
+                <input
+                  pInputText
+                  id="inpx-archive-path"
+                  [(ngModel)]="inpxArchivePath"
+                  [placeholder]="t('inpxArchivePathPlaceholder')"/>
+                <small>{{ t('inpxArchivePathHint') }}</small>
+              </div>
+            </div>
+          }
 
           <div class="inpx-search-row">
             <input
@@ -118,7 +136,7 @@
               icon="pi pi-search"
               [label]="t('inpxSearchBtn')"
               [loading]="isSearchingInpx()"
-              [disabled]="!inpxPath.trim() || isUploading()"
+              [disabled]="!inpxSource() || isUploading()"
               (onClick)="searchInpx()"/>
           </div>
 

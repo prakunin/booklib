@@ -1,6 +1,6 @@
 import {computed, effect, inject, Injectable, signal} from '@angular/core';
 import {first, from, lastValueFrom, Observable, switchMap, throwError} from 'rxjs';
-import {HttpClient, HttpParams} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
 import {catchError, tap} from 'rxjs/operators';
 import {Book, BookDeletionResponse, BookRecommendation, BookSetting, BookStatusUpdateResponse, BookType, CreatePhysicalBookRequest, PersonalRatingUpdateResponse, ReadStatus} from '../model/book.model';
 import {API_CONFIG} from '../../../core/config/api-config';
@@ -88,6 +88,22 @@ export class BookService {
 
     const error = this.booksQuery.error();
     return error instanceof Error ? error.message : 'Failed to load books';
+  });
+
+  /**
+   * True when the server refused the flat catalog because it exceeds the legacy size cap.
+   *
+   * The screens still reading the full catalog aggregate it client-side and have no paginated
+   * equivalent yet, so they cannot render at all here. They must say so rather than show an empty
+   * result, which reads as an empty library. A 400 identifies this unambiguously: the flat
+   * endpoint's only other parameters are booleans with defaults, so the cap is its sole 400.
+   */
+  readonly legacyCatalogTooLarge = computed(() => {
+    if (!this.token() || !this.booksQuery.isError()) {
+      return false;
+    }
+    const error = this.booksQuery.error();
+    return error instanceof HttpErrorResponse && error.status === 400;
   });
 
   // Use isLoading (isPending && isFetching), not isPending: the legacy catalog query is
