@@ -9,6 +9,7 @@ import {SeriesDataService} from '../../service/series-data.service';
 import {SeriesSummary} from '../../model/series.model';
 import {SeriesCardComponent} from '../series-card/series-card.component';
 import {BookService} from '../../../book/service/book.service';
+import {AppMessageComponent} from '../../../../shared/ui/message/app-message.component';
 import {ReadStatus} from '../../../book/model/book.model';
 import {PageTitleService} from '../../../../shared/service/page-title.service';
 import {ActivatedRoute, Router} from '@angular/router';
@@ -38,6 +39,7 @@ interface SortOption {
   imports: [
     FormsModule,
     ProgressSpinner,
+    AppMessageComponent,
     InputText,
     Select,
     Popover,
@@ -74,6 +76,9 @@ export class SeriesBrowserComponent implements OnInit {
   private layoutService = inject(LayoutService);
 
   readonly isBooksLoading = this.bookService.isBooksLoading;
+  // Series summaries are grouped from the whole catalog client-side; there is no paginated
+  // equivalent covering the status filters yet, so an oversized catalog must be reported.
+  readonly catalogTooLarge = this.bookService.legacyCatalogTooLarge;
   private readonly searchTerm = signal('');
   private readonly statusFilter = signal('all');
   private readonly sortBy = signal('name-asc');

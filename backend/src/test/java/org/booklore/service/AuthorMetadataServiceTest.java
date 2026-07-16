@@ -43,6 +43,7 @@ class AuthorMetadataServiceTest {
     @Mock private DuckDuckGoCoverService duckDuckGoCoverService;
     @Mock private AuthenticationService authenticationService;
     @Mock private AppSettingService appSettingService;
+    @Mock private AuthorPhotoIndex authorPhotoIndex;
 
     private AuthorMetadataService service;
 
@@ -59,7 +60,8 @@ class AuthorMetadataServiceTest {
                 fileService,
                 duckDuckGoCoverService,
                 authenticationService,
-                appSettingService
+                appSettingService,
+                authorPhotoIndex
         );
 
         BookLoreUser.UserPermissions adminPermissions = new BookLoreUser.UserPermissions();

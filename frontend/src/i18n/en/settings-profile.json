@@ -20,6 +20,7 @@
     "currentPasswordRequired": "Current password is required.",
     "newPasswordRequired": "New password is required.",
     "passwordMinLength": "Password must be at least 8 characters long.",
+    "passwordInvalid": "Password does not meet the current requirements.",
     "confirmPasswordRequired": "Please confirm your new password.",
     "passwordMismatch": "Passwords do not match."
   },

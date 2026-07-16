@@ -124,7 +124,7 @@
         "saveErrorDetail": "Wystąpił błąd podczas zapisywania ustawień."
     },
     "setup": {
-        "title": "Witaj w Grimmory",
+        "title": "Witaj w BookLib",
         "subtitle": "Skonfiguruj swoje początkowe konto administratora, aby rozpocząć",
         "usernameLabel": "Nazwa użytkownika",
         "usernamePlaceholder": "Wybierz nazwę użytkownika",

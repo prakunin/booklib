@@ -1,6 +1,8 @@
+import {DOCUMENT} from '@angular/common';
 import {inject, Injectable} from '@angular/core';
 import {ReaderState} from '../state/reader-state.service';
 import {EpubCustomFontService} from '../features/fonts/custom-font.service';
+import {ACADEMY_BOOK_FONT} from '../state/built-in-fonts.constant';
 
 interface ReaderRenderer {
   setAttribute(name: string, value: string | number): void;
@@ -13,6 +15,7 @@ interface ReaderRenderer {
 })
 export class ReaderStyleService {
   private epubCustomFontService = inject(EpubCustomFontService);
+  private document = inject(DOCUMENT);
 
   generateCSS(state: ReaderState): string {
     const {lineHeight, justify, hyphenate, fontSize, theme, fontFamily} = state;
@@ -39,6 +42,17 @@ export class ReaderStyleService {
               font-display: swap;
           }`;
         }
+      } else if (fontFamily === ACADEMY_BOOK_FONT.family) {
+        const fontUrl = new URL(ACADEMY_BOOK_FONT.assetPath, this.document.baseURI).href;
+        actualFontFamily = `"${ACADEMY_BOOK_FONT.family}", ${ACADEMY_BOOK_FONT.fallback}`;
+        fontFaceRule = `@font-face {
+              font-family: "${ACADEMY_BOOK_FONT.family}";
+              src: url("${fontUrl}") format("opentype");
+              font-weight: normal;
+              font-style: normal;
+              font-display: swap;
+              size-adjust: ${ACADEMY_BOOK_FONT.sizeAdjust};
+          }`;
       } else {
         actualFontFamily = fontFamily;
       }

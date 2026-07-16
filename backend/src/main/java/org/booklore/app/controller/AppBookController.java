@@ -5,14 +5,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.booklore.app.dto.*;
 import org.booklore.app.service.AppBookService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
+import java.util.Set;
 
 @AllArgsConstructor
 @RestController
+@Validated
 @RequestMapping("/api/v1/app/books")
 @Tag(name = "App Books", description = "Endpoints for browsing and updating books in the app experience")
 public class AppBookController {
@@ -26,7 +30,7 @@ public class AppBookController {
     )
     @GetMapping
     public ResponseEntity<AppPageResponse<AppBookSummary>> getBooks(
-            @ModelAttribute BookListRequest request) {
+            @Valid @ModelAttribute BookListRequest request) {
 
         return ResponseEntity.ok(mobileBookService.getBooks(request));
     }
@@ -38,9 +42,42 @@ public class AppBookController {
     )
     @GetMapping("/ids")
     public ResponseEntity<List<Long>> getAllBookIds(
-            @ModelAttribute BookListRequest request) {
+            @Valid @ModelAttribute BookListRequest request) {
 
         return ResponseEntity.ok(mobileBookService.getAllBookIds(request));
+    }
+
+    @Operation(
+            summary = "Get catalog summary",
+            description = "Return exact catalog counts without materializing books.",
+            operationId = "appGetCatalogSummary"
+    )
+    @GetMapping("/summary")
+    public ResponseEntity<AppCatalogSummary> getCatalogSummary() {
+        return ResponseEntity.ok(mobileBookService.getCatalogSummary());
+    }
+
+    @Operation(
+            summary = "Get book summaries by ID",
+            description = "Return a bounded set of accessible book summaries for bulk dialogs.",
+            operationId = "appGetBookSummariesByIds"
+    )
+    @PostMapping("/summaries")
+    public ResponseEntity<List<AppBookSummary>> getBookSummariesByIds(
+            @RequestBody @Size(max = 500) Set<Long> bookIds) {
+        return ResponseEntity.ok(mobileBookService.getBookSummariesByIds(bookIds));
+    }
+
+    @Operation(
+            summary = "Find existing ISBNs",
+            description = "Return the submitted ISBNs that already exist in an accessible library.",
+            operationId = "appFindExistingIsbns"
+    )
+    @PostMapping("/isbn-matches")
+    public ResponseEntity<Set<String>> findExistingIsbns(
+            @RequestParam Long libraryId,
+            @RequestBody @Size(max = 500) Set<String> isbns) {
+        return ResponseEntity.ok(mobileBookService.findExistingIsbns(libraryId, isbns));
     }
 
     @Operation(

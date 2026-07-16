@@ -7,6 +7,12 @@ import {ReaderEventService, ViewEvent} from './event.service';
 interface TestView extends HTMLDivElement {
   addAnnotation: (annotation: {value: string}) => void;
   addAnnotationSpy: (annotation: {value: string}) => void;
+  renderer?: {
+    getAttribute: (name: string) => string | null;
+    start: number;
+    end: number;
+    viewSize: number;
+  };
 }
 
 interface RangeLike {
@@ -197,6 +203,87 @@ describe('ReaderEventService', () => {
     expect(view.addAnnotationSpy).toHaveBeenNthCalledWith(1, {value: 'cfi-1'});
     expect(view.addAnnotationSpy).toHaveBeenNthCalledWith(2, {value: 'cfi-2'});
     expect(emittedEvents).toContainEqual({type: 'load', detail: {doc}});
+  });
+
+  it('continues scrolling across chapter boundaries in scrolled mode', () => {
+    view.renderer = {
+      getAttribute: name => name === 'flow' ? 'scrolled' : null,
+      start: 900,
+      end: 1000,
+      viewSize: 1000,
+    };
+    view.dispatchEvent(new CustomEvent('load', {detail: {doc}}));
+    view.dispatchEvent(new CustomEvent('relocate', {detail: {section: {current: 1, total: 3}}}));
+
+    const forward = new WheelEvent('wheel', {deltaY: 120, bubbles: true, cancelable: true});
+    doc.dispatchEvent(forward);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(forward.defaultPrevented).toBe(true);
+
+    vi.advanceTimersByTime(300);
+    view.renderer.start = 0;
+    view.renderer.end = 100;
+    const backward = new WheelEvent('wheel', {deltaY: -120, bubbles: true, cancelable: true});
+    doc.dispatchEvent(backward);
+
+    expect(prev).toHaveBeenCalledOnce();
+    expect(backward.defaultPrevented).toBe(true);
+  });
+
+  it('does not change chapters while ordinary scrolling still has room', () => {
+    view.renderer = {
+      getAttribute: name => name === 'flow' ? 'scrolled' : null,
+      start: 300,
+      end: 700,
+      viewSize: 1000,
+    };
+    view.dispatchEvent(new CustomEvent('load', {detail: {doc}}));
+
+    const wheel = new WheelEvent('wheel', {deltaY: 120, bubbles: true, cancelable: true});
+    doc.dispatchEvent(wheel);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(wheel.defaultPrevented).toBe(false);
+  });
+
+  it('does not navigate beyond the first or last chapter', () => {
+    view.renderer = {
+      getAttribute: name => name === 'flow' ? 'scrolled' : null,
+      start: 900,
+      end: 1000,
+      viewSize: 1000,
+    };
+    view.dispatchEvent(new CustomEvent('load', {detail: {doc}}));
+    view.dispatchEvent(new CustomEvent('relocate', {detail: {section: {current: 2, total: 3}}}));
+
+    doc.dispatchEvent(new WheelEvent('wheel', {deltaY: 120, bubbles: true, cancelable: true}));
+    expect(next).not.toHaveBeenCalled();
+
+    view.renderer.start = 0;
+    view.renderer.end = 100;
+    view.dispatchEvent(new CustomEvent('relocate', {detail: {section: {current: 0, total: 3}}}));
+    doc.dispatchEvent(new WheelEvent('wheel', {deltaY: -120, bubbles: true, cancelable: true}));
+    expect(prev).not.toHaveBeenCalled();
+  });
+
+  it('continues to the next chapter with an upward swipe at the scroll boundary', () => {
+    view.renderer = {
+      getAttribute: name => name === 'flow' ? 'scrolled' : null,
+      start: 900,
+      end: 1000,
+      viewSize: 1000,
+    };
+    view.dispatchEvent(new CustomEvent('relocate', {detail: {section: {current: 1, total: 3}}}));
+    privateService.touchStartX = 150;
+    privateService.touchStartY = 200;
+    privateService.touchStartTime = Date.now() - 100;
+
+    const swipeUp = createTouchEvent('touchend', [{clientX: 150, clientY: 100}]);
+    privateService.handleTouchEnd(swipeUp, doc);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(swipeUp.defaultPrevented).toBe(true);
   });
 
   it('navigates and emits keyboard events for reader shortcuts while ignoring editable targets', () => {

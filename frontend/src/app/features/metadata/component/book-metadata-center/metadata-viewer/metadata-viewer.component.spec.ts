@@ -72,6 +72,7 @@ describe('MetadataViewerComponent', () => {
   const openBookFileAttacherDialog = vi.fn(() => Promise.resolve(null));
   const openFileMoverDialog = vi.fn(() => Promise.resolve(null));
   const openShelfAssignerDialog = vi.fn(() => Promise.resolve(null));
+  const openCoverSearchDialog = vi.fn(() => Promise.resolve(null));
 
   const emailBookQuick = vi.fn(() => of(void 0));
   const refreshMetadataTask = vi.fn(() => of(void 0));
@@ -180,6 +181,7 @@ describe('MetadataViewerComponent', () => {
     openBookFileAttacherDialog.mockClear();
     openFileMoverDialog.mockClear();
     openShelfAssignerDialog.mockClear();
+    openCoverSearchDialog.mockClear();
 
     emailBookQuick.mockClear();
     refreshMetadataTask.mockClear();
@@ -212,6 +214,7 @@ describe('MetadataViewerComponent', () => {
             openBookFileAttacherDialog,
             openFileMoverDialog,
             openShelfAssignerDialog,
+            openCoverSearchDialog,
           },
         },
         {provide: EmailService, useValue: {emailBookQuick}},
@@ -386,6 +389,18 @@ describe('MetadataViewerComponent', () => {
       expect(getBooksInSeries).toHaveBeenCalledWith(21);
     });
     expect(component.bookInSeries).toEqual([]);
+  });
+
+  it('opens cover search for the primary book format', async () => {
+    const component = createComponent();
+
+    await component.openCoverSearch(createBook());
+    expect(openCoverSearchDialog).toHaveBeenLastCalledWith(21, 'ebook');
+
+    await component.openCoverSearch(createBook({
+      primaryFile: createFile(2, {bookId: 21, bookType: 'AUDIOBOOK'}),
+    }));
+    expect(openCoverSearchDialog).toHaveBeenLastCalledWith(21, 'audiobook');
   });
 
   it('chooses confirmation copy for file deletion branches and runs the accept callbacks', () => {

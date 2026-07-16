@@ -10,6 +10,14 @@ export interface AppPageResponse<T> {
   hasPrevious: boolean;
 }
 
+export interface AppCatalogSummary {
+  totalBooks: number;
+  totalAuthors: number;
+  totalSeries: number;
+  unshelvedBooks: number;
+  libraryBookCounts: Record<string, number>;
+}
+
 export interface AppBookSummary {
   id: number;
   title: string;

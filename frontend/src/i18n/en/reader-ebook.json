@@ -58,7 +58,9 @@
     "maxHeight": "Max Height",
     "textOptions": "Text Options",
     "justifyText": "Justify Text",
-    "hyphenate": "Hyphenate"
+    "hyphenate": "Hyphenate",
+    "useForAllBooks": "Use for all books",
+    "useForAllBooksDescription": "Save the current appearance as the default for every eBook."
   },
   "footer": {
     "previousSection": "Previous Section",

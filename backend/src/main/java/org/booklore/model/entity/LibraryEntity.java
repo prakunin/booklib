@@ -6,6 +6,7 @@ import org.booklore.model.dto.Sort;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.IconType;
 import org.booklore.model.enums.LibraryOrganizationMode;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.enums.MetadataSource;
 import jakarta.persistence.*;
 import lombok.*;
@@ -46,6 +47,17 @@ public class LibraryEntity {
     private Set<BookLoreUserEntity> users = new HashSet<>();
 
     private boolean watch;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", nullable = false)
+    @Builder.Default
+    private LibrarySourceType sourceType = LibrarySourceType.FILESYSTEM;
+
+    @Column(name = "inpx_path", length = 1000)
+    private String inpxPath;
+
+    @Column(name = "inpx_archive_path", length = 1000)
+    private String inpxArchivePath;
 
     private String icon;
 

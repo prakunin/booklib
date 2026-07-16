@@ -13,6 +13,7 @@ import {BOOKS_QUERY_KEY, bookDetailQueryKey} from './book-query-keys';
 import {BookFileService} from './book-file.service';
 import {FileDownloadService} from '../../../shared/service/file-download.service';
 import {LocalSettingsService} from '../../../shared/service/local-settings.service';
+import {API_CONFIG} from '../../../core/config/api-config';
 
 type BuildBookOverrides = Omit<Partial<Book>, 'metadata'> & {
   metadata?: Partial<BookMetadata>;
@@ -101,7 +102,7 @@ describe('BookFileService', () => {
 
     const request = httpTestingController.expectOne(req => req.urlWithParams.endsWith('/api/v1/books/7/content?bookType=EPUB'));
     expect(request.request.method).toBe('GET');
-    expect(request.request.urlWithParams).toBe('http://localhost:6060/api/v1/books/7/content?bookType=EPUB');
+    expect(request.request.urlWithParams).toBe(`${API_CONFIG.BASE_URL}/api/v1/books/7/content?bookType=EPUB`);
     expect(request.request.responseType).toBe('blob');
 
     request.flush(responseBlob);
@@ -131,17 +132,17 @@ describe('BookFileService', () => {
 
     expect(fileDownloadService.downloadFile).toHaveBeenNthCalledWith(
       1,
-      'http://localhost:6060/api/v1/books/5/download',
+      `${API_CONFIG.BASE_URL}/api/v1/books/5/download`,
       'main.epub',
     );
     expect(fileDownloadService.downloadFile).toHaveBeenNthCalledWith(
       2,
-      'http://localhost:6060/api/v1/books/5/download-all',
+      `${API_CONFIG.BASE_URL}/api/v1/books/5/download-all`,
       'Title__Volume_1.zip',
     );
     expect(fileDownloadService.downloadFile).toHaveBeenNthCalledWith(
       3,
-      'http://localhost:6060/api/v1/books/5/files/53/download',
+      `${API_CONFIG.BASE_URL}/api/v1/books/5/files/53/download`,
       'notes.pdf',
     );
   });

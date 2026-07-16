@@ -36,6 +36,12 @@ public class BookFileEntity {
     @Column(name = "file_sub_path", length = 512, nullable = false)
     private String fileSubPath;
 
+    @Column(name = "source_archive", length = 1000)
+    private String sourceArchive;
+
+    @Column(name = "source_archive_entry", length = 1000)
+    private String sourceArchiveEntry;
+
     @Column(name = "is_book", nullable = false)
     private boolean isBookFormat;
 
@@ -110,6 +116,11 @@ public class BookFileEntity {
         }
 
         return Paths.get(book.getLibraryPath().getPath(), fileSubPath, fileName);
+    }
+
+    public boolean isArchivedSource() {
+        return sourceArchive != null && !sourceArchive.isBlank()
+                && sourceArchiveEntry != null && !sourceArchiveEntry.isBlank();
     }
 
     /**

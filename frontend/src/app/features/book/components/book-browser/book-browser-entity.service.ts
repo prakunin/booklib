@@ -8,7 +8,7 @@ import {ShelfService} from '../../service/shelf.service';
 import {MagicShelf, MagicShelfService} from '../../../magic-shelf/service/magic-shelf.service';
 import {BookRuleEvaluatorService} from '../../../magic-shelf/service/book-rule-evaluator.service';
 import {GroupRule} from '../../../magic-shelf/component/magic-shelf-component';
-import {EntityType} from './book-browser.component';
+import {EntityType} from './book-browser-entity-type';
 
 export interface EntityInfo {
   entityId: number;

@@ -51,8 +51,16 @@ interface IframeClickMessage {
   target?: string;
 }
 
+interface ScrolledRenderer {
+  getAttribute(name: string): string | null;
+  start: number;
+  end: number;
+  viewSize: number;
+}
+
 interface EventServiceView extends HTMLElement {
   addAnnotation(annotation: { value: string }): void;
+  renderer?: unknown;
 }
 
 export type ViewEvent =
@@ -108,6 +116,8 @@ export class ReaderEventService {
   private touchStartTime = 0;
   private selectionChangeTimeout: ReturnType<typeof setTimeout> | null = null;
   private lastTouchTime = 0;
+  private currentSectionIndex: number | null = null;
+  private sectionCount: number | null = null;
 
   private eventSubject = new Subject<ViewEvent>();
   public events$ = this.eventSubject.asObservable();
@@ -141,6 +151,8 @@ export class ReaderEventService {
     this.isNavigating = false;
     this.lastClickTime = 0;
     this.lastClickZone = null;
+    this.currentSectionIndex = null;
+    this.sectionCount = null;
     this.clickedDocs = new WeakSet<Document>();
   }
 
@@ -175,6 +187,10 @@ export class ReaderEventService {
 
     this.view.addEventListener('relocate', (event: Event) => {
       const e = event as CustomEvent<RelocateEventDetail>;
+      if (e.detail.section) {
+        this.currentSectionIndex = e.detail.section.current;
+        this.sectionCount = e.detail.section.total;
+      }
       this.eventSubject.next({type: 'relocate', detail: e.detail});
     });
 
@@ -322,6 +338,12 @@ export class ReaderEventService {
       this.handleTouchEnd(event, doc);
     }) as EventListener, {passive: false});
 
+    track(doc, 'wheel', ((event: WheelEvent) => {
+      if (this.tryNavigateAcrossScrolledBoundary(event.deltaY)) {
+        event.preventDefault();
+      }
+    }) as EventListener, {passive: false});
+
     track(doc, 'selectionchange', () => {
       this.handleSelectionChange(doc);
     });
@@ -421,7 +443,14 @@ export class ReaderEventService {
     if (!this.isTextSelectionInProgress && event.changedTouches.length === 1) {
       const touch = event.changedTouches[0];
       const deltaX = touch.clientX - this.touchStartX;
-      const deltaY = Math.abs(touch.clientY - this.touchStartY);
+      const signedDeltaY = touch.clientY - this.touchStartY;
+      const deltaY = Math.abs(signedDeltaY);
+
+      if (deltaY >= this.SWIPE_THRESHOLD_PX && deltaY > Math.abs(deltaX)
+        && this.tryNavigateAcrossScrolledBoundary(-signedDeltaY)) {
+        event.preventDefault();
+        return;
+      }
 
       if (Math.abs(deltaX) >= this.SWIPE_THRESHOLD_PX && Math.abs(deltaX) > deltaY) {
         if (this.isNavigating) return;
@@ -456,6 +485,38 @@ export class ReaderEventService {
     }
 
     this.isTextSelectionInProgress = false;
+  }
+
+  private tryNavigateAcrossScrolledBoundary(scrollDelta: number): boolean {
+    if (this.isNavigating || scrollDelta === 0) return false;
+
+    const renderer = this.view?.renderer;
+    if (!this.isScrolledRenderer(renderer) || renderer.getAttribute('flow') !== 'scrolled') return false;
+
+    const boundaryTolerance = 2;
+    const atStart = renderer.start <= boundaryTolerance;
+    const atEnd = renderer.viewSize - renderer.end <= boundaryTolerance;
+    if ((scrollDelta < 0 && !atStart) || (scrollDelta > 0 && !atEnd)) return false;
+    if (scrollDelta < 0 && this.currentSectionIndex === 0) return false;
+    if (scrollDelta > 0 && this.currentSectionIndex !== null && this.sectionCount !== null
+      && this.currentSectionIndex >= this.sectionCount - 1) return false;
+
+    this.isNavigating = true;
+    if (scrollDelta < 0) {
+      this.viewCallbacks?.prev();
+    } else {
+      this.viewCallbacks?.next();
+    }
+    setTimeout(() => this.isNavigating = false, 300);
+    return true;
+  }
+
+  private isScrolledRenderer(value: unknown): value is ScrolledRenderer {
+    if (!value || typeof value !== 'object') return false;
+    return 'getAttribute' in value && typeof value.getAttribute === 'function'
+      && 'start' in value && typeof value.start === 'number'
+      && 'end' in value && typeof value.end === 'number'
+      && 'viewSize' in value && typeof value.viewSize === 'number';
   }
 
   private handleSelectionEnd(doc: Document): void {

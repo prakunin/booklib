@@ -5,6 +5,7 @@ import {IconType} from '../../../shared/icons/icon-selection';
 export type MetadataSource = 'EMBEDDED' | 'SIDECAR' | 'PREFER_SIDECAR' | 'PREFER_EMBEDDED' | 'NONE';
 
 export type OrganizationMode = 'BOOK_PER_FILE' | 'BOOK_PER_FOLDER' | 'AUTO_DETECT';
+export type LibrarySourceType = 'FILESYSTEM' | 'INPX';
 
 export interface Library {
   id?: number;
@@ -12,6 +13,9 @@ export interface Library {
   icon?: string | null;
   iconType?: IconType | null;
   watch: boolean;
+  sourceType?: LibrarySourceType;
+  inpxPath?: string | null;
+  inpxArchivePath?: string | null;
   fileNamingPattern?: string;
   sort?: SortOption;
   paths: LibraryPath[];

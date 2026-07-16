@@ -499,6 +499,20 @@
   min-width: 150px;
 }
 
+.link-button {
+  align-self: flex-start;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--primary-color);
+  cursor: pointer;
+  font-size: var(--app-text-sm);
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .format-warning-message {
   display: flex;
   align-items: center;

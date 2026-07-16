@@ -16,6 +16,7 @@ import {LibrariesSummaryService} from './service/libraries-summary.service';
 import {LibraryFilterService, LibraryOption} from './service/library-filter.service';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {BookService} from '../../../book/service/book.service';
+import {AppMessageComponent} from '../../../../shared/ui/message/app-message.component';
 import {LibraryService} from '../../../book/service/library.service';
 import {StatsChartThemeService} from '../shared/stats-chart-theme.service';
 
@@ -37,6 +38,7 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
     Select,
     DragDropModule,
     Button,
+    AppMessageComponent,
     BookFormatsChartComponent,
     LanguageChartComponent,
     MetadataScoreChartComponent,
@@ -63,6 +65,9 @@ export class LibraryStatsComponent {
   public readonly isLoading = computed(() =>
     this.bookService.isBooksLoading() || this.libraryService.isLibrariesLoading()
   );
+  // These charts aggregate the whole catalog client-side and have no paginated equivalent yet,
+  // so on an oversized catalog they must say so instead of rendering as an empty library.
+  public readonly catalogTooLarge = this.bookService.legacyCatalogTooLarge;
   public readonly hasData = computed(() => this.booksSummary().totalBooks > 0);
   public readonly libraryOptions = this.libraryFilterService.libraryOptions;
   public readonly booksSummary = this.librariesSummaryService.booksSummary;

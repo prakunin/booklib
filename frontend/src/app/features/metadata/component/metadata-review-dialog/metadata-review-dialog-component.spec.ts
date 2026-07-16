@@ -4,7 +4,8 @@ import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
 
-import {BookService} from '../../../book/service/book.service';
+import {AppBooksApiService} from '../../../book/service/app-books-api.service';
+import {createQueryClientHarness, flushQueryAsync} from '../../../../core/testing/query-testing';
 import {FetchedMetadataProposalStatus, FetchedProposal, MetadataTaskService} from '../../../book/service/metadata-task';
 import {BookMetadata} from '../../../book/model/book.model';
 import {MetadataProgressService} from '../../../../shared/service/metadata-progress.service';
@@ -18,7 +19,7 @@ describe('MetadataReviewDialogComponent', () => {
   const deleteTask = vi.fn(() => of(void 0));
   const clearTask = vi.fn();
   const books = signal([{id: 11, title: 'Book 11'}]);
-  const findBookById = vi.fn((bookId: number) => books().find(book => book.id === bookId));
+  const getBooksByIds = vi.fn((bookIds: number[]) => of(books().filter(book => bookIds.includes(book.id))));
 
   beforeEach(() => {
     close.mockClear();
@@ -26,7 +27,7 @@ describe('MetadataReviewDialogComponent', () => {
     updateProposalStatus.mockClear();
     deleteTask.mockClear();
     clearTask.mockClear();
-    findBookById.mockClear();
+    getBooksByIds.mockClear();
   });
 
   function createProposal(overrides: Partial<FetchedProposal>): FetchedProposal {
@@ -52,12 +53,14 @@ describe('MetadataReviewDialogComponent', () => {
   }
 
   function createComponent(taskId: string | undefined) {
+    const queryClientHarness = createQueryClientHarness();
     TestBed.configureTestingModule({
       providers: [
+        ...queryClientHarness.providers,
         {provide: DynamicDialogConfig, useValue: {data: taskId ? {taskId} : {}}},
         {provide: DynamicDialogRef, useValue: {close}},
         {provide: MetadataTaskService, useValue: {getTaskWithProposals, updateProposalStatus, deleteTask}},
-        {provide: BookService, useValue: {books, findBookById}},
+        {provide: AppBooksApiService, useValue: {getBooksByIds}},
         {provide: MetadataProgressService, useValue: {clearTask}},
       ]
     });
@@ -73,7 +76,7 @@ describe('MetadataReviewDialogComponent', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it('loads proposals for the requested task and exposes the current book', () => {
+  it('loads proposals and fetches their books through the bounded summaries API', async () => {
     getTaskWithProposals.mockReturnValue(of({
       proposals: [
         createProposal({proposalId: 5}),
@@ -83,10 +86,12 @@ describe('MetadataReviewDialogComponent', () => {
     const component = createComponent('task-1');
     component.ngOnInit();
     TestBed.flushEffects();
+    await flushQueryAsync();
 
     expect(getTaskWithProposals).toHaveBeenCalledWith('task-1');
     expect(component.currentProposal).toEqual(createProposal({proposalId: 5}));
     expect(component.currentBook()).toEqual({id: 11, title: 'Book 11'});
+    expect(getBooksByIds).toHaveBeenCalledWith([11]);
     expect(component.loading()).toBe(false);
   });
 

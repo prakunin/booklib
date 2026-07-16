@@ -1,8 +1,8 @@
 {
     "offline": "Sei Offline",
-    "loading": "Caricamento di Grimmory…",
+    "loading": "Caricamento di BookLib…",
     "loadingDescription": "Attendere mentre prepariamo tutto.",
-    "offlineLoadingDescription": "Grimmory necessita di una connessione al server per caricarsi.",
+    "offlineLoadingDescription": "BookLib necessita di una connessione al server per caricarsi.",
     "offlineDescription": "Controlla la rete e riprova.",
     "connectionLost": "La connessione è stata persa. Alcune funzionalità potrebbero non funzionare."
 }

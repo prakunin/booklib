@@ -85,6 +85,29 @@ describe('ReaderStyleService', () => {
     expect(css).toContain('hyphens: none;');
   });
 
+  it('embeds the built-in Academy Book font in the reader document', () => {
+    const css = service.generateCSS({
+      lineHeight: 1.5,
+      justify: true,
+      hyphenate: true,
+      maxColumnCount: 2,
+      gap: 0.05,
+      fontSize: 16,
+      theme: {...themes[0], fg: themes[0].dark.fg, bg: themes[0].dark.bg, link: themes[0].dark.link},
+      maxInlineSize: 720,
+      maxBlockSize: 1440,
+      fontFamily: 'Academy Book',
+      isDark: true,
+      flow: 'paginated',
+    });
+
+    expect(css).toContain('@font-face');
+    expect(css).toContain('font-family: "Academy Book";');
+    expect(css).toContain('/assets/fonts/AcademyBook-Regular.otf');
+    expect(css).toContain('size-adjust: 135%;');
+    expect(css).toContain('font-family: "Academy Book", serif !important;');
+  });
+
   it('applies renderer attributes and paginated margins only when a renderer exists', () => {
     const renderer = {
       setAttribute: vi.fn(),

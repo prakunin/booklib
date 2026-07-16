@@ -652,6 +652,11 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
     }, 15000);
   }
 
+  async openCoverSearch(book: Book): Promise<void> {
+    const coverType = book.primaryFile?.bookType === 'AUDIOBOOK' ? 'audiobook' : 'ebook';
+    await this.bookDialogHelperService.openCoverSearchDialog(book.id, coverType);
+  }
+
   quickSend(book: Book) {
     const doSend = () => {
       this.emailService.emailBookQuick(book.id).subscribe({

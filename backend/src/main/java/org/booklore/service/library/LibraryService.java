@@ -17,6 +17,7 @@ import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
 import org.booklore.model.enums.AuditAction;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.websocket.Topic;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.LibraryPathRepository;
@@ -24,6 +25,7 @@ import org.booklore.repository.LibraryRepository;
 import org.booklore.repository.UserRepository;
 import org.booklore.service.NotificationService;
 import org.booklore.service.audit.AuditService;
+import org.booklore.service.inpx.InpxScanControl;
 import org.booklore.service.monitoring.LibraryWatchService;
 import org.booklore.task.options.RescanLibraryContext;
 import org.booklore.util.FileService;
@@ -44,8 +46,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
+import java.util.zip.ZipFile;
 
 @Slf4j
 @Service
@@ -67,12 +71,16 @@ public class LibraryService {
     private final AuditService auditService;
     private final LibraryProcessingService libraryProcessingService;
     private final Executor taskExecutor;
-    private final Set<Long> scanningLibraries = ConcurrentHashMap.newKeySet();
+    private final InpxScanControl inpxScanControl;
+    private final ConcurrentMap<Long, Boolean> scanningLibraries = new ConcurrentHashMap<>();
 
     @Transactional
     @EventListener(ApplicationReadyEvent.class)
     public void initializeMonitoring() {
-        List<Library> libraries = libraryRepository.findAll().stream().map(libraryMapper::toLibrary).toList();
+        List<Library> libraries = libraryRepository.findAll().stream()
+                .filter(library -> library.getSourceType() != LibrarySourceType.INPX)
+                .map(libraryMapper::toLibrary)
+                .toList();
         libraryWatchService.registerLibraries(libraries);
         log.info("Monitoring initialized with {} libraries", libraries.size());
     }
@@ -82,10 +90,13 @@ public class LibraryService {
         LibraryEntity library = libraryRepository.findById(libraryId)
                 .orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
 
+        LibrarySourceType previousSourceType = library.getSourceType();
+        applyAndValidateSource(request, library);
+
         library.setName(request.getName());
         library.setIcon(request.getIcon());
         library.setIconType(request.getIconType());
-        library.setWatch(request.isWatch());
+        library.setWatch(library.getSourceType() == LibrarySourceType.FILESYSTEM && request.isWatch());
         library.setFormatPriority(request.getFormatPriority());
         library.setAllowedFormats(request.getAllowedFormats());
         if (request.getMetadataSource() != null) {
@@ -136,13 +147,14 @@ public class LibraryService {
 
         LibraryEntity savedLibrary = libraryRepository.save(library);
 
-        if (request.isWatch()) {
+        if (library.getSourceType() == LibrarySourceType.FILESYSTEM && request.isWatch()) {
             libraryWatchService.registerLibraries(List.of(libraryMapper.toLibrary(savedLibrary)));
         } else {
             libraryWatchService.unregisterLibrary(libraryId);
         }
 
-        if (!newPaths.isEmpty()) {
+        if (!newPaths.isEmpty() || previousSourceType != library.getSourceType()
+                || library.getSourceType() == LibrarySourceType.INPX) {
             scheduleBackgroundScanAfterCommit(libraryId);
         }
 
@@ -158,6 +170,9 @@ public class LibraryService {
 
         // Stream.toList() returns an unmodifiable list, while JPA/Hibernate requires a mutable collection for entity
         // relationship fields
+        LibrarySourceType sourceType = sourceType(request);
+        validateSource(request, sourceType);
+
         LibraryEntity libraryEntity = LibraryEntity.builder()
                 .name(request.getName())
                 .libraryPaths(
@@ -169,7 +184,10 @@ public class LibraryService {
                 )
                 .icon(request.getIcon())
                 .iconType(request.getIconType())
-                .watch(request.isWatch())
+                .watch(sourceType == LibrarySourceType.FILESYSTEM && request.isWatch())
+                .sourceType(sourceType)
+                .inpxPath(sourceType == LibrarySourceType.INPX ? normalizedOrNull(request.getInpxPath()) : null)
+                .inpxArchivePath(sourceType == LibrarySourceType.INPX ? normalized(request.getInpxArchivePath()) : null)
                 .formatPriority(request.getFormatPriority())
                 .allowedFormats(request.getAllowedFormats())
                 .metadataSource(request.getMetadataSource())
@@ -184,7 +202,7 @@ public class LibraryService {
         libraryEntity = libraryRepository.save(libraryEntity);
         Long libraryId = libraryEntity.getId();
 
-        if (request.isWatch()) {
+        if (sourceType == LibrarySourceType.FILESYSTEM && request.isWatch()) {
             for (LibraryPathEntity pathEntity : libraryEntity.getLibraryPaths()) {
                 Path path = Paths.get(pathEntity.getPath());
                 libraryWatchService.registerPath(path, libraryId);
@@ -203,7 +221,7 @@ public class LibraryService {
         auditService.log(AuditAction.LIBRARY_SCANNED, "Library", libraryId, "Scanned library: " + lib.getName());
 
         taskExecutor.execute(() -> {
-            if (!scanningLibraries.add(libraryId)) {
+            if (!beginScan(libraryId)) {
                 log.warn("Library {} is already being scanned, skipping duplicate rescan request", libraryId);
                 return;
             }
@@ -221,6 +239,41 @@ public class LibraryService {
             }
             log.info("Parsing task completed!");
         });
+    }
+
+    /**
+     * Opens the scan guard for a library, clearing any leftover cancellation flag as part of the
+     * same atomic step.
+     * <p>
+     * Doing both inside the mapping function is what makes cancellation safe. {@link #cancelScan}
+     * only accepts a cancellation once the key is visible, and the map publishes the key only after
+     * the mapping function returns, so a cancellation can never be accepted before the clear (it
+     * would be silently wiped) nor wiped after being accepted. Clearing here also disarms a flag
+     * stranded by a cancellation that raced a finishing scan, which would otherwise abort the next
+     * scan at its first batch boundary. A duplicate request does not run the mapping function, so a
+     * running scan's accepted cancellation survives.
+     *
+     * @return false when a scan is already running for this library.
+     */
+    private boolean beginScan(long libraryId) {
+        boolean[] opened = {false};
+        scanningLibraries.computeIfAbsent(libraryId, id -> {
+            inpxScanControl.clear(id);
+            opened[0] = true;
+            return Boolean.TRUE;
+        });
+        return opened[0];
+    }
+
+    public void cancelScan(long libraryId) {
+        // Only forward the cancellation while a scan is actually running, so a cancel that races a
+        // scan's terminal event cannot strand a flag. beginScan clears any that slips through.
+        if (!scanningLibraries.containsKey(libraryId)) {
+            log.info("Ignoring cancellation for library {}: no scan is currently running", libraryId);
+            return;
+        }
+        inpxScanControl.requestCancel(libraryId);
+        log.info("Cancellation requested for the scan of library {}", libraryId);
     }
 
     public Library getLibrary(long libraryId) {
@@ -293,6 +346,10 @@ public class LibraryService {
     }
 
     public int scanLibraryPaths(CreateLibraryRequest request) {
+        if (sourceType(request) == LibrarySourceType.INPX) {
+            validateSource(request, LibrarySourceType.INPX);
+            return 0;
+        }
         int count = 0;
         if (request.getPaths() == null || request.getPaths().isEmpty()) {
             return count;
@@ -346,6 +403,69 @@ public class LibraryService {
         return false;
     }
 
+    private void applyAndValidateSource(CreateLibraryRequest request, LibraryEntity library) {
+        LibrarySourceType sourceType = sourceType(request);
+        validateSource(request, sourceType);
+        library.setSourceType(sourceType);
+        library.setInpxPath(sourceType == LibrarySourceType.INPX ? normalizedOrNull(request.getInpxPath()) : null);
+        library.setInpxArchivePath(sourceType == LibrarySourceType.INPX ? normalized(request.getInpxArchivePath()) : null);
+    }
+
+    private void validateSource(CreateLibraryRequest request, LibrarySourceType sourceType) {
+        if (sourceType != LibrarySourceType.INPX) {
+            return;
+        }
+        Path archivePath = requiredPath(request.getInpxArchivePath(), "INPX archive directory is required");
+        if (!Files.isDirectory(archivePath) || !Files.isReadable(archivePath)) {
+            throw ApiError.GENERIC_BAD_REQUEST.createException("INPX archive path must be a readable directory");
+        }
+        if (request.getInpxPath() == null || request.getInpxPath().isBlank()) {
+            return;
+        }
+        Path inpxPath = requiredPath(request.getInpxPath(), "INPX index path is required");
+        if (!Files.isRegularFile(inpxPath) || !Files.isReadable(inpxPath)
+                || !inpxPath.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".inpx")) {
+            throw ApiError.GENERIC_BAD_REQUEST.createException("INPX index must be a readable .inpx file");
+        }
+        validateInpxArchive(inpxPath);
+    }
+
+    private Path requiredPath(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw ApiError.GENERIC_BAD_REQUEST.createException(message);
+        }
+        try {
+            return Path.of(value).toAbsolutePath().normalize();
+        } catch (RuntimeException e) {
+            throw ApiError.GENERIC_BAD_REQUEST.createException(message);
+        }
+    }
+
+    private void validateInpxArchive(Path inpxPath) {
+        try (ZipFile inpx = new ZipFile(inpxPath.toFile())) {
+            boolean containsIndex = inpx.stream()
+                    .anyMatch(entry -> !entry.isDirectory()
+                            && entry.getName().toLowerCase(Locale.ROOT).endsWith(".inp"));
+            if (!containsIndex) {
+                throw ApiError.GENERIC_BAD_REQUEST.createException("INPX index does not contain any .inp catalogs");
+            }
+        } catch (IOException e) {
+            throw ApiError.GENERIC_BAD_REQUEST.createException("INPX index is empty or invalid");
+        }
+    }
+
+    private String normalized(String value) {
+        return Path.of(value).toAbsolutePath().normalize().toString();
+    }
+
+    private String normalizedOrNull(String value) {
+        return value == null || value.isBlank() ? null : normalized(value);
+    }
+
+    private LibrarySourceType sourceType(CreateLibraryRequest request) {
+        return request.getSourceType() == null ? LibrarySourceType.FILESYSTEM : request.getSourceType();
+    }
+
     private void scheduleBackgroundScanAfterCommit(long libraryId) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -361,7 +481,7 @@ public class LibraryService {
 
     private void startBackgroundScan(long libraryId) {
         taskExecutor.execute(() -> {
-            if (!scanningLibraries.add(libraryId)) {
+            if (!beginScan(libraryId)) {
                 log.warn("Library {} is already being scanned, skipping duplicate process request", libraryId);
                 return;
             }

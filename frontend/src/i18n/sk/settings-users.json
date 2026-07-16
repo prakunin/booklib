@@ -1,6 +1,6 @@
 {
     "title": "Správa používateľov",
-    "description": "Spravujte používateľov Grimmory, ich oprávnenia a prístup ku knižniciam. Nakonfigurujte používateľské roly a možnosti pre vašu zbierku kníh.",
+    "description": "Spravujte používateľov BookLib, ich oprávnenia a prístup ku knižniciam. Nakonfigurujte používateľské roly a možnosti pre vašu zbierku kníh.",
     "permGroups": {
         "bulkReset": "",
         "metadataEditing": "",

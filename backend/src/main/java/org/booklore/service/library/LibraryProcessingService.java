@@ -10,17 +10,22 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.websocket.LogNotification;
 import org.booklore.model.websocket.Topic;
 import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.LibraryRepository;
 import org.booklore.service.NotificationService;
+import org.booklore.service.inpx.InpxLibraryScanner;
 import org.booklore.service.file.FileFingerprint;
 import org.booklore.task.options.RescanLibraryContext;
 import org.booklore.util.FileUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -46,13 +51,19 @@ public class LibraryProcessingService {
     private final LibraryFileHelper libraryFileHelper;
     private final BookGroupingService bookGroupingService;
     private final BookCoverGenerator bookCoverGenerator;
+    private final InpxLibraryScanner inpxLibraryScanner;
     @PersistenceContext
     private final EntityManager entityManager;
+    private final PlatformTransactionManager transactionManager;
 
     @Transactional
     public void processLibrary(long libraryId) {
         LibraryEntity libraryEntity = libraryRepository.findByIdWithPaths(libraryId).orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
         notificationService.sendMessage(Topic.LOG, LogNotification.info("Started processing library: " + libraryEntity.getName()));
+        if (libraryEntity.getSourceType() == LibrarySourceType.INPX) {
+            scanInpxLibrary(libraryEntity, "processing");
+            return;
+        }
         try {
             List<LibraryFile> libraryFiles = libraryFileHelper.getLibraryFiles(libraryEntity);
             List<BookEntity> existingBooks = bookRepository.findAllByLibraryIdForRescan(libraryId);
@@ -78,6 +89,11 @@ public class LibraryProcessingService {
         LibraryEntity libraryEntity = libraryRepository.findByIdWithPaths(libraryId)
                 .orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
         notificationService.sendMessage(Topic.LOG, LogNotification.info("Started refreshing library: " + libraryEntity.getName()));
+
+        if (libraryEntity.getSourceType() == LibrarySourceType.INPX) {
+            scanInpxLibrary(libraryEntity, "refreshing");
+            return;
+        }
 
         validateLibraryPathsAccessible(libraryEntity);
 
@@ -195,5 +211,31 @@ public class LibraryProcessingService {
         } catch (Exception e) {
             log.error("Error auto-attaching file {}: {}", file.getFileName(), e.getMessage());
         }
+    }
+
+    private void scanInpxLibrary(LibraryEntity libraryEntity, String action) {
+        String inpxPath = libraryEntity.getInpxPath();
+        if (inpxPath == null || inpxPath.isBlank()) {
+            log.info("Skipping {} of INPX library {}: no index configured", action, libraryEntity.getId());
+            notificationService.sendMessage(Topic.LOG, LogNotification.info(
+                    "Skipped " + action + " INPX library without an index: " + libraryEntity.getName()));
+            return;
+        }
+        // processLibrary(...)/rescanLibrary(...) are @Transactional, and are the only callers of
+        // this method. The scan itself can run for hours and loads what it needs itself
+        // (InpxLibraryScanner is deliberately non-transactional: InpxBatchWriter commits one
+        // batch at a time), so it must not hold the enclosing transaction - and its pooled
+        // connection and InnoDB read view - open for the whole ingest. Suspend the outer
+        // transaction for the duration of the scan and resume it once the scan returns.
+        runWithoutTransaction(() -> inpxLibraryScanner.scan(libraryEntity.getId()));
+        notificationService.sendMessage(Topic.LIBRARY_SCAN_COMPLETE, libraryEntity.getId());
+        notificationService.sendMessage(Topic.LOG, LogNotification.info(
+                "Finished " + action + " INPX library: " + libraryEntity.getName()));
+    }
+
+    private void runWithoutTransaction(Runnable action) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+        template.executeWithoutResult(status -> action.run());
     }
 }

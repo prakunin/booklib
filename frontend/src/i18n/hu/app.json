@@ -1,8 +1,8 @@
 {
     "offline": "Offline vagy",
-    "loading": "Grimmory betöltése…",
+    "loading": "BookLib betöltése…",
     "loadingDescription": "Kérlek várj amíg felkészülünk.",
-    "offlineLoadingDescription": "Szerverkapcsolat szükséges a Grimmory betöltéséhez.",
+    "offlineLoadingDescription": "Szerverkapcsolat szükséges a BookLib betöltéséhez.",
     "offlineDescription": "Ellenőrizd a hálózati kapcsolatodat és próbáld újra.",
     "connectionLost": "A kapcsolatod megszakadt. Bizonyos funkciók elérhetetlenek lehetnek."
 }

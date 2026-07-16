@@ -1,16 +1,16 @@
-import { Component, computed, inject, OnInit, OnDestroy, AfterViewInit, ElementRef, ViewChild, Signal, signal } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DynamicDialogRef, DynamicDialogConfig } from 'primeng/dynamicdialog';
 import { AutoComplete, AutoCompleteSelectEvent } from 'primeng/autocomplete';
 import { Button } from 'primeng/button';
 import { Checkbox } from 'primeng/checkbox';
-import { Subject, takeUntil } from 'rxjs';
-import { BookService } from '../../service/book.service';
+import { debounceTime, distinctUntilChanged, map, startWith, Subject, switchMap, takeUntil } from 'rxjs';
 import { BookFileService } from '../../service/book-file.service';
 import { Book } from '../../model/book.model';
 import { MessageService, PrimeTemplate } from 'primeng/api';
 import { TranslocoDirective, TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { AppSettingsService } from '../../../../shared/service/app-settings.service';
+import {AppBooksApiService} from '../../service/app-books-api.service';
 
 @Component({
   selector: 'app-book-file-attacher',
@@ -39,13 +39,13 @@ export class BookFileAttacherComponent implements OnInit, AfterViewInit, OnDestr
   autocomplePanelStyle: Record<string, string> = {};
 
   private destroy$ = new Subject<void>();
-  private allBooks: Signal<Book[]> = signal([]);
+  private searchRequests = new Subject<string>();
 
   private readonly t = inject(TranslocoService);
   private readonly appSettingsService = inject(AppSettingsService);
   private dialogRef = inject(DynamicDialogRef);
   private config = inject(DynamicDialogConfig);
-  private bookService = inject(BookService);
+  private appBooksApi = inject(AppBooksApiService);
   private bookFileService = inject(BookFileService);
   private messageService = inject(MessageService);
 
@@ -80,13 +80,21 @@ export class BookFileAttacherComponent implements OnInit, AfterViewInit, OnDestr
     const libraryId = this.sourceBooks[0].libraryId;
     const sourceBookIds = new Set(this.sourceBooks.map(b => b.id));
 
-    this.allBooks = computed(() =>
-      this.bookService.books().filter(book =>
-        book.libraryId === libraryId && !sourceBookIds.has(book.id)
-      )
-    );
-
-    this.filteredBooks = this.allBooks().slice(0, 20);
+    this.searchRequests.pipe(
+      startWith(''),
+      debounceTime(150),
+      distinctUntilChanged(),
+      switchMap(query => this.appBooksApi.getPage(
+        {libraryId},
+        {field: 'title', dir: 'asc'},
+        20 + sourceBookIds.size,
+        query,
+      )),
+      map(books => books.filter(book => !sourceBookIds.has(book.id)).slice(0, 20)),
+      takeUntil(this.destroy$),
+    ).subscribe(books => {
+      this.filteredBooks = books;
+    });
   }
 
   ngOnDestroy(): void {
@@ -99,20 +107,7 @@ export class BookFileAttacherComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   filterBooks(event: { query: string; }): void {
-    const query = event.query.toLowerCase().trim();
-    const books = this.allBooks();
-    if (!query) {
-      this.filteredBooks = books.slice(0, 20);
-      return;
-    }
-
-    this.filteredBooks = books
-      .filter(book => {
-        const title = book.metadata?.title?.toLowerCase() || '';
-        const authors = book.metadata?.authors?.join(' ').toLowerCase() || '';
-        return title.includes(query) || authors.includes(query);
-      })
-      .slice(0, 20);
+    this.searchRequests.next(event.query.trim());
   }
 
   onBookSelect(event: AutoCompleteSelectEvent): void {

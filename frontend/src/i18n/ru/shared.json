@@ -31,6 +31,29 @@
         "statusFailed": "Ошибка",
         "destinationLibrary": "Библиотека",
         "destinationBookdrop": "Bookdrop",
+        "destinationInpx": "INPX",
+        "inpxTitle": "Каталог INPX",
+        "inpxPathLabel": "Путь к индексу INPX",
+        "inpxPathPlaceholder": "/catalog/librusec_local_fb2.inpx",
+        "inpxPathHint": "Путь должен быть доступен backend-контейнеру BookLib.",
+        "inpxArchivePathLabel": "Каталог архивов (необязательно)",
+        "inpxArchivePathPlaceholder": "/catalog",
+        "inpxArchivePathHint": "Оставьте пустым, если ZIP-файлы находятся рядом с индексом INPX.",
+        "inpxSearchPlaceholder": "Поиск по названию, автору, серии или ID",
+        "inpxSearchBtn": "Найти",
+        "inpxFound": "Показано книг: {{ count }}; просмотрено записей: {{ scanned }}.",
+        "inpxTruncated": "Уточните запрос, чтобы увидеть остальные результаты.",
+        "inpxSelectAll": "Выбрать все результаты",
+        "inpxSelected": "Выбрано: {{ count }}",
+        "inpxImportBtn": "Импортировать выбранные ({{ count }})",
+        "inpxPathRequired": "Укажите серверный путь к индексу INPX.",
+        "inpxSelectionRequired": "Выберите библиотеку, путь назначения и хотя бы одну книгу INPX.",
+        "inpxSearchFailed": "Ошибка поиска INPX",
+        "inpxSearchFailedDetail": "Не удалось прочитать индекс INPX.",
+        "inpxImportComplete": "Импорт INPX завершён",
+        "inpxImportSummary": "Импортировано: {{ imported }}, пропущено: {{ skipped }}, ошибок: {{ failed }}.",
+        "inpxImportFailed": "Ошибка импорта INPX",
+        "inpxImportFailedDetail": "Не удалось импортировать выбранные книги.",
         "toast": {
             "noDestinationSummary": "Место загрузки не выбрано",
             "noDestinationDetail": "Пожалуйста, выберите библиотеку и подпапку перед добавлением файлов.",
@@ -112,7 +135,8 @@
         "statusInProgress": "Выполняется",
         "statusCompleted": "Завершено",
         "statusError": "Ошибка",
-        "statusCancelled": "Отменено"
+        "statusCancelled": "Отменено",
+        "cancelScanBtn": "Остановить сканирование"
     },
     "reader": {
         "failedToLoadPages": "Не удалось загрузить страницы",
@@ -124,7 +148,7 @@
         "saveErrorDetail": "Произошла ошибка при сохранении настроек."
     },
     "setup": {
-        "title": "Добро пожаловать в Grimmory",
+        "title": "Добро пожаловать в BookLib",
         "subtitle": "Создайте начальную учётную запись администратора",
         "usernameLabel": "Имя пользователя",
         "usernamePlaceholder": "Выберите имя пользователя",
@@ -144,12 +168,21 @@
             "nameRequired": "Имя обязательно",
             "emailRequired": "Необходим корректный адрес электронной почты",
             "passwordMinLength": "Минимум 6 символов",
+            "passwordInvalid": "Пароль не соответствует текущим требованиям",
             "confirmPasswordRequired": "Подтверждение пароля обязательно",
             "passwordsMismatch": "Пароли не совпадают"
         },
         "toast": {
             "createFailedDefault": "Не удалось создать администратора. Попробуйте снова."
         }
+    },
+    "passwordPolicy": {
+        "minimumLength": "Минимум {{ count }} символ(а)",
+        "uppercase": "заглавная буква",
+        "lowercase": "строчная буква",
+        "digit": "цифра",
+        "specialCharacter": "специальный символ",
+        "invalid": "Пароль не соответствует текущим требованиям"
     },
     "ui": {
         "validation": {

@@ -18,6 +18,8 @@
           {{ t('libraryCreator.loading.complete') }}
         } @else if (progress.status === 'ERROR') {
           {{ t('libraryCreator.creator.toast.createFailedSummary') }}
+        } @else if (progress.status === 'CANCELLED') {
+          {{ t('shared.metadataProgress.statusCancelled') }}
         } @else {
           {{ t('libraryCreator.loading.processing') }} <strong>{{ progress.currentBookTitle || progress.libraryName }}</strong>
         }
@@ -32,6 +34,21 @@
         [value]="getProgressPercent(progress)"
         [showValue]="false">
       </p-progressBar>
+
+      @if (progress.status === 'IN_PROGRESS' && progress.cancellable) {
+        <div class="mt-3.5 flex flex-wrap justify-end gap-1.5">
+          <button
+            pButton
+            type="button"
+            [label]="t('shared.metadataProgress.cancelScanBtn')"
+            icon="pi pi-times-circle"
+            severity="danger"
+            size="small"
+            outlined
+            (click)="cancelScan(progress)">
+          </button>
+        </div>
+      }
 
       @if (progress.status !== 'IN_PROGRESS') {
         <div class="mt-3.5 flex flex-wrap justify-end gap-1.5">

@@ -15,6 +15,8 @@ import org.booklore.model.enums.ReadStatus;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.ReadingSessionRepository;
 import org.booklore.repository.UserBookProgressRepository;
+import org.booklore.service.annotation.CacheUserStats;
+import org.booklore.service.annotation.InvalidateUserStats;
 import org.booklore.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -123,6 +125,7 @@ public class ReadingSessionService {
     }
 
     @Transactional
+    @InvalidateUserStats
     public void recordSession(ReadingSessionRequest request) {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
@@ -150,6 +153,7 @@ public class ReadingSessionService {
         log.info("Reading session persisted successfully: sessionId={}, userId={}, bookId={}, duration={}s", session.getId(), userId, request.getBookId(), request.getDurationSeconds());
     }
 
+    @CacheUserStats
     public List<ReadingSessionHeatmapResponse> getSessionHeatmapForYear(int year) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -160,6 +164,7 @@ public class ReadingSessionService {
         }
     }
 
+    @CacheUserStats
     public List<ReadingSessionHeatmapResponse> getSessionHeatmapForMonth(int year, int month) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -170,6 +175,7 @@ public class ReadingSessionService {
         }
     }
 
+    @CacheUserStats
     public List<ReadingSessionTimelineResponse> getSessionTimelineForWeek(int year, int week) {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
@@ -193,6 +199,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public List<ReadingSpeedResponse> getReadingSpeedForYear(int year) {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
@@ -210,6 +217,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public List<PeakHoursResponse> getPeakReadingHours(Integer year, Integer month) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -219,6 +227,7 @@ public class ReadingSessionService {
         return computePeakHours(sessions, zone);
     }
 
+    @CacheUserStats
     public List<FavoriteReadingDaysResponse> getFavoriteReadingDays(Integer year, Integer month) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -228,6 +237,7 @@ public class ReadingSessionService {
         return computeFavoriteDays(sessions, zone);
     }
 
+    @CacheUserStats
     public List<GenreStatisticsResponse> getGenreStatistics() {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
@@ -250,6 +260,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public List<CompletionTimelineResponse> getCompletionTimeline(int year) {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
@@ -316,6 +327,7 @@ public class ReadingSessionService {
                 .build());
     }
 
+    @CacheUserStats
     public List<BookCompletionHeatmapResponse> getBookCompletionHeatmap() {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
@@ -333,6 +345,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public List<PageTurnerScoreResponse> getPageTurnerScores() {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
@@ -434,6 +447,7 @@ public class ReadingSessionService {
 
     private static final int COMPLETION_RACE_BOOK_LIMIT = 10;
 
+    @CacheUserStats
     public List<CompletionRaceResponse> getCompletionRace(int year) {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
@@ -476,6 +490,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public List<ReadingSessionHeatmapResponse> getReadingDates() {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -485,6 +500,7 @@ public class ReadingSessionService {
         }
     }
 
+    @CacheUserStats
     public BookDistributionsResponse getBookDistributions() {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
@@ -558,6 +574,7 @@ public class ReadingSessionService {
         return max;
     }
 
+    @CacheUserStats
     public List<SessionScatterResponse> getSessionScatter(int year) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -577,6 +594,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public ReadingStreakResponse getReadingStreak() {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -636,6 +654,7 @@ public class ReadingSessionService {
                 .build();
     }
 
+    @CacheUserStats
     public List<BookTimelineResponse> getBookTimeline(int year) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -683,6 +702,7 @@ public class ReadingSessionService {
     // Listening (audiobook) stats
     // ========================================================================
 
+    @CacheUserStats
     public List<ListeningHeatmapResponse> getListeningHeatmapForMonth(int year, int month) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -706,6 +726,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public List<WeeklyListeningTrendResponse> getWeeklyListeningTrend(int weeks) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -736,6 +757,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public ListeningCompletionResponse getListeningCompletion() {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         var progressList = readingSessionRepository.findAudiobookProgressByUser(userId);
@@ -772,6 +794,7 @@ public class ReadingSessionService {
                 .build();
     }
 
+    @CacheUserStats
     public List<MonthlyPaceResponse> getMonthlyListeningPace(int months) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -801,6 +824,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public ListeningFinishFunnelResponse getListeningFinishFunnel() {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         var progressList = readingSessionRepository.findAudiobookProgressByUser(userId);
@@ -831,6 +855,7 @@ public class ReadingSessionService {
                 .build();
     }
 
+    @CacheUserStats
     public List<PeakHoursResponse> getListeningPeakHours(Integer year, Integer month) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -840,6 +865,7 @@ public class ReadingSessionService {
         return computePeakHours(sessions, zone);
     }
 
+    @CacheUserStats
     public List<FavoriteReadingDaysResponse> getListeningFavoriteDays(Integer year, Integer month) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -849,6 +875,7 @@ public class ReadingSessionService {
         return computeFavoriteDays(sessions, zone);
     }
 
+    @CacheUserStats
     public List<GenreStatisticsResponse> getListeningGenreStatistics() {
         Long userId = authenticationService.getAuthenticatedUser().getId();
 
@@ -870,6 +897,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public List<ListeningAuthorResponse> getListeningAuthorStats() {
         Long userId = authenticationService.getAuthenticatedUser().getId();
 
@@ -884,6 +912,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public List<SessionScatterResponse> getListeningSessionScatter() {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         ZoneId zone = ZoneId.systemDefault();
@@ -901,6 +930,7 @@ public class ReadingSessionService {
                 .toList();
     }
 
+    @CacheUserStats
     public List<LongestAudiobookResponse> getListeningLongestBooks() {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         return readingSessionRepository.findAudiobookProgressByUser(userId)

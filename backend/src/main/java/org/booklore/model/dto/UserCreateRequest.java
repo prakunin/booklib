@@ -14,7 +14,7 @@ public class UserCreateRequest {
     private String username;
 
     @NotBlank
-    @Size(min = 8, max = 72, message = "Password must be at least 8 characters long")
+    @Size(max = 72, message = "Password must be no more than 72 characters long")
     private String password;
 
     @NotBlank

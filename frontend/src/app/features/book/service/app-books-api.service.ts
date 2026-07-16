@@ -1,11 +1,12 @@
 import {computed, inject, Injectable, signal} from '@angular/core';
 import {HttpClient, HttpParams} from '@angular/common/http';
-import {lastValueFrom, Observable} from 'rxjs';
+import {concatMap, from, lastValueFrom, map, Observable, toArray} from 'rxjs';
 import {injectInfiniteQuery, injectQuery, QueryClient} from '@tanstack/angular-query-experimental';
 import {API_CONFIG} from '../../../core/config/api-config';
 import {AuthService} from '../../../shared/service/auth.service';
 import {
   AppBookFilters,
+  AppCatalogSummary,
   AppBookSort,
   AppBookSummary,
   AppFilterOptions,
@@ -31,6 +32,12 @@ export class AppBooksApiService {
   private readonly _filters = signal<AppBookFilters>({});
   private readonly _sort = signal<AppBookSort>({field: 'addedOn', dir: 'desc'});
   private readonly _search = signal('');
+  private readonly _booksEnabled = signal(false);
+  private readonly _filterOptionsEnabled = signal(false);
+  private readonly _globalFilterOptionsEnabled = signal(false);
+  private readonly _catalogSummaryEnabled = signal(false);
+  private globalFilterOptionsEnableScheduled = false;
+  private catalogSummaryEnableScheduled = false;
 
   readonly booksQuery = injectInfiniteQuery(() => ({
     queryKey: ['app-books', this._filters(), this._sort(), this._search()] as const,
@@ -41,12 +48,12 @@ export class AppBooksApiService {
     initialPageParam: 0,
     getNextPageParam: (lastPage: AppPageResponse<AppBookSummary>) =>
       lastPage.hasNext ? lastPage.page + 1 : undefined,
-    enabled: !!this.token(),
+    enabled: !!this.token() && this._booksEnabled(),
     staleTime: 5 * 60_000,
   }));
 
   readonly filterOptionsQuery = injectQuery(() => ({
-    queryKey: ['app-filter-options', this._filters().libraryId, this._filters().shelfId, this._filters().magicShelfId] as const,
+    queryKey: this.filterOptionsQueryKey(),
     queryFn: () => {
       const filters = this._filters();
       let params = new HttpParams();
@@ -55,7 +62,21 @@ export class AppBooksApiService {
       if (filters.magicShelfId) params = params.set('magicShelfId', filters.magicShelfId.toString());
       return lastValueFrom(this.http.get<AppFilterOptions>(this.filterOptionsUrl, {params}));
     },
-    enabled: !!this.token(),
+    enabled: !!this.token() && this._filterOptionsEnabled(),
+    staleTime: 10 * 60_000,
+  }));
+
+  readonly globalFilterOptionsQuery = injectQuery(() => ({
+    queryKey: ['app-filter-options', 'global'] as const,
+    queryFn: () => lastValueFrom(this.http.get<AppFilterOptions>(this.filterOptionsUrl)),
+    enabled: !!this.token() && this._globalFilterOptionsEnabled(),
+    staleTime: 10 * 60_000,
+  }));
+
+  readonly catalogSummaryQuery = injectQuery(() => ({
+    queryKey: ['app-catalog-summary'] as const,
+    queryFn: () => lastValueFrom(this.http.get<AppCatalogSummary>(`${this.booksUrl}/summary`)),
+    enabled: !!this.token() && this._catalogSummaryEnabled(),
     staleTime: 10 * 60_000,
   }));
 
@@ -73,9 +94,10 @@ export class AppBooksApiService {
   });
 
   readonly hasNextPage = computed(() => this.booksQuery.hasNextPage());
-  readonly isLoading = computed(() => this.booksQuery.isPending());
+  readonly isLoading = computed(() => this.booksQuery.isLoading());
   readonly isFetchingNextPage = computed(() => this.booksQuery.isFetchingNextPage());
   readonly isError = computed(() => this.booksQuery.isError());
+  readonly hasData = computed(() => this.booksQuery.data() !== undefined);
   readonly error = computed<string | null>(() => {
     if (!this.booksQuery.isError()) return null;
     const err = this.booksQuery.error();
@@ -84,6 +106,11 @@ export class AppBooksApiService {
 
   private readonly _filterOptions = computed(() => this.filterOptionsQuery.data() ?? null);
   readonly filterOptions = this._filterOptions;
+  readonly globalFilterOptions = computed(() => this.globalFilterOptionsQuery.data() ?? null);
+  readonly catalogSummary = computed(() => {
+    this.enableCatalogSummary();
+    return this.catalogSummaryQuery.data() ?? null;
+  });
 
   // Individual signals for each filter type for more granular reactivity
   readonly authorOptions = computed(() => this._filterOptions()?.authors ?? []);
@@ -123,6 +150,10 @@ export class AppBooksApiService {
     }
   }
 
+  setBooksEnabled(enabled: boolean): void {
+    this._booksEnabled.set(enabled);
+  }
+
   setSort(sort: AppBookSort): void {
     const current = this._sort();
     if (current.field !== sort.field || current.dir !== sort.dir) {
@@ -136,6 +167,28 @@ export class AppBooksApiService {
     }
   }
 
+  setFilterOptionsEnabled(enabled: boolean): void {
+    this._filterOptionsEnabled.set(enabled);
+  }
+
+  enableGlobalFilterOptions(): void {
+    if (this._globalFilterOptionsEnabled() || this.globalFilterOptionsEnableScheduled) return;
+    this.globalFilterOptionsEnableScheduled = true;
+    queueMicrotask(() => {
+      this.globalFilterOptionsEnableScheduled = false;
+      this._globalFilterOptionsEnabled.set(true);
+    });
+  }
+
+  private enableCatalogSummary(): void {
+    if (this._catalogSummaryEnabled() || this.catalogSummaryEnableScheduled) return;
+    this.catalogSummaryEnableScheduled = true;
+    queueMicrotask(() => {
+      this.catalogSummaryEnableScheduled = false;
+      this._catalogSummaryEnabled.set(true);
+    });
+  }
+
   searchBooks(query: string, size = 20): Observable<AppPageResponse<AppBookSummary>> {
     const params = new HttpParams()
       .set('q', query.trim())
@@ -143,6 +196,82 @@ export class AppBooksApiService {
       .set('size', Math.max(1, size).toString());
 
     return this.http.get<AppPageResponse<AppBookSummary>>(`${this.booksUrl}/search`, {params});
+  }
+
+  getContinueReading(limit = 10): Observable<Book[]> {
+    return this.getSummaryList('continue-reading', limit);
+  }
+
+  getContinueListening(limit = 10): Observable<Book[]> {
+    return this.getSummaryList('continue-listening', limit);
+  }
+
+  getRecentlyAdded(limit = 10): Observable<Book[]> {
+    return this.getSummaryList('recently-added', limit);
+  }
+
+  getRandom(limit = 10): Observable<Book[]> {
+    const params = new HttpParams().set('page', '0').set('size', Math.max(1, limit).toString());
+    return this.http.get<AppPageResponse<AppBookSummary>>(`${this.booksUrl}/random`, {params}).pipe(
+      map(response => response.content.map(summaryToBook)),
+    );
+  }
+
+  getPage(filters: AppBookFilters, sort: AppBookSort, size = PAGE_SIZE, search = ''): Observable<Book[]> {
+    let params = this.buildFilterParamsFor(filters, search);
+    params = params
+      .set('page', '0')
+      .set('size', Math.max(1, size).toString())
+      .set('sort', sort.field)
+      .set('dir', sort.dir);
+    return this.http.get<AppPageResponse<AppBookSummary>>(this.booksUrl, {params}).pipe(
+      map(response => response.content.map(summaryToBook)),
+    );
+  }
+
+  getSeriesBooks(seriesName: string): Observable<Book[]> {
+    return from(this.fetchAllPages(
+      {series: [seriesName]},
+      {field: 'seriesNumber', dir: 'asc'},
+    ));
+  }
+
+  getCount(filters: AppBookFilters): Observable<number> {
+    const params = this.buildFilterParamsFor(filters, '')
+      .set('page', '0')
+      .set('size', '1');
+    return this.http.get<AppPageResponse<AppBookSummary>>(this.booksUrl, {params}).pipe(
+      map(response => response.totalElements),
+    );
+  }
+
+  findExistingIsbns(libraryId: number, isbns: string[]): Observable<Set<string>> {
+    const params = new HttpParams().set('libraryId', libraryId.toString());
+    return this.http.post<string[]>(`${this.booksUrl}/isbn-matches`, isbns, {params}).pipe(
+      map(matches => new Set(matches)),
+    );
+  }
+
+  getBooksByIds(bookIds: number[]): Observable<Book[]> {
+    if (bookIds.length === 0) return from([[]]);
+    const batches: number[][] = [];
+    for (let offset = 0; offset < bookIds.length; offset += 500) {
+      batches.push(bookIds.slice(offset, offset + 500));
+    }
+
+    return from(batches).pipe(
+      concatMap(batch => this.http.post<AppBookSummary[]>(`${this.booksUrl}/summaries`, batch)),
+      toArray(),
+      map(responses => {
+        const booksById = new Map(
+          responses.flatMap(response => response).map(summary => [summary.id, summaryToBook(summary)]),
+        );
+        return bookIds.flatMap(bookId => {
+          const book = booksById.get(bookId);
+          return book ? [book] : [];
+        });
+      }),
+    );
   }
 
   fetchNextPage(): void {
@@ -159,6 +288,14 @@ export class AppBooksApiService {
   invalidate(): void {
     void this.queryClient.invalidateQueries({queryKey: ['app-books']});
     void this.queryClient.invalidateQueries({queryKey: ['app-filter-options']});
+    void this.queryClient.invalidateQueries({queryKey: ['app-catalog-summary']});
+  }
+
+  private filterOptionsQueryKey(): readonly unknown[] {
+    const {libraryId, shelfId, magicShelfId} = this._filters();
+    return libraryId || shelfId || magicShelfId
+      ? ['app-filter-options', libraryId, shelfId, magicShelfId] as const
+      : ['app-filter-options', 'global'] as const;
   }
 
   private buildParams(page: number): HttpParams {
@@ -172,8 +309,10 @@ export class AppBooksApiService {
   }
 
   private buildFilterParams(): HttpParams {
-    const filters = this._filters();
-    const search = this._search();
+    return this.buildFilterParamsFor(this._filters(), this._search());
+  }
+
+  private buildFilterParamsFor(filters: AppBookFilters, search: string): HttpParams {
 
     let params = new HttpParams();
 
@@ -229,13 +368,41 @@ export class AppBooksApiService {
 
     return params;
   }
+
+  private getSummaryList(path: string, limit: number): Observable<Book[]> {
+    const params = new HttpParams().set('limit', Math.max(1, limit).toString());
+    return this.http.get<AppBookSummary[]>(`${this.booksUrl}/${path}`, {params}).pipe(
+      map(summaries => summaries.map(summaryToBook)),
+    );
+  }
+
+
+  private async fetchAllPages(filters: AppBookFilters, sort: AppBookSort): Promise<Book[]> {
+    const books: Book[] = [];
+    let page = 0;
+    let hasNext = true;
+    while (hasNext) {
+      const params = this.buildFilterParamsFor(filters, '')
+        .set('page', page.toString())
+        .set('size', PAGE_SIZE.toString())
+        .set('sort', sort.field)
+        .set('dir', sort.dir);
+      const response = await lastValueFrom(
+        this.http.get<AppPageResponse<AppBookSummary>>(this.booksUrl, {params}),
+      );
+      books.push(...response.content.map(summaryToBook));
+      hasNext = response.hasNext;
+      page++;
+    }
+    return books;
+  }
 }
 
 /**
  * Maps a server-side AppBookSummary to a Book-shaped object
  * compatible with book browser card and table views.
  */
-function summaryToBook(summary: AppBookSummary): Book {
+export function summaryToBook(summary: AppBookSummary): Book {
   return {
     id: summary.id,
     libraryId: summary.libraryId,
@@ -312,7 +479,7 @@ function summaryToBookType(value: string | null): BookType | undefined {
 
 function summaryToReadStatus(value: string | null): ReadStatus {
   const readStatus = value as ReadStatus;
-  return value != null && READ_STATUSES.has(readStatus) ? readStatus : ReadStatus.UNREAD;
+  return value != null && READ_STATUSES.has(readStatus) ? readStatus : ReadStatus.UNSET;
 }
 
 function summaryToPrimaryFileExtension(summary: AppBookSummary): string | undefined {

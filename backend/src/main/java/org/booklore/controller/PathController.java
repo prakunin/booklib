@@ -1,6 +1,7 @@
 package org.booklore.controller;
 
 import org.booklore.service.file.PathService;
+import org.booklore.model.dto.inpx.InpxIndexOption;
 import lombok.AllArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,5 +30,13 @@ public class PathController {
     @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
     public List<String> getFolders(@Parameter(description = "Path to list folders at") @RequestParam String path) {
         return pathService.getFoldersAtPath(path);
+    }
+
+    @Operation(summary = "Find INPX indexes at a path", description = "List .inpx index files directly inside a folder. Requires admin or library manipulation permission.")
+    @ApiResponse(responseCode = "200", description = "Indexes returned successfully")
+    @GetMapping("/inpx")
+    @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
+    public List<InpxIndexOption> getInpxFiles(@Parameter(description = "Folder to search for .inpx files") @RequestParam String path) {
+        return pathService.getInpxFilesAtPath(path);
     }
 }

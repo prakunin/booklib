@@ -20,5 +20,6 @@
     "progress": "Progress",
     "recentlyRead": "Recently Read",
     "recentlyAdded": "Recently Added"
-  }
+  },
+  "catalogTooLarge": "This view aggregates the whole catalog and is not available for catalogs over 10,000 books. Use the book browser, which loads results page by page."
 }

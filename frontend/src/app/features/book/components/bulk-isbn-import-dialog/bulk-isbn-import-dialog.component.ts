@@ -14,6 +14,8 @@ import {Library} from '../../model/library.model';
 import {BookMetadata, CreatePhysicalBookRequest} from '../../model/book.model';
 import {TranslocoDirective} from '@jsverse/transloco';
 import {Tabs, TabList, Tab, TabPanels, TabPanel} from 'primeng/tabs';
+import {firstValueFrom} from 'rxjs';
+import {AppBooksApiService} from '../../service/app-books-api.service';
 
 const MAX_ISBN_COUNT = 500;
 const MAX_FILE_SIZE_BYTES = 1_048_576; // 1 MB
@@ -61,6 +63,7 @@ export class BulkIsbnImportDialogComponent {
   private dynamicDialogRef = inject(DynamicDialogRef);
   private dialogConfig = inject(DynamicDialogConfig);
   private bookService = inject(BookService);
+  private appBooksApi = inject(AppBooksApiService);
   private bookMetadataService = inject(BookMetadataService);
   private libraryService = inject(LibraryService);
 
@@ -137,6 +140,22 @@ export class BulkIsbnImportDialogComponent {
 
   async startImport(): Promise<void> {
     if (!this.canStartImport()) return;
+
+    const existingIsbns = await firstValueFrom(this.appBooksApi.findExistingIsbns(
+      this.selectedLibraryId!,
+      this.entries.map(entry => entry.isbn),
+    ));
+    if (existingIsbns.size > 0) {
+      const pending: IsbnEntry[] = [];
+      for (const entry of this.entries) {
+        if (existingIsbns.has(entry.isbn)) {
+          this.skipped.push({value: entry.isbn, reason: 'alreadyExists'});
+        } else {
+          pending.push(entry);
+        }
+      }
+      this.entries = pending;
+    }
 
     this.phase = 'processing';
     this.processedCount = 0;
@@ -233,7 +252,6 @@ export class BulkIsbnImportDialogComponent {
       isbns = lines.map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
     }
 
-    const existingIsbns = this.getExistingIsbnsForLibrary();
     const validEntries: IsbnEntry[] = [];
     const seen = new Set<string>();
 
@@ -247,11 +265,6 @@ export class BulkIsbnImportDialogComponent {
 
       if (seen.has(normalized)) {
         this.duplicatesRemoved++;
-        continue;
-      }
-
-      if (existingIsbns.has(normalized)) {
-        this.skipped.push({value: normalized, reason: 'alreadyExists'});
         continue;
       }
 
@@ -305,21 +318,6 @@ export class BulkIsbnImportDialogComponent {
       }
     }
     return result;
-  }
-
-  private getExistingIsbnsForLibrary(): Set<string> {
-    const isbns = new Set<string>();
-    if (!this.selectedLibraryId) return isbns;
-
-    const books = this.bookService.books();
-    for (const book of books) {
-      if (book.libraryId !== this.selectedLibraryId) continue;
-      const isbn13 = book.metadata?.isbn13;
-      const isbn10 = book.metadata?.isbn10;
-      if (isbn13) isbns.add(isbn13.toUpperCase());
-      if (isbn10) isbns.add(isbn10.toUpperCase());
-    }
-    return isbns;
   }
 
   private normalizeIsbn(raw: string): string {

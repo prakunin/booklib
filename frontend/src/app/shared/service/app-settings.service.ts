@@ -3,7 +3,7 @@ import {HttpClient} from '@angular/common/http';
 import {lastValueFrom, Observable} from 'rxjs';
 import {map, switchMap} from 'rxjs/operators';
 import {API_CONFIG} from '../../core/config/api-config';
-import {AppSettings, OidcProviderDetails, OidcTestResult} from '../model/app-settings.model';
+import {AppSettings, OidcProviderDetails, OidcTestResult, PasswordPolicy} from '../model/app-settings.model';
 import {AuthService} from './auth.service';
 import {injectQuery, queryOptions, QueryClient} from '@tanstack/angular-query-experimental';
 import {APP_SETTINGS_QUERY_KEY, PUBLIC_SETTINGS_QUERY_KEY} from './app-settings-query-keys';
@@ -13,6 +13,7 @@ export interface PublicAppSettings {
   remoteAuthEnabled: boolean;
   oidcProviderDetails: OidcProviderDetails;
   oidcForceOnlyMode: boolean;
+  passwordPolicy?: PasswordPolicy;
 }
 
 @Injectable({providedIn: 'root'})
@@ -77,7 +78,8 @@ export class AppSettingsService {
       oidcEnabled: appSettings.oidcEnabled,
       remoteAuthEnabled: appSettings.remoteAuthEnabled,
       oidcProviderDetails: appSettings.oidcProviderDetails,
-      oidcForceOnlyMode: appSettings.oidcForceOnlyMode
+      oidcForceOnlyMode: appSettings.oidcForceOnlyMode,
+      passwordPolicy: appSettings.passwordPolicy
     };
     const current = this.publicAppSettings();
 
@@ -86,6 +88,7 @@ export class AppSettingsService {
       current.oidcEnabled !== updatedPublicSettings.oidcEnabled ||
       current.remoteAuthEnabled !== updatedPublicSettings.remoteAuthEnabled ||
       current.oidcForceOnlyMode !== updatedPublicSettings.oidcForceOnlyMode ||
+      JSON.stringify(current.passwordPolicy) !== JSON.stringify(updatedPublicSettings.passwordPolicy) ||
       JSON.stringify(current.oidcProviderDetails) !== JSON.stringify(updatedPublicSettings.oidcProviderDetails)
     ) {
       this.queryClient.setQueryData(PUBLIC_SETTINGS_QUERY_KEY, updatedPublicSettings);

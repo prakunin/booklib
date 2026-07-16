@@ -10,14 +10,12 @@ import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.Library;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.repository.AuthorRepository;
-import org.booklore.util.FileService;
+import org.booklore.service.AuthorPhotoIndex;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -32,7 +30,7 @@ public class AppAuthorService {
 
     private final AuthorRepository authorRepository;
     private final AuthenticationService authenticationService;
-    private final FileService fileService;
+    private final AuthorPhotoIndex authorPhotoIndex;
     private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
@@ -82,7 +80,7 @@ public class AppAuthorService {
                 .map(row -> {
                     AuthorEntity author = (AuthorEntity) row[0];
                     long bookCount = (Long) row[1];
-                    boolean authorHasPhoto = Files.exists(Paths.get(fileService.getAuthorThumbnailFile(author.getId())));
+                    boolean authorHasPhoto = authorPhotoIndex.hasPhoto(author.getId());
                     return AppAuthorSummary.builder()
                             .id(author.getId())
                             .name(author.getName())
@@ -123,7 +121,7 @@ public class AppAuthorService {
 
         // Count books accessible to this user
         int bookCount = countAccessibleBooks(authorId, accessibleLibraryIds);
-        boolean authorHasPhoto = Files.exists(Paths.get(fileService.getAuthorThumbnailFile(author.getId())));
+        boolean authorHasPhoto = authorPhotoIndex.hasPhoto(author.getId());
 
         return AppAuthorDetail.builder()
                 .id(author.getId())
@@ -152,19 +150,20 @@ public class AppAuthorService {
     }
 
     private long countAuthorsWithPhotoFilter(Set<Long> accessibleLibraryIds, Long libraryId, String search, boolean hasPhoto) {
-        // Since hasPhoto is file-system based, we need to count all matching authors
-        // and check their photos. For large datasets this could be optimized with a DB column.
+        // hasPhoto lives on disk, so intersect the matching author ids with the cached photo index
+        // rather than loading every matching AuthorEntity and probing the filesystem per row.
         StringBuilder whereClause = new StringBuilder(" WHERE (1=1)");
         buildLibraryFilter(whereClause, accessibleLibraryIds, libraryId);
         buildSearchFilter(whereClause, search);
 
-        String jpql = "SELECT DISTINCT a FROM AuthorEntity a LEFT JOIN a.bookMetadataEntityList bm LEFT JOIN bm.book b"
+        String jpql = "SELECT DISTINCT a.id FROM AuthorEntity a LEFT JOIN a.bookMetadataEntityList bm LEFT JOIN bm.book b"
                 + whereClause;
-        TypedQuery<AuthorEntity> query = entityManager.createQuery(jpql, AuthorEntity.class);
+        TypedQuery<Long> query = entityManager.createQuery(jpql, Long.class);
         setQueryParams(query, accessibleLibraryIds, libraryId, search);
 
+        Set<Long> authorsWithPhoto = authorPhotoIndex.authorIdsWithPhoto();
         return query.getResultList().stream()
-                .filter(a -> Files.exists(Paths.get(fileService.getAuthorThumbnailFile(a.getId()))) == hasPhoto)
+                .filter(id -> authorsWithPhoto.contains(id) == hasPhoto)
                 .count();
     }
 

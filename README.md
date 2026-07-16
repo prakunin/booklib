@@ -1,24 +1,15 @@
 > [!NOTE]
-> Grimmory is an independent community fork of Booklore.
+> Booklib is an independent fork of Grimmory, itself a fork of Booklore.
 
 <div align="center">
 
-<picture>
-  <source srcset="assets/logo-with-text.svg">
-  <img src="assets/logo-with-text.svg" alt="Grimmory" height="80" />
-</picture>
+# Booklib
 
-**Grimmory is a self-hosted digital library for people who take their reading seriously.**
+**Booklib is a self-hosted digital library for people who take their reading seriously.**
 
-[![Release](https://img.shields.io/github/v/release/grimmory-tools/grimmory?color=818CF8&logo=github)](https://github.com/grimmory-tools/grimmory/releases)
-[![License](https://img.shields.io/github/license/grimmory-tools/grimmory?color=fab005)](LICENSE)
-<a href="https://hosted.weblate.org/engage/grimmory/"><img src="https://hosted.weblate.org/widget/grimmory/svg-badge.svg" alt="Translation status"></a>
-[![Docker Pulls](https://img.shields.io/docker/pulls/grimmory/grimmory?color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/grimmory/grimmory)
-[![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/9YJ7HB4n8T)
+[![License](https://img.shields.io/github/license/prakunin/booklib?color=fab005)](LICENSE)
 
-[Documentation](https://grimmory.org/docs) · [Quick Start](#quick-start) · [Translations](https://hosted.weblate.org/engage/grimmory/) · [Discord](https://discord.gg/9YJ7HB4n8T) · [Releases](https://github.com/grimmory-tools/grimmory/releases)
-
-<!-- ![Grimmory Demo](assets/demo.gif) -->
+[Quick Start](#quick-start) · [Documentation](docs/) · [Releases](https://github.com/prakunin/booklib/releases)
 
 </div>
 
@@ -33,7 +24,7 @@
 | **Built-in Reader** | Read PDFs, EPUBs, and comics in the browser with annotations, highlights, and reading progress tracking |
 | **Device Sync** | Connect a Kobo, use any OPDS-compatible app, or sync progress with KOReader |
 | **Multi-User** | Separate shelves, progress, and preferences per user with local or OIDC authentication |
-| **BookDrop** | Drop files into a watched folder and Grimmory detects, enriches, and queues them for import automatically |
+| **BookDrop** | Drop files into a watched folder and Booklib detects, enriches, and queues them for import automatically |
 | **One-Click Sharing** | Send any book to a Kindle, an email address, or another user directly from the interface |
 
 ### Supported Formats
@@ -50,19 +41,14 @@
 ## Quick Start
 
 > [!TIP]
-> For OIDC setup, advanced configuration, or upgrade guides, see the [full documentation](https://grimmory.org/docs/getting-started).
+> For OIDC setup, reverse-proxy auth, and other advanced topics, see the guides under [`docs/`](docs/).
 
-Requirements: [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/).
+Booklib ships as a single all-in-one container built from this repository. Requirements: [Docker](https://docs.docker.com/get-docker/), [Docker Compose](https://docs.docker.com/compose/install/), and a local clone of this repo.
 
-<details>
-<summary><strong>Image Repositories</strong></summary>
-
-| Registry | Image |
-| --- | --- |
-| Docker Hub | `grimmory/grimmory` |
-| GitHub Container Registry | `ghcr.io/grimmory-tools/grimmory` |
-
-</details>
+```bash
+git clone https://github.com/prakunin/booklib.git
+cd booklib
+```
 
 ### Step 1: Environment Configuration
 
@@ -75,9 +61,9 @@ APP_GROUP_ID=1000
 TZ=Etc/UTC
 
 # Database
-DATABASE_URL=jdbc:mariadb://mariadb:3306/grimmory
-DB_USER=grimmory
-DB_PASSWORD=ChangeMe_Grimmory_2025!
+DATABASE_URL=jdbc:mariadb://mariadb:3306/booklib
+DB_USER=booklib
+DB_PASSWORD=ChangeMe_Booklib_2025!
 
 # Optional: enable API docs + export OpenAPI JSON (defaults to false)
 API_DOCS_ENABLED=false
@@ -89,34 +75,23 @@ DISK_TYPE=LOCAL
 DB_USER_ID=1000
 DB_GROUP_ID=1000
 MYSQL_ROOT_PASSWORD=ChangeMe_MariaDBRoot_2025!
-MYSQL_DATABASE=grimmory
+MYSQL_DATABASE=booklib
 ```
 
 ### Step 2: Docker Compose
 
-Stable images are published from semantic-release tags on `main` as `vX.Y.Z` plus `latest`. Nightly images are built from `develop` and tagged `nightly`.
+The image is built locally from the repository via `build: .` — no external registry is required.
 
 > [!NOTE]
-> Migrating from an existing Booklore container? You can keep your current service name, `container_name`, database name and user, ports, and mounted volumes the same. Replace only the `image:` line with `grimmory/grimmory:<tag>` or `ghcr.io/grimmory-tools/grimmory:<tag>`.
-
-```yaml
-services:
-  booklore:
-    image: grimmory/grimmory:v2.2.1
-```
+> Migrating from an existing Booklore or Grimmory container? Keep your current `container_name`, database name and user, ports, and mounted volumes the same. Replace only the `image:` line with `build: .` and run `docker compose up -d --build`.
 
 Create a `docker-compose.yml` or copy and adapt [`deploy/compose/docker-compose.yml`](deploy/compose/docker-compose.yml):
 
 ```yaml
 services:
-  grimmory:
-    image: grimmory/grimmory:latest
-    # Convenience tag:
-    # image: grimmory/grimmory:<release-version>
-    # Alternative: ghcr.io/grimmory-tools/grimmory:<release-version>
-    # To build from source instead: comment out 'image' and uncomment below
-    # build: .
-    container_name: grimmory
+  booklib:
+    build: .
+    container_name: booklib
     environment:
       - USER_ID=${APP_USER_ID}
       - GROUP_ID=${APP_GROUP_ID}
@@ -166,7 +141,7 @@ services:
 ### Step 3: Launch
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 Open http://localhost:6060, create your admin account, and start building your library. (All libraries must be created within directories mounted on the host, e.g. the `/books/` directory in the sample `docker-compose.yml` above.)
@@ -181,9 +156,7 @@ Additional deployment examples:
 
 ## Developer Surfaces
 
-
 Contributor workflow, PR policy, and release semantics live in [CONTRIBUTING.md](CONTRIBUTING.md).
-Non-English translation contributions are managed through [Weblate](https://hosted.weblate.org/engage/grimmory/).
 
 General purpose development guidelines live in [DEVELOPMENT.md](DEVELOPMENT.md). Component-specific implementation guidance lives in:
 
@@ -211,7 +184,7 @@ When enabled via `API_DOCS_ENABLED`, API reference documentation is available as
 
 ## BookDrop
 
-Drop book files into a watched folder. Grimmory picks them up, pulls metadata, and queues them for your review.
+Drop book files into a watched folder. Booklib picks them up, pulls metadata, and queues them for your review.
 
 ```mermaid
 graph LR
@@ -222,7 +195,7 @@ graph LR
 
 | Step | What Happens |
 | --- | --- |
-| 1. Watch | Grimmory monitors the BookDrop folder continuously |
+| 1. Watch | Booklib monitors the BookDrop folder continuously |
 | 2. Detect | New files are picked up and parsed automatically |
 | 3. Enrich | Metadata is fetched from Google Books and Open Library |
 | 4. Import | You review, adjust if needed, and add to your library |
@@ -238,7 +211,7 @@ volumes:
 
 ## Network Storage
 
-Set `DISK_TYPE=NETWORK` in your `.env` to run Grimmory against a network-mounted file system (NFS, SMB, etc.).
+Set `DISK_TYPE=NETWORK` in your `.env` to run Booklib against a network-mounted file system (NFS, SMB, etc.).
 In this mode, direct file operations (delete, move, rename from the UI) are disabled to avoid destructive changes on shared mounts.
 All other features — reading, metadata, sync — remain fully functional.
 
@@ -248,15 +221,14 @@ All other features — reading, metadata, sync — remain fully functional.
 
 | Channel | |
 | :--- | :--- |
-| Report a bug | [Open an issue](https://github.com/grimmory-tools/grimmory/issues/new?template=bug_report.yml) |
-| Request a feature | [Open an issue](https://github.com/grimmory-tools/grimmory/issues/new?template=feature_request.yml) |
+| Report a bug | [Open an issue](https://github.com/prakunin/booklib/issues/new/choose) |
+| Request a feature | [Open an issue](https://github.com/prakunin/booklib/issues/new/choose) |
 | Contribute | [Contributing Guide](CONTRIBUTING.md) |
-| Join the discussion | [Discord Server](https://discord.gg/9YJ7HB4n8T) |
 
 > [!WARNING]
 > Before opening a pull request, open an issue first and get maintainer approval. Pull requests without a linked issue, without screenshots or video proof, or without pasted test output will be closed. All code must follow the project [backend](CONTRIBUTING.md#backend-conventions) and [frontend](CONTRIBUTING.md#frontend-conventions) conventions. AI-assisted contributions are welcome, but you must run, test, and understand every line you submit. See the [Contributing Guide](CONTRIBUTING.md) for full details.
 
---- 
+---
 
 ## License
 

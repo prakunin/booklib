@@ -1,12 +1,13 @@
 import {signal, WritableSignal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, ParamMap, Router} from '@angular/router';
-import {BehaviorSubject, Subject} from 'rxjs';
+import {BehaviorSubject, of, Subject} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {ConfirmationService, MessageService} from 'primeng/api';
 
 import {PageTitleService} from '../../../../shared/service/page-title.service';
 import {BookService} from '../../service/book.service';
+import {AppBooksApiService} from '../../service/app-books-api.service';
 import {BookMetadataManageService} from '../../service/book-metadata-manage.service';
 import {LibraryShelfMenuService} from '../../service/library-shelf-menu.service';
 import {Book} from '../../model/book.model';
@@ -109,6 +110,10 @@ interface BookBrowserHarness {
   books: WritableSignal<Book[]>;
   booksError: WritableSignal<string | null>;
   isBooksLoading: WritableSignal<boolean>;
+  appBooksApi: {
+    setFilters: ReturnType<typeof vi.fn>;
+    setSort: ReturnType<typeof vi.fn>;
+  };
   paramMap$: BehaviorSubject<ParamMap>;
   setHasNextPage: (value: boolean) => void;
   setIsFetchingNextPage: (value: boolean) => void;
@@ -145,6 +150,7 @@ function createHarness(options?: {
   );
   const booksError = signal<string | null>(options?.booksError ?? null);
   const isBooksLoading = signal<boolean>(options?.isBooksLoading ?? false);
+  const hasData = signal(!(options?.isBooksLoading ?? false));
   const isFetchingNextPage = signal(false);
   const hasNextPage = signal(false);
   const currentUser = signal(makeCurrentUser());
@@ -155,6 +161,8 @@ function createHarness(options?: {
   const queryParamMap$ = new BehaviorSubject(convertToParamMap({}));
   const url$ = new BehaviorSubject<unknown[]>([]);
   const defaultSort: SortOption = {field: 'addedOn', direction: SortDirection.DESCENDING, label: 'Added On'};
+  const setFilters = vi.fn();
+  const setSort = vi.fn();
   const queryParamsService = {
     parseQueryParams: vi.fn((_q, _u, _et, _ei, _sortOptions, defaultFilterMode) => ({
       viewMode: VIEW_MODES.GRID,
@@ -279,10 +287,24 @@ function createHarness(options?: {
       {provide: MessageService, useValue: {add: vi.fn()}},
       {
         provide: BookService,
+        useValue: {},
+      },
+      {
+        provide: AppBooksApiService,
         useValue: {
           books: books.asReadonly(),
-          isBooksLoading: isBooksLoading.asReadonly(),
-          booksError: booksError.asReadonly(),
+          totalElements: () => options?.totalElements ?? books().length,
+          hasData: hasData.asReadonly(),
+          hasNextPage: hasNextPage.asReadonly(),
+          isLoading: isBooksLoading.asReadonly(),
+          isFetchingNextPage: isFetchingNextPage.asReadonly(),
+          error: booksError.asReadonly(),
+          setFilters,
+          setBooksEnabled: vi.fn(),
+          setSearch: vi.fn(),
+          setSort,
+          fetchNextPage: vi.fn(),
+          fetchAllBookIds: vi.fn(() => of(books().map(book => book.id))),
         },
       },
       {provide: BookMetadataManageService, useValue: {}},
@@ -352,6 +374,7 @@ function createHarness(options?: {
     books,
     booksError,
     isBooksLoading,
+    appBooksApi: {setFilters, setSort},
     paramMap$,
     setHasNextPage: value => hasNextPage.set(value),
     setIsFetchingNextPage: value => isFetchingNextPage.set(value),
@@ -388,13 +411,13 @@ describe('BookBrowserComponent', () => {
     expect(queryParamsService.updateViewMode).toHaveBeenCalledWith(VIEW_MODES.TABLE);
   });
 
-  it('updates books when sorting changes', () => {
-    const {component} = createHarness();
+  it('updates the server query when sorting changes', () => {
+    const {component, appBooksApi} = createHarness();
 
     TestBed.flushEffects();
     vi.runOnlyPendingTimers();
 
-    expect(component.books().map(book => book.id)).toEqual([2, 1]);
+    expect(component.books().map(book => book.id)).toEqual([2, 1, 3]);
 
     component.applySortCriteria([
       {label: 'Title', field: 'title', direction: SortDirection.ASCENDING},
@@ -402,16 +425,16 @@ describe('BookBrowserComponent', () => {
     TestBed.flushEffects();
     vi.runOnlyPendingTimers();
 
-    expect(component.books().map(book => book.id)).toEqual([1, 2]);
+    expect(appBooksApi.setSort).toHaveBeenLastCalledWith({field: 'title', dir: 'asc'});
   });
 
-  it('updates books after a context change', () => {
-    const {component, paramMap$, routeSnapshot} = createHarness();
+  it('updates the server query after a context change', () => {
+    const {component, paramMap$, routeSnapshot, appBooksApi} = createHarness();
 
     TestBed.flushEffects();
     vi.runOnlyPendingTimers();
 
-    expect(component.books().map(book => book.id)).toEqual([2, 1]);
+    expect(component.books().map(book => book.id)).toEqual([2, 1, 3]);
 
     routeSnapshot.paramMap = convertToParamMap({libraryId: '2'});
     routeSnapshot.params = {libraryId: '2'};
@@ -419,7 +442,7 @@ describe('BookBrowserComponent', () => {
     TestBed.flushEffects();
     vi.runOnlyPendingTimers();
 
-    expect(component.books().map(book => book.id)).toEqual([3]);
+    expect(appBooksApi.setFilters).toHaveBeenLastCalledWith(expect.objectContaining({libraryId: 2}));
   });
 
   it('hides loading placeholders when the books query is in an error state', () => {
@@ -467,18 +490,7 @@ describe('BookBrowserComponent', () => {
     })).toBe(36);
   });
 
-  it('calls SeriesCollapseFilter.collapseBooks when computing books', () => {
-    createHarness();
-    const filter = TestBed.inject(SeriesCollapseFilter);
-    const collapseBooksSpy = vi.spyOn(filter, 'collapseBooks');
-
-    vi.runOnlyPendingTimers();
-    TestBed.flushEffects();
-
-    expect(collapseBooksSpy).toHaveBeenCalled();
-  });
-
-  it.skip('uses the known total book count while more pages are available', () => {
+  it('uses the known total book count while more pages are available', () => {
     const {component, setHasNextPage} = createHarness({totalElements: 100});
 
     setHasNextPage(true);
@@ -490,29 +502,14 @@ describe('BookBrowserComponent', () => {
     expect(component.virtualGrid.virtualizer.options().count).toBe(100);
   });
 
-  it.skip('uses one unloaded slot for collapsed series while more pages are available', () => {
-    const {component, setHasNextPage} = createHarness({totalElements: 100});
-    const filter = TestBed.inject(SeriesCollapseFilter);
-    filter.setCollapsed(true);
-    setHasNextPage(true);
-
-    vi.runOnlyPendingTimers();
-    TestBed.flushEffects();
-
-    expect(component.virtualRowCount()).toBe(component.books().length + 1);
-    expect(component.virtualGrid.virtualizer.options().count).toBe(component.books().length + 1);
-  });
-
   it('uses the rendered book count once pagination is exhausted', () => {
     const {component} = createHarness();
-    const filter = TestBed.inject(SeriesCollapseFilter);
-    vi.mocked(filter.collapseBooks).mockImplementation((items: Book[]) => items.slice(0, 1));
 
     vi.runOnlyPendingTimers();
     TestBed.flushEffects();
 
-    expect(component.books()).toHaveLength(1);
-    expect(component.virtualRowCount()).toBe(1);
-    expect(component.virtualGrid.virtualizer.options().count).toBe(1);
+    expect(component.books()).toHaveLength(3);
+    expect(component.virtualRowCount()).toBe(3);
+    expect(component.virtualGrid.virtualizer.options().count).toBe(3);
   });
 });

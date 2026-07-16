@@ -3,8 +3,6 @@ import {DecimalPipe, DOCUMENT} from '@angular/common';
 import {TranslocoDirective} from '@jsverse/transloco';
 import {ReaderStateService} from '../state/reader-state.service';
 import {ReaderViewManagerService} from '../core/view-manager.service';
-import {BookService} from '../../../book/service/book.service';
-import {EbookViewerSetting} from '../../../book/model/book.model';
 import {EpubCustomFontService} from '../features/fonts/custom-font.service';
 
 interface AnnotationColor {
@@ -39,7 +37,6 @@ export class ReaderSettingsDialogComponent implements OnInit {
     {name: 'orange', value: '#FFD580', label: 'Orange'}
   ];
 
-  private bookService = inject(BookService);
   private customFontService = inject(EpubCustomFontService);
   private renderer = inject(Renderer2);
   private document = inject(DOCUMENT);
@@ -65,22 +62,16 @@ export class ReaderSettingsDialogComponent implements OnInit {
     return this.stateService.fonts();
   }
 
+  get usesGlobalSettings(): boolean {
+    return this.stateService.usesGlobalSettings();
+  }
+
   private syncSettingsToBackend() {
-    const setting: EbookViewerSetting = {
-      lineHeight: this.state.lineHeight,
-      justify: this.state.justify,
-      hyphenate: this.state.hyphenate,
-      maxColumnCount: this.state.maxColumnCount,
-      gap: this.state.gap,
-      fontSize: this.state.fontSize,
-      theme: this.state.theme.name,
-      maxInlineSize: this.state.maxInlineSize,
-      maxBlockSize: this.state.maxBlockSize,
-      fontFamily: this.state.fontFamily,
-      isDark: this.state.isDark,
-      flow: this.state.flow,
-    };
-    this.bookService.updateViewerSetting({ebookSettings: setting}, this.bookId).subscribe();
+    this.stateService.persistSettings(this.bookId);
+  }
+
+  toggleGlobalSettings(): void {
+    this.stateService.setGlobalSettings(!this.usesGlobalSettings, this.bookId);
   }
 
   setFontFamily(value: string | null) {

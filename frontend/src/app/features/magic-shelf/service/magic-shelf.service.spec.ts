@@ -1,13 +1,12 @@
 import {HttpTestingController} from '@angular/common/http/testing';
 import {TestBed} from '@angular/core/testing';
+import {of, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {createAuthServiceStub, createQueryClientHarness, flushSignalAndQueryEffects, flushQueryAsync} from '../../../core/testing/query-testing';
-import type {Book} from '../../book/model/book.model';
 import {AuthService} from '../../../shared/service/auth.service';
 import type {GroupRule} from '../component/magic-shelf-component';
-import {BookService} from '../../book/service/book.service';
-import {BookRuleEvaluatorService} from './book-rule-evaluator.service';
+import {AppBooksApiService} from '../../book/service/app-books-api.service';
 import {MagicShelfService, type MagicShelf} from './magic-shelf.service';
 
 function buildMagicShelf(overrides: Partial<MagicShelf> = {}): MagicShelf {
@@ -32,19 +31,6 @@ function buildGroupRule(overrides: Partial<GroupRule> = {}): GroupRule {
   };
 }
 
-function buildBook(id: number, overrides: Partial<Book> = {}): Book {
-  return {
-    id,
-    libraryId: 1,
-    libraryName: 'Main Library',
-    metadata: {
-      bookId: id,
-      title: `Book ${id}`,
-    },
-    ...overrides,
-  };
-}
-
 async function flushShelvesQuery(): Promise<void> {
   await flushQueryAsync();
 }
@@ -54,11 +40,8 @@ describe('MagicShelfService', () => {
   let httpTestingController: HttpTestingController;
   let authService: ReturnType<typeof createAuthServiceStub>;
   let queryClientHarness: ReturnType<typeof createQueryClientHarness>;
-  let bookService: {
-    books: ReturnType<typeof vi.fn>;
-  };
-  let ruleEvaluatorService: {
-    evaluateGroup: ReturnType<typeof vi.fn>;
+  let appBooksApi: {
+    getCount: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -70,11 +53,8 @@ describe('MagicShelfService', () => {
       },
     });
 
-    bookService = {
-      books: vi.fn(() => []),
-    };
-    ruleEvaluatorService = {
-      evaluateGroup: vi.fn(() => false),
+    appBooksApi = {
+      getCount: vi.fn(() => of(0)),
     };
 
     vi.spyOn(queryClientHarness.queryClient, 'invalidateQueries').mockResolvedValue(undefined);
@@ -85,8 +65,7 @@ describe('MagicShelfService', () => {
         ...queryClientHarness.providers,
         MagicShelfService,
         {provide: AuthService, useValue: authService},
-        {provide: BookService, useValue: bookService},
-        {provide: BookRuleEvaluatorService, useValue: ruleEvaluatorService},
+        {provide: AppBooksApiService, useValue: appBooksApi},
       ],
     });
 
@@ -200,21 +179,20 @@ describe('MagicShelfService', () => {
     expect(service.findShelfById(999)).toBeUndefined();
   });
 
-  it('returns zero and logs when a shelf filter contains invalid JSON', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  it('falls back to zero when a specialized count request fails', async () => {
+    appBooksApi.getCount.mockReturnValue(throwError(() => new Error('invalid rule')));
 
     httpTestingController.expectOne(req => req.url.endsWith('/api/magic-shelves')).flush([
       buildMagicShelf({id: 1, filterJson: '{invalid-json'}),
     ]);
     await flushShelvesQuery();
+    flushSignalAndQueryEffects();
 
     expect(service.getBookCountValue(1)).toBe(0);
-    expect(bookService.books).not.toHaveBeenCalled();
-    expect(ruleEvaluatorService.evaluateGroup).not.toHaveBeenCalled();
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid filter JSON', expect.any(SyntaxError));
+    expect(appBooksApi.getCount).toHaveBeenCalledWith({magicShelfId: 1});
   });
 
-  it('counts matching books against the parsed shelf rule group', async () => {
+  it('loads matching counts through the specialized paginated books API', async () => {
     const group = buildGroupRule({
       rules: [
         {
@@ -224,26 +202,15 @@ describe('MagicShelfService', () => {
         },
       ],
     });
-    const books = [
-      buildBook(1),
-      buildBook(2),
-      buildBook(3),
-    ];
-
-    bookService.books.mockReturnValue(books);
-    ruleEvaluatorService.evaluateGroup.mockImplementation((book: Book, parsedGroup: GroupRule, allBooks: Book[]) =>
-      parsedGroup.name === group.name && allBooks === books && book.id !== 2
-    );
+    appBooksApi.getCount.mockReturnValue(of(2));
 
     httpTestingController.expectOne(req => req.url.endsWith('/api/magic-shelves')).flush([
       buildMagicShelf({id: 5, filterJson: JSON.stringify(group)}),
     ]);
     await flushShelvesQuery();
+    flushSignalAndQueryEffects();
 
     expect(service.getBookCountValue(5)).toBe(2);
-    expect(ruleEvaluatorService.evaluateGroup).toHaveBeenCalledTimes(3);
-    expect(ruleEvaluatorService.evaluateGroup).toHaveBeenNthCalledWith(1, books[0], group, books);
-    expect(ruleEvaluatorService.evaluateGroup).toHaveBeenNthCalledWith(2, books[1], group, books);
-    expect(ruleEvaluatorService.evaluateGroup).toHaveBeenNthCalledWith(3, books[2], group, books);
+    expect(appBooksApi.getCount).toHaveBeenCalledWith({magicShelfId: 5});
   });
 });

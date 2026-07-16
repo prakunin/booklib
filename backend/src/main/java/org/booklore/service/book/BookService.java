@@ -16,8 +16,10 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.*;
 import org.booklore.service.FileStreamingService;
 import org.booklore.service.audit.AuditService;
+import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
+import org.booklore.service.annotation.InvalidateUserStats;
 import org.booklore.service.progress.ReadingProgressService;
 import org.booklore.util.BookUtils;
 import org.booklore.util.FileService;
@@ -70,6 +72,7 @@ public class BookService {
     private final SidecarMetadataWriter sidecarMetadataWriter;
     private final FileStreamingService fileStreamingService;
     private final AuditService auditService;
+    private final ArchivedBookContentService archivedBookContentService;
 
 
     public List<Book> getBookDTOs(boolean includeDescription, boolean stripForListView) {
@@ -265,11 +268,17 @@ public class BookService {
         bookUpdateService.updateBookViewerSetting(bookId, bookViewerSettings);
     }
 
+    // Annotated here rather than on the inner service: UserStatsCacheAspect invalidates
+    // @AfterReturning, which only lands after commit when it wraps the outermost transactional
+    // boundary. Saving progress can flip readStatus and stamp dateFinished, which the completion
+    // timeline and heatmap aggregate over.
+    @InvalidateUserStats
     @Transactional
-    public void updateReadProgress(ReadProgressRequest request) {
-        readingProgressService.updateReadProgress(request);
+    public BookStatusUpdateResponse updateReadProgress(ReadProgressRequest request) {
+        return readingProgressService.updateReadProgress(request);
     }
 
+    @InvalidateUserStats
     @Transactional
     public List<BookStatusUpdateResponse> updateReadStatus(List<Long> bookIds, String status) {
         return bookUpdateService.updateReadStatus(bookIds, status);
@@ -360,9 +369,14 @@ public class BookService {
                     .filter(bf -> bf.getBookType() == requestedType)
                     .findFirst()
                     .orElseThrow(() -> ApiError.FILE_NOT_FOUND.createException("No file of type " + bookType + " found for book"));
-            filePath = bookFile.getFullFilePath().toString();
+            filePath = bookFile.isArchivedSource()
+                    ? archivedBookContentService.resolve(bookFile).toString()
+                    : bookFile.getFullFilePath().toString();
         } else {
-            filePath = FileUtils.getBookFullPath(bookEntity).toString();
+            BookFileEntity primaryFile = bookEntity.getPrimaryBookFile();
+            filePath = primaryFile != null && primaryFile.isArchivedSource()
+                    ? archivedBookContentService.resolve(primaryFile).toString()
+                    : FileUtils.getBookFullPath(bookEntity).toString();
         }
         File file = new File(filePath);
         if (!file.exists()) {

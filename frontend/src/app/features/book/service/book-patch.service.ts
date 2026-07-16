@@ -1,18 +1,30 @@
 import {inject, Injectable} from '@angular/core';
 import {HttpClient, HttpParams} from '@angular/common/http';
 import {Observable, Subject} from 'rxjs';
-import {distinctUntilChanged, exhaustMap, share, tap} from 'rxjs/operators';
+import {distinctUntilChanged, exhaustMap, map, share, tap} from 'rxjs/operators';
 import {Book, BookFileProgress, ReadStatus} from '../model/book.model';
 import {API_CONFIG} from '../../../core/config/api-config';
 import {ResetProgressType, ResetProgressTypes} from '../../../shared/constants/reset-progress-type';
 import {BookStatusUpdateResponse, PersonalRatingUpdateResponse} from '../model/book.model';
 import {QueryClient} from '@tanstack/angular-query-experimental';
-import {BOOKS_QUERY_KEY} from './book-query-keys';
 import {
-  invalidateAppBooksQueries,
   patchBooksInCache,
   patchBookFieldsInCache,
 } from './book-query-cache';
+
+/**
+ * The read status the server derived from a saved progress. The client cannot compute it — the
+ * server's calculateReadStatus weighs the percentage against the previous status — so patching the
+ * response back is the only way a list keeps a correct status badge without a refetch.
+ */
+function serverDerivedStatusFields(status: BookStatusUpdateResponse | null): Partial<Book> {
+  if (!status) return {};
+  return {
+    readStatus: status.readStatus,
+    readStatusModifiedTime: status.readStatusModifiedTime,
+    dateFinished: status.dateFinished,
+  };
+}
 
 function getResetProgressFields(type: ResetProgressType): Partial<Book> {
   if (type === ResetProgressTypes.KOREADER) {
@@ -80,11 +92,14 @@ export class BookPatchService {
           progressPercent: payload.percentage
         };
       }
-      return this.http.post<void>(`${this.url}/progress`, body).pipe(
-        tap(() => {
+      return this.http.post<BookStatusUpdateResponse>(`${this.url}/progress`, body).pipe(
+        tap(status => {
           patchBookFieldsInCache(this.queryClient, [{
             bookId: payload.bookId,
-            fields: {epubProgress: {cfi: payload.cfi, percentage: payload.percentage}}
+            fields: {
+              epubProgress: {cfi: payload.cfi, percentage: payload.percentage},
+              ...serverDerivedStatusFields(status)
+            }
           }]);
         })
       );
@@ -135,13 +150,14 @@ export class BookPatchService {
         progressPercent: percentage
       };
     }
-    return this.http.post<void>(`${this.url}/progress`, body).pipe(
-      tap(() => {
+    return this.http.post<BookStatusUpdateResponse>(`${this.url}/progress`, body).pipe(
+      tap(status => {
         patchBookFieldsInCache(this.queryClient, [{
           bookId,
-          fields: {pdfProgress: {page, percentage}}
+          fields: {pdfProgress: {page, percentage}, ...serverDerivedStatusFields(status)}
         }]);
-      })
+      }),
+      map(() => undefined)
     );
   }
 
@@ -175,13 +191,14 @@ export class BookPatchService {
         progressPercent: percentage
       };
     }
-    return this.http.post<void>(`${this.url}/progress`, body).pipe(
-      tap(() => {
+    return this.http.post<BookStatusUpdateResponse>(`${this.url}/progress`, body).pipe(
+      tap(status => {
         patchBookFieldsInCache(this.queryClient, [{
           bookId,
-          fields: {cbxProgress: {page, percentage}}
+          fields: {cbxProgress: {page, percentage}, ...serverDerivedStatusFields(status)}
         }]);
-      })
+      }),
+      map(() => undefined)
     );
   }
 
@@ -266,11 +283,6 @@ export class BookPatchService {
 
   updateLastReadTime(bookId: number): void {
     const timestamp = new Date().toISOString();
-    this.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-      (current ?? []).map(book =>
-        book.id === bookId ? {...book, lastReadTime: timestamp} : book
-      )
-    );
-    invalidateAppBooksQueries(this.queryClient);
+    patchBookFieldsInCache(this.queryClient, [{bookId, fields: {lastReadTime: timestamp}}]);
   }
 }

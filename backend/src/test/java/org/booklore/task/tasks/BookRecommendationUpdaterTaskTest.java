@@ -12,6 +12,7 @@ import org.booklore.model.websocket.Topic;
 import org.booklore.service.NotificationService;
 import org.booklore.service.book.BookQueryService;
 import org.booklore.service.recommender.BookVectorService;
+import org.booklore.task.TaskCancellationManager;
 import org.booklore.task.TaskStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,8 @@ class BookRecommendationUpdaterTaskTest {
     private BookVectorService vectorService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private TaskCancellationManager cancellationManager;
 
     @InjectMocks
     private BookRecommendationUpdaterTask task;
@@ -120,6 +123,40 @@ class BookRecommendationUpdaterTaskTest {
         when(vectorService.generateEmbedding(any())).thenThrow(new RuntimeException("Embedding failed"));
 
         assertThrows(RuntimeException.class, () -> task.execute(request));
+    }
+
+    @Test
+    void execute_shouldStopWithoutWork_whenTaskCancelledBeforeStart() {
+        when(bookQueryService.countAllNonDeleted()).thenReturn(5L);
+        when(cancellationManager.isTaskCancelled("task-123")).thenReturn(true);
+
+        TaskCreateResponse response = task.execute(request);
+
+        assertEquals(TaskStatus.CANCELLED, response.getStatus());
+        verify(bookQueryService, never()).getAllFullBookEntitiesBatch(any());
+        verify(bookQueryService, never()).saveRecommendationsInBatches(any(), anyInt());
+    }
+
+    @Test
+    void execute_shouldPersistEmbeddingsButNotRecommendations_whenCancelledAfterEmbeddingPhase() {
+        BookEntity book1 = BookEntity.builder().id(1L).metadata(BookMetadataEntity.builder().title("B1").build()).build();
+
+        when(bookQueryService.countAllNonDeleted()).thenReturn(1L);
+        when(bookQueryService.getAllFullBookEntitiesBatch(any())).thenReturn(List.of(book1)).thenReturn(Collections.emptyList());
+        when(vectorService.generateEmbedding(any())).thenReturn(new double[]{0.1});
+        when(vectorService.serializeVector(any())).thenReturn("[0.1]");
+        when(vectorService.findTopKSimilar(any(), anyList(), anyInt())).thenReturn(List.of());
+        // The single small batch breaks the embedding loop after one check; false for that and the
+        // similarity-loop check, then true at the pre-save checkpoint.
+        when(cancellationManager.isTaskCancelled("task-123")).thenReturn(false, false, true);
+
+        TaskCreateResponse response = task.execute(request);
+
+        assertEquals(TaskStatus.CANCELLED, response.getStatus());
+        // Per-batch embeddings are idempotent and already persisted...
+        verify(bookQueryService).compareAndSaveEmbeddings(any());
+        // ...but the final recommendation set is not published on cancellation.
+        verify(bookQueryService, never()).saveRecommendationsInBatches(any(), anyInt());
     }
 
     @Test

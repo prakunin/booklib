@@ -293,7 +293,7 @@ describe('BookCardComponent', () => {
     expect(component.displayTitle()).toBe('Series Saga');
     expect(component.titleTooltip()).toContain('Series Saga');
     expect(component.coverImageUrl()).toBe('audio-thumb:8:2024-04-02');
-    expect(component.progressTooltip()).toBe('42% (Grimmory) | 11% (KOReader) | 7% (Kobo)');
+    expect(component.progressTooltip()).toBe('42% (BookLib) | 11% (KOReader) | 7% (Kobo)');
     expect(component.readButtonIcon()).toBe('pi pi-forward');
 
     ref.setInput('isSeriesCollapsed', false);

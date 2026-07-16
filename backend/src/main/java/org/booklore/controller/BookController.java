@@ -21,6 +21,7 @@ import org.booklore.model.dto.response.PersonalRatingUpdateResponse;
 import org.booklore.model.enums.ResetProgressType;
 import org.booklore.service.book.BookFileAttachmentService;
 import org.booklore.service.book.BookService;
+import org.booklore.app.service.AppBookService;
 import org.booklore.service.book.BookUpdateService;
 import org.booklore.service.book.DuplicateDetectionService;
 import org.booklore.service.book.PhysicalBookService;
@@ -59,7 +60,10 @@ import java.io.IOException;
 @AllArgsConstructor
 public class BookController {
 
+    private static final long MAX_LEGACY_CATALOG_SIZE = 10_000;
+
     private final BookService bookService;
+    private final AppBookService appBookService;
     private final BookBrowseService bookBrowseService;
     private final BookUpdateService bookUpdateService;
     private final BookRecommendationService bookRecommendationService;
@@ -77,6 +81,12 @@ public class BookController {
             @RequestParam(required = false, defaultValue = "false") boolean withDescription,
             @Parameter(description = "Remove other metadata fields from the response")
             @RequestParam(required = false, defaultValue = "true") boolean stripForListView) {
+        long bookCount = appBookService.getCatalogBookCount();
+        if (bookCount > MAX_LEGACY_CATALOG_SIZE) {
+            throw ApiError.INVALID_INPUT.createException(
+                    "The flat books endpoint is disabled for catalogs over " + MAX_LEGACY_CATALOG_SIZE
+                            + " books; use /api/v1/app/books or /api/v1/books/page");
+        }
         return ResponseEntity.ok(bookService.getBookDTOs(withDescription, stripForListView));
     }
 
@@ -253,13 +263,13 @@ public class BookController {
         return ResponseEntity.ok(bookService.assignShelvesToBooks(request.getBookIds(), request.getShelvesToAssign(), request.getShelvesToUnassign()));
     }
 
-    @Operation(summary = "Update read progress", description = "Update the read progress for a book.")
-    @ApiResponse(responseCode = "204", description = "Read progress updated successfully")
+    @Operation(summary = "Update read progress",
+            description = "Update the read progress for a book. Returns the read status the server derived from it.")
+    @ApiResponse(responseCode = "200", description = "Read progress updated successfully")
     @PostMapping("/progress")
-    public ResponseEntity<Void> addBookToProgress(
+    public ResponseEntity<BookStatusUpdateResponse> addBookToProgress(
             @Parameter(description = "Read progress request") @RequestBody @Valid ReadProgressRequest request) {
-        bookService.updateReadProgress(request);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(bookService.updateReadProgress(request));
     }
 
     @Operation(summary = "Get book recommendations", description = "Get recommended books based on a specific book.")

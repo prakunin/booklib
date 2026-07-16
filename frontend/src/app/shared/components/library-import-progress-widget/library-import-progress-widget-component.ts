@@ -6,6 +6,7 @@ import {Tag} from 'primeng/tag';
 import {TranslocoDirective} from '@jsverse/transloco';
 
 import {LibraryImportProgressService, LibraryImportProgressState, LibraryImportProgressStatus} from '../../service/library-import-progress.service';
+import {LibraryService} from '../../../features/book/service/library.service';
 
 @Component({
   selector: 'app-library-import-progress-widget',
@@ -17,6 +18,7 @@ import {LibraryImportProgressService, LibraryImportProgressState, LibraryImportP
 export class LibraryImportProgressWidgetComponent {
   protected readonly progressService = inject(LibraryImportProgressService);
   private readonly router = inject(Router);
+  private readonly libraryService = inject(LibraryService);
 
   getProgressPercent(state: LibraryImportProgressState): number {
     if (state.expectedCount <= 0) return 0;
@@ -34,19 +36,27 @@ export class LibraryImportProgressWidgetComponent {
       IN_PROGRESS: 'shared.metadataProgress.statusInProgress',
       COMPLETED: 'shared.metadataProgress.statusCompleted',
       ERROR: 'shared.metadataProgress.statusError',
+      CANCELLED: 'shared.metadataProgress.statusCancelled',
     }[status];
   }
 
-  getTagSeverity(status: LibraryImportProgressStatus): 'info' | 'success' | 'danger' {
+  getTagSeverity(status: LibraryImportProgressStatus): 'info' | 'success' | 'danger' | 'warn' {
     switch (status) {
       case 'COMPLETED':
         return 'success';
       case 'ERROR':
         return 'danger';
+      case 'CANCELLED':
+        return 'warn';
       case 'IN_PROGRESS':
       default:
         return 'info';
     }
+  }
+
+  cancelScan(state: LibraryImportProgressState): void {
+    if (state.libraryId === undefined) return;
+    this.libraryService.cancelScan(state.libraryId).subscribe();
   }
 
   dismiss(): void {

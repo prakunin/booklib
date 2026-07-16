@@ -90,6 +90,19 @@ public class BookQueryService {
         return books;
     }
 
+    public List<BookEntity> getRecommendationCandidatesAfterId(long excludeBookId, long afterId, Pageable pageable) {
+        List<Long> bookIds = bookRepository.findRecommendationCandidateIdsAfterId(excludeBookId, afterId, pageable);
+        if (bookIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return bookRepository.findRecommendationCandidatesByIds(bookIds);
+    }
+
+    public List<org.booklore.repository.projection.BookEmbeddingProjection> getEmbeddingCandidatesAfterId(
+            long excludeBookId, long afterId, Pageable pageable) {
+        return bookRepository.findEmbeddingCandidatesAfterId(excludeBookId, afterId, pageable);
+    }
+
     public long countAllNonDeleted() {
         return bookRepository.countNonDeleted();
     }
@@ -143,6 +156,13 @@ public class BookQueryService {
             }
             bookRepository.saveAll(batch);
         }
+    }
+
+    @Transactional
+    public void saveRecommendations(long bookId, Set<BookRecommendationLite> recommendations) {
+        BookEntity book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new IllegalArgumentException("Book not found with ID: " + bookId));
+        book.setSimilarBooksJson(recommendations);
     }
 
     private List<Book> mapBooksToDto(List<BookEntity> books, boolean includeDescription, Long userId, boolean stripForListView) {

@@ -16,7 +16,9 @@ import org.booklore.repository.BookRepository;
 import org.booklore.repository.ShelfRepository;
 import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
+import org.booklore.repository.UserContentRestrictionRepository;
 import org.booklore.service.book.BookService;
+import org.booklore.service.browse.BookSortRegistry;
 import org.booklore.service.opds.MagicShelfBookService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,6 +56,9 @@ class AppBookServiceFilterOptionsTest {
     @Mock private BookService bookService;
     @Mock private MagicShelfBookService magicShelfBookService;
     @Mock private EntityManager entityManager;
+    @Mock private UserContentRestrictionRepository restrictionRepository;
+    @Mock private BookSortRegistry bookSortRegistry;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private AppBookService service;
 
@@ -64,7 +69,8 @@ class AppBookServiceFilterOptionsTest {
         service = new AppBookService(
                 bookRepository, userBookProgressRepository, userBookFileProgressRepository,
                 shelfRepository, authenticationService, mobileBookMapper,
-                bookService, magicShelfBookService, entityManager
+                bookService, magicShelfBookService, entityManager, restrictionRepository, bookSortRegistry, eventPublisher,
+                new CatalogSummaryCache()
         );
     }
 
@@ -170,17 +176,16 @@ class AppBookServiceFilterOptionsTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void getFilterOptions_withMagicShelfId_emptyResult_returnsEmptyOptions() {
+    void getFilterOptions_withMagicShelfId_doesNotMaterializeMatchingBookIds() {
         mockAdminUser();
         mockMagicShelfSpec(7L, Collections.emptyList());
+        mockJpqlQueries();
 
         AppFilterOptions result = service.getFilterOptions(null, null, 7L);
 
         assertNotNull(result);
-        assertTrue(result.authors().isEmpty());
-        assertTrue(result.languages().isEmpty());
-        assertTrue(result.fileTypes().isEmpty());
-        assertTrue(result.readStatuses().isEmpty());
+        verify(magicShelfBookService).toSpecification(eq(userId), eq(7L));
+        verify(entityManager, never()).createQuery(any(CriteriaQuery.class));
     }
 
     @Test

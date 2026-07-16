@@ -38,65 +38,71 @@
 
         @if (hasQuery) {
           <div class="command-palette-results" role="listbox">
-            @if (!isSearching && groups.length === 0) {
-              <div class="command-palette-empty">{{ t('empty') }}</div>
-            }
-
-            @for (group of groups; track group.kind) {
-              <div class="command-palette-group" role="group" [attr.aria-label]="t(groupLabelKey(group.kind))">
-                <div class="command-palette-group-label" aria-hidden="true">{{ t(groupLabelKey(group.kind)) }}</div>
-                @for (item of group.items; track item.id) {
-                  <button
-                    type="button"
-                    class="command-palette-item"
-                    [class.active]="activeItem()?.id === item.id"
-                    [class.book-item]="item.kind === 'book' && !!item.bookMeta"
-                    [id]="itemDomId(item)"
-                    role="option"
-                    [attr.aria-selected]="activeItem()?.id === item.id"
-                    (mouseenter)="onItemHover(item)"
-                    (click)="svc.select(item)"
-                  >
-                    @if (item.kind === 'book' && item.bookMeta; as bookMeta) {
-                      <ng-container *transloco="let tb; prefix: 'book.searcher'">
-                        <div class="command-palette-book-cover" [class.square-cover]="bookMeta.isAudiobook">
-                          <app-cover
-                            aria-hidden="true"
-                            [src]="bookMeta.thumbnailUrl"
-                            [title]="item.title"
-                            [authors]="bookMeta.authors"
-                            size="sm" />
-                        </div>
-                        <div class="command-palette-book-details">
-                          <div class="command-palette-book-title">{{ item.title }}</div>
-                          <div class="command-palette-book-meta">
-                            @if (bookMeta.authors.length) {
-                              <span>{{ tb('byPrefix') }} {{ bookMeta.authors.join(', ') }}</span>
-                            }
-                            @if (bookMeta.seriesName) {
-                              <span>{{ bookMeta.seriesName }}@if (bookMeta.seriesNumber) { #{{ bookMeta.seriesNumber }} }</span>
-                            }
-                            @if (bookMeta.year) {
-                              <span>{{ bookMeta.year }}</span>
-                            }
-                          </div>
-                        </div>
-                      </ng-container>
-                    } @else {
-                      <app-icon-display
-                        class="command-palette-item-icon"
-                        [icon]="item.icon ?? null"
-                        size="18px"
-                        [displayEmpty]="true"
-                      ></app-icon-display>
-                      <span class="command-palette-item-title">{{ item.title }}</span>
-                      @if (item.subtitle) {
-                        <span class="command-palette-item-subtitle">{{ item.subtitle }}</span>
-                      }
-                    }
-                  </button>
-                }
+            @if (isSearching) {
+              <div class="command-palette-loading">
+                <app-spinner size="sm" />
               </div>
+            } @else {
+              @if (groups.length === 0) {
+                <div class="command-palette-empty">{{ t('empty') }}</div>
+              }
+
+              @for (group of groups; track group.kind) {
+                <div class="command-palette-group" role="group" [attr.aria-label]="t(groupLabelKey(group.kind))">
+                  <div class="command-palette-group-label" aria-hidden="true">{{ t(groupLabelKey(group.kind)) }}</div>
+                  @for (item of group.items; track item.id) {
+                    <button
+                      type="button"
+                      class="command-palette-item"
+                      [class.active]="activeItem()?.id === item.id"
+                      [class.book-item]="item.kind === 'book' && !!item.bookMeta"
+                      [id]="itemDomId(item)"
+                      role="option"
+                      [attr.aria-selected]="activeItem()?.id === item.id"
+                      (mouseenter)="onItemHover(item)"
+                      (click)="svc.select(item)"
+                    >
+                      @if (item.kind === 'book' && item.bookMeta; as bookMeta) {
+                        <ng-container *transloco="let tb; prefix: 'book.searcher'">
+                          <div class="command-palette-book-cover" [class.square-cover]="bookMeta.isAudiobook">
+                            <app-cover
+                              aria-hidden="true"
+                              [src]="bookMeta.thumbnailUrl"
+                              [title]="item.title"
+                              [authors]="bookMeta.authors"
+                              size="sm" />
+                          </div>
+                          <div class="command-palette-book-details">
+                            <div class="command-palette-book-title">{{ item.title }}</div>
+                            <div class="command-palette-book-meta">
+                              @if (bookMeta.authors.length) {
+                                <span>{{ tb('byPrefix') }} {{ bookMeta.authors.join(', ') }}</span>
+                              }
+                              @if (bookMeta.seriesName) {
+                                <span>{{ bookMeta.seriesName }}@if (bookMeta.seriesNumber) { #{{ bookMeta.seriesNumber }} }</span>
+                              }
+                              @if (bookMeta.year) {
+                                <span>{{ bookMeta.year }}</span>
+                              }
+                            </div>
+                          </div>
+                        </ng-container>
+                      } @else {
+                        <app-icon-display
+                          class="command-palette-item-icon"
+                          [icon]="item.icon ?? null"
+                          size="18px"
+                          [displayEmpty]="true"
+                        ></app-icon-display>
+                        <span class="command-palette-item-title">{{ item.title }}</span>
+                        @if (item.subtitle) {
+                          <span class="command-palette-item-subtitle">{{ item.subtitle }}</span>
+                        }
+                      }
+                    </button>
+                  }
+                </div>
+              }
             }
           </div>
 

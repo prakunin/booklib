@@ -1,108 +1,83 @@
 import {computed, inject, Injectable, Signal} from '@angular/core';
-import {Book} from '../../../model/book.model';
-import {Library} from '../../../model/library.model';
-import {Shelf} from '../../../model/shelf.model';
-import {MagicShelf} from '../../../../magic-shelf/service/magic-shelf.service';
-import {BookService} from '../../../service/book.service';
-import {LibraryService} from '../../../service/library.service';
-import {BookRuleEvaluatorService} from '../../../../magic-shelf/service/book-rule-evaluator.service';
-import {GroupRule} from '../../../../magic-shelf/component/magic-shelf-component';
-import {EntityType} from '../book-browser.component';
-import {Filter, FILTER_CONFIGS, FILTER_EXTRACTORS, FilterType, FilterValue, NUMERIC_ID_FILTER_TYPES, SortMode} from './book-filter.config';
-import {filterBooksByFilters} from '../filters/sidebar-filter';
-import {BookFilterMode} from '../../../../settings/user-management/user.service';
+import {
+  AGE_RATING_OPTIONS,
+  FILE_SIZE_RANGES,
+  Filter,
+  FilterType,
+  MATCH_SCORE_RANGES,
+  NUMERIC_ID_FILTER_TYPES,
+  PAGE_COUNT_RANGES,
+  RATING_OPTIONS_10,
+  RATING_RANGES_5,
+  READ_STATUS_LABELS,
+  RangeConfig,
+} from './book-filter.config';
+import {AppBooksApiService} from '../../../service/app-books-api.service';
+import {AppFilterOptions, CountedOption} from '../../../model/app-book.model';
 
-const MAX_FILTER_ITEMS = 100;
+const OPTION_KEYS: Readonly<Record<FilterType, keyof AppFilterOptions>> = {
+  author: 'authors',
+  category: 'categories',
+  series: 'series',
+  bookType: 'fileTypes',
+  readStatus: 'readStatuses',
+  personalRating: 'personalRatings',
+  publisher: 'publishers',
+  matchScore: 'matchScores',
+  library: 'libraries',
+  shelf: 'shelves',
+  shelfStatus: 'shelfStatuses',
+  tag: 'tags',
+  publishedDate: 'publishedYears',
+  fileSize: 'fileSizes',
+  amazonRating: 'amazonRatings',
+  goodreadsRating: 'goodreadsRatings',
+  hardcoverRating: 'hardcoverRatings',
+  lubimyczytacRating: 'lubimyczytacRatings',
+  ranobedbRating: 'ranobedbRatings',
+  audibleRating: 'audibleRatings',
+  language: 'languages',
+  pageCount: 'pageCounts',
+  mood: 'moods',
+  ageRating: 'ageRatings',
+  contentRating: 'contentRatings',
+  narrator: 'narrators',
+  comicCharacter: 'comicCharacters',
+  comicTeam: 'comicTeams',
+  comicLocation: 'comicLocations',
+  comicCreator: 'comicCreators',
+};
+
+const RANGE_OPTIONS: Partial<Record<FilterType, readonly RangeConfig[]>> = {
+  personalRating: RATING_OPTIONS_10,
+  matchScore: MATCH_SCORE_RANGES,
+  fileSize: FILE_SIZE_RANGES,
+  amazonRating: RATING_RANGES_5,
+  goodreadsRating: RATING_RANGES_5,
+  hardcoverRating: RATING_RANGES_5,
+  lubimyczytacRating: RATING_RANGES_5,
+  ranobedbRating: RATING_RANGES_5,
+  audibleRating: RATING_RANGES_5,
+  pageCount: PAGE_COUNT_RANGES,
+  ageRating: AGE_RATING_OPTIONS,
+};
 
 @Injectable({providedIn: 'root'})
 export class BookFilterService {
-  private readonly bookService = inject(BookService);
-  private readonly libraryService = inject(LibraryService);
-  private readonly bookRuleEvaluatorService = inject(BookRuleEvaluatorService);
+  private readonly appBooksApi = inject(AppBooksApiService);
 
-  createFilterSignals(
-    entity: Signal<Library | Shelf | MagicShelf | null>,
-    entityType: Signal<EntityType>,
-    activeFilters: Signal<Record<string, unknown[]> | null>,
-    filterMode: Signal<BookFilterMode>
-  ): Record<FilterType, Signal<Filter[]>> {
-    const filteredBooks = computed(() =>
-      this.filterBooksByEntity(this.bookService.books(), entity(), entityType())
-    );
-
-    const signals = {} as Record<FilterType, Signal<Filter[]>>;
-
-    for (const [type, config] of Object.entries(FILTER_CONFIGS)) {
-      const filterType = type as Exclude<FilterType, 'library'>;
-      signals[filterType] = computed(() => {
-        const books = filterBooksByFilters(filteredBooks(), activeFilters(), filterMode(), filterType);
-        return this.buildAndSortFilters(books, FILTER_EXTRACTORS[filterType], config.sortMode);
-      });
+  createFilterSignals(): Record<FilterType, Signal<Filter[]>> {
+    const result = {} as Record<FilterType, Signal<Filter[]>>;
+    for (const type of Object.keys(OPTION_KEYS) as FilterType[]) {
+      result[type] = computed(() => this.optionsFor(type));
     }
-
-    signals.library = computed(() => {
-      const books = filterBooksByFilters(filteredBooks(), activeFilters(), filterMode(), 'library');
-      const libraries = this.libraryService.libraries();
-
-      const libraryMap = new Map(
-        libraries
-          .filter(lib => lib.id !== undefined)
-          .map(lib => [lib.id!, lib.name])
-      );
-
-      const filterMap = new Map<number, Filter>();
-
-      for (const book of books) {
-        if (book.libraryId == null) continue;
-
-        if (!filterMap.has(book.libraryId)) {
-          filterMap.set(book.libraryId, {
-            value: {
-              id: book.libraryId,
-              name: libraryMap.get(book.libraryId) ?? book.libraryName ?? `Library ${book.libraryId}`
-            },
-            bookCount: 0
-          });
-        }
-        filterMap.get(book.libraryId)!.bookCount++;
-      }
-
-      return this.sortFiltersByCount(Array.from(filterMap.values()));
-    });
-
-    return signals;
-  }
-
-  filterBooksByEntity(
-    books: Book[],
-    entity: Library | Shelf | MagicShelf | null,
-    entityType: EntityType
-  ): Book[] {
-    if (!entity) return books;
-
-    switch (entityType) {
-      case EntityType.LIBRARY:
-        return books.filter(book => book.libraryId === (entity as Library).id);
-
-      case EntityType.SHELF: {
-        const shelfId = (entity as Shelf).id;
-        return books.filter(book => book.shelves?.some(s => s.id === shelfId));
-      }
-
-      case EntityType.MAGIC_SHELF:
-        return this.filterByMagicShelf(books, entity as MagicShelf);
-
-      case EntityType.UNSHELVED:
-        return books.filter(book => !book.shelves || book.shelves.length === 0);
-
-      default:
-        return books;
-    }
+    return result;
   }
 
   processFilterValue(key: string, value: unknown): unknown {
     if (NUMERIC_ID_FILTER_TYPES.has(key as FilterType) && typeof value === 'string') {
-      return Number(value);
+      const id = value.includes(':') ? value.slice(0, value.indexOf(':')) : value;
+      return Number(id);
     }
     return value;
   }
@@ -111,61 +86,44 @@ export class BookFilterService {
     return NUMERIC_ID_FILTER_TYPES.has(filterType as FilterType);
   }
 
-  private buildAndSortFilters(
-    books: Book[],
-    extractor: (book: Book) => FilterValue[],
-    sortMode: SortMode
-  ): Filter[] {
-    const filterMap = new Map<unknown, Filter>();
+  private optionsFor(type: FilterType): Filter[] {
+    const options = this.appBooksApi.filterOptions();
+    if (!options) return [];
 
-    for (const book of books) {
-      for (const item of extractor(book)) {
-        const id = item.id;
-        if (!filterMap.has(id)) {
-          filterMap.set(id, {value: item, bookCount: 0});
-        }
-        filterMap.get(id)!.bookCount++;
-      }
+    if (type === 'language') {
+      return options.languages.map(option => ({
+        value: {id: option.code, name: option.label},
+        bookCount: option.count,
+      }));
     }
 
-    const filters = Array.from(filterMap.values());
-    const sorted = sortMode === 'sortIndex'
-      ? this.sortFiltersBySortIndex(filters)
-      : this.sortFiltersByCount(filters);
-
-    return sorted.slice(0, MAX_FILTER_ITEMS);
+    const counted = options[OPTION_KEYS[type]] as CountedOption[];
+    return counted.map(option => this.toFilter(type, option));
   }
 
-  private sortFiltersByCount(filters: Filter[]): Filter[] {
-    return filters.sort((a, b) => {
-      if (b.bookCount !== a.bookCount) return b.bookCount - a.bookCount;
-      return this.compareNames(a, b);
-    });
-  }
-
-  private sortFiltersBySortIndex(filters: Filter[]): Filter[] {
-    return filters.sort((a, b) => {
-      const aIndex = (a.value as { sortIndex?: number }).sortIndex ?? 999;
-      const bIndex = (b.value as { sortIndex?: number }).sortIndex ?? 999;
-      if (aIndex !== bIndex) return aIndex - bIndex;
-      return this.compareNames(a, b);
-    });
-  }
-
-  private compareNames(a: Filter, b: Filter): number {
-    const aName = String((a.value as { name?: string }).name ?? '');
-    const bName = String((b.value as { name?: string }).name ?? '');
-    return aName.localeCompare(bName);
-  }
-
-  private filterByMagicShelf(books: Book[], magicShelf: MagicShelf): Book[] {
-    if (!magicShelf.filterJson) return [];
-    try {
-      const groupRule = JSON.parse(magicShelf.filterJson) as GroupRule;
-      return books.filter(book => this.bookRuleEvaluatorService.evaluateGroup(book, groupRule, books));
-    } catch {
-      console.warn('Invalid filterJson for MagicShelf');
-      return [];
+  private toFilter(type: FilterType, option: CountedOption): Filter {
+    const range = RANGE_OPTIONS[type]?.find(item => String(item.id) === option.name);
+    if (range) {
+      return {
+        value: {id: range.id, name: range.label, sortIndex: range.sortIndex},
+        bookCount: option.count,
+      };
     }
+
+    if (type === 'readStatus') {
+      return {
+        value: {id: option.name, name: READ_STATUS_LABELS[option.name as keyof typeof READ_STATUS_LABELS] ?? option.name},
+        bookCount: option.count,
+      };
+    }
+
+    if (type === 'library' || type === 'shelf') {
+      const separator = option.name.indexOf(':');
+      const id = separator >= 0 ? option.name.slice(0, separator) : option.name;
+      const name = separator >= 0 ? option.name.slice(separator + 1) : option.name;
+      return {value: {id: Number(id), name}, bookCount: option.count};
+    }
+
+    return {value: {id: option.name, name: option.name}, bookCount: option.count};
   }
 }

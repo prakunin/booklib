@@ -1,7 +1,7 @@
 import {inject, Injectable} from '@angular/core';
 import {Book} from '../model/book.model';
 import {QueryClient} from '@tanstack/angular-query-experimental';
-import {BOOKS_QUERY_KEY} from './book-query-keys';
+import {BOOKS_QUERY_KEY, bookRecommendationsQueryPrefix} from './book-query-keys';
 import {
   addBookToCache,
   invalidateBookDetailQueries,
@@ -37,6 +37,10 @@ export class BookSocketService {
   handleBookMetadataUpdate(bookId: number): void {
     invalidateBooksQuery(this.queryClient);
     invalidateBookDetailQueries(this.queryClient, [bookId]);
+  }
+
+  handleBookRecommendationsUpdate(bookId: number): void {
+    this.queryClient.invalidateQueries({queryKey: bookRecommendationsQueryPrefix(bookId)});
   }
 
   handleMultipleBookCoverPatches(patches: { id: number; coverUpdatedOn: string }[]): void {

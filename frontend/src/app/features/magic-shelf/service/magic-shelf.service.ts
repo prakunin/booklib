@@ -1,15 +1,14 @@
 import {computed, effect, inject, Injectable} from '@angular/core';
+import {toObservable, toSignal} from '@angular/core/rxjs-interop';
 import {HttpClient} from '@angular/common/http';
-import {lastValueFrom, Observable} from 'rxjs';
+import {catchError, forkJoin, lastValueFrom, map, Observable, of, switchMap} from 'rxjs';
 import {tap} from 'rxjs/operators';
 import {injectQuery, queryOptions, QueryClient} from '@tanstack/angular-query-experimental';
 
 import {API_CONFIG} from '../../../core/config/api-config';
-import {BookService} from '../../book/service/book.service';
-import {BookRuleEvaluatorService} from './book-rule-evaluator.service';
 import {AuthService} from '../../../shared/service/auth.service';
-import {GroupRule} from '../component/magic-shelf-component';
 import {IconType} from '../../../shared/icons/icon-selection';
+import {AppBooksApiService} from '../../book/service/app-books-api.service';
 
 export interface MagicShelf {
   id?: number | null;
@@ -29,8 +28,7 @@ export class MagicShelfService {
   private readonly url = `${API_CONFIG.BASE_URL}/api/magic-shelves`;
 
   private readonly http = inject(HttpClient);
-  private readonly bookService = inject(BookService);
-  private readonly ruleEvaluatorService = inject(BookRuleEvaluatorService);
+  private readonly appBooksApi = inject(AppBooksApiService);
   private readonly authService = inject(AuthService);
   private readonly queryClient = inject(QueryClient);
   private readonly token = this.authService.token;
@@ -98,34 +96,22 @@ export class MagicShelfService {
   }
 
   getBookCountValue(shelfId: number): number {
-    const shelf = this.findShelfById(shelfId);
-    if (!shelf) {
-      return 0;
-    }
-
-    let group: GroupRule;
-    try {
-      group = JSON.parse(shelf.filterJson);
-    } catch (error) {
-      console.error('Invalid filter JSON', error);
-      return 0;
-    }
-
-    const allBooks = this.bookService.books();
-    return allBooks.filter(book =>
-      this.ruleEvaluatorService.evaluateGroup(book, group, allBooks)
-    ).length;
+    return this.bookCountByMagicShelfId().get(shelfId) ?? 0;
   }
 
-  readonly bookCountByMagicShelfId = computed(() => {
-    const counts = new Map<number, number>();
-    for (const shelf of this.shelves()) {
-      if (shelf.id != null) {
-        counts.set(shelf.id, this.getBookCountValue(shelf.id));
-      }
-    }
-    return counts;
-  });
+  readonly bookCountByMagicShelfId = toSignal(
+    toObservable(this.shelves).pipe(
+      switchMap(shelves => {
+        const withIds = shelves.filter((shelf): shelf is MagicShelf & {id: number} => shelf.id != null);
+        if (withIds.length === 0) return of(new Map<number, number>());
+        return forkJoin(withIds.map(shelf => this.appBooksApi.getCount({magicShelfId: shelf.id}).pipe(
+          map(count => [shelf.id, count] as const),
+          catchError(() => of([shelf.id, 0] as const)),
+        ))).pipe(map(entries => new Map(entries)));
+      }),
+    ),
+    {initialValue: new Map<number, number>()},
+  );
 
   deleteShelf(id: number): Observable<void> {
     return this.http.delete<void>(`${this.url}/${id}`).pipe(

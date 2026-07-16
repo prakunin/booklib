@@ -141,7 +141,7 @@ export class BookCardComponent {
     const p = this.progressPercentage();
     const ko = this.koProgressPercentage();
     const kobo = this.koboProgressPercentage();
-    if (p !== null) parts.push(`${p}% (Grimmory)`);
+    if (p !== null) parts.push(`${p}% (BookLib)`);
     if (ko !== null) parts.push(`${ko}% (KOReader)`);
     if (kobo !== null) parts.push(`${kobo}% (Kobo)`);
     return parts.join(' | ');

@@ -1,4 +1,4 @@
-import {ChangeDetectorRef, Component, inject, ViewChild, effect, signal} from '@angular/core';
+import {ChangeDetectorRef, Component, computed, inject, ViewChild, effect, signal} from '@angular/core';
 import {FileSelectEvent, FileUpload, FileUploadHandlerEvent} from 'primeng/fileupload';
 import {Button} from 'primeng/button';
 import {FormsModule} from '@angular/forms';
@@ -14,7 +14,10 @@ import {AppSettingsService} from '../../service/app-settings.service';
 import {SelectButton} from 'primeng/selectbutton';
 import {DynamicDialogRef} from 'primeng/dynamicdialog';
 import {ProgressBar} from 'primeng/progressbar';
+import {InputText} from 'primeng/inputtext';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {InpxBook, InpxImportResult, InpxImportService, InpxSearchResult, InpxSource} from './inpx-import.service';
+import {UserService} from '../../../features/settings/user-management/user.service';
 
 interface UploadingFile {
   file: File;
@@ -38,6 +41,7 @@ type FileRemoveCallback = (event: Event, index: number) => void;
     Tooltip,
     SelectButton,
     ProgressBar,
+    InputText,
     TranslocoDirective
   ],
   templateUrl: './book-uploader.component.html',
@@ -49,32 +53,59 @@ export class BookUploaderComponent {
   files: UploadingFile[] = [];
   isUploading = signal(false);
   uploadCompleted = signal(false);
+  isSearchingInpx = signal(false);
+  inpxBooks = signal<InpxBook[]>([]);
+  selectedInpxIds = signal<Set<string>>(new Set());
+  inpxSearchResult = signal<InpxSearchResult | null>(null);
+  inpxImportResult = signal<InpxImportResult | null>(null);
   _selectedLibrary: Library | null = null;
   selectedPath: LibraryPath | null = null;
+  inpxSourceLibrary: Library | null = null;
+  inpxPath = '';
+  inpxArchivePath = '';
+  inpxQuery = '';
 
   private readonly libraryService = inject(LibraryService);
   private readonly messageService = inject(MessageService);
   private readonly appSettingsService = inject(AppSettingsService);
   private readonly http = inject(HttpClient);
+  private readonly inpxImportService = inject(InpxImportService);
+  private readonly userService = inject(UserService);
   private readonly ref = inject(DynamicDialogRef);
   private readonly t = inject(TranslocoService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly libraries = this.libraryService.libraries;
+  // An INPX library's rescan only reads its index and archives, so extracted loose files would
+  // never surface there - it can be an import source, never an import destination.
+  readonly destinationLibraries = computed(() => this.libraries().filter(library => library.sourceType !== 'INPX'));
+  readonly inpxSourceLibraries = computed(() => this.libraries().filter(library => library.sourceType === 'INPX'));
+  // A raw index path is unconstrained filesystem access, so the server accepts it from admins only.
+  readonly canUseManualInpxPath = computed(() => this.userService.currentUser()?.permissions?.admin === true);
   maxFileSizeBytes?: number;
   maxFileSizeDisplay: string = '100 MB';
   stateOptions = [
     {label: this.t.translate('shared.bookUploader.destinationLibrary'), value: 'library'},
-    {label: this.t.translate('shared.bookUploader.destinationBookdrop'), value: 'bookdrop'}
+    {label: this.t.translate('shared.bookUploader.destinationBookdrop'), value: 'bookdrop'},
+    {label: this.t.translate('shared.bookUploader.destinationInpx'), value: 'inpx'}
   ];
   value = 'library';
   private readonly selectSingleLibraryEffect = effect(() => {
-    const libraries = this.libraries();
+    const libraries = this.destinationLibraries();
     if (libraries.length !== 1 || this.selectedLibrary) {
       return;
     }
 
     this.selectedLibrary = libraries[0];
+  });
+
+  private readonly selectSingleInpxSourceEffect = effect(() => {
+    const sources = this.inpxSourceLibraries();
+    if (sources.length !== 1 || this.inpxSourceLibrary) {
+      return;
+    }
+
+    this.inpxSourceLibrary = sources[0];
   });
 
   private readonly loadSettingsEffect = effect(() => {
@@ -196,6 +227,115 @@ export class BookUploaderComponent {
     const pathId = this.selectedPath?.id?.toString();
 
     this.uploadBatch(filesToUpload, 0, 1, destination, libraryId, pathId);
+  }
+
+  /** The chosen INPX library, or an admin's manually entered path when no library is selected. */
+  inpxSource(): InpxSource | null {
+    if (this.inpxSourceLibrary?.id != null) {
+      return {sourceLibraryId: this.inpxSourceLibrary.id};
+    }
+    if (this.canUseManualInpxPath() && this.inpxPath.trim()) {
+      return {inpxPath: this.inpxPath.trim(), archivePath: this.inpxArchivePath.trim() || null};
+    }
+    return null;
+  }
+
+  searchInpx(): void {
+    const source = this.inpxSource();
+    if (!source) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: this.t.translate('shared.bookUploader.toast.missingDataSummary'),
+        detail: this.t.translate('shared.bookUploader.inpxPathRequired')
+      });
+      return;
+    }
+
+    this.isSearchingInpx.set(true);
+    this.inpxImportResult.set(null);
+    this.inpxImportService.search(source, this.inpxQuery.trim()).subscribe({
+      next: result => {
+        this.inpxBooks.set(result.books);
+        this.inpxSearchResult.set(result);
+        this.selectedInpxIds.set(new Set());
+        this.isSearchingInpx.set(false);
+      },
+      error: error => {
+        this.isSearchingInpx.set(false);
+        this.messageService.add({
+          severity: 'error',
+          summary: this.t.translate('shared.bookUploader.inpxSearchFailed'),
+          detail: error?.error?.message ?? this.t.translate('shared.bookUploader.inpxSearchFailedDetail')
+        });
+      }
+    });
+  }
+
+  toggleInpxBook(bookId: string, selected: boolean): void {
+    this.selectedInpxIds.update(current => {
+      const next = new Set(current);
+      if (selected) {
+        next.add(bookId);
+      } else {
+        next.delete(bookId);
+      }
+      return next;
+    });
+  }
+
+  toggleAllInpxBooks(selected: boolean): void {
+    this.selectedInpxIds.set(selected ? new Set(this.inpxBooks().map(book => book.id)) : new Set());
+  }
+
+  isInpxBookSelected(bookId: string): boolean {
+    return this.selectedInpxIds().has(bookId);
+  }
+
+  importSelectedInpxBooks(): void {
+    const source = this.inpxSource();
+    if (!this.selectedLibrary?.id || !this.selectedPath?.id || this.selectedInpxIds().size === 0 || !source) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: this.t.translate('shared.bookUploader.toast.missingDataSummary'),
+        detail: this.t.translate('shared.bookUploader.inpxSelectionRequired')
+      });
+      return;
+    }
+
+    const selectedIds = this.selectedInpxIds();
+    const books = this.inpxBooks()
+      .filter(book => selectedIds.has(book.id))
+      .map(book => ({
+        archiveName: book.archiveName,
+        fileName: book.fileName,
+        extension: book.extension
+      }));
+
+    this.isUploading.set(true);
+    this.inpxImportResult.set(null);
+    this.inpxImportService.importBooks(this.selectedLibrary.id, {
+      ...source,
+      libraryPathId: this.selectedPath.id,
+      books
+    }).subscribe({
+      next: result => {
+        this.isUploading.set(false);
+        this.inpxImportResult.set(result);
+        this.messageService.add({
+          severity: result.failed > 0 ? 'warn' : 'success',
+          summary: this.t.translate('shared.bookUploader.inpxImportComplete'),
+          detail: this.t.translate('shared.bookUploader.inpxImportSummary', result)
+        });
+      },
+      error: error => {
+        this.isUploading.set(false);
+        this.messageService.add({
+          severity: 'error',
+          summary: this.t.translate('shared.bookUploader.inpxImportFailed'),
+          detail: error?.error?.message ?? this.t.translate('shared.bookUploader.inpxImportFailedDetail')
+        });
+      }
+    });
   }
 
   private uploadBatch(files: UploadingFile[], startIndex: number, batchSize: number, destination: string, libraryId?: string, pathId?: string): void {

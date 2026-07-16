@@ -1,9 +1,7 @@
 import {Location} from '@angular/common';
 import {TestBed} from '@angular/core/testing';
-import {of} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {BookService} from '../../../../book/service/book.service';
 import {ReaderSidebarService} from '../sidebar/sidebar.service';
 import {ReaderLeftSidebarService} from '../panel/panel.service';
 import {ReaderStateService} from '../../state/reader-state.service';
@@ -28,6 +26,7 @@ describe('ReaderHeaderService', () => {
     })),
     toggleDarkMode: vi.fn(),
     updateFontSize: vi.fn(),
+    persistSettings: vi.fn(),
   };
 
   const sidebarService = {
@@ -37,10 +36,6 @@ describe('ReaderHeaderService', () => {
 
   const leftSidebarService = {
     open: vi.fn(),
-  };
-
-  const bookService = {
-    updateViewerSetting: vi.fn(() => of(void 0)),
   };
 
   const location = {
@@ -56,8 +51,7 @@ describe('ReaderHeaderService', () => {
     sidebarService.open.mockReset();
     sidebarService.toggleBookmark.mockReset();
     leftSidebarService.open.mockReset();
-    bookService.updateViewerSetting.mockReset();
-    bookService.updateViewerSetting.mockReturnValue(of(void 0));
+    readerState.persistSettings.mockReset();
     location.back.mockReset();
 
     TestBed.configureTestingModule({
@@ -66,7 +60,6 @@ describe('ReaderHeaderService', () => {
         {provide: ReaderStateService, useValue: readerState},
         {provide: ReaderSidebarService, useValue: sidebarService},
         {provide: ReaderLeftSidebarService, useValue: leftSidebarService},
-        {provide: BookService, useValue: bookService},
         {provide: Location, useValue: location},
       ]
     });
@@ -128,28 +121,13 @@ describe('ReaderHeaderService', () => {
     expect(location.back).toHaveBeenCalledOnce();
   });
 
-  it('syncs dark mode and font size updates back to the viewer settings endpoint', () => {
+  it('persists dark mode and font size updates through the reader state', () => {
     service.toggleDarkMode();
     service.increaseFontSize();
 
     expect(readerState.toggleDarkMode).toHaveBeenCalledOnce();
     expect(readerState.updateFontSize).toHaveBeenCalledWith(1);
-    expect(bookService.updateViewerSetting).toHaveBeenCalledTimes(2);
-    expect(bookService.updateViewerSetting).toHaveBeenCalledWith({
-      ebookSettings: {
-        lineHeight: 1.5,
-        justify: true,
-        hyphenate: true,
-        maxColumnCount: 2,
-        gap: 0.05,
-        fontSize: 16,
-        theme: 'default',
-        maxInlineSize: 720,
-        maxBlockSize: 1440,
-        fontFamily: null,
-        isDark: true,
-        flow: 'paginated',
-      }
-    }, 12);
+    expect(readerState.persistSettings).toHaveBeenCalledTimes(2);
+    expect(readerState.persistSettings).toHaveBeenCalledWith(12);
   });
 });

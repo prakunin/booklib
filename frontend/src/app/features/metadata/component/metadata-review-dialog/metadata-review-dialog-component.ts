@@ -1,7 +1,6 @@
-import {Component, computed, effect, inject, OnInit, signal, ViewChild} from '@angular/core';
+import {Component, computed, inject, OnInit, signal, ViewChild} from '@angular/core';
 import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
 import {FetchedProposal, MetadataTaskService} from '../../../book/service/metadata-task';
-import {BookService} from '../../../book/service/book.service';
 import {Book} from '../../../book/model/book.model';
 import {ProgressSpinner} from 'primeng/progressspinner';
 import {Button} from 'primeng/button';
@@ -11,6 +10,9 @@ import {Tooltip} from 'primeng/tooltip';
 import {MetadataProgressService} from '../../../../shared/service/metadata-progress.service';
 import {MetadataPickerComponent} from '../book-metadata-center/metadata-picker/metadata-picker.component';
 import {DecimalPipe} from '@angular/common';
+import {AppBooksApiService} from '../../../book/service/app-books-api.service';
+import {injectQuery} from '@tanstack/angular-query-experimental';
+import {lastValueFrom} from 'rxjs';
 
 @Component({
   selector: 'app-metadata-review-dialog-component',
@@ -28,33 +30,34 @@ export class MetadataReviewDialogComponent implements OnInit {
   private config = inject(DynamicDialogConfig);
   private dialogRef = inject(DynamicDialogRef);
   private metadataTaskService = inject(MetadataTaskService);
-  private bookService = inject(BookService);
+  private appBooksApi = inject(AppBooksApiService);
   private progressService = inject(MetadataProgressService);
 
-  loading = signal(true);
   readonly proposals = signal<FetchedProposal[]>([]);
   readonly currentIndex = signal(0);
+  private readonly proposalBooksQuery = injectQuery(() => {
+    const ids = [...new Set(this.proposals().map(proposal => proposal.bookId))];
+    return {
+      queryKey: ['app-book-summaries', ...ids] as const,
+      queryFn: () => lastValueFrom(this.appBooksApi.getBooksByIds(ids)),
+      enabled: ids.length > 0,
+    };
+  });
+  private readonly proposalBooksById = computed(() => new Map(
+    (this.proposalBooksQuery.data() ?? []).map(book => [book.id, book]),
+  ));
+  readonly loading = computed(() => {
+    const proposalCount = new Set(this.proposals().map(proposal => proposal.bookId)).size;
+    return proposalCount === 0 || this.proposalBooksById().size !== proposalCount;
+  });
   readonly currentBook = computed<Book | null>(() => {
     const proposal = this.proposals()[this.currentIndex()];
     if (!proposal) {
       return null;
     }
 
-    return this.bookService.findBookById(proposal.bookId) ?? null;
+    return this.proposalBooksById().get(proposal.bookId) ?? null;
   });
-
-  constructor() {
-    effect(() => {
-      const proposals = this.proposals();
-      if (proposals.length === 0) {
-        return;
-      }
-
-      const bookIds = new Set(proposals.map(proposal => proposal.bookId));
-      const matchedBooks = this.bookService.books().filter(book => bookIds.has(book.id));
-      this.loading.set(matchedBooks.length !== bookIds.size);
-    });
-  }
 
   ngOnInit() {
     const taskId = this.config.data?.taskId;

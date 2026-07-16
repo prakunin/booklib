@@ -18,6 +18,7 @@ import {PageTitleService} from '../../../../shared/service/page-title.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {UserService} from '../../../settings/user-management/user.service';
 import {BookService} from '../../../book/service/book.service';
+import {AppMessageComponent} from '../../../../shared/ui/message/app-message.component';
 import {Book, ReadStatus} from '../../../book/model/book.model';
 import {createVirtualGrid} from '../../../../shared/util/virtual-grid.util';
 import {GridDensityButtonsComponent, type GridDensityDirection} from '../../../../shared/components/grid-density-buttons/grid-density-buttons.component';
@@ -58,6 +59,7 @@ const DEFAULT_SORT_DIRECTIONS: Record<string, SortDirection> = {
   imports: [
     FormsModule,
     ProgressSpinner,
+    AppMessageComponent,
     InputText,
     Select,
     Popover,
@@ -127,6 +129,9 @@ export class AuthorBrowserComponent implements OnInit {
   private allAuthorsState = signal<AuthorSummary[] | null>(null);
 
   loading = computed(() => this.allAuthorsState() === null || this.bookService.isBooksLoading());
+  // Authors are enriched from the whole catalog client-side (library names, per-author counts),
+  // so an oversized catalog must be reported rather than rendered as an empty author list.
+  readonly catalogTooLarge = this.bookService.legacyCatalogTooLarge;
   protected currentUser = this.userService.currentUser;
   selectedCount = computed(() => this.selectedAuthors().size);
   searchTerm = signal('');

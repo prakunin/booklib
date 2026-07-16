@@ -1,7 +1,7 @@
-import {computed, effect, inject, Injectable} from '@angular/core';
-import {first, from, lastValueFrom, Observable, throwError} from 'rxjs';
-import {HttpClient, HttpParams} from '@angular/common/http';
-import {catchError, map, tap} from 'rxjs/operators';
+import {computed, effect, inject, Injectable, signal} from '@angular/core';
+import {first, from, lastValueFrom, Observable, switchMap, throwError} from 'rxjs';
+import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
+import {catchError, tap} from 'rxjs/operators';
 import {Book, BookDeletionResponse, BookRecommendation, BookSetting, BookStatusUpdateResponse, BookType, CreatePhysicalBookRequest, PersonalRatingUpdateResponse, ReadStatus} from '../model/book.model';
 import {API_CONFIG} from '../../../core/config/api-config';
 import {MessageService} from 'primeng/api';
@@ -23,6 +23,7 @@ import {
   patchBooksInCache,
   removeBookQueries,
 } from './book-query-cache';
+import {AppBooksApiService} from './app-books-api.service';
 
 @Injectable({
   providedIn: 'root',
@@ -38,44 +39,45 @@ export class BookService {
   private bookSocketService = inject(BookSocketService);
   private bookPatchService = inject(BookPatchService);
   private queryClient = inject(QueryClient);
+  private appBooksApi = inject(AppBooksApiService);
   private readonly t = inject(TranslocoService);
   private readonly token = this.authService.token;
+  private readonly legacyCatalogEnabled = signal(false);
+  private legacyCatalogRequested = false;
 
   private booksQuery = injectQuery(() => ({
     ...this.getBooksQueryOptions(),
-    enabled: !!this.token(),
+    enabled: !!this.token() && this.legacyCatalogEnabled(),
   }));
 
-  books = computed(() => this.booksQuery.data() ?? []);
+  /**
+   * Transitional legacy catalog accessor.
+   *
+   * The full-catalog query stays disabled until an unmigrated screen actually reads it.
+   * Scheduling the enable outside the current reactive computation avoids a signal write
+   * from inside a consumer's computed/effect. Remove this accessor with the final legacy
+   * catalog consumers.
+   */
+  books = (): Book[] => {
+    if (!this.legacyCatalogRequested) {
+      this.legacyCatalogRequested = true;
+      queueMicrotask(() => this.legacyCatalogEnabled.set(true));
+    }
+    return this.booksQuery.data() ?? [];
+  };
 
   /** Pre-computed unique metadata values for autocomplete across the app. */
   readonly uniqueMetadata = computed(() => {
-    const books = this.books();
-    const authors = new Set<string>();
-    const categories = new Set<string>();
-    const moods = new Set<string>();
-    const tags = new Set<string>();
-    const publishers = new Set<string>();
-    const series = new Set<string>();
-
-    for (const book of books) {
-      const m = book.metadata;
-      if (!m) continue;
-      m.authors?.forEach(v => authors.add(v));
-      m.categories?.forEach(v => categories.add(v));
-      m.moods?.forEach(v => moods.add(v));
-      m.tags?.forEach(v => tags.add(v));
-      if (m.publisher) publishers.add(m.publisher);
-      if (m.seriesName) series.add(m.seriesName);
-    }
+    this.appBooksApi.enableGlobalFilterOptions();
+    const options = this.appBooksApi.globalFilterOptions();
 
     return {
-      authors: Array.from(authors),
-      categories: Array.from(categories),
-      moods: Array.from(moods),
-      tags: Array.from(tags),
-      publishers: Array.from(publishers),
-      series: Array.from(series),
+      authors: options?.authors.map(option => option.name) ?? [],
+      categories: options?.categories.map(option => option.name) ?? [],
+      moods: options?.moods.map(option => option.name) ?? [],
+      tags: options?.tags.map(option => option.name) ?? [],
+      publishers: options?.publishers.map(option => option.name) ?? [],
+      series: options?.series.map(option => option.name) ?? [],
     };
   });
 
@@ -88,7 +90,26 @@ export class BookService {
     return error instanceof Error ? error.message : 'Failed to load books';
   });
 
-  isBooksLoading = computed(() => !!this.token() && this.booksQuery.isPending());
+  /**
+   * True when the server refused the flat catalog because it exceeds the legacy size cap.
+   *
+   * The screens still reading the full catalog aggregate it client-side and have no paginated
+   * equivalent yet, so they cannot render at all here. They must say so rather than show an empty
+   * result, which reads as an empty library. A 400 identifies this unambiguously: the flat
+   * endpoint's only other parameters are booleans with defaults, so the cap is its sole 400.
+   */
+  readonly legacyCatalogTooLarge = computed(() => {
+    if (!this.token() || !this.booksQuery.isError()) {
+      return false;
+    }
+    const error = this.booksQuery.error();
+    return error instanceof HttpErrorResponse && error.status === 400;
+  });
+
+  // Use isLoading (isPending && isFetching), not isPending: the legacy catalog query is
+  // lazily enabled, and a disabled/idle query reports isPending forever. Screens that read
+  // this flag without consuming books() (e.g. the dashboard) would otherwise spin endlessly.
+  isBooksLoading = computed(() => !!this.token() && this.booksQuery.isLoading());
 
   constructor() {
     effect(() => {
@@ -141,7 +162,8 @@ export class BookService {
       queryKey: bookRecommendationsQueryKey(bookId, limit),
       queryFn: () => lastValueFrom(this.http.get<BookRecommendation[]>(`${this.url}/${bookId}/recommendations`, {
         params: {limit: limit.toString()}
-      }))
+      })),
+      retry: false,
     });
   }
 
@@ -158,26 +180,24 @@ export class BookService {
   /*------------------ Book Retrieval ------------------*/
 
   findBookById(bookId: number): Book | undefined {
-    return this.books().find(book => +book.id === +bookId);
+    return this.appBooksApi.books().find(book => +book.id === +bookId)
+      ?? this.queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)?.find(book => +book.id === +bookId);
   }
 
   getBooksByIds(bookIds: number[]): Book[] {
     if (bookIds.length === 0) return [];
     const idSet = new Set(bookIds.map(id => +id));
-    return this.books().filter(book => idSet.has(+book.id));
+    const paged = this.appBooksApi.books().filter(book => idSet.has(+book.id));
+    const foundIds = new Set(paged.map(book => +book.id));
+    const legacy = this.queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY) ?? [];
+    return [...paged, ...legacy.filter(book => idSet.has(+book.id) && !foundIds.has(+book.id))];
   }
 
   getBooksInSeries(bookId: number): Observable<Book[]> {
-    return from(this.queryClient.ensureQueryData(this.getBooksQueryOptions())).pipe(
-      map(books => {
-        const currentBook = books.find(book => book.id === bookId);
-        if (!currentBook?.metadata?.seriesName) {
-          return [];
-        }
-
-        const seriesName = currentBook.metadata.seriesName.toLowerCase();
-        return books.filter(book => book.metadata?.seriesName?.toLowerCase() === seriesName);
-      }),
+    return from(this.ensureBookDetail(bookId, false)).pipe(
+      switchMap(book => book.metadata?.seriesName
+        ? this.appBooksApi.getSeriesBooks(book.metadata.seriesName)
+        : from([[] as Book[]])),
       first()
     );
   }
@@ -373,6 +393,10 @@ export class BookService {
     this.bookSocketService.handleNewlyCreatedBook(book);
   }
 
+  handleLibraryScanComplete(): void {
+    invalidateBooksQuery(this.queryClient);
+  }
+
   handleRemovedBookIds(removedBookIds: number[]): void {
     this.bookSocketService.handleRemovedBookIds(removedBookIds);
   }
@@ -391,5 +415,9 @@ export class BookService {
 
   handleMultipleBookCoverPatches(patches: { id: number; coverUpdatedOn: string }[]): void {
     this.bookSocketService.handleMultipleBookCoverPatches(patches);
+  }
+
+  handleBookRecommendationsUpdate(bookId: number): void {
+    this.bookSocketService.handleBookRecommendationsUpdate(bookId);
   }
 }

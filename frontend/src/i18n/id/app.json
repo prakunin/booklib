@@ -1,8 +1,8 @@
 {
     "offline": "Anda sedang offline",
-    "loading": "Memuat Grimmory…",
+    "loading": "Memuat BookLib…",
     "loadingDescription": "Mohon menunggu selagi kami menyiapkan semuanya.",
-    "offlineLoadingDescription": "Grimmory butuh koneksi ke server untuk memuat.",
+    "offlineLoadingDescription": "BookLib butuh koneksi ke server untuk memuat.",
     "offlineDescription": "Periksa koneksi anda dan coba lagi.",
     "connectionLost": "Koneksi anda terputus. Beberapa fitur mungkin tidak berfungsi"
 }

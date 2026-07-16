@@ -91,7 +91,7 @@
             "moreActions": "Plus d'actions",
             "organizeFile": "Organiser le fichier",
             "readStatus": "Statut de lecture",
-            "resetGrimmoryProgress": "Réinitialiser la progression Grimmory",
+            "resetGrimmoryProgress": "Réinitialiser la progression BookLib",
             "resetKOReaderProgress": "Réinitialiser la progression KOReader",
             "book": "Livre",
             "loading": "Chargement..."
@@ -115,10 +115,10 @@
             "readStatusFailedSummary": "Échec de la mise à jour",
             "readStatusFailedDetail": "Impossible de mettre à jour le statut de lecture.",
             "progressResetSummary": "Progression réinitialisée",
-            "progressResetGrimmoryDetail": "La progression de lecture Grimmory a été réinitialisée.",
+            "progressResetGrimmoryDetail": "La progression de lecture BookLib a été réinitialisée.",
             "progressResetKOReaderDetail": "La progression de lecture KOReader a été réinitialisée.",
             "progressResetFailedSummary": "Échec",
-            "progressResetGrimmoryFailedDetail": "Impossible de réinitialiser la progression Grimmory.",
+            "progressResetGrimmoryFailedDetail": "Impossible de réinitialiser la progression BookLib.",
             "progressResetKOReaderFailedDetail": "Impossible de réinitialiser la progression KOReader.",
             "coverRegenSuccessSummary": "Succès",
             "coverRegenSuccessDetail": "Régénération de la couverture lancée",
@@ -200,7 +200,7 @@
             "setContentRating": "Définir la classification de contenu",
             "clearContentRating": "Effacer la classification de contenu",
             "removeFromAllShelves": "Retirer de toutes les étagères",
-            "resetGrimmoryProgress": "Réinitialiser la progression Grimmory",
+            "resetGrimmoryProgress": "Réinitialiser la progression BookLib",
             "resetKOReaderProgress": "Réinitialiser la progression KOReader"
         },
         "confirm": {
@@ -216,7 +216,7 @@
             "clearContentRatingHeader": "Confirmer l'effacement de la classification de contenu",
             "unshelveMessage": "Êtes-vous sûr de vouloir retirer {{ count }} livre(s) de TOUTES leurs étagères ?",
             "unshelveHeader": "Confirmer le retrait des étagères",
-            "resetGrimmoryMessage": "Êtes-vous sûr de vouloir réinitialiser la progression de lecture Grimmory pour {{ count }} livre(s) ?",
+            "resetGrimmoryMessage": "Êtes-vous sûr de vouloir réinitialiser la progression de lecture BookLib pour {{ count }} livre(s) ?",
             "resetKOReaderMessage": "Êtes-vous sûr de vouloir réinitialiser la progression de lecture KOReader pour {{ count }} livre(s) ?",
             "resetHeader": "Confirmer la réinitialisation"
         },
@@ -241,7 +241,7 @@
             "unshelveSuccessDetail": "Livres retirés de toutes les étagères",
             "unshelveFailedDetail": "Échec de la mise à jour des étagères des livres",
             "progressResetSummary": "Progression réinitialisée",
-            "grimmoryProgressResetDetail": "La progression de lecture Grimmory a été réinitialisée.",
+            "grimmoryProgressResetDetail": "La progression de lecture BookLib a été réinitialisée.",
             "koreaderProgressResetDetail": "La progression de lecture KOReader a été réinitialisée.",
             "failedSummary": "Échec",
             "progressResetFailedDetail": "Impossible de réinitialiser la progression."
@@ -253,7 +253,7 @@
             "settingContentRating": "Définition de la classification de contenu pour {{ count }} livre(s)...",
             "clearingContentRating": "Effacement de la classification de contenu pour {{ count }} livre(s)...",
             "removingFromShelves": "Retrait de {{ count }} livre(s) des étagères...",
-            "resettingGrimmoryProgress": "Réinitialisation de la progression Grimmory pour {{ count }} livre(s)...",
+            "resettingGrimmoryProgress": "Réinitialisation de la progression BookLib pour {{ count }} livre(s)...",
             "resettingKOReaderProgress": "Réinitialisation de la progression KOReader pour {{ count }} livre(s)..."
         }
     },

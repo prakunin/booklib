@@ -18,6 +18,7 @@ import org.booklore.model.enums.ReadStatus;
 import org.booklore.model.enums.ResetProgressType;
 import org.booklore.model.enums.UserPermission;
 import org.booklore.repository.*;
+import org.booklore.service.annotation.InvalidateUserStats;
 import org.booklore.service.hardcover.HardcoverSyncService;
 import org.booklore.service.kobo.KoboReadingStateService;
 import org.booklore.service.koreader.KoreaderService;
@@ -198,8 +199,12 @@ public class ReadingProgressService {
 
     // ==================== Methods from BookUpdateService ====================
 
+    /**
+     * @return the read status the server derived from the saved progress. The client cannot compute
+     * it (see calculateReadStatus) and would otherwise show a stale status until the next refetch.
+     */
     @Transactional
-    public void updateReadProgress(ReadProgressRequest request) {
+    public BookStatusUpdateResponse updateReadProgress(ReadProgressRequest request) {
         BookEntity book = bookRepository.findByIdWithBookFiles(request.getBookId())
                 .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(request.getBookId()));
         BookLoreUser user = authenticationService.getAuthenticatedUser();
@@ -275,8 +280,19 @@ public class ReadingProgressService {
             koreaderService.syncProgressToKoreader(book.getId(), percentage, user.getId());
             hardcoverSyncService.syncProgressToHardcover(book.getId(), percentage, user.getId());
         }
+
+        return BookStatusUpdateResponse.builder()
+                .bookId(book.getId())
+                .readStatus(progress.getReadStatus())
+                .readStatusModifiedTime(progress.getReadStatusModifiedTime())
+                .dateFinished(progress.getDateFinished())
+                .build();
     }
 
+    // Resetting clears readStatus and dateFinished (see bulkResetBookloreProgress), which the
+    // completion timeline and heatmap aggregate over. The controller calls this directly, so it is
+    // the outermost transactional boundary and the invalidation lands after commit.
+    @InvalidateUserStats
     @Transactional
     public List<BookStatusUpdateResponse> resetProgress(List<Long> bookIds, ResetProgressType type) {
         BookLoreUser user = authenticationService.getAuthenticatedUser();

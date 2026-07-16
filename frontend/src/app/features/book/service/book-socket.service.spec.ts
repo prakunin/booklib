@@ -103,6 +103,14 @@ describe('BookSocketService', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({queryKey: ['books', 'detail', 3]});
   });
 
+  it('invalidates recommendations when queued computation completes', () => {
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    service.handleBookRecommendationsUpdate(12);
+
+    expect(invalidateSpy).toHaveBeenCalledWith({queryKey: ['books', 'recommendations', 12]});
+  });
+
   it('ignores empty cover patch lists', () => {
     const setQueryDataSpy = vi.spyOn(queryClient, 'setQueryData');
 

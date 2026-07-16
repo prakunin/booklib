@@ -39,7 +39,7 @@
         </div>
       </div>
 
-      @if (value === 'library') {
+      @if (value === 'library' || value === 'inpx') {
         <div class="gradient-divider"></div>
         <div class="library-selection">
           <div class="section-header">
@@ -53,7 +53,7 @@
               <label for="library-select" class="field-label">{{ t('libraryLabel') }}</label>
               <p-select
                 inputId="library-select"
-                [options]="libraries"
+                [options]="destinationLibraries()"
                 optionLabel="name"
                 [placeholder]="t('selectLibrary')"
                 [(ngModel)]="selectedLibrary"
@@ -78,6 +78,133 @@
 
       <div class="gradient-divider"></div>
 
+      @if (value === 'inpx') {
+        <div class="inpx-section">
+          <div class="section-header">
+            <span class="section-title">
+              <i class="pi pi-database"></i>
+              {{ t('inpxTitle') }}
+            </span>
+          </div>
+
+          <div class="inpx-fields">
+            <div class="field-group">
+              <label for="inpx-source-select" class="field-label">{{ t('inpxSourceLibraryLabel') }}</label>
+              <p-select
+                inputId="inpx-source-select"
+                [options]="inpxSourceLibraries()"
+                optionLabel="name"
+                [placeholder]="t('inpxSourceLibraryPlaceholder')"
+                [(ngModel)]="inpxSourceLibrary"
+                [showClear]="canUseManualInpxPath()"
+                class="full-width">
+              </p-select>
+              <small>{{ t('inpxSourceLibraryHint') }}</small>
+            </div>
+          </div>
+
+          @if (canUseManualInpxPath() && !inpxSourceLibrary) {
+            <div class="inpx-fields">
+              <div class="field-group">
+                <label for="inpx-path" class="field-label">{{ t('inpxPathLabel') }}</label>
+                <input
+                  pInputText
+                  id="inpx-path"
+                  [(ngModel)]="inpxPath"
+                  [placeholder]="t('inpxPathPlaceholder')"/>
+                <small>{{ t('inpxPathHint') }}</small>
+              </div>
+              <div class="field-group">
+                <label for="inpx-archive-path" class="field-label">{{ t('inpxArchivePathLabel') }}</label>
+                <input
+                  pInputText
+                  id="inpx-archive-path"
+                  [(ngModel)]="inpxArchivePath"
+                  [placeholder]="t('inpxArchivePathPlaceholder')"/>
+                <small>{{ t('inpxArchivePathHint') }}</small>
+              </div>
+            </div>
+          }
+
+          <div class="inpx-search-row">
+            <input
+              pInputText
+              [(ngModel)]="inpxQuery"
+              [placeholder]="t('inpxSearchPlaceholder')"
+              (keyup.enter)="searchInpx()"/>
+            <p-button
+              icon="pi pi-search"
+              [label]="t('inpxSearchBtn')"
+              [loading]="isSearchingInpx()"
+              [disabled]="!inpxSource() || isUploading()"
+              (onClick)="searchInpx()"/>
+          </div>
+
+          @if (inpxSearchResult(); as result) {
+            <div class="inpx-result-summary">
+              {{ t('inpxFound', {count: result.books.length, scanned: result.scannedCount}) }}
+              @if (result.truncated) {
+                <span>{{ t('inpxTruncated') }}</span>
+              }
+            </div>
+          }
+
+          @if (inpxBooks().length > 0) {
+            <div class="inpx-selection-actions">
+              <label>
+                <input
+                  type="checkbox"
+                  [checked]="selectedInpxIds().size === inpxBooks().length"
+                  (change)="toggleAllInpxBooks($any($event.target).checked)"/>
+                {{ t('inpxSelectAll') }}
+              </label>
+              <span>{{ t('inpxSelected', {count: selectedInpxIds().size}) }}</span>
+            </div>
+
+            <div class="inpx-book-list">
+              @for (book of inpxBooks(); track book.id) {
+                <label class="inpx-book-row">
+                  <input
+                    type="checkbox"
+                    [checked]="isInpxBookSelected(book.id)"
+                    (change)="toggleInpxBook(book.id, $any($event.target).checked)"/>
+                  <span class="inpx-book-details">
+                    <strong>{{ book.title }}</strong>
+                    <small>
+                      {{ book.authors.join(', ') }}
+                      @if (book.series) { · {{ book.series }} }
+                    </small>
+                  </span>
+                  <small class="inpx-book-source">{{ book.archiveName }} / {{ book.fileName }}.{{ book.extension }}</small>
+                </label>
+              }
+            </div>
+
+            <div class="inpx-import-actions">
+              <p-button
+                icon="pi pi-download"
+                severity="success"
+                [label]="t('inpxImportBtn', {count: selectedInpxIds().size})"
+                [loading]="isUploading()"
+                [disabled]="selectedInpxIds().size === 0 || !selectedLibrary || !selectedPath"
+                (onClick)="importSelectedInpxBooks()"/>
+            </div>
+          }
+
+          @if (inpxImportResult(); as result) {
+            <div class="inpx-import-result">
+              {{ t('inpxImportSummary', result) }}
+              @if (result.errors.length > 0) {
+                <ul>
+                  @for (error of result.errors; track error) {
+                    <li>{{ error }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        </div>
+      } @else {
       <div class="file-upload-section">
         <div class="section-header">
           <span class="section-title">
@@ -230,6 +357,7 @@
           </ng-template>
         </p-fileupload>
       </div>
+      }
     </div>
   </div>
   </ng-container>

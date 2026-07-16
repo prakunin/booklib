@@ -1,6 +1,8 @@
 <ng-container *transloco="let t; prefix: 'authorBrowser'">
 <div class="author-browser-page">
-  @if (loading()) {
+  @if (catalogTooLarge()) {
+    <app-message color="amber">{{ t('catalogTooLarge') }}</app-message>
+  } @else if (loading()) {
     <div class="loading-state">
       <p-progressSpinner
         [style]="{'width': '60px', 'height': '60px'}"
@@ -11,7 +13,7 @@
     </div>
   }
 
-  @if (!loading()) {
+  @if (!loading() && !catalogTooLarge()) {
     <div class="browse-header">
       <h2 class="browse-title">{{ t('browseAllAuthors') }}</h2>
 

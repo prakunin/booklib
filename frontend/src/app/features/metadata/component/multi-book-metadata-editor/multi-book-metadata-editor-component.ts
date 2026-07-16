@@ -7,6 +7,8 @@ import {MetadataEditorComponent} from '../book-metadata-center/metadata-editor/m
 import {MetadataSearcherComponent} from '../book-metadata-center/metadata-searcher/metadata-searcher.component';
 import {Button} from 'primeng/button';
 import {injectQuery} from '@tanstack/angular-query-experimental';
+import {AppBooksApiService} from '../../../book/service/app-books-api.service';
+import {lastValueFrom} from 'rxjs';
 
 @Component({
   selector: 'app-multi-book-metadata-editor-component',
@@ -29,13 +31,17 @@ export class MultiBookMetadataEditorComponent {
   private readonly config = inject(DynamicDialogConfig);
   readonly ref = inject(DynamicDialogRef);
   private readonly bookService = inject(BookService);
+  private readonly appBooksApi = inject(AppBooksApiService);
   private readonly userService = inject(UserService);
   bookIds: number[] = this.config.data?.bookIds ?? [];
   loading = false;
 
-  filteredBooks = computed(() => this.bookService.books().filter(book =>
-    !!book.metadata && this.bookIds.includes(book.id)
-  ));
+  private readonly selectedBooksQuery = injectQuery(() => ({
+    queryKey: ['app-book-summaries', ...this.bookIds] as const,
+    queryFn: () => lastValueFrom(this.appBooksApi.getBooksByIds(this.bookIds)),
+    enabled: this.bookIds.length > 0,
+  }));
+  filteredBooks = computed(() => (this.selectedBooksQuery.data() ?? []).filter(book => !!book.metadata));
   private currentIndex = signal(0);
   private currentBookId = computed(() => this.filteredBooks()[this.currentIndex()]?.id ?? null);
   private bookDetailQuery = injectQuery(() => ({

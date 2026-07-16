@@ -91,6 +91,24 @@
   transform: translateX(var(--sidebar-brand-optical-nudge));
 }
 
+/* Text wordmark: renders the brand name with the same logo gradient the vector
+   wordmark used, sized to the shared brand height so it aligns with the collapsed
+   G-only mark across the expand/collapse toggle. */
+.sidebar-brand-wordmark-text {
+  display: flex;
+  align-items: center;
+  height: var(--brand-content-height);
+  font-size: calc(var(--brand-content-height) * 0.86);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  background: linear-gradient(180deg, var(--color-logo-start), var(--color-logo-end));
+  background-clip: text;
+  color: transparent;
+  user-select: none;
+}
+
 .sidebar-toolbar-button {
   font-weight: 500;
 }

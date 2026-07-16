@@ -35,7 +35,7 @@
         "tools": "Tools",
         "collapseSidebar": "Collapse sidebar",
         "expandSidebar": "Expand sidebar",
-        "goToDashboard": "Grimmory — go to dashboard",
+        "goToDashboard": "BookLib — go to dashboard",
         "notifications": "Notifications",
         "primaryNav": "Primary navigation",
         "resizeSidebar": "Resize sidebar",
@@ -83,7 +83,7 @@
         "customPrimary": "Custom color",
         "syncAcrossDevices": "Sync my theme across devices",
         "options": {
-            "grimmory": "Grimmory",
+            "grimmory": "BookLib",
             "cobalt": "Cobalt",
             "ember": "Ember",
             "crimson": "Crimson",

@@ -18,6 +18,9 @@ import {Tooltip} from 'primeng/tooltip';
 import {DialogLauncherService} from '../../../shared/services/dialog-launcher.service';
 import {ContentRestrictionsEditorComponent} from './content-restrictions-editor/content-restrictions-editor.component';
 import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
+import {AppSettingsService} from '../../../shared/service/app-settings.service';
+import {PasswordPolicyRequirementsComponent} from '../../../shared/components/password-policy-requirements/password-policy-requirements.component';
+import {DEFAULT_PASSWORD_POLICY, passwordPolicyViolations} from '../../../shared/validators/password-policy.validator';
 
 export interface UserWithEditing extends User {
   isEditing?: boolean;
@@ -41,7 +44,8 @@ export interface UserWithEditing extends User {
     Tooltip,
     ContentRestrictionsEditorComponent,
     TranslocoDirective,
-    TranslocoPipe
+    TranslocoPipe,
+    PasswordPolicyRequirementsComponent
   ],
   templateUrl: './user-management.component.html',
   styleUrls: ['./user-management.component.scss'],
@@ -54,7 +58,12 @@ export class UserManagementComponent implements OnInit {
   private messageService = inject(MessageService);
   private t = inject(TranslocoService);
   private destroyRef = inject(DestroyRef);
+  private appSettingsService = inject(AppSettingsService);
   get allLibraries() { return this.libraryService.libraries(); }
+
+  get passwordPolicy() {
+    return this.appSettingsService.appSettings()?.passwordPolicy ?? DEFAULT_PASSWORD_POLICY;
+  }
 
   users: WritableSignal<UserWithEditing[]> = signal([]);
   currentUser: User | null = null;
@@ -203,6 +212,11 @@ export class UserManagementComponent implements OnInit {
 
     if (this.newPassword !== this.confirmNewPassword) {
       this.passwordError = this.t.translate('settingsUsers.passwordDialog.mismatch');
+      return;
+    }
+
+    if (passwordPolicyViolations(this.newPassword, this.passwordPolicy).length > 0) {
+      this.passwordError = this.t.translate('shared.passwordPolicy.invalid');
       return;
     }
 

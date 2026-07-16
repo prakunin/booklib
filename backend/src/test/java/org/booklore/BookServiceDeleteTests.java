@@ -13,6 +13,7 @@ import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
 import org.booklore.service.FileStreamingService;
 import org.booklore.service.audit.AuditService;
+import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.util.FileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,7 @@ class BookServiceDeleteTests {
         SidecarMetadataWriter sidecarMetadataWriter = Mockito.mock(SidecarMetadataWriter.class);
         FileStreamingService fileStreamingService = Mockito.mock(FileStreamingService.class);
         AuditService auditService = Mockito.mock(AuditService.class);
+        ArchivedBookContentService archivedBookContentService = Mockito.mock(ArchivedBookContentService.class);
         EntityManager entityManager = Mockito.mock(EntityManager.class);
 
         bookService = new BookService(
@@ -79,7 +81,8 @@ class BookServiceDeleteTests {
                 ebookViewerPreferenceRepository,
                 sidecarMetadataWriter,
                 fileStreamingService,
-                auditService
+                auditService,
+                archivedBookContentService
         );
     }
 

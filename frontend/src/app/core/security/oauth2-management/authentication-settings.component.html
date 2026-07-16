@@ -13,6 +13,67 @@
   <div class="settings-card">
     <div class="section-header">
       <h3 class="section-title">
+        <i class="pi pi-lock"></i>
+        {{ t('passwordPolicy.sectionTitle') }}
+      </h3>
+      <p class="section-description">
+        {{ t('passwordPolicy.sectionDesc') }}
+      </p>
+    </div>
+
+    <div class="section-body">
+      <div class="config-grid">
+        <div class="config-item">
+          <label for="passwordMinimumLength">{{ t('passwordPolicy.minimumLength') }}</label>
+          <p-inputNumber
+            inputId="passwordMinimumLength"
+            [(ngModel)]="passwordPolicy.minimumLength"
+            [min]="1"
+            [max]="72"
+            [showButtons]="true"
+            [useGrouping]="false">
+          </p-inputNumber>
+          <span class="field-hint">{{ t('passwordPolicy.minimumLengthHint') }}</span>
+        </div>
+      </div>
+
+      <div class="auth-methods-list" style="margin-top: 0.875rem;">
+        <div class="auth-method-item" [class.is-active]="passwordPolicy.requireUppercase">
+          <span class="auth-method-label">{{ t('passwordPolicy.requireUppercase') }}</span>
+          <p-toggleswitch [(ngModel)]="passwordPolicy.requireUppercase"></p-toggleswitch>
+        </div>
+        <div class="auth-method-item" [class.is-active]="passwordPolicy.requireLowercase">
+          <span class="auth-method-label">{{ t('passwordPolicy.requireLowercase') }}</span>
+          <p-toggleswitch [(ngModel)]="passwordPolicy.requireLowercase"></p-toggleswitch>
+        </div>
+        <div class="auth-method-item" [class.is-active]="passwordPolicy.requireDigit">
+          <span class="auth-method-label">{{ t('passwordPolicy.requireDigit') }}</span>
+          <p-toggleswitch [(ngModel)]="passwordPolicy.requireDigit"></p-toggleswitch>
+        </div>
+        <div class="auth-method-item" [class.is-active]="passwordPolicy.requireSpecialCharacter">
+          <span class="auth-method-label">{{ t('passwordPolicy.requireSpecialCharacter') }}</span>
+          <p-toggleswitch [(ngModel)]="passwordPolicy.requireSpecialCharacter"></p-toggleswitch>
+        </div>
+      </div>
+
+      <div class="provider-actions-row">
+        <div></div>
+        <p-button
+          [outlined]="true"
+          [label]="'common.save' | transloco"
+          icon="pi pi-save"
+          severity="success"
+          size="small"
+          (click)="savePasswordPolicy()"
+          [disabled]="passwordPolicy.minimumLength < 1 || passwordPolicy.minimumLength > 72">
+        </p-button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <div class="section-header">
+      <h3 class="section-title">
         <i class="pi pi-shield"></i>
         {{ t('methods.sectionTitle') }}
       </h3>

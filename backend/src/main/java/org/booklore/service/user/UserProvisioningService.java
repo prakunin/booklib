@@ -36,6 +36,7 @@ public class UserProvisioningService {
     private final UserDefaultsService userDefaultsService;
     private final AppSettingService appSettingService;
     private final AuditService auditService;
+    private final PasswordPolicyService passwordPolicyService;
 
     public boolean isInitialUserAlreadyProvisioned() {
         return userRepository.count() > 0;
@@ -43,6 +44,7 @@ public class UserProvisioningService {
 
     @Transactional
     public void provisionInitialUser(InitialUserRequest request) {
+        passwordPolicyService.validate(request.getPassword());
         BookLoreUserEntity user = new BookLoreUserEntity();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -87,6 +89,7 @@ public class UserProvisioningService {
 
     @Transactional
     public void provisionInternalUser(UserCreateRequest request) {
+        passwordPolicyService.validate(request.getPassword());
         Optional<BookLoreUserEntity> existingUser = userRepository.findByUsername(request.getUsername());
         if (existingUser.isPresent()) {
             throw ApiError.USERNAME_ALREADY_TAKEN.createException(request.getUsername());

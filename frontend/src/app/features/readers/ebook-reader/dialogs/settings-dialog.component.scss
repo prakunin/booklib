@@ -131,6 +131,35 @@
   max-height: 100%;
 }
 
+.global-settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--reader-chrome-border);
+  background: rgb(0 0 0 / 20%);
+}
+
+.global-settings-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.global-settings-title {
+  color: var(--color-white);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.global-settings-description {
+  color: var(--reader-chrome-fg-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .tab-content {
   animation: fade-in var(--transition-base);
 }

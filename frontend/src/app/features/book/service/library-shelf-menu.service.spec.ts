@@ -88,6 +88,7 @@ describe('LibraryShelfMenuService', () => {
   };
   const dialogLauncherService = {
     openLibraryEditDialog: vi.fn(() => Promise.resolve(null)),
+    openInpxArchiveManagerDialog: vi.fn(() => Promise.resolve(null)),
     openShelfEditDialog: vi.fn(() => Promise.resolve(null)),
     openMagicShelfEditDialog: vi.fn(() => Promise.resolve(null)),
   };
@@ -143,6 +144,7 @@ describe('LibraryShelfMenuService', () => {
     userService.getCurrentUser.mockClear();
     router.navigate.mockClear();
     dialogLauncherService.openLibraryEditDialog.mockClear();
+    dialogLauncherService.openInpxArchiveManagerDialog.mockClear();
     dialogLauncherService.openShelfEditDialog.mockClear();
     dialogLauncherService.openMagicShelfEditDialog.mockClear();
     magicShelfService.deleteShelf.mockClear();
@@ -209,6 +211,28 @@ describe('LibraryShelfMenuService', () => {
     });
     expect(bookDialogHelperService.openDuplicateMergerDialog).toHaveBeenCalledWith(42);
     expect(confirmationService.confirm).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['FILESYSTEM', 'book.shelfMenuService.confirm.deleteLibraryMessage'],
+    ['INPX', 'book.shelfMenuService.confirm.deleteInpxLibraryMessage'],
+  ] as const)('uses the appropriate delete confirmation for a %s library', (sourceType, message) => {
+    const items = service.initializeLibraryMenuItems(buildLibrary({sourceType}));
+
+    runCommand(findMenuItem(items, 'book.shelfMenuService.library.deleteLibrary'));
+
+    expect(confirmationService.confirm).toHaveBeenCalledWith(expect.objectContaining({message}));
+  });
+
+  it('opens archive management only for an INPX library', () => {
+    const items = service.initializeLibraryMenuItems(buildLibrary({id: 42, sourceType: 'INPX'}));
+
+    runCommand(findMenuItem(items, 'book.shelfMenuService.library.manageInpxArchives'));
+
+    expect(dialogLauncherService.openInpxArchiveManagerDialog).toHaveBeenCalledWith(42);
+    const filesystemItems = service.initializeLibraryMenuItems(buildLibrary({sourceType: 'FILESYSTEM'}));
+    expect(filesystemItems.flatMap(item => item.items ?? [item]))
+      .not.toContainEqual(expect.objectContaining({label: 'book.shelfMenuService.library.manageInpxArchives'}));
   });
 
   it('guards shelf actions when the shelf id is missing even for the owner', () => {

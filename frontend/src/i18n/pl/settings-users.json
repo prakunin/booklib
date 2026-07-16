@@ -1,6 +1,6 @@
 {
     "title": "Zarządzanie użytkownikami",
-    "description": "Zarządzaj użytkownikami Grimmory, ich uprawnieniami i dostępem do bibliotek. Konfiguruj role i możliwości użytkowników dla Twojej kolekcji książek.",
+    "description": "Zarządzaj użytkownikami BookLib, ich uprawnieniami i dostępem do bibliotek. Konfiguruj role i możliwości użytkowników dla Twojej kolekcji książek.",
     "currentUsers": {
         "sectionTitle": "Aktualni użytkownicy",
         "sectionDesc": "Przeglądaj i zarządzaj wszystkimi zarejestrowanymi użytkownikami, ich uprawnieniami i dostępem do bibliotek.",
@@ -71,7 +71,7 @@
         "koreaderSync": "Synchronizacja KOReader",
         "koboSync": "Synchronizacja Kobo",
         "opdsFeedAccess": "Dostęp do kanału OPDS",
-        "bulkResetGrimmory": "Zbiorczy reset postępu czytania Grimmory",
+        "bulkResetGrimmory": "Zbiorczy reset postępu czytania BookLib",
         "bulkResetKoreader": "Zbiorczy reset postępu czytania KOReader",
         "bulkResetReadStatus": "Zbiorczy reset statusu czytania książek"
     },

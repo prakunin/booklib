@@ -27,8 +27,10 @@ class MockCommandPaletteService {
   readonly query = signal('');
   readonly isSearching = signal(false);
   readonly items = signal<PaletteItem[]>([]);
+  // Mirrors the real service, which only emits a group once it actually has items — an empty
+  // group would hide the template's empty state.
   readonly groups = computed<PaletteGroup[]>(() =>
-    this.query().trim()
+    this.query().trim() && this.items().length > 0
       ? [{ kind: 'page', items: this.items() }]
       : []
   );
@@ -185,6 +187,23 @@ describe('CommandPaletteComponent', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
     expect(service.select).toHaveBeenCalledWith(items[1]);
+  });
+
+  it('shows a spinner instead of the empty state while searching', async () => {
+    service.query.set('missing');
+    service.isSearching.set(true);
+    service.open();
+
+    await flushPalette(fixture);
+
+    expect(overlayRoot.querySelector('app-spinner')).not.toBeNull();
+    expect(overlayRoot.querySelector('.command-palette-empty')).toBeNull();
+
+    service.isSearching.set(false);
+    await flushPalette(fixture);
+
+    expect(overlayRoot.querySelector('app-spinner')).toBeNull();
+    expect(overlayRoot.querySelector('.command-palette-empty')).not.toBeNull();
   });
 
   it('disposes the overlay when the component is destroyed while open', async () => {

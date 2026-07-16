@@ -112,6 +112,16 @@ public class LibraryController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Cancel a running scan", description = "Requests cancellation of a running library scan. Requires admin or library manipulation permission.")
+    @ApiResponse(responseCode = "204", description = "Cancellation requested")
+    @PostMapping("/{libraryId}/scan/cancel")
+    @CheckLibraryAccess(libraryIdParam = "libraryId")
+    @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
+    public ResponseEntity<Void> cancelScan(@Parameter(description = "ID of the library") @PathVariable long libraryId) {
+        libraryService.cancelScan(libraryId);
+        return ResponseEntity.noContent().build();
+    }
+
     @Operation(summary = "Set file naming pattern", description = "Set the file naming pattern for a library. Requires admin or manipulation permission.")
     @ApiResponse(responseCode = "200", description = "File naming pattern updated successfully")
     @PatchMapping("/{libraryId}/file-naming-pattern")

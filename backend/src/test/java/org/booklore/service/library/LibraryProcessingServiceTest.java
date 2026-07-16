@@ -7,10 +7,13 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
+import org.booklore.model.enums.LibrarySourceType;
+import org.booklore.model.websocket.Topic;
 import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.LibraryRepository;
 import org.booklore.service.NotificationService;
+import org.booklore.service.inpx.InpxLibraryScanner;
 import org.booklore.task.options.RescanLibraryContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +22,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -54,7 +60,11 @@ class LibraryProcessingServiceTest {
     @Mock
     private BookCoverGenerator bookCoverGenerator;
     @Mock
+    private InpxLibraryScanner inpxLibraryScanner;
+    @Mock
     private EntityManager entityManager;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private LibraryProcessingService libraryProcessingService;
 
@@ -71,7 +81,9 @@ class LibraryProcessingServiceTest {
                 libraryFileHelper,
                 bookGroupingService,
                 bookCoverGenerator,
-                entityManager
+                inpxLibraryScanner,
+                entityManager,
+                transactionManager
         );
     }
 
@@ -136,6 +148,89 @@ class LibraryProcessingServiceTest {
 
         assertThat(processedFiles).hasSize(1);
         assertThat(processedFiles.getFirst().getFileName()).isEqualTo("book2.epub");
+    }
+
+    @Test
+    void rescanLibrary_delegatesInpxLibraryWithoutWalkingFolders() throws IOException {
+        long libraryId = 44L;
+        LibraryEntity library = LibraryEntity.builder()
+                .id(libraryId)
+                .name("INPX")
+                .sourceType(LibrarySourceType.INPX)
+                .inpxPath("/path/to/index.inpx")
+                .build();
+        when(libraryRepository.findByIdWithPaths(libraryId)).thenReturn(Optional.of(library));
+        TransactionStatus status = mock(TransactionStatus.class);
+        when(transactionManager.getTransaction(any())).thenReturn(status);
+
+        libraryProcessingService.rescanLibrary(
+                RescanLibraryContext.builder().libraryId(libraryId).build());
+
+        verify(inpxLibraryScanner).scan(libraryId);
+        verifyNoInteractions(libraryFileHelper);
+    }
+
+    @Test
+    void scanInpxLibrary_suspendsTheEnclosingTransactionForTheDurationOfTheScan() throws IOException {
+        // processLibrary/rescanLibrary are @Transactional and are the only callers of the INPX
+        // scan, which can run for hours. Previously that transaction (and its pooled connection
+        // and InnoDB read view) stayed open for the whole scan. The scan must instead run with
+        // PROPAGATION_NOT_SUPPORTED so the enclosing transaction is suspended while it runs.
+        long libraryId = 51L;
+        LibraryEntity library = LibraryEntity.builder()
+                .id(libraryId)
+                .name("INPX")
+                .sourceType(LibrarySourceType.INPX)
+                .inpxPath("/path/to/index.inpx")
+                .build();
+        when(libraryRepository.findByIdWithPaths(libraryId)).thenReturn(Optional.of(library));
+        TransactionStatus status = mock(TransactionStatus.class);
+        ArgumentCaptor<TransactionDefinition> definitionCaptor = ArgumentCaptor.forClass(TransactionDefinition.class);
+        when(transactionManager.getTransaction(definitionCaptor.capture())).thenReturn(status);
+
+        libraryProcessingService.processLibrary(libraryId);
+
+        verify(inpxLibraryScanner).scan(libraryId);
+        assertThat(definitionCaptor.getValue().getPropagationBehavior())
+                .isEqualTo(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+        verify(transactionManager).commit(status);
+    }
+
+    @Test
+    void rescanLibrary_inpxLibraryWithoutIndex_doesNotScan() throws IOException {
+        long libraryId = 45L;
+        LibraryEntity library = LibraryEntity.builder()
+                .id(libraryId)
+                .name("INPX without index")
+                .sourceType(LibrarySourceType.INPX)
+                .inpxPath(null)
+                .build();
+        when(libraryRepository.findByIdWithPaths(libraryId)).thenReturn(Optional.of(library));
+
+        libraryProcessingService.rescanLibrary(
+                RescanLibraryContext.builder().libraryId(libraryId).build());
+
+        verifyNoInteractions(inpxLibraryScanner);
+        verifyNoInteractions(libraryFileHelper);
+        verify(notificationService, never()).sendMessage(eq(Topic.LIBRARY_SCAN_COMPLETE), any());
+    }
+
+    @Test
+    void processLibrary_inpxLibraryWithBlankIndex_doesNotScan() {
+        long libraryId = 46L;
+        LibraryEntity library = LibraryEntity.builder()
+                .id(libraryId)
+                .name("INPX with blank index")
+                .sourceType(LibrarySourceType.INPX)
+                .inpxPath("  ")
+                .build();
+        when(libraryRepository.findByIdWithPaths(libraryId)).thenReturn(Optional.of(library));
+
+        libraryProcessingService.processLibrary(libraryId);
+
+        verifyNoInteractions(inpxLibraryScanner);
+        verifyNoInteractions(libraryFileHelper);
+        verify(notificationService, never()).sendMessage(eq(Topic.LIBRARY_SCAN_COMPLETE), any());
     }
 
     @Test

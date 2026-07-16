@@ -35,6 +35,9 @@ describe('book.model', () => {
     expect(computeSeriesReadStatus([
       {id: 1, libraryId: 1, libraryName: 'Main', readStatus: ReadStatus.WONT_READ} as Book
     ])).toBe(ReadStatus.WONT_READ);
+    expect(computeSeriesReadStatus([
+      {id: 1, libraryId: 1, libraryName: 'Main', readStatus: ReadStatus.UNSET} as Book
+    ])).toBe(ReadStatus.UNREAD);
   });
 
   it('keeps core payload and metadata contracts typed', () => {

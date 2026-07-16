@@ -115,6 +115,7 @@
             class="field-input"
             [inputStyle]="{'width': '100%'}">
           </p-password>
+          <app-password-policy-requirements [policy]="passwordPolicy" />
           @if (changePasswordForm.get('newPassword')?.invalid &&
                 (changePasswordForm.get('newPassword')?.dirty || changePasswordForm.get('newPassword')?.touched)) {
             <small class="field-error">
@@ -122,8 +123,8 @@
               @if (changePasswordForm.get('newPassword')?.errors?.['required']) {
                 <span>{{ t('validation.newPasswordRequired') }}</span>
               }
-              @if (changePasswordForm.get('newPassword')?.errors?.['minlength']) {
-                <span>{{ t('validation.passwordMinLength') }}</span>
+              @if (changePasswordForm.get('newPassword')?.errors?.['passwordPolicy']) {
+                <span>{{ t('validation.passwordInvalid') }}</span>
               }
             </small>
           }

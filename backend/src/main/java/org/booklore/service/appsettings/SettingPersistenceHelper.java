@@ -81,6 +81,10 @@ public class SettingPersistenceHelper {
         return key.isJson() ? objectMapper.writeValueAsString(val) : val.toString();
     }
 
+    public <T> T convertSettingValue(Object value, Class<T> type) {
+        return objectMapper.convertValue(value, type);
+    }
+
     public MetadataProviderSettings getDefaultMetadataProviderSettings() {
         MetadataProviderSettings defaultMetadataProviderSettings = new MetadataProviderSettings();
 

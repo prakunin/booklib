@@ -153,6 +153,13 @@ configurations {
 val openApiExportRuntimeOnly by configurations.creating
 
 dependencies {
+    // --- Dev tooling ---
+    // Auto-restart the app when compiled classes change. Pair `./gradlew bootRun`
+    // with `./gradlew -t classes` (continuous compile) in a second shell: Gradle
+    // does not compile on its own, so without the latter devtools never sees a change.
+    // developmentOnly => never packaged into the production bootJar.
+    developmentOnly("org.springframework.boot:spring-boot-devtools")
+
     // --- Spring Boot ---
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")

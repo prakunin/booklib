@@ -8,6 +8,7 @@ import {getTranslocoModule} from '../../../core/testing/transloco-testing';
 import {AuthService} from '../../service/auth.service';
 import {ChangePasswordComponent} from './change-password.component';
 import {UserService} from '../../../features/settings/user-management/user.service';
+import {AppSettingsService} from '../../service/app-settings.service';
 
 describe('ChangePasswordComponent', () => {
   let fixture: ComponentFixture<ChangePasswordComponent>;
@@ -34,6 +35,7 @@ describe('ChangePasswordComponent', () => {
         {provide: UserService, useValue: userService},
         {provide: AuthService, useValue: authService},
         {provide: MessageService, useValue: messageService},
+        {provide: AppSettingsService, useValue: {publicAppSettings: () => null}},
       ],
     }).compileComponents();
 

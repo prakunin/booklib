@@ -7,6 +7,7 @@ import { MessageService } from 'primeng/api';
 
 import { getTranslocoModule } from '../../../core/testing/transloco-testing';
 import { BookDialogHelperService } from '../../../features/book/components/book-browser/book-dialog-helper.service';
+import { AppBooksApiService } from '../../../features/book/service/app-books-api.service';
 import { BookService } from '../../../features/book/service/book.service';
 import { LibraryHealthService } from '../../../features/book/service/library-health.service';
 import { LibraryService } from '../../../features/book/service/library.service';
@@ -89,6 +90,7 @@ describe('AppSidebarComponent', () => {
         { provide: LibraryHealthService, useValue: { isUnhealthy: vi.fn(() => false) } },
         { provide: ShelfService, useValue: { shelves: signal([]), bookCountByShelfId: signal(new Map()), unshelvedBookCount: signal(0) } },
         { provide: BookService, useValue: { books: signal([]) } },
+        { provide: AppBooksApiService, useValue: { catalogSummary: signal(null) } },
         {
           provide: LibraryShelfMenuService,
           useValue: {

@@ -14,6 +14,7 @@ import org.booklore.model.websocket.Topic;
 import org.booklore.service.NotificationService;
 import org.booklore.service.book.BookQueryService;
 import org.booklore.service.recommender.BookVectorService;
+import org.booklore.task.TaskCancellationManager;
 import org.booklore.task.TaskStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class BookRecommendationUpdaterTask implements Task {
     private final BookQueryService bookQueryService;
     private final BookVectorService vectorService;
     private final NotificationService notificationService;
+    private final TaskCancellationManager cancellationManager;
 
     private static final int RECOMMENDATION_LIMIT = 25;
     private static final int BATCH_SIZE = 500;
@@ -68,6 +70,9 @@ public class BookRecommendationUpdaterTask implements Task {
         int embeddingProgress = 0;
         int batchPage = 0;
         while (true) {
+            if (cancellationManager.isTaskCancelled(taskId)) {
+                return buildCancelledResponse(builder, taskId, lastNotificationTime);
+            }
             List<BookEntity> batch = bookQueryService.getAllFullBookEntitiesBatch(
                     PageRequest.of(batchPage, BATCH_SIZE));
             if (batch.isEmpty()) break;
@@ -112,6 +117,9 @@ public class BookRecommendationUpdaterTask implements Task {
 
         int processedBooks = 0;
         for (Map.Entry<Long, double[]> entry : embeddings.entrySet()) {
+            if (cancellationManager.isTaskCancelled(taskId)) {
+                return buildCancelledResponse(builder, taskId, lastNotificationTime);
+            }
             Long targetId = entry.getKey();
             try {
                 double[] targetVector = entry.getValue();
@@ -159,6 +167,11 @@ public class BookRecommendationUpdaterTask implements Task {
             }
         }
 
+        // Catch a cancellation that arrived while processing the final target, before publishing.
+        if (cancellationManager.isTaskCancelled(taskId)) {
+            return buildCancelledResponse(builder, taskId, lastNotificationTime);
+        }
+
         // Save recommendations in batches
         lastNotificationTime = sendTaskProgressNotification(taskId, 85, String.format("Saving recommendations for %d books...", allRecommendations.size()), TaskStatus.IN_PROGRESS, lastNotificationTime, false);
 
@@ -172,6 +185,15 @@ public class BookRecommendationUpdaterTask implements Task {
         return builder
                 .status(TaskStatus.COMPLETED)
                 .build();
+    }
+
+    // The embedding and similarity phases loop over the whole library, so honour a user cancellation
+    // at each checkpoint (matching LibraryRescanTask) instead of grinding through every book.
+    private TaskCreateResponse buildCancelledResponse(TaskCreateResponse.TaskCreateResponseBuilder builder,
+                                                      String taskId, long lastNotificationTime) {
+        log.info("{}: Task {} stopped before completion (cancelled or interrupted)", getTaskType(), taskId);
+        sendTaskProgressNotification(taskId, 0, "Recommendation update cancelled", TaskStatus.CANCELLED, lastNotificationTime, true);
+        return builder.status(TaskStatus.CANCELLED).build();
     }
 
     private long sendTaskProgressNotification(String taskId, int progress, String message, TaskStatus taskStatus, long lastNotificationTime, boolean force) {

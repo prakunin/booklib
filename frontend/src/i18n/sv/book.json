@@ -91,7 +91,7 @@
             "moreActions": "Fler åtgärder",
             "organizeFile": "Organisera fil",
             "readStatus": "Lässtatus",
-            "resetGrimmoryProgress": "Återställ Grimmory-framsteg",
+            "resetGrimmoryProgress": "Återställ BookLib-framsteg",
             "resetKOReaderProgress": "Återställ KOReader-framsteg",
             "book": "Bok",
             "loading": "Laddar..."
@@ -115,10 +115,10 @@
             "readStatusFailedSummary": "Uppdatering misslyckades",
             "readStatusFailedDetail": "Kunde inte uppdatera lässtatus.",
             "progressResetSummary": "Framsteg återställt",
-            "progressResetGrimmoryDetail": "Grimmory-läsframsteget har återställts.",
+            "progressResetGrimmoryDetail": "BookLib-läsframsteget har återställts.",
             "progressResetKOReaderDetail": "KOReader-läsframsteget har återställts.",
             "progressResetFailedSummary": "Misslyckades",
-            "progressResetGrimmoryFailedDetail": "Kunde inte återställa Grimmory-framsteg.",
+            "progressResetGrimmoryFailedDetail": "Kunde inte återställa BookLib-framsteg.",
             "progressResetKOReaderFailedDetail": "Kunde inte återställa KOReader-framsteg.",
             "coverRegenSuccessSummary": "Klart",
             "coverRegenSuccessDetail": "Omslagsåterskapning startad",
@@ -200,7 +200,7 @@
             "setContentRating": "Ange innehållsbetyg",
             "clearContentRating": "Rensa innehållsbetyg",
             "removeFromAllShelves": "Ta bort från alla hyllor",
-            "resetGrimmoryProgress": "Återställ Grimmory-framsteg",
+            "resetGrimmoryProgress": "Återställ BookLib-framsteg",
             "resetKOReaderProgress": "Återställ KOReader-framsteg"
         },
         "confirm": {
@@ -216,7 +216,7 @@
             "clearContentRatingHeader": "Bekräfta rensning av innehållsbetyg",
             "unshelveMessage": "Är du säker på att du vill ta bort {{ count }} bok/böcker från ALLA deras hyllor?",
             "unshelveHeader": "Bekräfta borttagning från hyllor",
-            "resetGrimmoryMessage": "Är du säker på att du vill återställa Grimmory-läsframsteg för {{ count }} bok/böcker?",
+            "resetGrimmoryMessage": "Är du säker på att du vill återställa BookLib-läsframsteg för {{ count }} bok/böcker?",
             "resetKOReaderMessage": "Är du säker på att du vill återställa KOReader-läsframsteg för {{ count }} bok/böcker?",
             "resetHeader": "Bekräfta återställning"
         },
@@ -241,7 +241,7 @@
             "unshelveSuccessDetail": "Böcker borttagna från alla hyllor",
             "unshelveFailedDetail": "Kunde inte uppdatera böckers hyllor",
             "progressResetSummary": "Framsteg återställt",
-            "grimmoryProgressResetDetail": "Grimmory-läsframsteget har återställts.",
+            "grimmoryProgressResetDetail": "BookLib-läsframsteget har återställts.",
             "koreaderProgressResetDetail": "KOReader-läsframsteget har återställts.",
             "failedSummary": "Misslyckades",
             "progressResetFailedDetail": "Kunde inte återställa framsteg."
@@ -253,7 +253,7 @@
             "settingContentRating": "Anger innehållsbetyg för {{ count }} bok/böcker...",
             "clearingContentRating": "Rensar innehållsbetyg för {{ count }} bok/böcker...",
             "removingFromShelves": "Tar bort {{ count }} bok/böcker från hyllor...",
-            "resettingGrimmoryProgress": "Återställer Grimmory-framsteg för {{ count }} bok/böcker...",
+            "resettingGrimmoryProgress": "Återställer BookLib-framsteg för {{ count }} bok/böcker...",
             "resettingKOReaderProgress": "Återställer KOReader-framsteg för {{ count }} bok/böcker..."
         }
     },

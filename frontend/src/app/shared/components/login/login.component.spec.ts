@@ -2,7 +2,8 @@ import {signal} from '@angular/core';
 import {ComponentFixture, TestBed} from '@angular/core/testing';
 import {ActivatedRoute, Router} from '@angular/router';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {of, throwError} from 'rxjs';
+import {of, Subject, throwError} from 'rxjs';
+import {AutofillMonitor, type AutofillEvent} from '@angular/cdk/text-field';
 
 import {OidcService} from '../../../core/security/oidc.service';
 import {getTranslocoModule} from '../../../core/testing/transloco-testing';
@@ -36,6 +37,7 @@ describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
   let component: LoginComponent;
   let publicSettingsSignal: ReturnType<typeof signal<PublicAppSettings | null>>;
+  let autofillEvents: Subject<AutofillEvent>;
 
   const authService = {
     clearSessionOnLoginPage: vi.fn(),
@@ -54,6 +56,11 @@ describe('LoginComponent', () => {
     buildAuthUrl: vi.fn(),
   };
 
+  const autofillMonitor = {
+    monitor: vi.fn(),
+    stopMonitoring: vi.fn(),
+  };
+
   function configureComponent(
     queryParams: Record<string, string> = {},
     settingsOverrides: Partial<PublicAppSettings> = {},
@@ -70,6 +77,7 @@ describe('LoginComponent', () => {
         {provide: AuthService, useValue: authService},
         {provide: Router, useValue: router},
         {provide: OidcService, useValue: oidcService},
+        {provide: AutofillMonitor, useValue: autofillMonitor},
         {
           provide: AppSettingsService,
           useValue: {
@@ -105,6 +113,10 @@ describe('LoginComponent', () => {
     oidcService.generateRandomString.mockReset();
     oidcService.storePkceState.mockReset();
     oidcService.buildAuthUrl.mockReset();
+    autofillEvents = new Subject<AutofillEvent>();
+    autofillMonitor.monitor.mockReset();
+    autofillMonitor.monitor.mockReturnValue(autofillEvents.asObservable());
+    autofillMonitor.stopMonitoring.mockReset();
   });
 
   afterEach(() => {
@@ -182,6 +194,21 @@ describe('LoginComponent', () => {
     component.login();
 
     expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
+  });
+
+  it('enables login after the browser autofills both credential inputs', () => {
+    configureComponent();
+    const usernameInput = fixture.nativeElement.querySelector('#username') as HTMLInputElement;
+    const passwordInput = fixture.nativeElement.querySelector('input[type="password"]') as HTMLInputElement;
+    const submitButton = fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+    usernameInput.value = 'admin';
+    passwordInput.value = 'secret';
+    autofillEvents.next({target: passwordInput, isAutofilled: true});
+
+    expect(component.username).toBe('admin');
+    expect(component.password).toBe('secret');
+    expect(submitButton.disabled).toBe(false);
   });
 
   it('shows translated messages for network and rate-limit login failures', () => {

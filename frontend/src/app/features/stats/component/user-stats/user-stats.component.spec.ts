@@ -2,6 +2,7 @@ import {computed, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {BookService} from '../../../book/service/book.service';
 import {UserService} from '../../../settings/user-management/user.service';
 import {UserChartConfigService} from './service/user-chart-config.service';
 import {UserStatsComponent} from './user-stats.component';
@@ -38,6 +39,7 @@ describe('UserStatsComponent', () => {
           },
         },
         {provide: UserChartConfigService, useValue: chartConfigService},
+        {provide: BookService, useValue: {legacyCatalogTooLarge: signal(false)}},
       ],
     });
   });
