@@ -12,6 +12,7 @@
         "tasks": "任务",
         "auditLogs": "审计日志",
         "opds": "OPDS",
-        "devices": "设备"
+        "devices": "设备",
+        "system": "系统"
     }
 }

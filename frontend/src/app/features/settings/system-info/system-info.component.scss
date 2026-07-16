@@ -78,6 +78,10 @@
   grid-column: 1 / -1;
 }
 
+.usage-bar-wide {
+  grid-column: 1 / -1;
+}
+
 .info-label {
   font-size: settings.$settings-description-size;
   color: var(--p-text-muted-color);

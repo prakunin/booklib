@@ -1,0 +1,54 @@
+{
+    "title": "Sistema",
+    "description": "Un'istantanea in sola lettura dello stato dell'applicazione, del runtime e dell'archiviazione del server. Mostra tutto ciò che il server è riuscito a raccogliere, anche se alcune parti non funzionano.",
+    "loading": "Caricamento informazioni di sistema...",
+    "loadError": "Impossibile caricare le informazioni di sistema. Provare ad aggiornare.",
+    "notAvailable": "Non disponibile",
+    "copied": "Informazioni di sistema copiate negli appunti",
+    "copyFailed": "Impossibile copiare le informazioni di sistema negli appunti",
+    "actions": {
+        "refresh": "Aggiorna",
+        "copy": "Copia"
+    },
+    "application": {
+        "title": "Applicazione",
+        "version": "Versione",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Runtime",
+        "javaVersion": "Versione Java",
+        "javaVendor": "Fornitore Java",
+        "uptime": "Tempo di attività",
+        "processors": "Processori disponibili",
+        "heap": "Utilizzo dell'heap"
+    },
+    "os": {
+        "title": "Sistema operativo",
+        "name": "Nome",
+        "version": "Versione",
+        "arch": "Architettura"
+    },
+    "database": {
+        "title": "Database",
+        "status": "Stato",
+        "vendor": "Fornitore",
+        "version": "Versione",
+        "downNote": "Il database non è raggiungibile. I valori sopra riportati potrebbero essere obsoleti o non disponibili."
+    },
+    "storage": {
+        "title": "Archiviazione",
+        "diskType": "Tipo di disco",
+        "filesystems": "Filesystem",
+        "noFilesystems": "Nessuna informazione sul filesystem disponibile.",
+        "free": "liberi",
+        "total": "totali",
+        "libraryPaths": "Percorsi delle librerie",
+        "noLibraryPaths": "Nessun percorso di libreria configurato."
+    },
+    "tools": {
+        "title": "Strumenti",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

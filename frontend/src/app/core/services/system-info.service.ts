@@ -2,6 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {injectQuery} from '@tanstack/angular-query-experimental';
 import {lastValueFrom} from 'rxjs';
+import {API_CONFIG} from '../config/api-config';
 
 export type PathStatus = 'OK' | 'MISSING' | 'UNREADABLE';
 
@@ -26,11 +27,12 @@ export interface SystemInfo {
 @Injectable({providedIn: 'root'})
 export class SystemInfoService {
   private http = inject(HttpClient);
+  private readonly url = `${API_CONFIG.BASE_URL}/api/v1/admin/system-info`;
 
   query() {
     return injectQuery(() => ({
       queryKey: ['system-info'],
-      queryFn: () => lastValueFrom(this.http.get<SystemInfo>('/api/v1/admin/system-info')),
+      queryFn: () => lastValueFrom(this.http.get<SystemInfo>(this.url)),
     }));
   }
 }

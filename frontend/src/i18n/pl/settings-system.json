@@ -1,0 +1,54 @@
+{
+    "title": "System",
+    "description": "Zrzut stanu tylko do odczytu obejmujący aplikację, środowisko wykonawcze i magazyn serwera. Wyświetla wszystko, co serwer zdołał zebrać, nawet jeśli część danych jest niedostępna.",
+    "loading": "Wczytywanie informacji o systemie...",
+    "loadError": "Nie można wczytać informacji o systemie. Spróbuj odświeżyć.",
+    "notAvailable": "Niedostępne",
+    "copied": "Informacje o systemie skopiowano do schowka",
+    "copyFailed": "Nie udało się skopiować informacji o systemie do schowka",
+    "actions": {
+        "refresh": "Odśwież",
+        "copy": "Kopiuj"
+    },
+    "application": {
+        "title": "Aplikacja",
+        "version": "Wersja",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Środowisko wykonawcze",
+        "javaVersion": "Wersja Java",
+        "javaVendor": "Dostawca Java",
+        "uptime": "Czas działania",
+        "processors": "Dostępne procesory",
+        "heap": "Wykorzystanie stercy"
+    },
+    "os": {
+        "title": "System operacyjny",
+        "name": "Nazwa",
+        "version": "Wersja",
+        "arch": "Architektura"
+    },
+    "database": {
+        "title": "Baza danych",
+        "status": "Status",
+        "vendor": "Dostawca",
+        "version": "Wersja",
+        "downNote": "Baza danych jest niedostępna. Wartości powyżej mogą być nieaktualne lub niedostępne."
+    },
+    "storage": {
+        "title": "Magazyn",
+        "diskType": "Typ dysku",
+        "filesystems": "Systemy plików",
+        "noFilesystems": "Brak dostępnych informacji o systemach plików.",
+        "free": "wolne",
+        "total": "łącznie",
+        "libraryPaths": "Ścieżki bibliotek",
+        "noLibraryPaths": "Nie skonfigurowano żadnych ścieżek bibliotek."
+    },
+    "tools": {
+        "title": "Narzędzia",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

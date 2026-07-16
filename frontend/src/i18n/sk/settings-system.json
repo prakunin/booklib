@@ -1,0 +1,54 @@
+{
+    "title": "Systém",
+    "description": "Snímka len na čítanie o stave aplikácie, behového prostredia a úložiska servera. Zobrazuje všetko, čo sa serveru podarilo zhromaždiť, aj keď časti sú nedostupné.",
+    "loading": "Načítavanie systémových informácií...",
+    "loadError": "Nepodarilo sa načítať systémové informácie. Skúste obnoviť.",
+    "notAvailable": "Nedostupné",
+    "copied": "Systémové informácie skopírované do schránky",
+    "copyFailed": "Nepodarilo sa skopírovať systémové informácie do schránky",
+    "actions": {
+        "refresh": "Obnoviť",
+        "copy": "Kopírovať"
+    },
+    "application": {
+        "title": "Aplikácia",
+        "version": "Verzia",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Behové prostredie",
+        "javaVersion": "Verzia Java",
+        "javaVendor": "Poskytovateľ Java",
+        "uptime": "Doba behu",
+        "processors": "Dostupné procesory",
+        "heap": "Využitie haldy"
+    },
+    "os": {
+        "title": "Operačný systém",
+        "name": "Názov",
+        "version": "Verzia",
+        "arch": "Architektúra"
+    },
+    "database": {
+        "title": "Databáza",
+        "status": "Stav",
+        "vendor": "Poskytovateľ",
+        "version": "Verzia",
+        "downNote": "Databáza je nedostupná. Hodnoty vyššie môžu byť zastarané alebo nedostupné."
+    },
+    "storage": {
+        "title": "Úložisko",
+        "diskType": "Typ disku",
+        "filesystems": "Súborové systémy",
+        "noFilesystems": "Nie sú k dispozícii žiadne informácie o súborových systémoch.",
+        "free": "voľné",
+        "total": "celkovo",
+        "libraryPaths": "Cesty knižníc",
+        "noLibraryPaths": "Nie sú nakonfigurované žiadne cesty knižníc."
+    },
+    "tools": {
+        "title": "Nástroje",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

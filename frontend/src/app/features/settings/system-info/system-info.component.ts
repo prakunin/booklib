@@ -3,7 +3,7 @@ import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {Button} from 'primeng/button';
 import {Toast} from 'primeng/toast';
 import {MessageService} from 'primeng/api';
-import {PathStatus, SystemInfo, SystemInfoService} from '../../../core/service/system-info.service';
+import {PathStatus, SystemInfo, SystemInfoService} from '../../../core/services/system-info.service';
 import {TagColor, TagComponent} from '../../../shared/components/tag/tag.component';
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];

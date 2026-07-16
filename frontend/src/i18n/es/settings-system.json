@@ -1,0 +1,54 @@
+{
+    "title": "Sistema",
+    "description": "Una instantánea de solo lectura del estado de la aplicación, el entorno de ejecución y el almacenamiento del servidor. Muestra todo lo que el servidor pudo recopilar, incluso si algunas partes no funcionan.",
+    "loading": "Cargando información del sistema...",
+    "loadError": "No se pudo cargar la información del sistema. Intente actualizar.",
+    "notAvailable": "No disponible",
+    "copied": "Información del sistema copiada al portapapeles",
+    "copyFailed": "No se pudo copiar la información del sistema al portapapeles",
+    "actions": {
+        "refresh": "Actualizar",
+        "copy": "Copiar"
+    },
+    "application": {
+        "title": "Aplicación",
+        "version": "Versión",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Entorno de ejecución",
+        "javaVersion": "Versión de Java",
+        "javaVendor": "Proveedor de Java",
+        "uptime": "Tiempo de actividad",
+        "processors": "Procesadores disponibles",
+        "heap": "Uso de memoria heap"
+    },
+    "os": {
+        "title": "Sistema operativo",
+        "name": "Nombre",
+        "version": "Versión",
+        "arch": "Arquitectura"
+    },
+    "database": {
+        "title": "Base de datos",
+        "status": "Estado",
+        "vendor": "Proveedor",
+        "version": "Versión",
+        "downNote": "La base de datos no está disponible. Los valores anteriores pueden estar obsoletos o no disponibles."
+    },
+    "storage": {
+        "title": "Almacenamiento",
+        "diskType": "Tipo de disco",
+        "filesystems": "Sistemas de archivos",
+        "noFilesystems": "No hay información de sistemas de archivos disponible.",
+        "free": "libre",
+        "total": "total",
+        "libraryPaths": "Rutas de bibliotecas",
+        "noLibraryPaths": "No hay rutas de bibliotecas configuradas."
+    },
+    "tools": {
+        "title": "Herramientas",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

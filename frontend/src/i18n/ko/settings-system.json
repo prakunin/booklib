@@ -1,0 +1,54 @@
+{
+  "title": "시스템",
+  "description": "서버의 애플리케이션, 런타임, 스토리지 상태를 읽기 전용으로 보여주는 스냅샷입니다. 일부가 다운되어도 서버가 수집할 수 있었던 모든 정보를 표시합니다.",
+  "loading": "시스템 정보를 불러오는 중...",
+  "loadError": "시스템 정보를 불러올 수 없습니다. 새로고침해 보세요.",
+  "notAvailable": "사용할 수 없음",
+  "copied": "시스템 정보를 클립보드에 복사했습니다",
+  "copyFailed": "시스템 정보를 클립보드에 복사할 수 없습니다",
+  "actions": {
+    "refresh": "새로고침",
+    "copy": "복사"
+  },
+  "application": {
+    "title": "애플리케이션",
+    "version": "버전",
+    "springBootVersion": "Spring Boot"
+  },
+  "runtime": {
+    "title": "런타임",
+    "javaVersion": "Java 버전",
+    "javaVendor": "Java 공급업체",
+    "uptime": "가동 시간",
+    "processors": "사용 가능한 프로세서",
+    "heap": "힙 사용량"
+  },
+  "os": {
+    "title": "운영 체제",
+    "name": "이름",
+    "version": "버전",
+    "arch": "아키텍처"
+  },
+  "database": {
+    "title": "데이터베이스",
+    "status": "상태",
+    "vendor": "공급업체",
+    "version": "버전",
+    "downNote": "데이터베이스에 연결할 수 없습니다. 위 값은 오래되었거나 사용할 수 없을 수 있습니다."
+  },
+  "storage": {
+    "title": "스토리지",
+    "diskType": "디스크 유형",
+    "filesystems": "파일 시스템",
+    "noFilesystems": "사용 가능한 파일 시스템 정보가 없습니다.",
+    "free": "여유",
+    "total": "전체",
+    "libraryPaths": "라이브러리 경로",
+    "noLibraryPaths": "구성된 라이브러리 경로가 없습니다."
+  },
+  "tools": {
+    "title": "도구",
+    "ffprobe": "ffprobe",
+    "kepubify": "kepubify"
+  }
+}

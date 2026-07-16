@@ -12,6 +12,7 @@
         "tasks": "Úlohy",
         "auditLogs": "Auditné záznamy",
         "opds": "OPDS",
-        "devices": "Zariadenia"
+        "devices": "Zariadenia",
+        "system": "Systém"
     }
 }

@@ -1,0 +1,54 @@
+{
+    "title": "システム",
+    "description": "サーバーのアプリケーション、ランタイム、ストレージの状態を読み取り専用で表示したスナップショットです。一部が停止していても、サーバーが収集できた情報はすべて表示されます。",
+    "loading": "システム情報を読み込んでいます...",
+    "loadError": "システム情報を読み込めませんでした。更新してみてください。",
+    "notAvailable": "利用不可",
+    "copied": "システム情報をクリップボードにコピーしました",
+    "copyFailed": "システム情報をクリップボードにコピーできませんでした",
+    "actions": {
+        "refresh": "更新",
+        "copy": "コピー"
+    },
+    "application": {
+        "title": "アプリケーション",
+        "version": "バージョン",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "ランタイム",
+        "javaVersion": "Javaバージョン",
+        "javaVendor": "Javaベンダー",
+        "uptime": "稼働時間",
+        "processors": "利用可能なプロセッサ数",
+        "heap": "ヒープ使用量"
+    },
+    "os": {
+        "title": "オペレーティングシステム",
+        "name": "名前",
+        "version": "バージョン",
+        "arch": "アーキテクチャ"
+    },
+    "database": {
+        "title": "データベース",
+        "status": "状態",
+        "vendor": "ベンダー",
+        "version": "バージョン",
+        "downNote": "データベースに接続できません。上記の値は古い、または利用できない可能性があります。"
+    },
+    "storage": {
+        "title": "ストレージ",
+        "diskType": "ディスクタイプ",
+        "filesystems": "ファイルシステム",
+        "noFilesystems": "ファイルシステム情報はありません。",
+        "free": "空き",
+        "total": "合計",
+        "libraryPaths": "ライブラリパス",
+        "noLibraryPaths": "ライブラリパスは設定されていません。"
+    },
+    "tools": {
+        "title": "ツール",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

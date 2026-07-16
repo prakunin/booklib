@@ -95,7 +95,7 @@
               <span class="info-subvalue">({{ heapUsagePercent(info.runtime) }}%)</span>
             </span>
           </div>
-          <div class="usage-bar" [attr.aria-label]="t('runtime.heap')">
+          <div class="usage-bar usage-bar-wide" [attr.aria-label]="t('runtime.heap')">
             <div class="usage-bar-fill" [style.width.%]="heapUsagePercent(info.runtime)"></div>
           </div>
         </div>

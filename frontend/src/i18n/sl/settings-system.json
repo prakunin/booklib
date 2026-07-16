@@ -1,0 +1,54 @@
+{
+    "title": "Sistem",
+    "description": "Posnetek stanja aplikacije, izvajalnega okolja in shrambe strežnika samo za branje. Prikazuje vse, kar je strežnik lahko zbral, tudi če deli ne delujejo.",
+    "loading": "Nalaganje sistemskih informacij...",
+    "loadError": "Sistemskih informacij ni bilo mogoče naložiti. Poskusite znova naložiti.",
+    "notAvailable": "Ni na voljo",
+    "copied": "Sistemske informacije so kopirane v odložišče",
+    "copyFailed": "Sistemskih informacij ni bilo mogoče kopirati v odložišče",
+    "actions": {
+        "refresh": "Posodobi",
+        "copy": "Kopiraj"
+    },
+    "application": {
+        "title": "Aplikacija",
+        "version": "Verzija",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Izvajalno okolje",
+        "javaVersion": "Verzija Java",
+        "javaVendor": "Ponudnik Java",
+        "uptime": "Čas delovanja",
+        "processors": "Razpoložljivi procesorji",
+        "heap": "Poraba kopice"
+    },
+    "os": {
+        "title": "Operacijski sistem",
+        "name": "Ime",
+        "version": "Verzija",
+        "arch": "Arhitektura"
+    },
+    "database": {
+        "title": "Podatkovna baza",
+        "status": "Stanje",
+        "vendor": "Ponudnik",
+        "version": "Verzija",
+        "downNote": "Podatkovna baza ni dosegljiva. Zgornje vrednosti so lahko zastarele ali nedosegljive."
+    },
+    "storage": {
+        "title": "Shramba",
+        "diskType": "Vrsta diska",
+        "filesystems": "Datotečni sistemi",
+        "noFilesystems": "Na voljo ni nobenih informacij o datotečnih sistemih.",
+        "free": "prosto",
+        "total": "skupaj",
+        "libraryPaths": "Poti knjižnic",
+        "noLibraryPaths": "Nastavljenih ni nobenih poti knjižnic."
+    },
+    "tools": {
+        "title": "Orodja",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}

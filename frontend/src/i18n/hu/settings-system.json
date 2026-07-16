@@ -1,0 +1,54 @@
+{
+    "title": "Rendszer",
+    "description": "Csak olvasható pillanatkép a szerver alkalmazás-, futásidejű és tárolási állapotáról. Mindent megjelenít, amit a szerver össze tudott gyűjteni, még akkor is, ha egyes részek nem működnek.",
+    "loading": "Rendszerinformációk betöltése...",
+    "loadError": "Nem sikerült betölteni a rendszerinformációkat. Próbálja frissíteni.",
+    "notAvailable": "Nem elérhető",
+    "copied": "Rendszerinformációk vágólapra másolva",
+    "copyFailed": "Nem sikerült a rendszerinformációkat a vágólapra másolni",
+    "actions": {
+        "refresh": "Frissítés",
+        "copy": "Másolás"
+    },
+    "application": {
+        "title": "Alkalmazás",
+        "version": "Verzió",
+        "springBootVersion": "Spring Boot"
+    },
+    "runtime": {
+        "title": "Futásidejű környezet",
+        "javaVersion": "Java verzió",
+        "javaVendor": "Java szolgáltató",
+        "uptime": "Üzemidő",
+        "processors": "Elérhető processzorok",
+        "heap": "Heap kihasználtság"
+    },
+    "os": {
+        "title": "Operációs rendszer",
+        "name": "Név",
+        "version": "Verzió",
+        "arch": "Architektúra"
+    },
+    "database": {
+        "title": "Adatbázis",
+        "status": "Állapot",
+        "vendor": "Szolgáltató",
+        "version": "Verzió",
+        "downNote": "Az adatbázis nem elérhető. A fenti értékek elavultak vagy nem elérhetők lehetnek."
+    },
+    "storage": {
+        "title": "Tárhely",
+        "diskType": "Lemeztípus",
+        "filesystems": "Fájlrendszerek",
+        "noFilesystems": "Nincs elérhető fájlrendszer-információ.",
+        "free": "szabad",
+        "total": "összesen",
+        "libraryPaths": "Könyvtárútvonalak",
+        "noLibraryPaths": "Nincsenek beállított könyvtárútvonalak."
+    },
+    "tools": {
+        "title": "Eszközök",
+        "ffprobe": "ffprobe",
+        "kepubify": "kepubify"
+    }
+}
