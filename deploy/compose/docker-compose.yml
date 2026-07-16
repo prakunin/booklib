@@ -69,4 +69,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      # Generous: first boot initialises the datadir, and an in-place upgrade
+      # (MARIADB_AUTO_UPGRADE=1) runs mariadb-upgrade before the server answers.
+      start_period: 120s

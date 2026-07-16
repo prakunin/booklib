@@ -81,7 +81,13 @@ MYSQL_DATABASE=booklib
 The image is built locally from the repository via `build: .` — no external registry is required.
 
 > [!NOTE]
-> Migrating from an existing Booklore or Grimmory container? Keep your current `container_name`, database name and user, ports, and mounted volumes the same. Replace only the `image:` line with `build: .` and run `docker compose up -d --build`.
+> Migrating from an existing Booklore or Grimmory container? Keep your current `container_name`, database name and user, and ports the same. Replace only the `image:` line with `build: .` and run `docker compose up -d --build`.
+
+> [!IMPORTANT]
+> The mariadb volume is the one thing you must **not** keep as-is. Grimmory now runs the official
+> MariaDB image, whose data directory is `/var/lib/mysql` rather than the linuxserver `/config`.
+> Reusing your old mapping starts an **empty** database and leaves your library invisible.
+> Read [docs/UPGRADING-MARIADB-12.md](docs/UPGRADING-MARIADB-12.md) first.
 
 Create a `docker-compose.yml` or copy and adapt [`deploy/compose/docker-compose.yml`](deploy/compose/docker-compose.yml):
 

@@ -78,10 +78,11 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mariadb-admin ping --silent"
+          --health-cmd="healthcheck.sh --su-mysql --connect --innodb_initialized"
           --health-interval=5s
           --health-timeout=5s
-          --health-retries=10
+          --health-retries=20
+          --health-start-period=30s
 
     steps:
       - name: Checkout Base Branch

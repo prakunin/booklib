@@ -22,8 +22,14 @@ Environment=MYSQL_DATABASE=grimmory
 HealthCmd=CMD-SHELL healthcheck.sh --su-mysql --connect --innodb_initialized
 HealthInterval=10s
 HealthRetries=10
-HealthStartPeriod=30s
+HealthStartPeriod=60s
 HealthTimeout=5s
+
+# Without this, systemd considers the unit started as soon as the container
+# process exists, so grimmory.container's After= would release the app while
+# MariaDB is still initialising. Notify=healthy defers that until the
+# healthcheck above passes.
+Notify=healthy
 
 DropCapability=all
 # CHOWN/FOWNER: the entrypoint chowns the datadir to mysql before starting.
