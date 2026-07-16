@@ -5,7 +5,7 @@
 mariadb:
   enabled: true
   image:
-    tag: 12.2.2
+    tag: 12.3.2
   auth:
     database: grimmory
     username: grimmory
