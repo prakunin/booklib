@@ -70,7 +70,7 @@ class StorageInfoServiceTest {
             when(pathProbe.fileStore(Path.of("/app/data"))).thenReturn(Optional.of(dataStore));
             when(pathProbe.fileStore(Path.of("/bookdrop"))).thenReturn(Optional.of(dataStore));
 
-            var filesystems = service.filesystems();
+            var filesystems = service.filesystems(service.configuredLibraryPaths());
 
             assertThat(filesystems).hasSize(2);
             assertThat(filesystems)
@@ -92,7 +92,7 @@ class StorageInfoServiceTest {
             when(libraryPathRepository.findAllPaths()).thenReturn(List.of());
             when(pathProbe.fileStore(any())).thenReturn(Optional.empty());
 
-            assertThat(service.filesystems()).isEmpty();
+            assertThat(service.filesystems(service.configuredLibraryPaths())).isEmpty();
         }
 
         @Test
@@ -102,7 +102,7 @@ class StorageInfoServiceTest {
             when(libraryPathRepository.findAllPaths())
                     .thenThrow(new DataAccessResourceFailureException("connection refused"));
 
-            assertThat(service.filesystems()).isEmpty();
+            assertThat(service.filesystems(service.configuredLibraryPaths())).isEmpty();
         }
 
         @Test
@@ -115,7 +115,7 @@ class StorageInfoServiceTest {
             when(pathProbe.fileStore(Path.of("/app/data"))).thenReturn(Optional.of(dataStore));
             when(pathProbe.fileStore(Path.of("/bookdrop"))).thenReturn(Optional.of(dataStore));
 
-            var filesystems = service.filesystems();
+            var filesystems = service.filesystems(service.configuredLibraryPaths());
 
             assertThat(filesystems).singleElement()
                     .satisfies(fs -> assertThat(fs.getPaths()).containsExactlyInAnyOrder("/app/data", "/bookdrop"));
@@ -127,7 +127,7 @@ class StorageInfoServiceTest {
             when(appProperties.getBookdropFolder()).thenReturn(null);
             when(libraryPathRepository.findAllPaths()).thenReturn(List.of());
 
-            assertThat(service.filesystems()).isEmpty();
+            assertThat(service.filesystems(service.configuredLibraryPaths())).isEmpty();
         }
 
         @Test
@@ -140,7 +140,7 @@ class StorageInfoServiceTest {
             when(pathProbe.fileStore(Path.of("/app/data"))).thenReturn(Optional.of(dataStore));
             when(pathProbe.fileStore(Path.of("/bookdrop"))).thenReturn(Optional.empty());
 
-            var filesystems = service.filesystems();
+            var filesystems = service.filesystems(service.configuredLibraryPaths());
 
             assertThat(filesystems).singleElement()
                     .satisfies(fs -> assertThat(fs.getPaths()).containsExactly("/app/data"));
@@ -160,7 +160,7 @@ class StorageInfoServiceTest {
             when(pathProbe.fileStore(Path.of("/app/data"))).thenReturn(Optional.empty());
             when(pathProbe.fileStore(Path.of("/bookdrop"))).thenReturn(Optional.empty());
 
-            var filesystems = service.filesystems();
+            var filesystems = service.filesystems(service.configuredLibraryPaths());
 
             assertThat(filesystems).singleElement()
                     .satisfies(fs -> assertThat(fs.getPaths()).containsExactly("/books/good"));
@@ -191,7 +191,7 @@ class StorageInfoServiceTest {
             when(pathProbe.isDirectory(Path.of("/books/locked"))).thenReturn(true);
             when(pathProbe.isReadable(Path.of("/books/locked"))).thenReturn(false);
 
-            var paths = service.libraryPaths();
+            var paths = service.libraryPaths(service.configuredLibraryPaths());
 
             assertThat(paths).extracting("path", "status").containsExactly(
                     org.assertj.core.groups.Tuple.tuple("/books/present", PathStatus.OK),
@@ -204,20 +204,20 @@ class StorageInfoServiceTest {
             when(libraryPathRepository.findAllPaths())
                     .thenThrow(new DataAccessResourceFailureException("connection refused"));
 
-            assertThat(service.libraryPaths()).isEmpty();
+            assertThat(service.libraryPaths(service.configuredLibraryPaths())).isEmpty();
         }
 
         @Test
         void skipsAnUnresolvableRowWithoutLosingTheOthers() {
             // Same NULL-row scenario as Filesystems#skipsAnUnresolvableDatabasePathWithoutLosingTheOthers,
-            // but proven independently for libraryPaths(): one bad path must degrade only itself.
+            // but proven independently for libraryPaths(List): one bad path must degrade only itself.
             List<String> pathsWithABadRow = Arrays.asList("/books/present", null, "/books/gone");
             when(libraryPathRepository.findAllPaths()).thenReturn(pathsWithABadRow);
             when(pathProbe.isDirectory(Path.of("/books/present"))).thenReturn(true);
             when(pathProbe.isReadable(Path.of("/books/present"))).thenReturn(true);
             when(pathProbe.isDirectory(Path.of("/books/gone"))).thenReturn(false);
 
-            var paths = service.libraryPaths();
+            var paths = service.libraryPaths(service.configuredLibraryPaths());
 
             assertThat(paths).extracting("path", "status").containsExactly(
                     org.assertj.core.groups.Tuple.tuple("/books/present", PathStatus.OK),

@@ -61,11 +61,11 @@
         <div class="info-grid">
           <div class="info-row">
             <span class="info-label">{{ t('application.version') }}</span>
-            <span class="info-value">{{ info.application.version }}</span>
+            <span class="info-value">{{ info.application.version ?? t('notAvailable') }}</span>
           </div>
           <div class="info-row">
             <span class="info-label">{{ t('application.springBootVersion') }}</span>
-            <span class="info-value">{{ info.application.springBootVersion }}</span>
+            <span class="info-value">{{ info.application.springBootVersion ?? t('notAvailable') }}</span>
           </div>
         </div>
       </div>
@@ -78,13 +78,14 @@
           </h3>
         </div>
         <div class="info-grid">
+          @let heapPercent = heapUsagePercent(info.runtime);
           <div class="info-row">
             <span class="info-label">{{ t('runtime.javaVersion') }}</span>
-            <span class="info-value">{{ info.runtime.javaVersion }}</span>
+            <span class="info-value">{{ info.runtime.javaVersion ?? t('notAvailable') }}</span>
           </div>
           <div class="info-row">
             <span class="info-label">{{ t('runtime.javaVendor') }}</span>
-            <span class="info-value">{{ info.runtime.javaVendor }}</span>
+            <span class="info-value">{{ info.runtime.javaVendor ?? t('notAvailable') }}</span>
           </div>
           <div class="info-row">
             <span class="info-label">{{ t('runtime.uptime') }}</span>
@@ -92,18 +93,22 @@
           </div>
           <div class="info-row">
             <span class="info-label">{{ t('runtime.processors') }}</span>
-            <span class="info-value">{{ info.runtime.availableProcessors }}</span>
+            <span class="info-value">{{ info.runtime.availableProcessors ?? t('notAvailable') }}</span>
           </div>
           <div class="info-row info-row-wide">
             <span class="info-label">{{ t('runtime.heap') }}</span>
             <span class="info-value">
               {{ formatBytes(info.runtime.heapUsedBytes) }} / {{ formatBytes(info.runtime.heapMaxBytes) }}
-              <span class="info-subvalue">({{ heapUsagePercent(info.runtime) }}%)</span>
+              @if (heapPercent !== null) {
+                <span class="info-subvalue">({{ heapPercent }}%)</span>
+              }
             </span>
           </div>
-          <div class="usage-bar usage-bar-wide" [attr.aria-label]="t('runtime.heap')">
-            <div class="usage-bar-fill" [style.width.%]="heapUsagePercent(info.runtime)"></div>
-          </div>
+          @if (heapPercent !== null) {
+            <div class="usage-bar usage-bar-wide" [attr.aria-label]="t('runtime.heap')">
+              <div class="usage-bar-fill" [style.width.%]="heapPercent"></div>
+            </div>
+          }
         </div>
       </div>
 
@@ -117,15 +122,15 @@
         <div class="info-grid">
           <div class="info-row">
             <span class="info-label">{{ t('os.name') }}</span>
-            <span class="info-value">{{ info.os.name }}</span>
+            <span class="info-value">{{ info.os.name ?? t('notAvailable') }}</span>
           </div>
           <div class="info-row">
             <span class="info-label">{{ t('os.version') }}</span>
-            <span class="info-value">{{ info.os.version }}</span>
+            <span class="info-value">{{ info.os.version ?? t('notAvailable') }}</span>
           </div>
           <div class="info-row">
             <span class="info-label">{{ t('os.arch') }}</span>
-            <span class="info-value">{{ info.os.arch }}</span>
+            <span class="info-value">{{ info.os.arch ?? t('notAvailable') }}</span>
           </div>
         </div>
       </div>

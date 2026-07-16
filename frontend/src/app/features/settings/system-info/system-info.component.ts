@@ -79,12 +79,20 @@ export class SystemInfoComponent {
     return info.database.status === 'DOWN' ? 'storage.libraryPathsUnavailable' : 'storage.noLibraryPaths';
   }
 
-  protected heapUsagePercent(runtime: SystemInfo['runtime']): number {
-    // heapMaxBytes is -1 when the JVM defines no maximum; there is no meaningful percentage then.
-    if (!runtime.heapMaxBytes || runtime.heapMaxBytes < 0) {
-      return 0;
+  /**
+   * `null` means "do not show a percentage or a usage bar at all", distinct from a genuine `0`:
+   * heapMaxBytes is `-1` when the JVM defines no maximum (no percentage is meaningful then), and
+   * `null` when the whole runtime block is degraded (heapUsedBytes is unknown too, in that case).
+   * A caller must not render "(0%)" plus a 0%-width bar for either case — that would assert a
+   * measurement that was never taken.
+   */
+  protected heapUsagePercent(runtime: SystemInfo['runtime']): number | null {
+    const max = runtime.heapMaxBytes;
+    const used = runtime.heapUsedBytes;
+    if (max === null || max === undefined || max <= 0 || used === null || used === undefined) {
+      return null;
     }
-    return Math.min(100, Math.max(0, Math.round((runtime.heapUsedBytes / runtime.heapMaxBytes) * 100)));
+    return Math.min(100, Math.max(0, Math.round((used / max) * 100)));
   }
 
   protected filesystemUsagePercent(fs: {totalBytes: number; usableBytes: number}): number {
@@ -133,12 +141,12 @@ export class SystemInfoComponent {
     const lines: string[] = [];
 
     lines.push(tr('title'));
-    lines.push(`${tr('application.title')}: ${info.application.version} (${tr('application.springBootVersion')} ${info.application.springBootVersion})`);
-    lines.push(`${tr('runtime.title')}: ${tr('runtime.javaVersion')} ${info.runtime.javaVersion} (${info.runtime.javaVendor}), `
+    lines.push(`${tr('application.title')}: ${info.application.version ?? na} (${tr('application.springBootVersion')} ${info.application.springBootVersion ?? na})`);
+    lines.push(`${tr('runtime.title')}: ${tr('runtime.javaVersion')} ${info.runtime.javaVersion ?? na} (${info.runtime.javaVendor ?? na}), `
       + `${tr('runtime.uptime')} ${this.formatUptime(info.runtime.jvmUptimeMillis)}, `
-      + `${tr('runtime.processors')} ${info.runtime.availableProcessors}`);
+      + `${tr('runtime.processors')} ${info.runtime.availableProcessors ?? na}`);
     lines.push(`${tr('runtime.heap')}: ${this.formatBytes(info.runtime.heapUsedBytes)} / ${this.formatBytes(info.runtime.heapMaxBytes)}`);
-    lines.push(`${tr('os.title')}: ${info.os.name} ${info.os.version} (${info.os.arch})`);
+    lines.push(`${tr('os.title')}: ${info.os.name ?? na} ${info.os.version ?? na} (${info.os.arch ?? na})`);
     lines.push(`${tr('database.title')}: ${info.database.status}`
       + (info.database.vendor ? ` - ${info.database.vendor} ${info.database.version ?? ''}` : ''));
     lines.push(`${tr('storage.title')}: ${info.storage.diskType ?? na}`);

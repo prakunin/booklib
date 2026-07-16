@@ -1,7 +1,7 @@
 import {TestBed} from '@angular/core/testing';
 import {HttpTestingController} from '@angular/common/http/testing';
 import {TranslocoService} from '@jsverse/transloco';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {getTranslocoModule} from '../../../core/testing/transloco-testing';
 import {createQueryClientHarness, flushQueryAsync} from '../../../core/testing/query-testing';
 import {API_CONFIG} from '../../../core/config/api-config';
@@ -184,6 +184,95 @@ describe('SystemInfoComponent', () => {
     const text = fixture.nativeElement.textContent;
     expect(text).toContain(translate('storage.noLibraryPaths'));
     expect(text).not.toContain(translate('storage.libraryPathsUnavailable'));
+  });
+
+  it('renders "Not available" for every field of a degraded application block, never a blank or "null"', async () => {
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      application: {version: null, springBootVersion: null},
+    });
+
+    const text = fixture.nativeElement.textContent;
+    const notAvailable = translate('notAvailable');
+    expect(text).not.toContain('null');
+    expect(text.match(new RegExp(notAvailable, 'g'))?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renders "Not available" for every field of a fully degraded runtime block, with no usage bar or percentage', async () => {
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      runtime: {
+        javaVersion: null,
+        javaVendor: null,
+        jvmUptimeMillis: null,
+        availableProcessors: null,
+        heapUsedBytes: null,
+        heapMaxBytes: null,
+      },
+    });
+
+    const text = fixture.nativeElement.textContent;
+    const notAvailable = translate('notAvailable');
+    expect(text).not.toContain('null');
+    // javaVersion, javaVendor, processors, uptime, heapUsed, heapMax: six degraded fields.
+    expect(text.match(new RegExp(notAvailable, 'g'))?.length).toBeGreaterThanOrEqual(6);
+    // A degraded heap must not assert a measured "(0%)" or render a 0%-width bar.
+    expect(text).not.toContain('(0%)');
+    const heapBar = fixture.nativeElement.querySelector('.usage-bar-wide');
+    expect(heapBar).toBeNull();
+  });
+
+  it('renders "Not available" for every field of a degraded OS block', async () => {
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      os: {name: null, version: null, arch: null},
+    });
+
+    const text = fixture.nativeElement.textContent;
+    const notAvailable = translate('notAvailable');
+    expect(text).not.toContain('null');
+    expect(text.match(new RegExp(notAvailable, 'g'))?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('still renders a genuine 0% heap usage, distinct from an unavailable one', async () => {
+    const {fixture} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      runtime: {...BASE_SNAPSHOT.runtime, heapUsedBytes: 0, heapMaxBytes: 200},
+    });
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('(0%)');
+    const heapBar = fixture.nativeElement.querySelector('.usage-bar-wide');
+    expect(heapBar).not.toBeNull();
+  });
+
+  it('copies a degraded snapshot as "Not available" text, never as the literal "null"', async () => {
+    const clipboardWrite = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {writeText: clipboardWrite},
+    });
+
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      application: {version: null, springBootVersion: null},
+      runtime: {
+        javaVersion: null,
+        javaVendor: null,
+        jvmUptimeMillis: null,
+        availableProcessors: null,
+        heapUsedBytes: null,
+        heapMaxBytes: null,
+      },
+      os: {name: null, version: null, arch: null},
+    });
+
+    fixture.componentInstance['copy']();
+
+    expect(clipboardWrite).toHaveBeenCalledTimes(1);
+    const copiedText: string = clipboardWrite.mock.calls[0][0];
+    expect(copiedText).not.toContain('null');
+    expect(copiedText).toContain(translate('notAvailable'));
   });
 });
 

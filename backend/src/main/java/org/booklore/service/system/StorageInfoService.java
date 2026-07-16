@@ -27,27 +27,25 @@ public class StorageInfoService {
     private final LibraryPathRepository libraryPathRepository;
     private final AppProperties appProperties;
 
-    public StorageInfo storageInfo() {
+    StorageInfo storageInfo() {
         return StorageInfo.builder()
                 .diskType(appProperties.getDiskType())
                 .build();
     }
 
-    public List<LibraryPathInfo> libraryPaths() {
-        return libraryPaths(configuredLibraryPaths());
-    }
-
     /**
-     * Overload for {@link SystemInfoService}, which fetches {@link #configuredLibraryPaths()} once
-     * per request and shares it with {@link #filesystems(List)} instead of querying the repository
-     * a second time for the same data.
+     * Called by {@link SystemInfoService} with the {@link #configuredLibraryPaths()} it already
+     * fetched once per request and shares with {@link #filesystems(List)}, instead of this query
+     * running twice for one System-tab view.
      */
-    public List<LibraryPathInfo> libraryPaths(List<String> configuredPaths) {
+    List<LibraryPathInfo> libraryPaths(List<String> configuredPaths) {
         List<LibraryPathInfo> result = new ArrayList<>();
         for (String path : configuredPaths) {
             // A path that cannot be resolved (e.g. a NULL row read back as null, since
             // library_path.path has no NOT NULL constraint at the schema level) must degrade only
-            // itself, not the classification of every other path.
+            // itself, not the classification of every other path. It is dropped from this list
+            // entirely rather than reported with some placeholder status; see filesystems(List)'s
+            // javadoc for why the same choice is made there.
             toPath(path).ifPresent(resolved -> result.add(LibraryPathInfo.builder()
                     .path(path)
                     .status(classify(resolved))
@@ -59,14 +57,13 @@ public class StorageInfoService {
     /**
      * Free space is reported per distinct file store, not per path: several library paths commonly
      * share one disk, and repeating the same figure for each would be noise. Paths that cannot be
-     * resolved contribute nothing here — they surface in {@link #libraryPaths()} with their status.
+     * resolved contribute nothing here — and they do not surface anywhere else either:
+     * {@link #libraryPaths(List)} silently drops the same unresolvable row rather than reporting it
+     * with a distinct status. That is a deliberate choice (one bad row must not take out the whole
+     * response), not an oversight; a caller cannot use either list to tell "not configured" apart
+     * from "configured but unresolvable".
      */
-    public List<FilesystemInfo> filesystems() {
-        return filesystems(configuredLibraryPaths());
-    }
-
-    /** Overload sharing a pre-fetched path list; see {@link #libraryPaths(List)}. */
-    public List<FilesystemInfo> filesystems(List<String> configuredPaths) {
+    List<FilesystemInfo> filesystems(List<String> configuredPaths) {
         Map<FileStore, List<String>> pathsByStore = new LinkedHashMap<>();
         for (String path : allKnownPaths(configuredPaths)) {
             toPath(path).flatMap(pathProbe::fileStore)

@@ -112,6 +112,24 @@ class ToolVersionServiceTest {
 
             assertThat(service.toolsInfo().getFfprobeVersion()).isEqualTo("ffprobe version 8.1.2");
         }
+
+        @Test
+        void cachesARejectionInsteadOfForkingAProcessOnEveryCallForever() {
+            // Unlike a transient probe failure, "this output does not look like a version" is a
+            // property of the binary itself: it will not change on retry, so it must be cached the
+            // same way a success is, or a wrapped binary printing garbage would fork two processes
+            // on every page view forever.
+            when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
+            when(fileService.findSystemFile("kepubify")).thenReturn(null);
+            when(processRunner.firstLine(Path.of("/usr/local/bin/ffprobe"), "-version"))
+                    .thenReturn(Optional.of("TOKEN=secret123"));
+
+            assertThat(service.toolsInfo().getFfprobeVersion()).isNull();
+            assertThat(service.toolsInfo().getFfprobeVersion()).isNull();
+            assertThat(service.toolsInfo().getFfprobeVersion()).isNull();
+
+            verify(processRunner, times(1)).firstLine(Path.of("/usr/local/bin/ffprobe"), "-version");
+        }
     }
 
     @Nested
