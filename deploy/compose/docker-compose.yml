@@ -47,17 +47,15 @@ services:
     restart: unless-stopped
 
   mariadb:
-    image: lscr.io/linuxserver/mariadb:11.4.8
+    image: mariadb:12.3.2
     environment:
-      - PUID=1000
-      - PGID=1000
       - TZ=Etc/UTC
       - MYSQL_ROOT_PASSWORD=super_secure_password
       - MYSQL_DATABASE=grimmory
       - MYSQL_USER=grimmory
       - MYSQL_PASSWORD=your_secure_password
     volumes:
-      - ./config:/config
+      - ./mariadb:/var/lib/mysql
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "mariadb-admin", "ping", "-h", "localhost" ]
