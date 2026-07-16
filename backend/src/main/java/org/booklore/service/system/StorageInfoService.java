@@ -83,15 +83,28 @@ public class StorageInfoService {
     }
 
     private List<String> configuredLibraryPaths() {
-        return libraryPathRepository.findAllWithLibrary().stream()
-                .map(entity -> entity.getPath())
-                .toList();
+        try {
+            return libraryPathRepository.findAllWithLibrary().stream()
+                    .map(entity -> entity.getPath())
+                    .toList();
+        } catch (Exception e) {
+            // The DB being unreachable must not take down filesystem/library-path reporting,
+            // which is often exactly what an operator needs to see when the DB is the problem.
+            log.warn("Could not read configured library paths for system info: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private List<String> allKnownPaths() {
         List<String> paths = new ArrayList<>();
-        paths.add(appProperties.getPathConfig());
-        paths.add(appProperties.getBookdropFolder());
+        // pathConfig/bookdropFolder may be unconfigured; Path.of(null) would NPE and take
+        // the whole filesystem listing down with it, so skip whichever is missing.
+        if (appProperties.getPathConfig() != null) {
+            paths.add(appProperties.getPathConfig());
+        }
+        if (appProperties.getBookdropFolder() != null) {
+            paths.add(appProperties.getBookdropFolder());
+        }
         paths.addAll(configuredLibraryPaths());
         return paths;
     }

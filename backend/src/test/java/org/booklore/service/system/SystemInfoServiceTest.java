@@ -1,5 +1,7 @@
 package org.booklore.service.system;
 
+import org.booklore.model.dto.system.LibraryPathInfo;
+import org.booklore.model.dto.system.StorageInfo;
 import org.booklore.service.VersionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -7,11 +9,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
@@ -121,6 +125,66 @@ class SystemInfoServiceTest {
             // The whole point of the tab: the rest still renders when the DB is gone.
             assertThat(info.getApplication().getVersion()).isEqualTo("v1.2.3");
             assertThat(info.getRuntime().getAvailableProcessors()).isPositive();
+        }
+
+        @Test
+        void reportsDownWithoutFailingTheResponseOnUncheckedFailure() throws Exception {
+            // Spring Data/JDBC connection pools (e.g. HikariCP) surface outages as unchecked
+            // exceptions, not SQLException — the old narrow catch let these escape.
+            when(dataSource.getConnection()).thenThrow(new DataAccessResourceFailureException("pool exhausted"));
+            when(versionService.getAppVersion()).thenReturn("v1.2.3");
+
+            var info = service.getSystemInfo();
+
+            assertThat(info.getDatabase().getStatus()).isEqualTo("DOWN");
+            assertThat(info.getApplication().getVersion()).isEqualTo("v1.2.3");
+        }
+    }
+
+    @Nested
+    class StorageBlockIsolation {
+
+        @Test
+        void filesystemsAndLibraryPathsDegradeToEmptyWhenStorageInfoServiceFails() {
+            when(storageInfoService.filesystems())
+                    .thenThrow(new DataAccessResourceFailureException("connection refused"));
+            when(storageInfoService.libraryPaths())
+                    .thenThrow(new DataAccessResourceFailureException("connection refused"));
+            when(versionService.getAppVersion()).thenReturn("v1.2.3");
+
+            var info = service.getSystemInfo();
+
+            assertThat(info.getFilesystems()).isEmpty();
+            assertThat(info.getLibraryPaths()).isEmpty();
+            // The rest of the response must still populate.
+            assertThat(info.getApplication().getVersion()).isEqualTo("v1.2.3");
+            assertThat(info.getRuntime().getAvailableProcessors()).isPositive();
+            assertThat(info.getOs().getName()).isNotBlank();
+        }
+
+        @Test
+        void storageDegradesToEmptyBuilderWhenStorageInfoServiceFails() {
+            when(storageInfoService.storageInfo()).thenThrow(new RuntimeException("unexpected"));
+
+            var storage = service.getSystemInfo().getStorage();
+
+            assertThat(storage).isNotNull();
+            assertThat(storage.getDiskType()).isNull();
+        }
+
+        @Test
+        void storageBlocksSucceedIndependentlyWhenOnlyOneFails() {
+            when(storageInfoService.filesystems())
+                    .thenThrow(new DataAccessResourceFailureException("connection refused"));
+            when(storageInfoService.libraryPaths()).thenReturn(List.of(
+                    LibraryPathInfo.builder().path("/books").build()));
+            when(storageInfoService.storageInfo()).thenReturn(StorageInfo.builder().diskType("LOCAL").build());
+
+            var info = service.getSystemInfo();
+
+            assertThat(info.getFilesystems()).isEmpty();
+            assertThat(info.getLibraryPaths()).extracting(LibraryPathInfo::getPath).containsExactly("/books");
+            assertThat(info.getStorage().getDiskType()).isEqualTo("LOCAL");
         }
     }
 }

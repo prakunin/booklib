@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 import java.io.IOException;
 import java.nio.file.FileStore;
@@ -99,6 +100,41 @@ class StorageInfoServiceTest {
         }
 
         @Test
+        void degradesToEmptyRatherThanPropagatingWhenTheRepositoryFails() {
+            // Spring Data reports SQL failures as unchecked exceptions — exactly the case
+            // this diagnostics tab exists for (DB unreachable).
+            when(libraryPathRepository.findAllWithLibrary())
+                    .thenThrow(new DataAccessResourceFailureException("connection refused"));
+
+            assertThat(service.filesystems()).isEmpty();
+        }
+
+        @Test
+        void stillReportsDataAndBookdropFilesystemsWhenTheRepositoryFails() throws IOException {
+            FileStore dataStore = mock(FileStore.class);
+            when(dataStore.getTotalSpace()).thenReturn(900L);
+            when(dataStore.getUsableSpace()).thenReturn(524L);
+            when(libraryPathRepository.findAllWithLibrary())
+                    .thenThrow(new DataAccessResourceFailureException("connection refused"));
+            when(pathProbe.fileStore(Path.of("/app/data"))).thenReturn(Optional.of(dataStore));
+            when(pathProbe.fileStore(Path.of("/bookdrop"))).thenReturn(Optional.of(dataStore));
+
+            var filesystems = service.filesystems();
+
+            assertThat(filesystems).singleElement()
+                    .satisfies(fs -> assertThat(fs.getPaths()).containsExactlyInAnyOrder("/app/data", "/bookdrop"));
+        }
+
+        @Test
+        void skipsUnconfiguredPathConfigAndBookdropFolderRatherThanThrowing() {
+            when(appProperties.getPathConfig()).thenReturn(null);
+            when(appProperties.getBookdropFolder()).thenReturn(null);
+            when(libraryPathRepository.findAllWithLibrary()).thenReturn(List.of());
+
+            assertThat(service.filesystems()).isEmpty();
+        }
+
+        @Test
         void keepsResolvableFilesystemsWhenOneFails() throws IOException {
             FileStore dataStore = mock(FileStore.class);
             when(dataStore.getTotalSpace()).thenReturn(900L);
@@ -137,6 +173,14 @@ class StorageInfoServiceTest {
                     org.assertj.core.groups.Tuple.tuple("/books/present", PathStatus.OK),
                     org.assertj.core.groups.Tuple.tuple("/books/gone", PathStatus.MISSING),
                     org.assertj.core.groups.Tuple.tuple("/books/locked", PathStatus.UNREADABLE));
+        }
+
+        @Test
+        void degradesToEmptyRatherThanPropagatingWhenTheRepositoryFails() {
+            when(libraryPathRepository.findAllWithLibrary())
+                    .thenThrow(new DataAccessResourceFailureException("connection refused"));
+
+            assertThat(service.libraryPaths()).isEmpty();
         }
     }
 

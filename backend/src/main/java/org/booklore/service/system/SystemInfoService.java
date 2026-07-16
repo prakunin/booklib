@@ -4,8 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.dto.system.ApplicationInfo;
 import org.booklore.model.dto.system.DatabaseInfo;
+import org.booklore.model.dto.system.FilesystemInfo;
+import org.booklore.model.dto.system.LibraryPathInfo;
 import org.booklore.model.dto.system.OsInfo;
 import org.booklore.model.dto.system.RuntimeInfo;
+import org.booklore.model.dto.system.StorageInfo;
 import org.booklore.model.dto.system.SystemInfoDto;
 import org.booklore.service.VersionService;
 import org.springframework.boot.SpringBootVersion;
@@ -16,7 +19,7 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryUsage;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.SQLException;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -33,9 +36,9 @@ public class SystemInfoService {
                 .runtime(runtimeInfo())
                 .os(osInfo())
                 .database(databaseInfo())
-                .storage(storageInfoService.storageInfo())
-                .filesystems(storageInfoService.filesystems())
-                .libraryPaths(storageInfoService.libraryPaths())
+                .storage(storageInfo())
+                .filesystems(filesystems())
+                .libraryPaths(libraryPaths())
                 .build();
     }
 
@@ -75,10 +78,38 @@ public class SystemInfoService {
                     .vendor(metaData.getDatabaseProductName())
                     .version(metaData.getDatabaseProductVersion())
                     .build();
-        } catch (SQLException e) {
+        } catch (Exception e) {
             // A diagnostics page must still render when the database is the thing that is broken.
+            // Spring Data/JDBC can surface failures as unchecked exceptions, not just SQLException.
             log.warn("Could not read database metadata for system info: {}", e.getMessage());
             return DatabaseInfo.builder().status("DOWN").build();
+        }
+    }
+
+    private StorageInfo storageInfo() {
+        try {
+            return storageInfoService.storageInfo();
+        } catch (Exception e) {
+            log.warn("Could not read storage info for system info: {}", e.getMessage());
+            return StorageInfo.builder().build();
+        }
+    }
+
+    private List<FilesystemInfo> filesystems() {
+        try {
+            return storageInfoService.filesystems();
+        } catch (Exception e) {
+            log.warn("Could not read filesystem info for system info: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<LibraryPathInfo> libraryPaths() {
+        try {
+            return storageInfoService.libraryPaths();
+        } catch (Exception e) {
+            log.warn("Could not read library path info for system info: {}", e.getMessage());
+            return List.of();
         }
     }
 }
