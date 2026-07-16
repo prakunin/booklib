@@ -22,7 +22,7 @@ COPY frontend/ ./frontend/
 RUN --mount=type=cache,target=/workspace/frontend/.angular/cache \
     CI=1 NG_CLI_ANALYTICS=false pnpm -C frontend run build:prod
 
-FROM --platform=$BUILDPLATFORM gradle:9.5.1-jdk25-alpine AS backend-build
+FROM --platform=$BUILDPLATFORM gradle:9.6.1-jdk25-alpine AS backend-build
 
 ARG TARGETARCH
 ARG APP_VERSION=development
@@ -47,7 +47,7 @@ RUN set -eux; \
     jar_path="$(find build/libs -maxdepth 1 -name '*.jar' ! -name '*plain.jar' | head -n 1)"; \
     cp "$jar_path" /workspace/backend/app.jar
 
-FROM mwader/static-ffmpeg:8.1 AS ffprobe-layer
+FROM mwader/static-ffmpeg:8.1.2 AS ffprobe-layer
 
 FROM scratch AS kepubify-layer-amd64
 
