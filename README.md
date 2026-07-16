@@ -72,8 +72,6 @@ API_DOCS_ENABLED=false
 DISK_TYPE=LOCAL
 
 # MariaDB
-DB_USER_ID=1000
-DB_GROUP_ID=1000
 MYSQL_ROOT_PASSWORD=ChangeMe_MariaDBRoot_2025!
 MYSQL_DATABASE=booklib
 ```
@@ -119,17 +117,15 @@ services:
     restart: unless-stopped
 
   mariadb:
-    image: lscr.io/linuxserver/mariadb:11.4.5
+    image: mariadb:12.3.2
     environment:
-      - PUID=${DB_USER_ID}
-      - PGID=${DB_GROUP_ID}
       - TZ=${TZ}
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${DB_USER}
       - MYSQL_PASSWORD=${DB_PASSWORD}
     volumes:
-      - ./mariadb/config:/config
+      - ./mariadb/data:/var/lib/mysql
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
@@ -137,6 +133,10 @@ services:
       timeout: 5s
       retries: 10
 ```
+
+> **Upgrading from an older release?** Grimmory now uses the official MariaDB image instead of the
+> linuxserver one, which stores data in a different directory. See
+> [docs/UPGRADING-MARIADB-12.md](docs/UPGRADING-MARIADB-12.md) before pulling.
 
 ### Step 3: Launch
 
