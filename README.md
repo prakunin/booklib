@@ -128,10 +128,11 @@ services:
       - ./mariadb/data:/var/lib/mysql
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 30s
 ```
 
 > **Upgrading from an older release?** Grimmory now uses the official MariaDB image instead of the

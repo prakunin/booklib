@@ -1,7 +1,12 @@
 services:
   # Upgrade path from Booklore:
-  # Keep your existing service name, container_name, database names/users, ports,
-  # and mounted volumes. Replace only the image line(s) with Grimmory tags.
+  # Keep your existing service name, container_name, database names/users, and ports.
+  # Replace the image line(s) with Grimmory tags.
+  #
+  # The mariadb volume is the exception: Grimmory now runs the official mariadb
+  # image, whose datadir is /var/lib/mysql rather than the linuxserver /config.
+  # Keeping your old volume mapping here will start an EMPTY database.
+  # Read docs/UPGRADING-MARIADB-12.md before upgrading.
   grimmory:
     # Stable release example:
     image: grimmory/grimmory:v0.38.2
@@ -55,10 +60,13 @@ services:
       - MYSQL_USER=grimmory
       - MYSQL_PASSWORD=your_secure_password
     volumes:
-      - ./mariadb:/var/lib/mysql
+      - ./mariadb/data:/var/lib/mysql
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "mariadb-admin", "ping", "-h", "localhost" ]
+      # The image's own probe. A bare `ping` also answers during the entrypoint's
+      # init phase, which would release dependants before the database exists.
+      test: [ "CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized" ]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 30s

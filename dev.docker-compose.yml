@@ -63,6 +63,10 @@ services:
       - MYSQL_DATABASE=grimmory
       - MYSQL_USER=grimmory
       - MYSQL_PASSWORD=grimmory
+      # Existing dev volumes hold an 11.4 datadir. The image does not run
+      # mariadb-upgrade unless asked, and would otherwise start 12.3 on 11.4
+      # system tables. Safe here because the dev database is disposable.
+      - MARIADB_AUTO_UPGRADE=1
     ports:
       - "${DB_PORT:-3366}:3306"
     healthcheck:

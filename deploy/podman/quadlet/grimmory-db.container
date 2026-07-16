@@ -7,7 +7,11 @@ Image=docker.io/library/mariadb:12.3.2
 Pod=grimmory.pod
 Pull=always
 
-Volume=grimmory-db:/var/lib/mysql
+# The official image's datadir. Deliberately a NEW volume: the old grimmory-db
+# volume holds a linuxserver /config tree, which this image would not recognise
+# as a datadir. Mounting it here would initialise an empty database on top of it.
+# See docs/UPGRADING-MARIADB-12.md before upgrading.
+Volume=grimmory-db-data:/var/lib/mysql
 
 Environment=TZ=Etc/UTC
 Environment=MYSQL_USER=grimmory
@@ -15,5 +19,14 @@ Secret=grimmory_db_pass,type=env,target=MYSQL_ROOT_PASSWORD
 Secret=grimmory_db_pass,type=env,target=MYSQL_PASSWORD
 Environment=MYSQL_DATABASE=grimmory
 
+HealthCmd=CMD-SHELL healthcheck.sh --su-mysql --connect --innodb_initialized
+HealthInterval=10s
+HealthRetries=10
+HealthStartPeriod=30s
+HealthTimeout=5s
+
 DropCapability=all
-AddCapability=CAP_CHOWN CAP_SETUID CAP_SETGID CAP_FOWNER
+# CHOWN/FOWNER: the entrypoint chowns the datadir to mysql before starting.
+# DAC_OVERRIDE: root must traverse the mysql-owned 0700 datadir to do so.
+# SETUID/SETGID: the entrypoint drops from root to mysql via gosu.
+AddCapability=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID
