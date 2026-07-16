@@ -10,6 +10,7 @@ import org.booklore.model.dto.system.OsInfo;
 import org.booklore.model.dto.system.RuntimeInfo;
 import org.booklore.model.dto.system.StorageInfo;
 import org.booklore.model.dto.system.SystemInfoDto;
+import org.booklore.model.dto.system.ToolsInfo;
 import org.booklore.service.VersionService;
 import org.springframework.boot.SpringBootVersion;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class SystemInfoService {
     private final VersionService versionService;
     private final DataSource dataSource;
     private final StorageInfoService storageInfoService;
+    private final ToolVersionService toolVersionService;
 
     public SystemInfoDto getSystemInfo() {
         return SystemInfoDto.builder()
@@ -39,6 +41,7 @@ public class SystemInfoService {
                 .storage(storageInfo())
                 .filesystems(filesystems())
                 .libraryPaths(libraryPaths())
+                .tools(tools())
                 .build();
     }
 
@@ -110,6 +113,16 @@ public class SystemInfoService {
         } catch (Exception e) {
             log.warn("Could not read library path info for system info: {}", e.getMessage());
             return List.of();
+        }
+    }
+
+    private ToolsInfo tools() {
+        try {
+            return toolVersionService.toolsInfo();
+        } catch (Exception e) {
+            // A missing, failing, or hanging binary must not fail the whole response.
+            log.warn("Could not read tool versions for system info: {}", e.getMessage());
+            return ToolsInfo.builder().build();
         }
     }
 }

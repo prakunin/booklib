@@ -2,6 +2,7 @@ package org.booklore.service.system;
 
 import org.booklore.model.dto.system.LibraryPathInfo;
 import org.booklore.model.dto.system.StorageInfo;
+import org.booklore.model.dto.system.ToolsInfo;
 import org.booklore.service.VersionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +35,9 @@ class SystemInfoServiceTest {
     @Mock
     private StorageInfoService storageInfoService;
 
+    @Mock
+    private ToolVersionService toolVersionService;
+
     private SystemInfoService service;
 
     @BeforeEach
@@ -45,7 +49,7 @@ class SystemInfoServiceTest {
         lenient().when(dataSource.getConnection()).thenReturn(defaultConnection);
         lenient().when(defaultConnection.getMetaData()).thenReturn(defaultMetaData);
 
-        service = new SystemInfoService(versionService, dataSource, storageInfoService);
+        service = new SystemInfoService(versionService, dataSource, storageInfoService, toolVersionService);
     }
 
     @Nested
@@ -185,6 +189,36 @@ class SystemInfoServiceTest {
             assertThat(info.getFilesystems()).isEmpty();
             assertThat(info.getLibraryPaths()).extracting(LibraryPathInfo::getPath).containsExactly("/books");
             assertThat(info.getStorage().getDiskType()).isEqualTo("LOCAL");
+        }
+    }
+
+    @Nested
+    class ToolsBlock {
+
+        @Test
+        void reportsVersionsFromToolVersionService() {
+            when(toolVersionService.toolsInfo()).thenReturn(
+                    ToolsInfo.builder().ffprobeVersion("ffprobe version 8.1.2").kepubifyVersion("kepubify v4.0.4").build());
+
+            var tools = service.getSystemInfo().getTools();
+
+            assertThat(tools.getFfprobeVersion()).isEqualTo("ffprobe version 8.1.2");
+            assertThat(tools.getKepubifyVersion()).isEqualTo("kepubify v4.0.4");
+        }
+
+        @Test
+        void degradesToEmptyBuilderWithoutFailingTheResponseWhenToolVersionServiceFails() {
+            when(toolVersionService.toolsInfo()).thenThrow(new RuntimeException("boom"));
+            when(versionService.getAppVersion()).thenReturn("v1.2.3");
+
+            var info = service.getSystemInfo();
+
+            assertThat(info.getTools()).isNotNull();
+            assertThat(info.getTools().getFfprobeVersion()).isNull();
+            assertThat(info.getTools().getKepubifyVersion()).isNull();
+            // The rest of the response must still populate.
+            assertThat(info.getApplication().getVersion()).isEqualTo("v1.2.3");
+            assertThat(info.getRuntime().getAvailableProcessors()).isPositive();
         }
     }
 }
