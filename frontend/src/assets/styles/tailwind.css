@@ -65,6 +65,15 @@
   src: url("../fonts/AtkinsonHyperlegibleNext-Italic-wght.woff2") format("woff2");
 }
 
+@font-face {
+  font-family: "Academy Book";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 135%;
+  src: url("../fonts/AcademyBook-Regular.otf") format("opentype");
+}
+
 @theme static {
   --font-sans: var(--font-ui, "Inter", sans-serif);
 

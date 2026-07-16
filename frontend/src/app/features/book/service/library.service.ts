@@ -5,17 +5,17 @@ import {tap} from 'rxjs/operators';
 import {injectQuery, queryOptions, QueryClient} from '@tanstack/angular-query-experimental';
 
 import {Library} from '../model/library.model';
-import {BookService} from './book.service';
 import {API_CONFIG} from '../../../core/config/api-config';
 import {AuthService} from '../../../shared/service/auth.service';
 import {BOOKS_QUERY_KEY} from './book-query-keys';
 import {LIBRARIES_QUERY_KEY, libraryFormatCountsQueryKey} from './library-query-keys';
+import {AppBooksApiService} from './app-books-api.service';
 
 @Injectable({providedIn: 'root'})
 export class LibraryService {
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/libraries`;
   private http = inject(HttpClient);
-  private bookService = inject(BookService);
+  private appBooksApi = inject(AppBooksApiService);
   private authService = inject(AuthService);
   private queryClient = inject(QueryClient);
   private readonly token = this.authService.token;
@@ -66,6 +66,10 @@ export class LibraryService {
 
   scanLibraryPaths(lib: Library): Observable<number> {
     return this.http.post<number>(`${this.url}/scan`, lib);
+  }
+
+  cancelScan(libraryId: number): Observable<void> {
+    return this.http.post<void>(`${this.url}/${libraryId}/scan/cancel`, {});
   }
 
   createLibrary(lib: Library): Observable<Library> {
@@ -122,15 +126,15 @@ export class LibraryService {
   }
 
   getBookCountValue(libraryId: number): number {
-    return this.bookService.books().filter(book => book.libraryId === libraryId).length;
+    return this.bookCountByLibraryId().get(libraryId) ?? 0;
   }
 
   readonly bookCountByLibraryId = computed(() => {
     const counts = new Map<number, number>();
-    for (const book of this.bookService.books()) {
-      if (book.libraryId != null) {
-        counts.set(book.libraryId, (counts.get(book.libraryId) ?? 0) + 1);
-      }
+    for (const [libraryId, count] of Object.entries(
+      this.appBooksApi.catalogSummary()?.libraryBookCounts ?? {}
+    )) {
+      counts.set(Number(libraryId), count);
     }
     return counts;
   });

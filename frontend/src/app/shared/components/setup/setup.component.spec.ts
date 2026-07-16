@@ -7,6 +7,7 @@ import {TranslocoService} from '@jsverse/transloco';
 import {getTranslocoModule} from '../../../core/testing/transloco-testing';
 import {SetupComponent} from './setup.component';
 import {SetupService} from './setup.service';
+import {AppSettingsService} from '../../service/app-settings.service';
 
 describe('SetupComponent', () => {
   let fixture: ComponentFixture<SetupComponent>;
@@ -30,6 +31,7 @@ describe('SetupComponent', () => {
       providers: [
         {provide: SetupService, useValue: setupService},
         {provide: Router, useValue: router},
+        {provide: AppSettingsService, useValue: {publicAppSettings: () => null}},
       ],
     }).compileComponents();
 

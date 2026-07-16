@@ -218,6 +218,21 @@
         </div>
       }
     </div>
+    <div class="global-settings-footer">
+      <div class="global-settings-copy">
+        <span class="global-settings-title">{{ t('useForAllBooks') }}</span>
+        <span class="global-settings-description">{{ t('useForAllBooksDescription') }}</span>
+      </div>
+      <button
+        type="button"
+        class="switch"
+        [class.active]="usesGlobalSettings"
+        [attr.aria-pressed]="usesGlobalSettings"
+        [attr.aria-label]="t('useForAllBooks')"
+        (click)="toggleGlobalSettings()">
+        <span class="slider"></span>
+      </button>
+    </div>
   </div>
 </div>
 </ng-container>

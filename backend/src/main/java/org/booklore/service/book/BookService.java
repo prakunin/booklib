@@ -16,6 +16,7 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.*;
 import org.booklore.service.FileStreamingService;
 import org.booklore.service.audit.AuditService;
+import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
 import org.booklore.service.progress.ReadingProgressService;
@@ -70,6 +71,7 @@ public class BookService {
     private final SidecarMetadataWriter sidecarMetadataWriter;
     private final FileStreamingService fileStreamingService;
     private final AuditService auditService;
+    private final ArchivedBookContentService archivedBookContentService;
 
 
     public List<Book> getBookDTOs(boolean includeDescription, boolean stripForListView) {
@@ -360,9 +362,14 @@ public class BookService {
                     .filter(bf -> bf.getBookType() == requestedType)
                     .findFirst()
                     .orElseThrow(() -> ApiError.FILE_NOT_FOUND.createException("No file of type " + bookType + " found for book"));
-            filePath = bookFile.getFullFilePath().toString();
+            filePath = bookFile.isArchivedSource()
+                    ? archivedBookContentService.resolve(bookFile).toString()
+                    : bookFile.getFullFilePath().toString();
         } else {
-            filePath = FileUtils.getBookFullPath(bookEntity).toString();
+            BookFileEntity primaryFile = bookEntity.getPrimaryBookFile();
+            filePath = primaryFile != null && primaryFile.isArchivedSource()
+                    ? archivedBookContentService.resolve(primaryFile).toString()
+                    : FileUtils.getBookFullPath(bookEntity).toString();
         }
         File file = new File(filePath);
         if (!file.exists()) {

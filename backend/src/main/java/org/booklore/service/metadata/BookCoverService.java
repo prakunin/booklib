@@ -9,6 +9,7 @@ import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.websocket.LogNotification;
 import org.booklore.model.websocket.Topic;
 import org.booklore.repository.BookRepository;
@@ -263,6 +264,31 @@ public class BookCoverService {
         }
         updateBookCoverMetadata(bookEntity);
         bookRepository.save(bookEntity);
+    }
+
+    public boolean tryGenerateMissingInpxCover(long bookId) {
+        BookEntity bookEntity = bookRepository.findByIdWithBookFiles(bookId).orElse(null);
+        if (bookEntity == null
+                || bookEntity.getBookCoverHash() != null
+                || bookEntity.getLibrary() == null
+                || bookEntity.getLibrary().getSourceType() != LibrarySourceType.INPX
+                || isCoverLocked(bookEntity)) {
+            return false;
+        }
+
+        BookFileEntity ebookFile = findEbookFile(bookEntity);
+        if (ebookFile == null || !ebookFile.isArchivedSource()) {
+            return false;
+        }
+
+        BookFileProcessor processor = processorRegistry.getProcessorOrThrow(ebookFile.getBookType());
+        if (!processor.generateCover(bookEntity, ebookFile)) {
+            return false;
+        }
+
+        updateBookCoverMetadata(bookEntity);
+        bookRepository.save(bookEntity);
+        return true;
     }
 
     /**

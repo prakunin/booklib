@@ -13,6 +13,7 @@ import {BookPatchService} from './book-patch.service';
 import {BOOKS_QUERY_KEY} from './book-query-keys';
 import {BookSocketService} from './book-socket.service';
 import {BookService} from './book.service';
+import {AppBooksApiService} from './app-books-api.service';
 
 type BuildBookOverrides = Omit<Partial<Book>, 'metadata' | 'shelves'> & {
   metadata?: Partial<BookMetadata>;
@@ -68,6 +69,21 @@ describe('BookService', () => {
       providers: [
         ...queryClientHarness.providers,
         BookService,
+        {
+          provide: AppBooksApiService,
+          useValue: {
+            enableGlobalFilterOptions: vi.fn(),
+            books: () => [],
+            globalFilterOptions: () => ({
+              authors: [{name: 'Le Guin', count: 1}, {name: 'Pratchett', count: 1}],
+              categories: [{name: 'Fantasy', count: 2}, {name: 'Humor', count: 1}],
+              moods: [{name: 'Calm', count: 2}, {name: 'Funny', count: 1}],
+              tags: [{name: 'Classic', count: 2}, {name: 'Satire', count: 1}],
+              publishers: [{name: 'Ace', count: 1}, {name: 'Corgi', count: 1}],
+              series: [{name: 'Earthsea', count: 1}, {name: 'Discworld', count: 1}],
+            }),
+          },
+        },
         {provide: AuthService, useValue: authService},
         {provide: MessageService, useValue: {add: vi.fn()}},
         {provide: Router, useValue: {navigate: vi.fn()}},
@@ -80,6 +96,7 @@ describe('BookService', () => {
             handleMultipleBookUpdates: vi.fn(),
             handleBookMetadataUpdate: vi.fn(),
             handleMultipleBookCoverPatches: vi.fn(),
+            handleBookRecommendationsUpdate: vi.fn(),
           },
         },
         {
@@ -121,7 +138,7 @@ describe('BookService', () => {
     vi.restoreAllMocks();
   });
 
-  it('eagerly fetches books and hydrates query-backed state, loading state, and unique metadata', async () => {
+  it('lazily fetches the legacy catalog only when a remaining consumer reads it', async () => {
     setup();
 
     const response = [
@@ -148,11 +165,15 @@ describe('BookService', () => {
     ];
 
     expect(service.books()).toEqual([]);
-    expect(service.isBooksLoading()).toBe(true);
+    // Requested but not yet fetching: a lazily-enabled query is not "loading" until it runs.
+    expect(service.isBooksLoading()).toBe(false);
     expect(service.booksError()).toBeNull();
+
+    await flushBooksQuery();
 
     const request = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books'));
     expect(request.request.method).toBe('GET');
+    expect(service.isBooksLoading()).toBe(true);
     request.flush(response);
     await flushBooksQuery();
 
@@ -172,7 +193,24 @@ describe('BookService', () => {
     expect(service.booksError()).toBeNull();
   });
 
-  it('gates loading on the auth token and starts the eager fetch once a token is available', async () => {
+  it('does not report loading when the legacy catalog was never requested', () => {
+    setup();
+
+    // The dashboard reads isBooksLoading without ever consuming books(), so the
+    // lazily-enabled legacy query stays idle. A disabled query must not look "loading".
+    expect(service.isBooksLoading()).toBe(false);
+    httpTestingController.expectNone(req => req.url.endsWith('/api/v1/books'));
+  });
+
+  it('disables retries for queued recommendation requests', () => {
+    setup();
+
+    const options = service.bookRecommendationsQueryOptions(42, 20);
+
+    expect(options.retry).toBe(false);
+  });
+
+  it('gates the requested legacy catalog on the auth token', async () => {
     setup(null);
 
     expect(service.books()).toEqual([]);
@@ -181,7 +219,7 @@ describe('BookService', () => {
     httpTestingController.expectNone(req => req.url.endsWith('/api/v1/books'));
 
     authService.token.set('token-123');
-    flushSignalAndQueryEffects();
+    await flushBooksQuery();
 
     const request = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books'));
     expect(service.isBooksLoading()).toBe(true);
@@ -195,6 +233,9 @@ describe('BookService', () => {
 
   it('surfaces query errors through booksError and clears the loading flag', async () => {
     setup();
+
+    service.books();
+    await flushBooksQuery();
 
     const request = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books'));
     request.flush({message: 'boom'}, {status: 500, statusText: 'Server Error'});
@@ -215,6 +256,8 @@ describe('BookService', () => {
       buildBook(2, {shelves: [targetShelf]}),
     ];
 
+    service.books();
+    await flushBooksQuery();
     httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books')).flush(initialBooks);
     await flushBooksQuery();
 
@@ -236,6 +279,8 @@ describe('BookService', () => {
 
     const removeQueriesSpy = vi.spyOn(queryClientHarness.queryClient, 'removeQueries');
 
+    service.books();
+    await flushBooksQuery();
     httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books')).flush([
       buildBook(1),
       buildBook(2),

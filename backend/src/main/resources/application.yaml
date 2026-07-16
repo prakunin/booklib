@@ -64,8 +64,8 @@ spring:
       auto-commit: false           # Required counterpart to provider_disables_autocommit
       max-lifetime: 580000         # 9.6 minutes (avoid DB-side connection cuts)
       connection-timeout: 30000    # 30s to acquire a connection before timeout
-      maximum-pool-size: 5         # Virtual threads don't need large pools; 5 is enough for a self-hosted app
-      minimum-idle: 1              # Minimal warm connections; virtual threads handle bursts
+      maximum-pool-size: 15        # Headroom for concurrent scans + polling read paths on large libraries
+      minimum-idle: 2              # Minimal warm connections; virtual threads handle bursts
       idle-timeout: 300000         # 5 minutes before idle connections are closed
   jpa:
     open-in-view: false

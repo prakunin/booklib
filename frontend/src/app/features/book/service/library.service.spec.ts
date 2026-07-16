@@ -1,10 +1,13 @@
 import {HttpTestingController} from '@angular/common/http/testing';
+import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AuthService} from '../../../shared/service/auth.service';
 import {createAuthServiceStub, createQueryClientHarness, flushSignalAndQueryEffects} from '../../../core/testing/query-testing';
 import type {Library} from '../model/library.model';
+import type {AppCatalogSummary} from '../model/app-book.model';
+import {AppBooksApiService} from './app-books-api.service';
 import {BookService} from './book.service';
 import {BOOKS_QUERY_KEY} from './book-query-keys';
 import {LIBRARIES_QUERY_KEY, libraryFormatCountsQueryKey} from './library-query-keys';
@@ -28,6 +31,7 @@ describe('LibraryService', () => {
   let bookService: {
     books: ReturnType<typeof vi.fn>;
   };
+  let catalogSummary: ReturnType<typeof signal<AppCatalogSummary | null>>;
 
   beforeEach(() => {
     authService = createAuthServiceStub();
@@ -35,6 +39,7 @@ describe('LibraryService', () => {
     bookService = {
       books: vi.fn(() => []),
     };
+    catalogSummary = signal<AppCatalogSummary | null>(null);
 
     vi.spyOn(queryClientHarness.queryClient, 'invalidateQueries').mockResolvedValue(undefined);
     vi.spyOn(queryClientHarness.queryClient, 'removeQueries').mockImplementation(() => undefined);
@@ -45,6 +50,7 @@ describe('LibraryService', () => {
         LibraryService,
         {provide: AuthService, useValue: authService},
         {provide: BookService, useValue: bookService},
+        {provide: AppBooksApiService, useValue: {catalogSummary}},
       ],
     });
 
@@ -109,11 +115,13 @@ describe('LibraryService', () => {
 
     await expect(resultPromise).resolves.toEqual({EPUB: 7, PDF: 2});
 
-    bookService.books.mockReturnValue([
-      {libraryId: 8, shelves: []},
-      {libraryId: 8, shelves: []},
-      {libraryId: 9, shelves: []},
-    ]);
+    catalogSummary.set({
+      totalBooks: 3,
+      totalAuthors: 0,
+      totalSeries: 0,
+      unshelvedBooks: 3,
+      libraryBookCounts: {8: 2, 9: 1},
+    });
     expect(service.getBookCountValue(8)).toBe(2);
   });
 

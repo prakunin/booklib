@@ -70,6 +70,12 @@ public class AppSettingService {
             validateOidcForceOnlyMode(val);
         }
 
+        if (key == AppSettingKey.PASSWORD_POLICY) {
+            PasswordPolicy policy = settingPersistenceHelper.convertSettingValue(val, PasswordPolicy.class);
+            validatePasswordPolicy(policy);
+            val = policy;
+        }
+
         var setting = settingPersistenceHelper.appSettingsRepository.findByName(key.toString());
         if (setting == null) {
             setting = new AppSettingEntity();
@@ -98,6 +104,16 @@ public class AppSettingService {
         if (details == null || details.getIssuerUri() == null || details.getIssuerUri().isBlank()
                 || details.getClientId() == null || details.getClientId().isBlank()) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Cannot enable OIDC-only mode: OIDC must be configured with issuer URI and client ID");
+        }
+    }
+
+    private void validatePasswordPolicy(PasswordPolicy policy) {
+        if (policy == null) {
+            throw ApiError.INVALID_INPUT.createException("Password policy is required");
+        }
+        if (policy.getMinimumLength() < 1 || policy.getMinimumLength() > PasswordPolicy.MAX_PASSWORD_LENGTH) {
+            throw ApiError.INVALID_INPUT.createException(
+                    "Password minimum length must be between 1 and " + PasswordPolicy.MAX_PASSWORD_LENGTH);
         }
     }
 
@@ -197,6 +213,8 @@ public class AppSettingService {
         }
         builder.oidcProviderDetails(details);
         builder.oidcForceOnlyMode(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_FORCE_ONLY_MODE, "false")));
+        builder.passwordPolicy(settingPersistenceHelper.getJsonSetting(
+                settingsMap, AppSettingKey.PASSWORD_POLICY, PasswordPolicy.class, new PasswordPolicy(), true));
 
         return builder.build();
     }
@@ -220,6 +238,8 @@ public class AppSettingService {
         builder.metadataPublicReviewsSettings(settingPersistenceHelper.getJsonSetting(settingsMap, AppSettingKey.METADATA_PUBLIC_REVIEWS_SETTINGS, MetadataPublicReviewsSettings.class, settingPersistenceHelper.getDefaultMetadataPublicReviewsSettings(), true));
         builder.koboSettings(settingPersistenceHelper.getJsonSetting(settingsMap, AppSettingKey.KOBO_SETTINGS, KoboSettings.class, settingPersistenceHelper.getDefaultKoboSettings(), true));
         builder.coverCroppingSettings(settingPersistenceHelper.getJsonSetting(settingsMap, AppSettingKey.COVER_CROPPING_SETTINGS, CoverCroppingSettings.class, settingPersistenceHelper.getDefaultCoverCroppingSettings(), true));
+        builder.passwordPolicy(settingPersistenceHelper.getJsonSetting(
+                settingsMap, AppSettingKey.PASSWORD_POLICY, PasswordPolicy.class, new PasswordPolicy(), true));
         builder.metadataProviderSpecificFields(
             settingPersistenceHelper.getJsonSetting(
                 settingsMap,

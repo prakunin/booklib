@@ -8,8 +8,8 @@ import {Shelf} from '../model/shelf.model';
 import {BookService} from './book.service';
 import {API_CONFIG} from '../../../core/config/api-config';
 import {Book} from '../model/book.model';
-import {UserService} from '../../settings/user-management/user.service';
 import {AuthService} from '../../../shared/service/auth.service';
+import {AppBooksApiService} from './app-books-api.service';
 
 const SHELVES_QUERY_KEY = ['shelves'] as const;
 const KOBO_SHELF_NAME = 'Kobo';
@@ -20,7 +20,7 @@ export class ShelfService {
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/shelves`;
   private http = inject(HttpClient);
   private bookService = inject(BookService);
-  private userService = inject(UserService);
+  private appBooksApi = inject(AppBooksApiService);
   private authService = inject(AuthService);
   private queryClient = inject(QueryClient);
   private readonly token = this.authService.token;
@@ -92,15 +92,6 @@ export class ShelfService {
     const shelf = this.shelves().find(currentShelf => currentShelf.id === shelfId);
     if (!shelf) return 0;
 
-    const currentUserId = this.userService.getCurrentUser()?.id;
-    const isOwner = currentUserId === shelf.userId;
-
-    if (isOwner) {
-      return this.bookService.books().filter(book =>
-        book.shelves?.some(currentShelf => currentShelf.id === shelfId)
-      ).length;
-    }
-
     return shelf.bookCount || 0;
   }
 
@@ -109,32 +100,20 @@ export class ShelfService {
   }
 
   getUnshelvedBookCountValue(): number {
-    return this.bookService.books().filter(book => !book.shelves || book.shelves.length === 0).length;
+    return this.unshelvedBookCount();
   }
 
   readonly bookCountByShelfId = computed(() => {
-    const currentUserId = this.userService.getCurrentUser()?.id;
     const counts = new Map<number, number>();
-
-    for (const book of this.bookService.books()) {
-      for (const shelf of book.shelves ?? []) {
-        if (shelf.id != null) {
-          counts.set(shelf.id, (counts.get(shelf.id) ?? 0) + 1);
-        }
-      }
-    }
-
     for (const shelf of this.shelves()) {
-      if (shelf.userId !== currentUserId && shelf.id != null) {
-        counts.set(shelf.id, shelf.bookCount ?? 0);
-      }
+      if (shelf.id != null) counts.set(shelf.id, shelf.bookCount ?? 0);
     }
 
     return counts;
   });
 
   readonly unshelvedBookCount = computed(() =>
-    this.bookService.books().filter(book => !book.shelves || book.shelves.length === 0).length
+    this.appBooksApi.catalogSummary()?.unshelvedBooks ?? 0
   );
 
   private decorateShelves(shelves: Shelf[]): Shelf[] {

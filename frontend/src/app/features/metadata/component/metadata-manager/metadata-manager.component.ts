@@ -7,9 +7,9 @@ import {InputText} from 'primeng/inputtext';
 import {Dialog} from 'primeng/dialog';
 import {ConfirmationService, MessageService} from 'primeng/api';
 import {PageTitleService} from "../../../../shared/service/page-title.service";
-import {BookService} from '../../../book/service/book.service';
 import {BookMetadataManageService} from '../../../book/service/book-metadata-manage.service';
-import {Book} from '../../../book/model/book.model';
+import {AppBooksApiService} from '../../../book/service/app-books-api.service';
+import {CountedOption} from '../../../book/model/app-book.model';
 import {FormsModule} from '@angular/forms';
 import {Tooltip} from 'primeng/tooltip';
 import {IconField} from 'primeng/iconfield';
@@ -64,7 +64,7 @@ interface TabConfig {
   styleUrls: ['./metadata-manager.component.scss']
 })
 export class MetadataManagerComponent implements OnInit, OnDestroy {
-  private bookService = inject(BookService);
+  private appBooksApi = inject(AppBooksApiService);
   private bookMetadataManageService = inject(BookMetadataManageService);
   private messageService = inject(MessageService);
   private router = inject(Router);
@@ -74,14 +74,21 @@ export class MetadataManagerComponent implements OnInit, OnDestroy {
 
   private routeSub!: Subscription;
   private readonly syncMetadataEffect = effect(() => {
-    const isLoading = this.bookService.isBooksLoading();
-    this.loading.set(isLoading);
-
-    if (isLoading) {
-      return;
-    }
-
-    this.extractMetadata(this.bookService.books());
+    const options = this.appBooksApi.globalFilterOptions();
+    this.loading.set(options === null);
+    if (!options) return;
+    this.authors = this.mapCountedOptions(options.authors);
+    this.categories = this.mapCountedOptions(options.categories);
+    this.moods = this.mapCountedOptions(options.moods);
+    this.tags = this.mapCountedOptions(options.tags);
+    this.series = this.mapCountedOptions(options.series);
+    this.publishers = this.mapCountedOptions(options.publishers);
+    this.languages = options.languages.map(option => ({
+      value: option.code,
+      count: option.count,
+      bookIds: [],
+      selected: false,
+    }));
   });
 
   authors: MetadataItem[] = [];
@@ -142,6 +149,7 @@ export class MetadataManagerComponent implements OnInit, OnDestroy {
   ];
 
   ngOnInit() {
+    this.appBooksApi.enableGlobalFilterOptions();
     this.routeSub = this.route.queryParams.subscribe(params => {
       const tabParam = params['tab'] as MetadataType;
       if (this.validTabs.includes(tabParam)) {
@@ -169,58 +177,12 @@ export class MetadataManagerComponent implements OnInit, OnDestroy {
     this.routeSub.unsubscribe();
   }
 
-  private extractMetadata(books: Book[]) {
-    const authorsMap = new Map<string, Set<number>>();
-    const categoriesMap = new Map<string, Set<number>>();
-    const moodsMap = new Map<string, Set<number>>();
-    const tagsMap = new Map<string, Set<number>>();
-    const seriesMap = new Map<string, Set<number>>();
-    const publishersMap = new Map<string, Set<number>>();
-    const languagesMap = new Map<string, Set<number>>();
-
-    books.forEach(book => {
-      if (book.metadata) {
-        this.addToMap(authorsMap, book.metadata.authors, book.id);
-        this.addToMap(categoriesMap, book.metadata.categories, book.id);
-        this.addToMap(moodsMap, book.metadata.moods, book.id);
-        this.addToMap(tagsMap, book.metadata.tags, book.id);
-        if (book.metadata.seriesName) {
-          this.addToMap(seriesMap, [book.metadata.seriesName], book.id);
-        }
-        if (book.metadata.publisher) {
-          this.addToMap(publishersMap, [book.metadata.publisher], book.id);
-        }
-        if (book.metadata.language) {
-          this.addToMap(languagesMap, [book.metadata.language], book.id);
-        }
-      }
-    });
-
-    this.authors = this.mapToItems(authorsMap);
-    this.categories = this.mapToItems(categoriesMap);
-    this.moods = this.mapToItems(moodsMap);
-    this.tags = this.mapToItems(tagsMap);
-    this.series = this.mapToItems(seriesMap);
-    this.publishers = this.mapToItems(publishersMap);
-    this.languages = this.mapToItems(languagesMap);
-  }
-
-  private addToMap(map: Map<string, Set<number>>, values: string[] | undefined, bookId: number) {
-    if (!values) return;
-    values.forEach(value => {
-      if (!map.has(value)) {
-        map.set(value, new Set());
-      }
-      map.get(value)!.add(bookId);
-    });
-  }
-
-  private mapToItems(map: Map<string, Set<number>>): MetadataItem[] {
-    return Array.from(map.entries())
-      .map(([value, bookIds]) => ({
-        value,
-        count: bookIds.size,
-        bookIds: Array.from(bookIds),
+  private mapCountedOptions(options: CountedOption[]): MetadataItem[] {
+    return options
+      .map(option => ({
+        value: option.name,
+        count: option.count,
+        bookIds: [],
         selected: false
       }))
       .sort((a, b) => b.count - a.count);
@@ -614,10 +576,6 @@ export class MetadataManagerComponent implements OnInit, OnDestroy {
   }
 
   protected getTotalAffectedBooks(items: MetadataItem[]): number {
-    const uniqueBookIds = new Set<number>();
-    items.forEach(item => {
-      item.bookIds.forEach(bookId => uniqueBookIds.add(bookId));
-    });
-    return uniqueBookIds.size;
+    return items.reduce((total, item) => total + item.count, 0);
   }
 }

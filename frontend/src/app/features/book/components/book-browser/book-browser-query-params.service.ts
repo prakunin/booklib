@@ -2,7 +2,7 @@ import {Injectable, inject} from '@angular/core';
 import {ActivatedRoute, ParamMap, Router} from '@angular/router';
 import {SortDirection, SortOption} from '../../model/sort.model';
 import {BookFilterMode, EntityViewPreference, EntityViewPreferences, SortCriterion} from '../../../settings/user-management/user.service';
-import {EntityType} from './book-browser.component';
+import {EntityType} from './book-browser-entity-type';
 
 export const QUERY_PARAMS = {
   VIEW: 'view',

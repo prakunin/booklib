@@ -78,6 +78,27 @@ class Fb2MetadataExtractorTest {
     }
 
     @Test
+    void extractMetadata_fromArchiveEntryStream() throws IOException {
+        File file = writeFb2("""
+                <description>
+                  <title-info>
+                    <book-title>Streamed book</book-title>
+                    <lang>ru</lang>
+                  </title-info>
+                </description>
+                """);
+
+        BookMetadata metadata;
+        try (InputStream input = Files.newInputStream(file.toPath())) {
+            metadata = extractor.extractMetadata(input, "books.zip!42.fb2");
+        }
+
+        assertThat(metadata).isNotNull();
+        assertThat(metadata.getTitle()).isEqualTo("Streamed book");
+        assertThat(metadata.getLanguage()).isEqualTo("ru");
+    }
+
+    @Test
     void extractMetadata_authorWithMiddleName() throws IOException {
         File file = writeFb2("""
                 <description>
@@ -496,6 +517,21 @@ class Fb2MetadataExtractorTest {
         byte[] cover = extractor.extractCover(file);
 
         assertThat(cover).isEqualTo(imageData);
+    }
+
+    @Test
+    void extractCover_binaryWithLineWrappedBase64() throws IOException {
+        File file = writeFb2("""
+                <description><title-info/></description>
+                <binary id="cover.jpg" content-type="image/jpeg">
+                    SGVs
+                    bG8=
+                </binary>
+                """);
+
+        byte[] cover = extractor.extractCover(file);
+
+        assertThat(cover).isEqualTo("Hello".getBytes(StandardCharsets.UTF_8));
     }
 
     @Test

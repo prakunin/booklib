@@ -32,6 +32,29 @@
     "statusFailed": "Failed",
     "destinationLibrary": "Library",
     "destinationBookdrop": "Bookdrop",
+    "destinationInpx": "INPX",
+    "inpxTitle": "INPX catalog",
+    "inpxPathLabel": "INPX index path",
+    "inpxPathPlaceholder": "/catalog/librusec_local_fb2.inpx",
+    "inpxPathHint": "Path visible to the BookLib backend container.",
+    "inpxArchivePathLabel": "Archive directory (optional)",
+    "inpxArchivePathPlaceholder": "/catalog",
+    "inpxArchivePathHint": "Leave empty when the ZIP files are next to the INPX index.",
+    "inpxSearchPlaceholder": "Search by title, author, series, or library ID",
+    "inpxSearchBtn": "Search",
+    "inpxFound": "Showing {{ count }} books after scanning {{ scanned }} entries.",
+    "inpxTruncated": "Refine the search to see more results.",
+    "inpxSelectAll": "Select all results",
+    "inpxSelected": "{{ count }} selected",
+    "inpxImportBtn": "Import selected ({{ count }})",
+    "inpxPathRequired": "Enter the server path to an INPX index.",
+    "inpxSelectionRequired": "Select a library, destination path, and at least one INPX book.",
+    "inpxSearchFailed": "INPX search failed",
+    "inpxSearchFailedDetail": "The INPX index could not be read.",
+    "inpxImportComplete": "INPX import complete",
+    "inpxImportSummary": "Imported: {{ imported }}, skipped: {{ skipped }}, failed: {{ failed }}.",
+    "inpxImportFailed": "INPX import failed",
+    "inpxImportFailedDetail": "Selected books could not be imported.",
     "toast": {
       "noDestinationSummary": "No Destination Selected",
       "noDestinationDetail": "Please select a library and subpath before adding files.",
@@ -112,7 +135,8 @@
     "statusInProgress": "In Progress",
     "statusCompleted": "Completed",
     "statusError": "Error",
-    "statusCancelled": "Cancelled"
+    "statusCancelled": "Cancelled",
+    "cancelScanBtn": "Cancel scan"
   },
   "reader": {
     "failedToLoadPages": "Failed to load pages",
@@ -124,7 +148,7 @@
     "saveErrorDetail": "There was an error saving the settings."
   },
   "setup": {
-    "title": "Welcome to Grimmory",
+    "title": "Welcome to BookLib",
     "subtitle": "Setup your initial admin account to get started",
     "usernameLabel": "Username",
     "usernamePlaceholder": "Choose a username",
@@ -144,6 +168,7 @@
       "nameRequired": "Name is required",
       "emailRequired": "Valid email is required",
       "passwordMinLength": "Minimum 8 characters required",
+      "passwordInvalid": "Password does not meet the current requirements",
       "confirmPasswordRequired": "Password confirmation is required",
       "passwordsMismatch": "Passwords do not match"
     },
@@ -156,6 +181,14 @@
     "issuePosition": "{{ current }} of {{ count }} issues",
     "previousIssue": "Previous issue",
     "nextIssue": "Next issue"
+  },
+  "passwordPolicy": {
+    "minimumLength": "At least {{ count }} character(s)",
+    "uppercase": "an uppercase letter",
+    "lowercase": "a lowercase letter",
+    "digit": "a digit",
+    "specialCharacter": "a special character",
+    "invalid": "Password does not meet the current requirements"
   },
   "ui": {
     "autocomplete": {

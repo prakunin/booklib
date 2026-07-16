@@ -28,6 +28,46 @@ public class TaskExecutorConfig {
         return executor;
     }
 
+    @Bean(name = "bookRecommendationExecutor")
+    public AsyncTaskExecutor bookRecommendationExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setThreadNamePrefix("book-recommendation-");
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(100);
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean(name = "inpxArchiveScanExecutor")
+    public AsyncTaskExecutor inpxArchiveScanExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setThreadNamePrefix("inpx-archive-scan-");
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(100);
+        executor.setTaskDecorator(DelegatingSecurityContextRunnable::new);
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean(name = "inpxArchiveStatisticsExecutor")
+    public AsyncTaskExecutor inpxArchiveStatisticsExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setThreadNamePrefix("inpx-archive-statistics-");
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(100);
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        return executor;
+    }
+
     @Bean
     public TaskScheduler taskScheduler() {
         var scheduler = new SimpleAsyncTaskScheduler();

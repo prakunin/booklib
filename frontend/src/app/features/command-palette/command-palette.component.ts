@@ -11,6 +11,7 @@ import { LucideSearch, LucideX } from '@lucide/angular';
 
 import { CoverComponent } from '../../shared/components/cover/cover.component';
 import { IconDisplayComponent } from '../../shared/components/icon-display/icon-display.component';
+import { AppSpinnerComponent } from '../../shared/ui/spinner/app-spinner.component';
 import { MOBILE_SHELL_ACTIVE_PROPERTY } from '../../shared/layout/layout.service';
 import { PaletteItem } from './command-palette.model';
 import { CommandPaletteService } from './command-palette.service';
@@ -18,7 +19,7 @@ import { CommandPaletteService } from './command-palette.service';
 @Component({
   selector: 'app-command-palette',
   standalone: true,
-  imports: [A11yModule, OverlayModule, FormsModule, TranslocoDirective, TranslocoPipe, IconDisplayComponent, CoverComponent, LucideSearch, LucideX],
+  imports: [A11yModule, OverlayModule, FormsModule, TranslocoDirective, TranslocoPipe, IconDisplayComponent, CoverComponent, AppSpinnerComponent, LucideSearch, LucideX],
   templateUrl: './command-palette.component.html',
   styleUrl: './command-palette.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

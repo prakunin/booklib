@@ -51,7 +51,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                     String contentType = binary.getAttribute("content-type");
                     if (contentType != null && contentType.startsWith("image/")) {
                         String base64Data = binary.getTextContent().trim();
-                        return Base64.getDecoder().decode(base64Data);
+                        return Base64.getMimeDecoder().decode(base64Data);
                     }
                 }
             }
@@ -73,7 +73,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                                 Element binary = (Element) binaries.item(i);
                                 if (imageId.equals(binary.getAttribute("id"))) {
                                     String base64Data = binary.getTextContent().trim();
-                                    return Base64.getDecoder().decode(base64Data);
+                                    return Base64.getMimeDecoder().decode(base64Data);
                                 }
                             }
                         }
@@ -91,6 +91,20 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     @Override
     public BookMetadata extractMetadata(File file) {
         try (InputStream inputStream = getInputStream(file)) {
+            return extractMetadata(inputStream, file.getName());
+        } catch (Exception e) {
+            log.warn("Failed to extract metadata from FB2: {}", file.getName(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Extracts metadata from an FB2 stream without taking ownership of the stream.
+     * This is used for books that live inside INPX ZIP archives, where extracting every
+     * entry to a temporary file would add avoidable disk IO.
+     */
+    public BookMetadata extractMetadata(InputStream inputStream, String sourceName) {
+        try {
             DocumentBuilder builder = SecureXmlUtils.createSecureDocumentBuilder(true);
             Document doc = builder.parse(inputStream);
 
@@ -98,19 +112,16 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
             List<String> authors = new ArrayList<>();
             Set<String> categories = new HashSet<>();
 
-            // Extract title-info (main metadata section)
             Element titleInfo = getFirstElementByTagNameNS(doc, FB2_NAMESPACE, "title-info");
             if (titleInfo != null) {
                 extractTitleInfo(titleInfo, metadataBuilder, authors, categories);
             }
 
-            // Extract publish-info (publisher, year, ISBN)
             Element publishInfo = getFirstElementByTagNameNS(doc, FB2_NAMESPACE, "publish-info");
             if (publishInfo != null) {
                 extractPublishInfo(publishInfo, metadataBuilder);
             }
 
-            // Extract document-info (optional metadata)
             Element documentInfo = getFirstElementByTagNameNS(doc, FB2_NAMESPACE, "document-info");
             if (documentInfo != null) {
                 extractDocumentInfo(documentInfo, metadataBuilder);
@@ -118,10 +129,9 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
 
             metadataBuilder.authors(authors);
             metadataBuilder.categories(categories);
-
             return metadataBuilder.build();
         } catch (Exception e) {
-            log.warn("Failed to extract metadata from FB2: {}", file.getName(), e);
+            log.warn("Failed to extract metadata from FB2: {}", sourceName, e);
             return null;
         }
     }

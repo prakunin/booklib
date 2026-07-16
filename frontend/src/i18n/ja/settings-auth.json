@@ -1,6 +1,6 @@
 {
     "title": "認証設定",
-    "description": "Grimmoryインスタンスの認証方法を設定します。内部認証は常に有効で、オプションで外部認証プロバイダー用のOIDCを有効にできます。",
+    "description": "BookLibインスタンスの認証方法を設定します。内部認証は常に有効で、オプションで外部認証プロバイダー用のOIDCを有効にできます。",
     "methods": {
         "sectionTitle": "認証方法",
         "sectionDesc": "ユーザーがサインインに使用できる認証方法を選択します。"
@@ -29,7 +29,7 @@
         "scope": "スコープ",
         "scopeHint": "OIDCログインに必要なスコープ。プロバイダーでサポートされている必要があります。",
         "claimMappings": "クレームマッピング",
-        "claimDesc": "OIDCトークンのクレームをGrimmoryユーザーフィールドにマッピングします。プロバイダーのトークンクレームと一致する必要があります。",
+        "claimDesc": "OIDCトークンのクレームをBookLibユーザーフィールドにマッピングします。プロバイダーのトークンクレームと一致する必要があります。",
         "usernameClaim": "ユーザー名クレーム",
         "usernamePlaceholder": "例: preferred_username",
         "emailClaim": "メールクレーム",
@@ -53,7 +53,7 @@
         "autoLabel": "自動ユーザープロビジョニング",
         "autoEnabled": "有効",
         "autoDisabled": "無効",
-        "autoDesc": "有効にすると、初回OIDCログイン時に以下の権限で新しいユーザーが自動的に作成されます。無効の場合、OIDCでログインする前にGrimmoryでユーザーを手動で作成する必要があります。",
+        "autoDesc": "有効にすると、初回OIDCログイン時に以下の権限で新しいユーザーが自動的に作成されます。無効の場合、OIDCでログインする前にBookLibでユーザーを手動で作成する必要があります。",
         "defaultPerms": "デフォルト権限",
         "readBooks": "本を読む",
         "defaultLibraryAccess": "デフォルトライブラリアクセス",

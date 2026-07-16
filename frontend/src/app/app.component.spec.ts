@@ -38,6 +38,7 @@ describe("AppComponent", () => {
     handleMultipleBookCoverPatches: ReturnType<typeof vi.fn>;
     handleRemovedBookIds: ReturnType<typeof vi.fn>;
     handleMultipleBookUpdates: ReturnType<typeof vi.fn>;
+    handleBookRecommendationsUpdate: ReturnType<typeof vi.fn>;
   };
   let authorService: { handleNewlyCreatedBook: ReturnType<typeof vi.fn> };
   let notificationEventService: {
@@ -83,6 +84,7 @@ describe("AppComponent", () => {
       handleMultipleBookCoverPatches: vi.fn(),
       handleRemovedBookIds: vi.fn(),
       handleMultipleBookUpdates: vi.fn(),
+      handleBookRecommendationsUpdate: vi.fn(),
     };
     authorService = { handleNewlyCreatedBook: vi.fn() };
     notificationEventService = { handleNewNotification: vi.fn() };
@@ -206,6 +208,9 @@ describe("AppComponent", () => {
     topics
       .get("/user/queue/task-progress")
       ?.next({ body: JSON.stringify({ taskId: "task-2" }) });
+    topics
+      .get("/user/queue/book-recommendations-update")
+      ?.next({ body: JSON.stringify(42) });
 
     expect(bookService.handleBookUpdate).toHaveBeenCalledWith({ id: 1 });
     expect(bookService.handleMultipleBookCoverPatches).toHaveBeenCalledWith([
@@ -229,6 +234,7 @@ describe("AppComponent", () => {
     expect(taskService.handleTaskProgress).toHaveBeenCalledWith({
       taskId: "task-2",
     });
+    expect(bookService.handleBookRecommendationsUpdate).toHaveBeenCalledWith(42);
   });
 
   it("forces logout when the session is revoked", () => {

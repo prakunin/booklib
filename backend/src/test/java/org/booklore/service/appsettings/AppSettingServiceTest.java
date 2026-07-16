@@ -4,6 +4,7 @@ import org.booklore.config.AppProperties;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.settings.AppSettingKey;
+import org.booklore.model.dto.settings.PasswordPolicy;
 import org.booklore.model.entity.AppSettingEntity;
 import org.booklore.model.enums.AuditAction;
 import org.booklore.repository.AppSettingsRepository;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -87,6 +89,32 @@ class AppSettingServiceTest {
         assertThat(savedSetting.getName()).isEqualTo(AppSettingKey.OIDC_REDIRECT_URIS.toString());
         assertThat(savedSetting.getVal()).isEqualTo("[\"*\"]");
         verify(auditService).log(AuditAction.OIDC_CONFIG_CHANGED, "Updated setting: " + AppSettingKey.OIDC_REDIRECT_URIS);
+    }
+
+    @Test
+    void updateSetting_acceptsSingleCharacterPasswordPolicy() throws Exception {
+        appSettingService.updateSetting(AppSettingKey.PASSWORD_POLICY, Map.of(
+                "minimumLength", 1,
+                "requireUppercase", false,
+                "requireLowercase", false,
+                "requireDigit", false,
+                "requireSpecialCharacter", false
+        ));
+
+        ArgumentCaptor<AppSettingEntity> settingCaptor = ArgumentCaptor.forClass(AppSettingEntity.class);
+        verify(appSettingsRepository).save(settingCaptor.capture());
+        assertThat(settingCaptor.getValue().getName()).isEqualTo(AppSettingKey.PASSWORD_POLICY.toString());
+        assertThat(settingCaptor.getValue().getVal()).contains("\"minimumLength\":1");
+    }
+
+    @Test
+    void updateSetting_rejectsPasswordMinimumOutsideSupportedRange() {
+        PasswordPolicy policy = PasswordPolicy.builder().minimumLength(0).build();
+
+        assertThatThrownBy(() -> appSettingService.updateSetting(AppSettingKey.PASSWORD_POLICY, policy))
+                .hasMessageContaining("between 1 and 72");
+
+        verify(appSettingsRepository, never()).save(any());
     }
 
     @Test

@@ -1,0 +1,65 @@
+<div *transloco="let t; prefix: 'book.inpxArchives'" class="archive-dialog">
+  <header class="dialog-header">
+    <div>
+      <h2>{{ t('title') }}</h2>
+      <p>{{ t('subtitle') }}</p>
+    </div>
+    <div class="header-actions">
+      <p-button icon="pi pi-list" [label]="t('scanQueue')" [outlined]="true" (onClick)="openScanQueue()"/>
+      <p-button icon="pi pi-times" [text]="true" [rounded]="true" [ariaLabel]="'common.close' | transloco" (onClick)="close()"/>
+    </div>
+  </header>
+
+  <main class="dialog-content">
+    @if (loading()) {
+      <div class="state"><p-progress-spinner strokeWidth="4"/></div>
+    } @else if (loadFailed()) {
+      <div class="state error-state">
+        <span>{{ t('loadFailed') }}</span>
+        <p-button [label]="t('retry')" icon="pi pi-refresh" (onClick)="load()"/>
+      </div>
+    } @else if (archives().length === 0) {
+      <div class="state">{{ t('empty') }}</div>
+    } @else {
+      <p-table [value]="archives()" [scrollable]="true" scrollHeight="60vh" responsiveLayout="scroll">
+        <ng-template #header>
+          <tr>
+            <th>{{ t('archive') }}</th>
+            <th>{{ t('size') }}</th>
+            <th>{{ t('books') }}</th>
+            <th>{{ t('covers') }}</th>
+            <th>{{ t('added') }}</th>
+            <th>{{ t('lastScanned') }}</th>
+            <th>{{ t('status') }}</th>
+            <th></th>
+          </tr>
+        </ng-template>
+        <ng-template #body let-archive>
+          <tr>
+            <td class="archive-name" [title]="archive.archiveName">{{ archive.archiveName }}</td>
+            <td>{{ formatSize(archive.sizeBytes) }}</td>
+            <td>{{ archive.importedBookCount }} / {{ archive.fb2Count }}</td>
+            <td>{{ archive.coveredBookCount }} / {{ archive.importedBookCount }}</td>
+            <td>{{ archive.addedAt ? (archive.addedAt | date:'medium') : '—' }}</td>
+            <td>{{ archive.lastScannedAt ? (archive.lastScannedAt | date:'medium') : '—' }}</td>
+            <td>
+              <p-tag [value]="t('statuses.' + archive.status)" [severity]="statusSeverity(archive)"/>
+              @if (archive.errorMessage) {
+                <div class="scan-error" [title]="archive.errorMessage">{{ archive.errorMessage }}</div>
+              }
+            </td>
+            <td>
+              <p-button
+                icon="pi pi-refresh"
+                [label]="t('fullRescan')"
+                size="small"
+                [loading]="isActive(archive)"
+                [disabled]="isActive(archive)"
+                (onClick)="rescan(archive)"/>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    }
+  </main>
+</div>

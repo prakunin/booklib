@@ -1,0 +1,90 @@
+.queue-dialog {
+  min-height: 24rem;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  p {
+    margin: 0.35rem 0 0;
+    color: var(--p-text-muted-color);
+  }
+}
+
+.queue-summary {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--p-text-muted-color);
+}
+
+.dialog-content {
+  padding: 1rem 1.5rem 1.5rem;
+}
+
+.state {
+  min-height: 16rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--p-text-muted-color);
+}
+
+.archive-name {
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.progress-cell {
+  min-width: 14rem;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.result-cell,
+.time-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 11rem;
+  font-size: 0.8rem;
+}
+
+.has-errors,
+.scan-error {
+  color: var(--p-red-500);
+}
+
+.task-status {
+  margin-top: 0.35rem;
+  color: var(--p-text-muted-color);
+  font-size: 0.75rem;
+}
+
+.scan-error {
+  max-width: 12rem;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+}

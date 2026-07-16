@@ -108,6 +108,11 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "development-low-memory": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": false
             }
           },
           "defaultConfiguration": "production"
@@ -118,14 +123,26 @@
             "headers": {
               "Cross-Origin-Opener-Policy": "same-origin",
               "Cross-Origin-Embedder-Policy": "credentialless"
-            }
+            },
+            "proxyConfig": "proxy.conf.json"
           },
           "configurations": {
             "production": {
               "buildTarget": "grimmory:build:production"
             },
             "development": {
-              "buildTarget": "grimmory:build:development"
+              "buildTarget": "grimmory:build:development",
+              "allowedHosts": [
+                "books.home",
+                "books.prakuninhome.duckdns.org"
+              ]
+            },
+            "development-low-memory": {
+              "buildTarget": "grimmory:build:development-low-memory",
+              "allowedHosts": [
+                "books.home",
+                "books.prakuninhome.duckdns.org"
+              ]
             }
           },
           "defaultConfiguration": "development"

@@ -91,7 +91,7 @@
             "moreActions": "További lehetőségek",
             "organizeFile": "Fájl rendszerezése",
             "readStatus": "Olvasás állapota",
-            "resetGrimmoryProgress": "Grimmory előrehaladás nullázása",
+            "resetGrimmoryProgress": "BookLib előrehaladás nullázása",
             "resetKOReaderProgress": "KOReader előrehaladás nullázása",
             "book": "Könyv",
             "loading": "Betöltés..."

@@ -6,7 +6,7 @@ import {Book} from "../../features/book/model/book.model";
 export class PageTitleService {
     protected titleService = inject(Title)
 
-    private appName = 'Grimmory'
+    private appName = 'BookLib'
 
     setBookPageTitle(book: Book) {
         const title = [

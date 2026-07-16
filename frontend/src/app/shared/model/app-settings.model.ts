@@ -198,7 +198,16 @@ export interface AppSettings {
   oidcSessionDurationHours: number | null;
   oidcGroupSyncMode: string | null;
   oidcForceOnlyMode: boolean;
+  passwordPolicy?: PasswordPolicy;
   diskType: string;
+}
+
+export interface PasswordPolicy {
+  minimumLength: number;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireDigit: boolean;
+  requireSpecialCharacter: boolean;
 }
 
 export interface MetadataProviderSpecificFields {
@@ -248,4 +257,5 @@ export enum AppSettingKey {
   OIDC_SESSION_DURATION_HOURS = 'OIDC_SESSION_DURATION_HOURS',
   OIDC_GROUP_SYNC_MODE = 'OIDC_GROUP_SYNC_MODE',
   OIDC_FORCE_ONLY_MODE = 'OIDC_FORCE_ONLY_MODE',
+  PASSWORD_POLICY = 'PASSWORD_POLICY',
 }

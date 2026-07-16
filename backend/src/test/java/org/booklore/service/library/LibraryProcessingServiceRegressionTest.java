@@ -9,6 +9,7 @@ import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.LibraryRepository;
 import org.booklore.service.NotificationService;
+import org.booklore.service.inpx.InpxLibraryScanner;
 import org.booklore.task.options.RescanLibraryContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -51,7 +53,11 @@ class LibraryProcessingServiceRegressionTest {
     @Mock
     private BookCoverGenerator bookCoverGenerator;
     @Mock
+    private InpxLibraryScanner inpxLibraryScanner;
+    @Mock
     private EntityManager entityManager;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private LibraryProcessingService libraryProcessingService;
 
@@ -68,7 +74,9 @@ class LibraryProcessingServiceRegressionTest {
                 libraryFileHelper,
                 bookGroupingService,
                 bookCoverGenerator,
-                entityManager
+                inpxLibraryScanner,
+                entityManager,
+                transactionManager
         );
     }
 

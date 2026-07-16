@@ -1,7 +1,18 @@
-import {Component, effect, inject, OnInit} from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectorRef,
+  Component,
+  DestroyRef,
+  effect,
+  ElementRef,
+  inject,
+  OnDestroy,
+  OnInit,
+  ViewChild
+} from '@angular/core';
 import {AuthService} from '../../service/auth.service';
 import {ActivatedRoute, Router} from '@angular/router';
-import {FormsModule} from '@angular/forms';
+import {FormsModule, NgForm} from '@angular/forms';
 import {Password} from 'primeng/password';
 import {Button} from 'primeng/button';
 import {Message} from 'primeng/message';
@@ -10,6 +21,8 @@ import {take} from 'rxjs/operators';
 import {AppSettingsService} from '../../service/app-settings.service';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {OidcService} from '../../../core/security/oidc.service';
+import {AutofillMonitor} from '@angular/cdk/text-field';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-login',
@@ -24,7 +37,11 @@ import {OidcService} from '../../../core/security/oidc.service';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss']
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('usernameInput', {read: ElementRef}) private usernameInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('passwordInput') private passwordInput?: Password;
+  @ViewChild('loginForm') private loginForm?: NgForm;
+
   username = '';
   password = '';
   errorMessage = '';
@@ -40,6 +57,10 @@ export class LoginComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private translocoService = inject(TranslocoService);
+  private autofillMonitor = inject(AutofillMonitor);
+  private changeDetectorRef = inject(ChangeDetectorRef);
+  private destroyRef = inject(DestroyRef);
+  private monitoredInputs: HTMLInputElement[] = [];
 
   private readonly initPublicSettingsEffect = effect(() => {
     const publicSettings = this.appSettingsService.publicAppSettings();
@@ -82,6 +103,34 @@ export class LoginComponent implements OnInit {
       }
     });
 
+  }
+
+  ngAfterViewInit(): void {
+    const usernameInput = this.usernameInput?.nativeElement;
+    const passwordInput = this.passwordInput?.input?.nativeElement as HTMLInputElement | undefined;
+    if (!usernameInput || !passwordInput) {
+      return;
+    }
+
+    this.monitoredInputs = [usernameInput, passwordInput];
+    for (const input of this.monitoredInputs) {
+      this.autofillMonitor.monitor(input)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => this.syncAutofilledCredentials(usernameInput, passwordInput));
+    }
+  }
+
+  ngOnDestroy(): void {
+    for (const input of this.monitoredInputs) {
+      this.autofillMonitor.stopMonitoring(input);
+    }
+  }
+
+  private syncAutofilledCredentials(usernameInput: HTMLInputElement, passwordInput: HTMLInputElement): void {
+    this.username = usernameInput.value;
+    this.password = passwordInput.value;
+    this.loginForm?.form.patchValue({username: this.username, password: this.password});
+    this.changeDetectorRef.detectChanges();
   }
 
   private handleAutoRedirect(): void {

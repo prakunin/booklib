@@ -11,7 +11,7 @@ import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.Library;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.repository.AuthorRepository;
-import org.booklore.util.FileService;
+import org.booklore.service.AuthorPhotoIndex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class AppAuthorServiceTest {
     @Mock private EntityManager entityManager;
     @Mock private AuthenticationService authenticationService;
     @Mock private AuthorRepository authorRepository;
-    @Mock private FileService fileService;
+    @Mock private AuthorPhotoIndex authorPhotoIndex;
 
     private AppAuthorService service;
 
@@ -42,7 +42,7 @@ class AppAuthorServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AppAuthorService(authorRepository, authenticationService, fileService, entityManager);
+        service = new AppAuthorService(authorRepository, authenticationService, authorPhotoIndex, entityManager);
     }
 
     // ---- getAuthors tests ----
@@ -143,8 +143,9 @@ class AppAuthorServiceTest {
             ));
             mockAuthorThumbnailExists(6L, true);
             mockAuthorThumbnailExists(7L, false);
-            // Mock the hasPhoto count query
-            mockAuthorEntityQuery(List.of(buildAuthor(6L, "Author E"), buildAuthor(7L, "Author F")));
+            // Mock the hasPhoto count query: matching ids intersected with the photo index
+            mockAuthorIdQuery(List.of(6L, 7L));
+            when(authorPhotoIndex.authorIdsWithPhoto()).thenReturn(Set.of(6L));
 
             AppPageResponse<AppAuthorSummary> result = service.getAuthors(0, 30, null, null, null, null, true);
 
@@ -164,7 +165,8 @@ class AppAuthorServiceTest {
             ));
             mockAuthorThumbnailExists(8L, true);
             mockAuthorThumbnailExists(9L, false);
-            mockAuthorEntityQuery(List.of(buildAuthor(8L, "Author G"), buildAuthor(9L, "Author H")));
+            mockAuthorIdQuery(List.of(8L, 9L));
+            when(authorPhotoIndex.authorIdsWithPhoto()).thenReturn(Set.of(8L));
 
             AppPageResponse<AppAuthorSummary> result = service.getAuthors(0, 30, null, null, null, null, false);
 
@@ -342,11 +344,13 @@ class AppAuthorServiceTest {
     }
 
     @SuppressWarnings("unchecked")
-    private void mockAuthorEntityQuery(List<AuthorEntity> authors) {
-        TypedQuery<AuthorEntity> authorQ = mock(TypedQuery.class);
-        when(authorQ.setParameter(anyString(), any())).thenReturn(authorQ);
-        when(authorQ.getResultList()).thenReturn(authors);
-        when(entityManager.createQuery(anyString(), eq(AuthorEntity.class))).thenReturn(authorQ);
+    private void mockAuthorIdQuery(List<Long> ids) {
+        TypedQuery<Long> idQ = mock(TypedQuery.class);
+        when(idQ.setParameter(anyString(), any())).thenReturn(idQ);
+        when(idQ.getResultList()).thenReturn(ids);
+        // Distinct from the COUNT(DISTINCT a.id) query, which also uses Long.class.
+        when(entityManager.createQuery(argThat(jpql -> jpql != null && jpql.contains("SELECT DISTINCT a.id")), eq(Long.class)))
+                .thenReturn(idQ);
     }
 
     @SuppressWarnings("unchecked")
@@ -358,14 +362,7 @@ class AppAuthorServiceTest {
     }
 
     private void mockAuthorThumbnailExists(Long authorId, boolean exists) {
-        String path = "/mock/authors/" + authorId + "/thumbnail.jpg";
-        when(fileService.getAuthorThumbnailFile(authorId)).thenReturn(path);
-        // Since Files.exists checks real filesystem, a non-existent mock path returns false.
-        // For "exists = true" tests, we need a path that actually exists.
-        if (exists) {
-            // Use a path we know exists — the temp directory
-            when(fileService.getAuthorThumbnailFile(authorId)).thenReturn(System.getProperty("java.io.tmpdir"));
-        }
+        when(authorPhotoIndex.hasPhoto(authorId)).thenReturn(exists);
     }
 
     private AuthorEntity buildAuthor(Long id, String name) {

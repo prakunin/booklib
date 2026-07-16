@@ -124,7 +124,7 @@
         "saveErrorDetail": "Pri shranjevanju nastavitev je prišlo do napake."
     },
     "setup": {
-        "title": "Dobrodošel v Grimmory",
+        "title": "Dobrodošel v BookLib",
         "subtitle": "Za začetek ustvari skrbniški račun",
         "usernameLabel": "Uporabniško ime",
         "usernamePlaceholder": "Izberi uporabniško ime",

@@ -19,17 +19,22 @@ describe('ReaderStateService', () => {
 
   const bookService = {
     getBookSetting: vi.fn(),
+    updateViewerSetting: vi.fn(() => of(void 0)),
   };
 
   const userService = {
     getMyself: vi.fn(),
+    updateUserSetting: vi.fn(),
   };
 
   let service: ReaderStateService;
 
   beforeEach(() => {
     bookService.getBookSetting.mockReset();
+    bookService.updateViewerSetting.mockReset();
+    bookService.updateViewerSetting.mockReturnValue(of(void 0));
     userService.getMyself.mockReset();
+    userService.updateUserSetting.mockReset();
     epubCustomFontService.getCustomFonts.mockReset();
     epubCustomFontService.getCustomFonts.mockReturnValue(customFonts);
 
@@ -50,6 +55,7 @@ describe('ReaderStateService', () => {
   });
 
   it('loads custom fonts into the reader font list on construction and refresh', () => {
+    expect(service.fonts()).toContainEqual({name: 'Academy Book', value: 'Academy Book'});
     expect(service.fonts()).toContainEqual({name: 'Fancy Serif', value: 'custom:2'});
 
     epubCustomFontService.getCustomFonts.mockReturnValue([
@@ -64,6 +70,7 @@ describe('ReaderStateService', () => {
 
   it('applies global reader settings from the user profile', async () => {
     userService.getMyself.mockReturnValue(of({
+      id: 7,
       userSettings: {
         perBookSetting: {epub: 'Global'},
         ebookReaderSetting: {
@@ -106,6 +113,7 @@ describe('ReaderStateService', () => {
 
   it('applies per-book settings and legacy custom font ids', async () => {
     userService.getMyself.mockReturnValue(of({
+      id: 8,
       userSettings: {
         perBookSetting: {epub: 'PerBook'},
         ebookReaderSetting: {
@@ -150,6 +158,97 @@ describe('ReaderStateService', () => {
     expect(service.state().gap).toBe(0.3);
     expect(service.state().theme.name).toBe('ember');
     expect(service.state().theme.fg).toBe(emberTheme?.dark.fg);
+  });
+
+  it('persists reader changes to the user profile in global mode', async () => {
+    userService.getMyself.mockReturnValue(of({
+      id: 7,
+      userSettings: {
+        perBookSetting: {epub: 'Global'},
+        ebookReaderSetting: {fontSize: 16, fontFamily: 'serif'}
+      }
+    }));
+    bookService.getBookSetting.mockReturnValue(of({}));
+    await firstValueFrom(service.initializeState(11, 22));
+
+    service.setFontFamily('Academy Book');
+    service.persistSettings(11);
+
+    expect(userService.updateUserSetting).toHaveBeenCalledWith(7, 'ebookReaderSetting', expect.objectContaining({
+      fontFamily: 'Academy Book',
+      fontSize: 16,
+    }));
+    expect(bookService.updateViewerSetting).not.toHaveBeenCalled();
+  });
+
+  it('persists reader changes for the current book in individual mode', async () => {
+    userService.getMyself.mockReturnValue(of({
+      id: 8,
+      userSettings: {
+        perBookSetting: {epub: 'Individual'},
+        ebookReaderSetting: {fontSize: 16}
+      }
+    }));
+    bookService.getBookSetting.mockReturnValue(of({ebookSettings: {fontSize: 20}}));
+    await firstValueFrom(service.initializeState(11, 22));
+
+    service.persistSettings(11);
+
+    expect(bookService.updateViewerSetting).toHaveBeenCalledWith({
+      ebookSettings: expect.objectContaining({fontSize: 20})
+    }, 11);
+    expect(userService.updateUserSetting).not.toHaveBeenCalled();
+  });
+
+  it('makes the current reader appearance global for all books', async () => {
+    userService.getMyself.mockReturnValue(of({
+      id: 9,
+      userSettings: {
+        perBookSetting: {pdf: 'Individual', epub: 'Individual', cbx: 'Individual'},
+        ebookReaderSetting: {fontSize: 16}
+      }
+    }));
+    bookService.getBookSetting.mockReturnValue(of({ebookSettings: {fontSize: 20}}));
+    await firstValueFrom(service.initializeState(11, 22));
+    service.setFontFamily('Academy Book');
+
+    service.setGlobalSettings(true, 11);
+
+    expect(service.usesGlobalSettings()).toBe(true);
+    expect(userService.updateUserSetting).toHaveBeenCalledWith(9, 'ebookReaderSetting', expect.objectContaining({
+      fontFamily: 'Academy Book',
+      fontSize: 20,
+    }));
+    expect(userService.updateUserSetting).toHaveBeenCalledWith(9, 'perBookSetting', {
+      pdf: 'Individual',
+      epub: 'Global',
+      cbx: 'Individual',
+    });
+    expect(bookService.updateViewerSetting).not.toHaveBeenCalled();
+  });
+
+  it('returns to per-book settings without losing the current book appearance', async () => {
+    userService.getMyself.mockReturnValue(of({
+      id: 10,
+      userSettings: {
+        perBookSetting: {pdf: 'Individual', epub: 'Global', cbx: 'Individual'},
+        ebookReaderSetting: {fontSize: 18, fontFamily: 'Academy Book'}
+      }
+    }));
+    bookService.getBookSetting.mockReturnValue(of({}));
+    await firstValueFrom(service.initializeState(11, 22));
+
+    service.setGlobalSettings(false, 11);
+
+    expect(service.usesGlobalSettings()).toBe(false);
+    expect(bookService.updateViewerSetting).toHaveBeenCalledWith({
+      ebookSettings: expect.objectContaining({fontFamily: 'Academy Book', fontSize: 18})
+    }, 11);
+    expect(userService.updateUserSetting).toHaveBeenCalledWith(10, 'perBookSetting', {
+      pdf: 'Individual',
+      epub: 'Individual',
+      cbx: 'Individual',
+    });
   });
 
   it('supports the small state mutators and clamps values', () => {

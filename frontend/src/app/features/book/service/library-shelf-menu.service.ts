@@ -120,6 +120,17 @@ export class LibraryShelfMenuService {
               });
             }
           },
+          ...(entity?.sourceType === 'INPX' ? [{
+            label: this.t.translate('book.shelfMenuService.library.manageInpxArchives'),
+            icon: 'pi pi-database',
+            disabled: libraryId == null,
+            command: async () => {
+              if (libraryId == null) {
+                return;
+              }
+              await this.dialogLauncherService.openInpxArchiveManagerDialog(libraryId).catch(() => undefined);
+            }
+          }] : []),
           {
             label: this.t.translate('book.shelfMenuService.library.customFetchMetadata'),
             icon: 'pi pi-sync',
@@ -170,8 +181,11 @@ export class LibraryShelfMenuService {
               if (libraryId == null) {
                 return;
               }
+              const confirmationMessageKey = entity?.sourceType === 'INPX'
+                ? 'book.shelfMenuService.confirm.deleteInpxLibraryMessage'
+                : 'book.shelfMenuService.confirm.deleteLibraryMessage';
               this.confirmationService.confirm({
-                message: this.t.translate('book.shelfMenuService.confirm.deleteLibraryMessage', {name: entity?.name}),
+                message: this.t.translate(confirmationMessageKey, {name: entity?.name}),
                 header: this.t.translate('book.shelfMenuService.confirm.header'),
                 acceptLabel: this.t.translate('common.yes'),
                 rejectLabel: this.t.translate('common.cancel'),

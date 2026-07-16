@@ -7,6 +7,9 @@ import {User, UserProfileUpdateRequest, UserService} from '../user-management/us
 import {MessageService} from 'primeng/api';
 import {DynamicDialogRef} from 'primeng/dynamicdialog';
 import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
+import {AppSettingsService} from '../../../shared/service/app-settings.service';
+import {PasswordPolicyRequirementsComponent} from '../../../shared/components/password-policy-requirements/password-policy-requirements.component';
+import {DEFAULT_PASSWORD_POLICY, passwordPolicyValidator} from '../../../shared/validators/password-policy.validator';
 
 export const passwordMatchValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const newPassword = control.get('newPassword');
@@ -29,6 +32,7 @@ export const passwordMatchValidator: ValidatorFn = (control: AbstractControl): V
     Password,
     TranslocoDirective,
     TranslocoPipe,
+    PasswordPolicyRequirementsComponent,
   ],
   templateUrl: './user-profile-dialog.component.html',
   styleUrls: ['./user-profile-dialog.component.scss']
@@ -45,12 +49,17 @@ export class UserProfileDialogComponent {
   private readonly fb = inject(FormBuilder);
   private readonly dialogRef = inject(DynamicDialogRef);
   private readonly t = inject(TranslocoService);
+  private readonly appSettingsService = inject(AppSettingsService);
+
+  get passwordPolicy() {
+    return this.appSettingsService.appSettings()?.passwordPolicy ?? DEFAULT_PASSWORD_POLICY;
+  }
 
   constructor() {
     this.changePasswordForm = this.fb.group(
       {
         currentPassword: ['', Validators.required],
-        newPassword: ['', [Validators.required, Validators.minLength(8)]],
+        newPassword: ['', [Validators.required, passwordPolicyValidator(() => this.passwordPolicy)]],
         confirmNewPassword: ['', Validators.required]
       },
       {validators: passwordMatchValidator}

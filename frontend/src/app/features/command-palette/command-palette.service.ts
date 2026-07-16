@@ -3,12 +3,12 @@ import { MessageService } from 'primeng/api';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { catchError, debounceTime, defer, distinctUntilChanged, finalize, map, of, switchMap } from 'rxjs';
 
 import { BookDialogHelperService } from '../book/components/book-browser/book-dialog-helper.service';
-import { filterBooksBySearchTerm, normalizeSearchTerm } from '../book/components/book-browser/filters/HeaderFilter';
+import { normalizeSearchTerm } from '../book/components/book-browser/filters/HeaderFilter';
 import { Book } from '../book/model/book.model';
-import { BookService } from '../book/service/book.service';
+import { AppBooksApiService, summaryToBook } from '../book/service/app-books-api.service';
 import { LibraryService } from '../book/service/library.service';
 import { ShelfService } from '../book/service/shelf.service';
 import { MagicShelfService } from '../magic-shelf/service/magic-shelf.service';
@@ -43,7 +43,7 @@ export class CommandPaletteService {
   private readonly router = inject(Router);
   private readonly t = inject(TranslocoService);
   private readonly userService = inject(UserService);
-  private readonly bookService = inject(BookService);
+  private readonly appBooksApi = inject(AppBooksApiService);
   private readonly shelfService = inject(ShelfService);
   private readonly magicShelfService = inject(MagicShelfService);
   private readonly libraryService = inject(LibraryService);
@@ -56,6 +56,7 @@ export class CommandPaletteService {
   private readonly _isOpen = signal(false);
   readonly isOpen = this._isOpen.asReadonly();
   readonly query = signal('');
+  private readonly bookSearchPending = signal(false);
   private overlayController?: CommandPaletteOverlayController;
 
   private readonly activeLang = toSignal(this.t.langChanges$, { initialValue: this.t.getActiveLang() });
@@ -68,16 +69,21 @@ export class CommandPaletteService {
     ),
     { initialValue: this.trimmedQuery() },
   );
-  private readonly localBookItems = computed<PaletteItem[]>(() => {
-    const query = this.debouncedBookQuery();
-    if (query.length < MIN_BOOK_SEARCH_LENGTH) {
-      return [];
-    }
-
-    return filterBooksBySearchTerm(this.bookService.books(), query)
-      .slice(0, BOOK_RESULT_LIMIT)
-      .map((book) => this.toPaletteBookItem(book));
-  });
+  private readonly localBookItems = toSignal(
+    toObservable(this.debouncedBookQuery).pipe(
+      switchMap(query => query.length < MIN_BOOK_SEARCH_LENGTH
+        ? of([])
+        : defer(() => {
+          this.bookSearchPending.set(true);
+          return this.appBooksApi.searchBooks(query, BOOK_RESULT_LIMIT).pipe(
+            map(response => response.content.map(summaryToBook).map(book => this.toPaletteBookItem(book))),
+            catchError(() => of([])),
+            finalize(() => this.bookSearchPending.set(false)),
+          );
+        })),
+    ),
+    {initialValue: [] as PaletteItem[]},
+  );
 
   registerOverlayController(controller: CommandPaletteOverlayController): () => void {
     this.overlayController = controller;
@@ -187,7 +193,7 @@ export class CommandPaletteService {
       return false;
     }
 
-    return raw !== this.debouncedBookQuery();
+    return raw !== this.debouncedBookQuery() || this.bookSearchPending();
   });
 
   private filterItems(source: PaletteItem[], tokens: string[], cap: number): PaletteItem[] {

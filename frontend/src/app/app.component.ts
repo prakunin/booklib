@@ -115,6 +115,16 @@ export class AppComponent implements OnInit, OnDestroy {
       })
     );
     this.subscriptions.push(
+      this.rxStompService.watch('/user/queue/library-scan-complete').subscribe(() => {
+        this.bookService.handleLibraryScanComplete();
+      })
+    );
+    this.subscriptions.push(
+      this.rxStompService.watch('/user/queue/library-scan-progress').subscribe(msg => {
+        this.libraryImportProgressService.applyScanProgress(JSON.parse(msg.body));
+      })
+    );
+    this.subscriptions.push(
       this.rxStompService.watch('/user/queue/book-update').subscribe(msg =>
         this.bookService.handleBookUpdate(JSON.parse(msg.body))
       )
@@ -142,6 +152,11 @@ export class AppComponent implements OnInit, OnDestroy {
     this.subscriptions.push(
       this.rxStompService.watch('/user/queue/book-metadata-batch-progress').subscribe(msg =>
         this.metadataProgressService.handleIncomingProgress(JSON.parse(msg.body) as MetadataBatchProgressNotification)
+      )
+    );
+    this.subscriptions.push(
+      this.rxStompService.watch('/user/queue/book-recommendations-update').subscribe(msg =>
+        this.bookService.handleBookRecommendationsUpdate(JSON.parse(msg.body) as number)
       )
     );
     this.subscriptions.push(

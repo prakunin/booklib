@@ -1,10 +1,12 @@
-import {inject, Injectable, signal} from '@angular/core';
+import {computed, inject, Injectable, signal} from '@angular/core';
 import {forkJoin, Observable} from 'rxjs';
 import {map, tap} from 'rxjs/operators';
 import {Theme, themes} from './themes.constant';
 import {BookService} from '../../../book/service/book.service';
-import {UserService} from '../../../settings/user-management/user.service';
+import {EbookViewerSetting} from '../../../book/model/book.model';
+import {PerBookSetting, UserService} from '../../../settings/user-management/user.service';
 import {EpubCustomFontService} from '../features/fonts/custom-font.service';
+import {ACADEMY_BOOK_FONT} from './built-in-fonts.constant';
 
 export interface ReaderState {
   lineHeight: number;
@@ -35,6 +37,7 @@ export class ReaderStateService {
 
   private readonly BASE_FONTS = [
     {name: 'Publisher\'s', value: null},
+    {name: ACADEMY_BOOK_FONT.name, value: ACADEMY_BOOK_FONT.family},
     {name: 'Serif', value: 'serif'},
     {name: 'Sans-Serif', value: 'sans-serif'},
     {name: 'Monospace', value: 'monospace'},
@@ -62,7 +65,11 @@ export class ReaderStateService {
   };
 
   private readonly _state = signal<ReaderState>(this.defaultState);
+  private readonly _settingScope = signal<'Global' | 'Individual'>('Individual');
+  private userId: number | null = null;
+  private perBookSetting: PerBookSetting | null = null;
   readonly state = this._state.asReadonly();
+  readonly usesGlobalSettings = computed(() => this._settingScope() === 'Global');
 
   readonly themes = themes;
   private readonly _fonts = signal<{ name: string; value: string | null }[]>(this.BASE_FONTS);
@@ -99,6 +106,9 @@ export class ReaderStateService {
     ]).pipe(
       tap(([myself, bookSetting]) => {
         const settingScope = myself.userSettings.perBookSetting.epub;
+        this._settingScope.set(settingScope === 'Global' ? 'Global' : 'Individual');
+        this.userId = myself.id;
+        this.perBookSetting = {...myself.userSettings.perBookSetting};
         const globalSettings = myself.userSettings.ebookReaderSetting;
         const individualSetting = bookSetting?.ebookSettings;
         const settings = settingScope === 'Global' ? globalSettings : (individualSetting || globalSettings);
@@ -235,6 +245,50 @@ export class ReaderStateService {
 
   setFlow(flow: 'paginated' | 'scrolled'): void {
     this.updateState({flow});
+  }
+
+  persistSettings(bookId: number): void {
+    const setting = this.getViewerSetting();
+
+    if (this._settingScope() === 'Global' && this.userId !== null) {
+      this.userService.updateUserSetting(this.userId, 'ebookReaderSetting', setting);
+      return;
+    }
+
+    this.bookService.updateViewerSetting({ebookSettings: setting}, bookId).subscribe();
+  }
+
+  setGlobalSettings(enabled: boolean, bookId: number): void {
+    if (this.userId === null || this.perBookSetting === null) return;
+
+    const scope = enabled ? 'Global' : 'Individual';
+    this._settingScope.set(scope);
+    this.perBookSetting = {...this.perBookSetting, epub: scope};
+
+    if (enabled) {
+      this.userService.updateUserSetting(this.userId, 'ebookReaderSetting', this.getViewerSetting());
+    } else {
+      this.bookService.updateViewerSetting({ebookSettings: this.getViewerSetting()}, bookId).subscribe();
+    }
+    this.userService.updateUserSetting(this.userId, 'perBookSetting', this.perBookSetting);
+  }
+
+  private getViewerSetting(): EbookViewerSetting {
+    const state = this._state();
+    return {
+      lineHeight: state.lineHeight,
+      justify: state.justify,
+      hyphenate: state.hyphenate,
+      maxColumnCount: state.maxColumnCount,
+      gap: state.gap,
+      fontSize: state.fontSize,
+      theme: state.theme.name,
+      maxInlineSize: state.maxInlineSize,
+      maxBlockSize: state.maxBlockSize,
+      fontFamily: state.fontFamily,
+      isDark: state.isDark,
+      flow: state.flow,
+    };
   }
 
   private updateState(partial: Partial<ReaderState>): void {

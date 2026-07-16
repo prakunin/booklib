@@ -4,11 +4,12 @@ import {TestBed} from '@angular/core/testing';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {createAuthServiceStub, createQueryClientHarness, flushQueryAsync, flushSignalAndQueryEffects} from '../../../core/testing/query-testing';
-import type {Book} from '../model/book.model';
 import type {Shelf} from '../model/shelf.model';
+import type {AppCatalogSummary} from '../model/app-book.model';
 import {AuthService} from '../../../shared/service/auth.service';
 import {UserService} from '../../settings/user-management/user.service';
 import {BookService} from './book.service';
+import {AppBooksApiService} from './app-books-api.service';
 import {ShelfService} from './shelf.service';
 
 function buildShelf(overrides: Partial<Shelf> = {}): Shelf {
@@ -17,15 +18,6 @@ function buildShelf(overrides: Partial<Shelf> = {}): Shelf {
     name: 'Favorites',
     userId: 7,
     bookCount: 0,
-    ...overrides,
-  };
-}
-
-function buildBook(id: number, overrides: Partial<Book> = {}): Book {
-  return {
-    id,
-    libraryId: 1,
-    libraryName: 'Main Library',
     ...overrides,
   };
 }
@@ -43,6 +35,7 @@ describe('ShelfService', () => {
     getCurrentUser: ReturnType<typeof vi.fn>;
   };
   let currentUser: ReturnType<typeof signal<{id: number} | null>>;
+  let catalogSummary: ReturnType<typeof signal<AppCatalogSummary | null>>;
 
   beforeEach(() => {
     authService = createAuthServiceStub();
@@ -52,6 +45,7 @@ describe('ShelfService', () => {
       removeBooksFromShelf: vi.fn(),
     };
     currentUser = signal<{id: number} | null>(null);
+    catalogSummary = signal<AppCatalogSummary | null>(null);
     userService = {
       getCurrentUser: vi.fn(() => currentUser()),
     };
@@ -65,6 +59,7 @@ describe('ShelfService', () => {
         ShelfService,
         {provide: AuthService, useValue: authService},
         {provide: BookService, useValue: bookService},
+        {provide: AppBooksApiService, useValue: {catalogSummary}},
         {provide: UserService, useValue: userService},
       ],
     });
@@ -154,57 +149,47 @@ describe('ShelfService', () => {
     expect(bookService.removeBooksFromShelf).toHaveBeenCalledWith(11);
   });
 
-  it('uses owner-aware shelf counts and falls back to persisted counts for non-owners', async () => {
+  it('uses persisted server counts for owned and shared shelves', async () => {
     httpTestingController.expectOne(req => req.url.endsWith('/api/v1/shelves')).flush([
       buildShelf({id: 1, userId: 7, bookCount: 99}),
       buildShelf({id: 2, userId: 10, bookCount: 6}),
     ]);
     await flushShelvesQueryResult();
 
-    bookService.books.mockReturnValue([
-      buildBook(1, {shelves: [buildShelf({id: 1, name: 'Reading'})]}),
-      buildBook(2, {shelves: [buildShelf({id: 1, name: 'Reading'})]}),
-      buildBook(3, {shelves: [buildShelf({id: 2, name: 'Archive'})]}),
-    ]);
-
     currentUser.set({id: 7});
-    expect(service.getBookCountValue(1)).toBe(2);
+    expect(service.getBookCountValue(1)).toBe(99);
 
     currentUser.set({id: 42});
     expect(service.getBookCountValue(2)).toBe(6);
     expect(service.getBookCountValue(999)).toBe(0);
   });
 
-  it('builds shelf count maps with local counts for the owner and persisted counts for shared shelves', async () => {
+  it('builds shelf count maps from persisted server counts', async () => {
     httpTestingController.expectOne(req => req.url.endsWith('/api/v1/shelves')).flush([
       buildShelf({id: 1, userId: 7, bookCount: 99}),
       buildShelf({id: 2, userId: 10, bookCount: 6}),
     ]);
     await flushShelvesQueryResult();
 
-    bookService.books.mockReturnValue([
-      buildBook(1, {shelves: [buildShelf({id: 1, name: 'Reading'})]}),
-      buildBook(2, {shelves: [buildShelf({id: 1, name: 'Reading'})]}),
-      buildBook(3, {shelves: [buildShelf({id: 2, name: 'Archive'})]}),
-    ]);
-
     currentUser.set({id: 7});
     flushSignalAndQueryEffects();
 
     const counts = service.bookCountByShelfId();
 
-    expect(counts.get(1)).toBe(2);
+    expect(counts.get(1)).toBe(99);
     expect(counts.get(2)).toBe(6);
   });
 
-  it('counts unshelved books from the current book cache snapshot', () => {
+  it('uses the catalog summary for the unshelved book count', () => {
     httpTestingController.expectOne(req => req.url.endsWith('/api/v1/shelves')).flush([]);
 
-    bookService.books.mockReturnValue([
-      buildBook(1, {shelves: [buildShelf({id: 1, name: 'Reading'})]}),
-      buildBook(2, {shelves: []}),
-      buildBook(3, {shelves: undefined}),
-    ]);
+    catalogSummary.set({
+      totalBooks: 10,
+      totalAuthors: 4,
+      totalSeries: 3,
+      unshelvedBooks: 2,
+      libraryBookCounts: {},
+    });
 
     expect(service.getUnshelvedBookCountValue()).toBe(2);
   });

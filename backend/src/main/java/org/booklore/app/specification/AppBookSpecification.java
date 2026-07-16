@@ -73,8 +73,11 @@ public class AppBookSpecification {
 
     public static Specification<BookEntity> inLibraries(Collection<Long> libraryIds) {
         return (root, query, cb) -> {
-            if (libraryIds == null || libraryIds.isEmpty()) {
+            if (libraryIds == null) {
                 return cb.conjunction();
+            }
+            if (libraryIds.isEmpty()) {
+                return cb.disjunction();
             }
             return root.get("library").get("id").in(libraryIds);
         };

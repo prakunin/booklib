@@ -187,6 +187,23 @@ describe('CommandPaletteComponent', () => {
     expect(service.select).toHaveBeenCalledWith(items[1]);
   });
 
+  it('shows a spinner instead of the empty state while searching', async () => {
+    service.query.set('missing');
+    service.isSearching.set(true);
+    service.open();
+
+    await flushPalette(fixture);
+
+    expect(overlayRoot.querySelector('app-spinner')).not.toBeNull();
+    expect(overlayRoot.querySelector('.command-palette-empty')).toBeNull();
+
+    service.isSearching.set(false);
+    await flushPalette(fixture);
+
+    expect(overlayRoot.querySelector('app-spinner')).toBeNull();
+    expect(overlayRoot.querySelector('.command-palette-empty')).not.toBeNull();
+  });
+
   it('disposes the overlay when the component is destroyed while open', async () => {
     service.query.set('dash');
     service.items.set([createItem('page:dashboard', 'Dashboard')]);

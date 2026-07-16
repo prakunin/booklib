@@ -1,4 +1,4 @@
-import {AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, computed, effect, inject, signal, untracked, viewChild} from '@angular/core';
+import {AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, computed, effect, inject, signal, viewChild} from '@angular/core';
 import {takeUntilDestroyed, toObservable, toSignal} from '@angular/core/rxjs-interop';
 import {ActivatedRoute} from '@angular/router';
 import {ConfirmationService, MenuItem, MessageService} from 'primeng/api';
@@ -51,22 +51,14 @@ import {AppSettingsService} from '../../../../shared/service/app-settings.servic
 import {MultiSortPopoverComponent} from './sorting/multi-sort-popover/multi-sort-popover.component';
 import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
 
-import {SortService} from '../../service/sort.service';
 import {createVirtualGrid, type VirtualGridMetrics} from '../../../../shared/util/virtual-grid.util';
 import {GridDensityButtonsComponent, type GridDensityDirection} from '../../../../shared/components/grid-density-buttons/grid-density-buttons.component';
-import {filterBooksBySearchTerm} from './filters/HeaderFilter';
-import {filterBooksByFilters} from './filters/sidebar-filter';
 import {LayoutService} from '../../../../shared/layout/layout.service';
 import {createGridDensity} from '../../../../shared/util/grid-density.util';
-import {DeferredRenderState} from './deferred-render-state';
-
-export enum EntityType {
-  LIBRARY = 'Library',
-  SHELF = 'Shelf',
-  MAGIC_SHELF = 'Magic Shelf',
-  ALL_BOOKS = 'All Books',
-  UNSHELVED = 'Unshelved Books',
-}
+import {AppBooksApiService} from '../../service/app-books-api.service';
+import {toAppBookFilters, toAppBookSort} from '../../service/app-book-query-adapter';
+import {EntityType} from './book-browser-entity-type';
+export {EntityType} from './book-browser-entity-type';
 
 const INITIAL_LOADING_ROW_COUNT = 24;
 const DEFAULT_MOBILE_GRID_COLUMNS = 3;
@@ -102,6 +94,7 @@ export class BookBrowserComponent implements AfterViewInit {
   private activatedRoute = inject(ActivatedRoute);
   private messageService = inject(MessageService);
   private bookService = inject(BookService);
+  private appBooksApi = inject(AppBooksApiService);
   private bookMetadataManageService = inject(BookMetadataManageService);
   private dialogHelperService = inject(BookDialogHelperService);
   private bookMenuService = inject(BookMenuService);
@@ -111,7 +104,6 @@ export class BookBrowserComponent implements AfterViewInit {
   private bookNavigationService = inject(BookNavigationService);
   private queryParamsService = inject(BookBrowserQueryParamsService);
   private entityService = inject(BookBrowserEntityService);
-  private sortService = inject(SortService);
   private localStorageService = inject(LocalStorageService);
   private scrollService = inject(RouteScrollPositionService);
   private layoutService = inject(LayoutService);
@@ -119,6 +111,7 @@ export class BookBrowserComponent implements AfterViewInit {
   private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
+    this.appBooksApi.setBooksEnabled(true);
     this.setupRouteChangeHandlers();
     this.setupQueryParamSubscription();
     this.scrollService.trackRoute({
@@ -128,7 +121,10 @@ export class BookBrowserComponent implements AfterViewInit {
       keySuffix: 'grid',
       dismissOverlaysBeforeSave: true,
     });
-    this.destroyRef.onDestroy(() => this.bookSelectionService.deselectAll());
+    this.destroyRef.onDestroy(() => {
+      this.appBooksApi.setBooksEnabled(false);
+      this.bookSelectionService.deselectAll();
+    });
   }
 
   private readonly defaultSortCriteria: SortOption[] = [{
@@ -167,7 +163,6 @@ export class BookBrowserComponent implements AfterViewInit {
   readonly visibleSortOptions = signal<SortOption[]>([]);
   readonly currentFilterLabel = signal<string | null>(null);
   readonly rawFilterParamFromUrl = signal<string | null>(null);
-  private readonly seriesCollapsed = this.seriesCollapseFilter.seriesCollapsed;
   readonly selectedBooks = this.bookSelectionService.selectedBooks;
   readonly selectedCount = this.bookSelectionService.selectedCount;
   readonly showFilter = this.sidebarFilterTogglePrefService.showFilter;
@@ -201,54 +196,23 @@ export class BookBrowserComponent implements AfterViewInit {
 
     return actions;
   });
-  // Deferred pipeline: heavy filter/sort runs in a setTimeout so the page chrome
-  // and skeletons paint first, then real books replace them on the next task.
-  private readonly forceExpandSeries = computed(() =>
-    this.queryParamsService.shouldForceExpandSeries(this.queryParamMap())
-  );
-  private readonly booksContextKey = computed(() => {
+  private readonly syncPagedQueryEffect = effect(() => {
     const {entityId, entityType} = this.entityInfo();
-    return Number.isNaN(entityId) ? entityType : `${entityType}:${entityId}`;
-  });
-  private lastBooksContextKey: string | null = null;
-  private readonly booksRenderState = new DeferredRenderState<Book[]>();
-  readonly books = computed(() => this.booksRenderState.value() ?? []);
-  readonly hasRenderedBooks = this.booksRenderState.hasValue;
-  readonly isBooksRefreshing = this.booksRenderState.isRefreshing;
-
-  private readonly computeBooksEffect = effect((onCleanup) => {
-    const contextKey = this.booksContextKey();
-    const allBooks = this.bookService.books();
-    const {entityId, entityType} = this.entityInfo();
-    const searchTerm = this.debouncedSearchTerm();
-    const filters = this.selectedFilter();
-    const filterMode = this.selectedFilterMode();
-    const collapsedFlag = this.seriesCollapsed();
-    const forceExpand = this.forceExpandSeries();
-    const sortCriteria = this.sortCriteria();
-
-    const sameContext = contextKey === this.lastBooksContextKey;
-    const shouldRefresh = sameContext && untracked(() => this.hasRenderedBooks());
-    const requestId = this.booksRenderState.begin(shouldRefresh ? 'refresh' : 'reset');
-    this.lastBooksContextKey = contextKey;
-
-    const timeoutId = globalThis.setTimeout(() => {
-      const entityBooks = this.entityService.getBooksByEntity(allBooks, entityId, entityType);
-      const searched = filterBooksBySearchTerm(entityBooks, searchTerm);
-      const filtered = filterBooksByFilters(searched, filters, filterMode);
-      const collapsed = this.seriesCollapseFilter.collapseBooks(filtered, forceExpand, collapsedFlag);
-      const sorted = this.sortService.applyMultiSort(collapsed, sortCriteria);
-      this.booksRenderState.commit(requestId, sorted);
-    });
-
-    onCleanup(() => {
-      globalThis.clearTimeout(timeoutId);
-      this.booksRenderState.cancel(requestId);
-    });
+    this.appBooksApi.setFilters(toAppBookFilters(
+      entityId,
+      entityType,
+      this.selectedFilter(),
+      this.selectedFilterMode(),
+    ));
+    this.appBooksApi.setSearch(this.debouncedSearchTerm());
+    this.appBooksApi.setSort(toAppBookSort(this.sortCriteria()));
   });
 
-  readonly isBooksLoading = this.bookService.isBooksLoading;
-  readonly booksError = this.bookService.booksError;
+  readonly books = this.appBooksApi.books;
+  readonly hasRenderedBooks = this.appBooksApi.hasData;
+  readonly isBooksRefreshing = this.appBooksApi.isFetchingNextPage;
+  readonly isBooksLoading = this.appBooksApi.isLoading;
+  readonly booksError = this.appBooksApi.error;
 
   private readonly GRID_GAP = 21;
   private readonly CARD_ASPECT_RATIO = 7 / 5;
@@ -333,8 +297,9 @@ export class BookBrowserComponent implements AfterViewInit {
     }
 
     this.gridLastLoadRequestLoadedBookCount = loadedBookCount;
+    this.loadNextBooksPage();
   });
-  readonly isFetchingNextBooksPage = this.bookService.isBooksLoading;
+  readonly isFetchingNextBooksPage = this.appBooksApi.isFetchingNextPage;
 
   parsedFilters: Record<string, string[]> = {};
   dynamicDialogRef: DynamicDialogRef | undefined | null;
@@ -481,7 +446,7 @@ export class BookBrowserComponent implements AfterViewInit {
     if (this.showBooksLoadingPlaceholder()) {
       return INITIAL_LOADING_ROW_COUNT;
     }
-    return renderedBookCount;
+    return Math.max(renderedBookCount, this.appBooksApi.totalElements());
   }
 
   private minimumLoadingGridItemCount({viewportHeight, columns, itemHeight, gap}: VirtualGridMetrics): number {
@@ -689,18 +654,14 @@ export class BookBrowserComponent implements AfterViewInit {
   }
 
   selectAllBooks(): void {
-    const {entityId, entityType} = this.entityInfo();
-    const entityBooks = this.entityService.getBooksByEntity(
-      this.bookService.books(), entityId, entityType
-    );
-    const searched = filterBooksBySearchTerm(entityBooks, this.debouncedSearchTerm());
-    const filtered = filterBooksByFilters(searched, this.selectedFilter(), this.selectedFilterMode());
-    this.bookSelectionService.selectAll(filtered.map(b => b.id));
+    this.appBooksApi.fetchAllBookIds()
+      .pipe(take(1), takeUntilDestroyed(this.destroyRef))
+      .subscribe(ids => this.bookSelectionService.selectAll(ids));
   }
 
   loadNextBooksPage(): void {
-    // This function is temporarily a no-op while a long term plan is being considered.
-    return;
+    if (!this.appBooksApi.hasNextPage() || this.appBooksApi.isFetchingNextPage()) return;
+    this.appBooksApi.fetchNextPage();
   }
 
   deselectAllBooks(): void {
@@ -730,10 +691,6 @@ export class BookBrowserComponent implements AfterViewInit {
           });
       }
     });
-  }
-
-  onSeriesCollapseCheckboxChange(value: boolean): void {
-    this.seriesCollapseFilter.setCollapsed(value);
   }
 
   onMultiSortChange(sortCriteria: SortOption[]): void {
@@ -1038,7 +995,7 @@ export class BookBrowserComponent implements AfterViewInit {
       selectedBookIds.includes(book.id)
     );
 
-    if (sourceBooks.length === 0) {
+    if (sourceBooks.length !== selectedBookIds.length) {
       this.messageService.add({
         severity: 'warn',
         summary: this.t.translate('book.browser.toast.noEligibleBooksSummary'),
@@ -1076,7 +1033,7 @@ export class BookBrowserComponent implements AfterViewInit {
       selectedBookIds.includes(book.id)
     );
 
-    if (selectedBooks.length === 0) return false;
+    if (selectedBooks.length !== selectedBookIds.length) return false;
 
     const libraryIds = new Set(selectedBooks.map(b => b.libraryId));
     return libraryIds.size === 1;

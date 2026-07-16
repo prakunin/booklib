@@ -32,6 +32,8 @@ import {CoverComponent} from '../../../../shared/components/cover/cover.componen
 import {injectQuery} from '@tanstack/angular-query-experimental';
 import {AuthorService} from '../../../author-browser/service/author.service';
 import {LayoutService} from '../../../../shared/layout/layout.service';
+import {AppBooksApiService} from '../../service/app-books-api.service';
+import {lastValueFrom} from 'rxjs';
 
 interface ReadStatusSegment {
   status: ReadStatus;
@@ -118,6 +120,7 @@ export class SeriesPageComponent implements AfterViewChecked {
   protected urlHelper = inject(UrlHelperService);
   private authorService = inject(AuthorService);
   private layoutService = inject(LayoutService);
+  private appBooksApi = inject(AppBooksApiService);
 
   private readonly descriptionContentRef = viewChild<ElementRef<HTMLElement>>('descriptionContent');
   private readonly seriesGridElement = viewChild<ElementRef<HTMLElement>>('seriesGrid');
@@ -127,7 +130,6 @@ export class SeriesPageComponent implements AfterViewChecked {
   readonly isOverflowing = signal(false);
   protected appSettings = this.appSettingsService.appSettings;
   protected currentUser = this.userService.currentUser;
-  protected isBooksLoading = this.bookService.isBooksLoading;
 
   // Selection state
   readonly selectedBooks = signal(new Set<number>());
@@ -145,9 +147,17 @@ export class SeriesPageComponent implements AfterViewChecked {
     map((params) => params.get("seriesName") || ""),
   ), {initialValue: ""});
 
+  private readonly seriesBooksQuery = injectQuery(() => ({
+    queryKey: ['app-series-books', this.seriesParam()] as const,
+    queryFn: () => lastValueFrom(this.appBooksApi.getSeriesBooks(this.seriesParam())),
+    enabled: this.seriesParam().trim().length > 0,
+    staleTime: 5 * 60_000,
+  }));
+  protected readonly isBooksLoading = computed(() => this.seriesBooksQuery.isLoading());
+
   filteredBooks = computed(() => {
     const seriesName = this.seriesParam().trim().toLowerCase();
-    const inSeries = this.bookService.books().filter(
+    const inSeries = (this.seriesBooksQuery.data() ?? []).filter(
       (book) => book.metadata?.seriesName?.trim().toLowerCase() === seriesName
     );
 

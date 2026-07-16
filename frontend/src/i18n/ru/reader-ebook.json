@@ -58,7 +58,9 @@
         "maxHeight": "Макс. высота",
         "textOptions": "Настройки текста",
         "justifyText": "Выравнивание по ширине",
-        "hyphenate": "Переносы"
+        "hyphenate": "Переносы",
+        "useForAllBooks": "Для всех книг",
+        "useForAllBooksDescription": "Сохранить текущее оформление по умолчанию для всех электронных книг."
     },
     "footer": {
         "previousSection": "Предыдущий раздел",

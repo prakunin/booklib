@@ -35,23 +35,16 @@ export const SORT_OPTION_LABEL_KEYS: Readonly<Record<string, string>> = {
 
 const SORT_FIELDS: { field: string; defaultLabel: string }[] = [
   {field: 'title', defaultLabel: 'Title'},
-  {field: 'fileName', defaultLabel: 'File Name'},
-  {field: 'filePath', defaultLabel: 'File Path'},
-  {field: 'author', defaultLabel: 'Author'},
-  {field: 'authorSurnameVorname', defaultLabel: 'Author (Surname)'},
   {field: 'seriesName', defaultLabel: 'Series Name'},
   {field: 'seriesNumber', defaultLabel: 'Series Number'},
   {field: 'lastReadTime', defaultLabel: 'Last Read'},
   {field: 'personalRating', defaultLabel: 'Personal Rating'},
   {field: 'addedOn', defaultLabel: 'Added On'},
-  {field: 'fileSizeKb', defaultLabel: 'File Size'},
-  {field: 'locked', defaultLabel: 'Locked'},
   {field: 'publisher', defaultLabel: 'Publisher'},
   {field: 'publishedDate', defaultLabel: 'Published Date'},
   {field: 'readStatus', defaultLabel: 'Read Status'},
   {field: 'dateFinished', defaultLabel: 'Date Finished'},
   {field: 'readingProgress', defaultLabel: 'Reading Progress'},
-  {field: 'bookType', defaultLabel: 'Book Type'},
   {field: 'amazonRating', defaultLabel: 'Amazon Rating'},
   {field: 'amazonReviewCount', defaultLabel: 'Amazon #'},
   {field: 'goodreadsRating', defaultLabel: 'Goodreads Rating'},
@@ -61,7 +54,6 @@ const SORT_FIELDS: { field: string; defaultLabel: string }[] = [
   {field: 'ranobedbRating', defaultLabel: 'Ranobedb Rating'},
   {field: 'narrator', defaultLabel: 'Narrator'},
   {field: 'pageCount', defaultLabel: 'Pages'},
-  {field: 'random', defaultLabel: 'Random'},
 ];
 
 export class BookSorter {

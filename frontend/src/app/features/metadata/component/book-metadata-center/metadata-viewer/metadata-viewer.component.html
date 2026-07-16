@@ -685,6 +685,16 @@
                 }
                 @if (currentUser.permissions.canEditMetadata || currentUser.permissions.admin) {
                   <p-button
+                    [label]="t('findCoverBtn')"
+                    icon="pi pi-images"
+                    [outlined]="true"
+                    severity="info"
+                    (onClick)="openCoverSearch(book!)"
+                    [pTooltip]="t('findCoverTooltip')"
+                    tooltipPosition="top"
+                    class="mobile-icon-only">
+                  </p-button>
+                  <p-button
                     [label]="isAutoFetching ? t('fetchingBtn') : t('fetchMetadataBtn')"
                     [icon]="isAutoFetching ? 'pi pi-spin pi-spinner' : 'pi pi-bolt'"
                     [outlined]="true"

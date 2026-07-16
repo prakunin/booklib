@@ -453,12 +453,7 @@ export class MagicShelfComponent implements OnInit {
     }))
   );
   categoryOptions = computed(() => {
-    const categoriesSet = new Set<string>();
-    this.bookService.books().forEach(book => {
-      book.metadata?.categories?.forEach(category => categoriesSet.add(category));
-    });
-
-    return Array.from(categoriesSet).map(category => ({
+    return this.bookService.uniqueMetadata().categories.map(category => ({
       label: category,
       value: category
     })).sort((a, b) => a.label.localeCompare(b.label));

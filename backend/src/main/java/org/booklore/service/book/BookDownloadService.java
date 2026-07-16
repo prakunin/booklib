@@ -14,6 +14,7 @@ import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.kobo.CbxConversionService;
 import org.booklore.service.kobo.KepubConversionService;
 import org.booklore.service.kobo.KoboSpanMapService;
+import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.util.FileUtils;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -50,6 +51,7 @@ public class BookDownloadService {
     private final CbxConversionService cbxConversionService;
     private final KoboSpanMapService koboSpanMapService;
     private final AppSettingService appSettingService;
+    private final ArchivedBookContentService archivedBookContentService;
 
     public ResponseEntity<StreamingResponseBody> downloadBook(Long bookId) {
         try {
@@ -61,7 +63,9 @@ public class BookDownloadService {
                 throw ApiError.FAILED_TO_DOWNLOAD_FILE.createException(bookId);
             }
             Path libraryRoot = Path.of(bookEntity.getLibraryPath().getPath());
-            Path file = FileUtils.requirePathWithinBase(primaryFile.getFullFilePath(), libraryRoot);
+            Path file = primaryFile.isArchivedSource()
+                    ? archivedBookContentService.resolve(primaryFile)
+                    : FileUtils.requirePathWithinBase(primaryFile.getFullFilePath(), libraryRoot);
 
             if (!Files.exists(file)) {
                 throw ApiError.FAILED_TO_DOWNLOAD_FILE.createException(bookId);
@@ -90,7 +94,9 @@ public class BookDownloadService {
             }
 
             Path libraryRoot = Path.of(bookFileEntity.getBook().getLibraryPath().getPath());
-            Path file = FileUtils.requirePathWithinBase(bookFileEntity.getFullFilePath(), libraryRoot);
+            Path file = bookFileEntity.isArchivedSource()
+                    ? archivedBookContentService.resolve(bookFileEntity)
+                    : FileUtils.requirePathWithinBase(bookFileEntity.getFullFilePath(), libraryRoot);
 
             if (!Files.exists(file)) {
                 throw ApiError.FAILED_TO_DOWNLOAD_FILE.createException(fileId);
@@ -156,7 +162,7 @@ public class BookDownloadService {
         // If only one file and it's not folder-based, download it directly
         if (allFiles.size() == 1) {
             BookFileEntity singleFile = allFiles.getFirst();
-            Path filePath = FileUtils.requirePathWithinBase(singleFile.getFullFilePath(), libraryRoot);
+            Path filePath = resolveReadableFile(singleFile, libraryRoot);
 
             if (!Files.exists(filePath)) {
                 throw ApiError.FAILED_TO_DOWNLOAD_FILE.createException(bookId);
@@ -172,7 +178,7 @@ public class BookDownloadService {
         List<ZipSource> sources = allFiles.stream()
                 .sorted(Comparator.comparing(BookFileEntity::getFileName))
                 .map(f -> new ZipSource(
-                        FileUtils.requirePathWithinBase(f.getFullFilePath(), libraryRoot),
+                        resolveReadableFile(f, libraryRoot),
                         f.getFileName(),
                         f.isFolderBased()))
                 .toList();
@@ -229,6 +235,12 @@ public class BookDownloadService {
     }
 
     private record ZipSource(Path path, String name, boolean folderBased) {
+    }
+
+    private Path resolveReadableFile(BookFileEntity bookFile, Path libraryRoot) {
+        return bookFile.isArchivedSource()
+                ? archivedBookContentService.resolve(bookFile)
+                : FileUtils.requirePathWithinBase(bookFile.getFullFilePath(), libraryRoot);
     }
 
     public void downloadKoboBook(Long bookId, HttpServletResponse response) {

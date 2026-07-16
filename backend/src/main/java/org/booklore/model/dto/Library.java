@@ -3,6 +3,7 @@ package org.booklore.model.dto;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.IconType;
 import org.booklore.model.enums.LibraryOrganizationMode;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.enums.MetadataSource;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
@@ -25,10 +26,12 @@ public class Library {
     private IconType iconType;
     private String fileNamingPattern;
     private boolean watch;
+    private LibrarySourceType sourceType;
+    private String inpxPath;
+    private String inpxArchivePath;
     private List<LibraryPath> paths;
     private List<BookFileType> formatPriority;
     private List<BookFileType> allowedFormats;
     private LibraryOrganizationMode organizationMode;
     private MetadataSource metadataSource;
 }
-

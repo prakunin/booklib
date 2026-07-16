@@ -39,5 +39,6 @@ public class AppSettings {
     private Integer oidcSessionDurationHours;
     private String oidcGroupSyncMode;
     private boolean oidcForceOnlyMode;
+    private PasswordPolicy passwordPolicy;
     private String diskType;
 }

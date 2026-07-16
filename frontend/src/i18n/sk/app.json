@@ -1,8 +1,8 @@
 {
     "offline": "Ste offline",
-    "loading": "Načítavam Grimmory…",
+    "loading": "Načítavam BookLib…",
     "loadingDescription": "Počkajte, prosím, kým všetko pripravíme.",
-    "offlineLoadingDescription": "Grimmory potrebuje pripojenie k serveru, aby sa načítal.",
+    "offlineLoadingDescription": "BookLib potrebuje pripojenie k serveru, aby sa načítal.",
     "offlineDescription": "Skontrolujte svoju sieť a skúste to znova.",
     "connectionLost": "Vaše pripojenie bolo prerušené. Niektoré funkcie nemusia fungovať."
 }

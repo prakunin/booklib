@@ -21,6 +21,7 @@ import org.booklore.model.dto.response.PersonalRatingUpdateResponse;
 import org.booklore.model.enums.ResetProgressType;
 import org.booklore.service.book.BookFileAttachmentService;
 import org.booklore.service.book.BookService;
+import org.booklore.app.service.AppBookService;
 import org.booklore.service.book.BookUpdateService;
 import org.booklore.service.book.DuplicateDetectionService;
 import org.booklore.service.book.PhysicalBookService;
@@ -59,7 +60,10 @@ import java.io.IOException;
 @AllArgsConstructor
 public class BookController {
 
+    private static final long MAX_LEGACY_CATALOG_SIZE = 10_000;
+
     private final BookService bookService;
+    private final AppBookService appBookService;
     private final BookBrowseService bookBrowseService;
     private final BookUpdateService bookUpdateService;
     private final BookRecommendationService bookRecommendationService;
@@ -77,6 +81,12 @@ public class BookController {
             @RequestParam(required = false, defaultValue = "false") boolean withDescription,
             @Parameter(description = "Remove other metadata fields from the response")
             @RequestParam(required = false, defaultValue = "true") boolean stripForListView) {
+        long bookCount = appBookService.getCatalogBookCount();
+        if (bookCount > MAX_LEGACY_CATALOG_SIZE) {
+            throw ApiError.INVALID_INPUT.createException(
+                    "The flat books endpoint is disabled for catalogs over " + MAX_LEGACY_CATALOG_SIZE
+                            + " books; use /api/v1/app/books or /api/v1/books/page");
+        }
         return ResponseEntity.ok(bookService.getBookDTOs(withDescription, stripForListView));
     }
 

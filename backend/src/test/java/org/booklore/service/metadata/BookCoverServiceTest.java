@@ -6,6 +6,7 @@ import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.projection.BookCoverUpdateProjection;
 import org.booklore.service.NotificationService;
@@ -175,6 +176,70 @@ class BookCoverServiceTest {
             assertThatThrownBy(() -> service.regenerateCover(1L))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("locked");
+        }
+    }
+
+    @Nested
+    class LazyInpxCoverGeneration {
+
+        @Mock private BookFileProcessor processor;
+
+        @Test
+        void generatesOnlyMissingArchivedCover() {
+            BookFileEntity bookFile = BookFileEntity.builder()
+                    .isBookFormat(true)
+                    .bookType(BookFileType.FB2)
+                    .sourceArchive("catalog.zip")
+                    .sourceArchiveEntry("book.fb2")
+                    .build();
+            BookEntity book = BookEntity.builder()
+                    .id(42L)
+                    .library(LibraryEntity.builder().sourceType(LibrarySourceType.INPX).build())
+                    .metadata(BookMetadataEntity.builder().coverLocked(false).build())
+                    .bookFiles(new ArrayList<>(List.of(bookFile)))
+                    .build();
+            bookFile.setBook(book);
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.generateCover(book, bookFile)).thenReturn(true);
+
+            boolean generated = service.tryGenerateMissingInpxCover(42L);
+
+            assertThat(generated).isTrue();
+            assertThat(book.getBookCoverHash()).isNotBlank();
+            assertThat(book.getMetadata().getCoverUpdatedOn()).isNotNull();
+            verify(bookRepository).save(book);
+        }
+
+        @Test
+        void skipsFilesystemBook() {
+            BookEntity book = BookEntity.builder()
+                    .id(42L)
+                    .library(LibraryEntity.builder().sourceType(LibrarySourceType.FILESYSTEM).build())
+                    .metadata(BookMetadataEntity.builder().coverLocked(false).build())
+                    .build();
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+
+            boolean generated = service.tryGenerateMissingInpxCover(42L);
+
+            assertThat(generated).isFalse();
+            verifyNoInteractions(processorRegistry);
+            verify(bookRepository, never()).save(any());
+        }
+
+        @Test
+        void skipsBookThatAlreadyHasCover() {
+            BookEntity book = BookEntity.builder()
+                    .id(42L)
+                    .bookCoverHash("existing")
+                    .library(LibraryEntity.builder().sourceType(LibrarySourceType.INPX).build())
+                    .metadata(BookMetadataEntity.builder().coverLocked(false).build())
+                    .build();
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+
+            assertThat(service.tryGenerateMissingInpxCover(42L)).isFalse();
+
+            verifyNoInteractions(processorRegistry);
         }
     }
 

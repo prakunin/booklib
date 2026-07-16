@@ -8,7 +8,7 @@ import {ToggleSwitch} from 'primeng/toggleswitch';
 import {InputNumber} from 'primeng/inputnumber';
 import {MessageService} from 'primeng/api';
 import {AppSettingsService} from '../../../shared/service/app-settings.service';
-import {AppSettingKey, AppSettings, OidcProviderDetails, OidcTestResult} from '../../../shared/model/app-settings.model';
+import {AppSettingKey, AppSettings, OidcProviderDetails, OidcTestResult, PasswordPolicy} from '../../../shared/model/app-settings.model';
 import {MultiSelect} from 'primeng/multiselect';
 import {LibraryService} from '../../../features/book/service/library.service';
 import {ExternalDocLinkComponent} from '../../../shared/components/external-doc-link/external-doc-link.component';
@@ -20,6 +20,7 @@ import {TableModule} from 'primeng/table';
 import {Dialog} from 'primeng/dialog';
 import {TagComponent} from '../../../shared/components/tag/tag.component';
 import {Chip} from 'primeng/chip';
+import {DEFAULT_PASSWORD_POLICY} from '../../../shared/validators/password-policy.validator';
 
 @Component({
   selector: 'app-authentication-settings',
@@ -71,7 +72,7 @@ export class AuthenticationSettingsComponent {
     {label: 'KOReader Sync', value: 'permissionSyncKoreader', selected: false, translationKey: 'perms.koreaderSync'},
     {label: 'Kobo Sync', value: 'permissionSyncKobo', selected: false, translationKey: 'perms.koboSync'},
     {label: 'OPDS Feed Access', value: 'permissionAccessOpds', selected: false, translationKey: 'perms.opdsFeedAccess'},
-    {label: 'Bulk Reset Grimmory Read Progress', value: 'permissionBulkResetBookloreReadProgress', selected: false, translationKey: 'perms.bulkResetGrimmory'},
+    {label: 'Bulk Reset BookLib Read Progress', value: 'permissionBulkResetBookloreReadProgress', selected: false, translationKey: 'perms.bulkResetGrimmory'},
     {label: 'Bulk Reset KoReader Read Progress', value: 'permissionBulkResetKoReaderReadProgress', selected: false, translationKey: 'perms.bulkResetKoreader'},
     {label: 'Bulk Reset Book Read Status', value: 'permissionBulkResetBookReadStatus', selected: false, translationKey: 'perms.bulkResetReadStatus'},
   ];
@@ -81,6 +82,7 @@ export class AuthenticationSettingsComponent {
   allowLocalAccountLinking = true;
   selectedPermissions: string[] = [];
   oidcEnabled = false;
+  passwordPolicy: PasswordPolicy = {...DEFAULT_PASSWORD_POLICY};
 
   editingLibraryIds: number[] = [];
   sessionDurationHours: number | null = null;
@@ -143,6 +145,7 @@ export class AuthenticationSettingsComponent {
 
   loadSettings(settings: AppSettings): void {
     this.oidcEnabled = settings.oidcEnabled;
+    this.passwordPolicy = {...(settings.passwordPolicy ?? DEFAULT_PASSWORD_POLICY)};
 
     const details = settings.oidcAutoProvisionDetails;
 
@@ -200,6 +203,24 @@ export class AuthenticationSettingsComponent {
         severity: 'error',
         summary: this.t.translate('common.error'),
         detail: this.t.translate('settingsAuth.toast.oidcError')
+      })
+    });
+  }
+
+  savePasswordPolicy(): void {
+    this.appSettingsService.saveSettings([{
+      key: AppSettingKey.PASSWORD_POLICY,
+      newValue: this.passwordPolicy
+    }]).subscribe({
+      next: () => this.messageService.add({
+        severity: 'success',
+        summary: this.t.translate('settingsAuth.toast.saved'),
+        detail: this.t.translate('settingsAuth.passwordPolicy.saved')
+      }),
+      error: (error: HttpErrorResponse) => this.messageService.add({
+        severity: 'error',
+        summary: this.t.translate('common.error'),
+        detail: error?.error?.message || this.t.translate('settingsAuth.passwordPolicy.error')
       })
     });
   }

@@ -8,6 +8,9 @@ import {MessageService} from 'primeng/api';
 import {UserService} from '../../../features/settings/user-management/user.service';
 import {AuthService} from '../../service/auth.service';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {AppSettingsService} from '../../service/app-settings.service';
+import {PasswordPolicyRequirementsComponent} from '../password-policy-requirements/password-policy-requirements.component';
+import {DEFAULT_PASSWORD_POLICY, passwordPolicyViolations} from '../../validators/password-policy.validator';
 
 @Component({
   selector: 'app-change-password',
@@ -18,7 +21,8 @@ import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
     Message,
     Password,
     ReactiveFormsModule,
-    TranslocoDirective
+    TranslocoDirective,
+    PasswordPolicyRequirementsComponent
   ],
   templateUrl: './change-password.component.html',
   styleUrl: './change-password.component.scss'
@@ -34,6 +38,11 @@ export class ChangePasswordComponent {
   protected authService = inject(AuthService);
   protected messageService = inject(MessageService);
   private readonly t = inject(TranslocoService);
+  private readonly appSettingsService = inject(AppSettingsService);
+
+  get passwordPolicy() {
+    return this.appSettingsService.publicAppSettings()?.passwordPolicy ?? DEFAULT_PASSWORD_POLICY;
+  }
 
   get passwordsMatch(): boolean {
     return this.newPassword === this.confirmNewPassword;
@@ -50,6 +59,11 @@ export class ChangePasswordComponent {
 
     if (!this.passwordsMatch) {
       this.errorMessage = this.t.translate('shared.changePassword.validation.passwordsDoNotMatch');
+      return;
+    }
+
+    if (passwordPolicyViolations(this.newPassword, this.passwordPolicy).length > 0) {
+      this.errorMessage = this.t.translate('shared.passwordPolicy.invalid');
       return;
     }
 

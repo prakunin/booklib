@@ -20,6 +20,7 @@
         "currentPasswordRequired": "Текущий пароль обязателен.",
         "newPasswordRequired": "Новый пароль обязателен.",
         "passwordMinLength": "Пароль должен содержать минимум 6 символов.",
+        "passwordInvalid": "Пароль не соответствует текущим требованиям.",
         "confirmPasswordRequired": "Пожалуйста, подтвердите новый пароль.",
         "passwordMismatch": "Пароли не совпадают."
     },

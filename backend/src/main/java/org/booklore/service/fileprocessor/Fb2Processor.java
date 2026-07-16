@@ -10,12 +10,12 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.book.BookCreatorService;
+import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.service.metadata.MetadataMatchService;
 import org.booklore.service.metadata.extractor.Fb2MetadataExtractor;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.util.BookCoverUtils;
 import org.booklore.util.FileService;
-import org.booklore.util.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +32,7 @@ import static org.booklore.util.FileService.truncate;
 public class Fb2Processor extends AbstractFileProcessor implements BookFileProcessor {
 
     private final Fb2MetadataExtractor fb2MetadataExtractor;
+    private final ArchivedBookContentService archivedBookContentService;
 
     public Fb2Processor(BookRepository bookRepository,
                         BookAdditionalFileRepository bookAdditionalFileRepository,
@@ -40,9 +41,11 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
                         FileService fileService,
                         MetadataMatchService metadataMatchService,
                         SidecarMetadataWriter sidecarMetadataWriter,
-                        Fb2MetadataExtractor fb2MetadataExtractor) {
+                        Fb2MetadataExtractor fb2MetadataExtractor,
+                        ArchivedBookContentService archivedBookContentService) {
         super(bookRepository, bookAdditionalFileRepository, bookCreatorService, bookMapper, fileService, metadataMatchService, sidecarMetadataWriter);
         this.fb2MetadataExtractor = fb2MetadataExtractor;
+        this.archivedBookContentService = archivedBookContentService;
     }
 
     @Override
@@ -71,7 +74,7 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
     @Override
     public boolean generateCover(BookEntity bookEntity, BookFileEntity bookFile) {
         try {
-            File fb2File = FileUtils.getBookFullPath(bookEntity, bookFile).toFile();
+            File fb2File = archivedBookContentService.resolve(bookFile).toFile();
             byte[] coverData = fb2MetadataExtractor.extractCover(fb2File);
 
             if (coverData == null || coverData.length == 0) {

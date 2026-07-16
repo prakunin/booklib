@@ -4,6 +4,7 @@ import org.booklore.model.dto.LibraryPath;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.IconType;
 import org.booklore.model.enums.LibraryOrganizationMode;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.enums.MetadataSource;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
@@ -31,6 +32,9 @@ public class CreateLibraryRequest {
     private List<LibraryPath> paths;
 
     private boolean watch;
+    private LibrarySourceType sourceType;
+    private String inpxPath;
+    private String inpxArchivePath;
     private List<BookFileType> formatPriority;
     private List<BookFileType> allowedFormats;
     private MetadataSource metadataSource;

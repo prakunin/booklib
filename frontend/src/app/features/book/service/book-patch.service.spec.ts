@@ -100,7 +100,11 @@ describe('BookPatchService', () => {
     ]);
 
     expect(queryClient.setQueryData).toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['app-books']});
+    // The list is never blanket-invalidated; a read-status change reconciles via a predicate.
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({queryKey: ['app-books']});
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({queryKey: ['app-books'], predicate: expect.any(Function)})
+    );
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['app-filter-options']});
   });
 
@@ -134,7 +138,11 @@ describe('BookPatchService', () => {
     ]);
 
     expect(queryClient.setQueryData).toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['app-books']});
+    // The list is never blanket-invalidated; a read-status change reconciles via a predicate.
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({queryKey: ['app-books']});
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({queryKey: ['app-books'], predicate: expect.any(Function)})
+    );
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['app-filter-options']});
   });
 

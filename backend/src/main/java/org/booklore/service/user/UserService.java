@@ -52,6 +52,7 @@ public class UserService {
     private final ObjectMapper objectMapper;
     private final BookLoreUserTransformer bookLoreUserTransformer;
     private final AuditService auditService;
+    private final PasswordPolicyService passwordPolicyService;
 
     @Transactional(readOnly = true)
     public List<BookLoreUser> getBookLoreUsers() {
@@ -179,9 +180,7 @@ public class UserService {
             throw ApiError.PASSWORD_SAME_AS_CURRENT.createException();
         }
 
-        if (!meetsMinimumPasswordRequirements(changePasswordRequest.getNewPassword())) {
-            throw ApiError.PASSWORD_TOO_SHORT.createException();
-        }
+        passwordPolicyService.validate(changePasswordRequest.getNewPassword());
 
         bookLoreUserEntity.setDefaultPassword(false);
         bookLoreUserEntity.setPasswordHash(passwordEncoder.encode(changePasswordRequest.getNewPassword()));
@@ -192,9 +191,7 @@ public class UserService {
     @Transactional
     public void changeUserPassword(ChangeUserPasswordRequest request) {
         BookLoreUserEntity userEntity = userRepository.findByIdWithPermissions(request.getUserId()).orElseThrow(() -> ApiError.USER_NOT_FOUND.createException(request.getUserId()));
-        if (!meetsMinimumPasswordRequirements(request.getNewPassword())) {
-            throw ApiError.PASSWORD_TOO_SHORT.createException();
-        }
+        passwordPolicyService.validate(request.getNewPassword());
         userEntity.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(userEntity);
         auditService.log(AuditAction.PASSWORD_CHANGED, "User", request.getUserId(), "Password changed for user: " + userEntity.getUsername());
@@ -242,10 +239,6 @@ public class UserService {
         }
 
         userRepository.save(user);
-    }
-
-    private boolean meetsMinimumPasswordRequirements(String password) {
-        return password != null && password.length() >= 8;
     }
 
     private void validateLocale(String locale) {

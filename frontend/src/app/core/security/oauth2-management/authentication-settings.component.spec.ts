@@ -190,6 +190,28 @@ describe('AuthenticationSettingsComponent', () => {
     expect(messageService.add).not.toHaveBeenCalled();
   });
 
+  it('saves a relaxed password policy for a trusted home installation', () => {
+    appSettingsService.saveSettings.mockReturnValueOnce(of(void 0));
+    component.passwordPolicy = {
+      minimumLength: 1,
+      requireUppercase: false,
+      requireLowercase: false,
+      requireDigit: false,
+      requireSpecialCharacter: false,
+    };
+
+    component.savePasswordPolicy();
+
+    expect(appSettingsService.saveSettings).toHaveBeenCalledWith([{
+      key: AppSettingKey.PASSWORD_POLICY,
+      newValue: component.passwordPolicy,
+    }]);
+    expect(messageService.add).toHaveBeenCalledWith(expect.objectContaining({
+      severity: 'success',
+      detail: 'settingsAuth.passwordPolicy.saved',
+    }));
+  });
+
   it('opens a new group mapping dialog with blank state', () => {
     component.groupMappingDraft.set({
       oidcGroupClaim: 'existing',

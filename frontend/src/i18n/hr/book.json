@@ -91,7 +91,7 @@
             "moreActions": "Više radnji",
             "organizeFile": "Organiziraj datoteku",
             "readStatus": "Status čitanja",
-            "resetGrimmoryProgress": "Vrati Grimmory napredak",
+            "resetGrimmoryProgress": "Vrati BookLib napredak",
             "resetKOReaderProgress": "Vrati KOReader napredak",
             "book": "Knjiga",
             "loading": "Učitavanje..."
@@ -115,10 +115,10 @@
             "readStatusFailedSummary": "Ažuriranje nije uspjelo",
             "readStatusFailedDetail": "Ažuriranje statusa čitanja nije uspjelo.",
             "progressResetSummary": "Napredak vraćen",
-            "progressResetGrimmoryDetail": "Grimmory napredak čitanja je vraćen.",
+            "progressResetGrimmoryDetail": "BookLib napredak čitanja je vraćen.",
             "progressResetKOReaderDetail": "KOReader napredak čitanja je vraćen.",
             "progressResetFailedSummary": "Neuspjelo",
-            "progressResetGrimmoryFailedDetail": "Vraćanje Grimmory napretka nije uspjelo.",
+            "progressResetGrimmoryFailedDetail": "Vraćanje BookLib napretka nije uspjelo.",
             "progressResetKOReaderFailedDetail": "Vraćanje KOReader napretka nije uspjelo.",
             "coverRegenSuccessSummary": "Uspjeh",
             "coverRegenSuccessDetail": "Regeneracija naslovnice pokrenuta",
@@ -200,7 +200,7 @@
             "setContentRating": "Postavi ocjenu sadržaja",
             "clearContentRating": "Obriši ocjenu sadržaja",
             "removeFromAllShelves": "Ukloni sa svih polica",
-            "resetGrimmoryProgress": "Vrati Grimmory napredak",
+            "resetGrimmoryProgress": "Vrati BookLib napredak",
             "resetKOReaderProgress": "Vrati KOReader napredak"
         },
         "confirm": {
@@ -216,7 +216,7 @@
             "clearContentRatingHeader": "Potvrdi brisanje ocjene sadržaja",
             "unshelveMessage": "Jeste li sigurni da želite ukloniti {{ count }} knjigu/e sa SVIH polica?",
             "unshelveHeader": "Potvrdi uklanjanje s polica",
-            "resetGrimmoryMessage": "Jeste li sigurni da želite vratiti Grimmory napredak čitanja za {{ count }} knjigu/e?",
+            "resetGrimmoryMessage": "Jeste li sigurni da želite vratiti BookLib napredak čitanja za {{ count }} knjigu/e?",
             "resetKOReaderMessage": "Jeste li sigurni da želite vratiti KOReader napredak čitanja za {{ count }} knjigu/e?",
             "resetHeader": "Potvrdi vraćanje"
         },
@@ -241,7 +241,7 @@
             "unshelveSuccessDetail": "Knjige uklonjene sa svih polica",
             "unshelveFailedDetail": "Ažuriranje polica knjiga nije uspjelo",
             "progressResetSummary": "Napredak vraćen",
-            "grimmoryProgressResetDetail": "Grimmory napredak čitanja je vraćen.",
+            "grimmoryProgressResetDetail": "BookLib napredak čitanja je vraćen.",
             "koreaderProgressResetDetail": "KOReader napredak čitanja je vraćen.",
             "failedSummary": "Neuspjelo",
             "progressResetFailedDetail": "Vraćanje napretka nije uspjelo."
@@ -253,7 +253,7 @@
             "settingContentRating": "Postavljanje ocjene sadržaja za {{ count }} knjigu/e...",
             "clearingContentRating": "Brisanje ocjene sadržaja za {{ count }} knjigu/e...",
             "removingFromShelves": "Uklanjanje {{ count }} knjige/a s polica...",
-            "resettingGrimmoryProgress": "Vraćanje Grimmory napretka za {{ count }} knjigu/e...",
+            "resettingGrimmoryProgress": "Vraćanje BookLib napretka za {{ count }} knjigu/e...",
             "resettingKOReaderProgress": "Vraćanje KOReader napretka za {{ count }} knjigu/e..."
         }
     },

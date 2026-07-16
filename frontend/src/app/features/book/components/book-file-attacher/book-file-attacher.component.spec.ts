@@ -3,11 +3,12 @@ import {TestBed} from '@angular/core/testing';
 import {TranslocoService} from '@jsverse/transloco';
 import {MessageService} from 'primeng/api';
 import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
-import {describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {Observable, of, throwError} from 'rxjs';
 import {Book} from '../../model/book.model';
 import {BookFileService} from '../../service/book-file.service';
 import {BookService} from '../../service/book.service';
+import {AppBooksApiService} from '../../service/app-books-api.service';
 import {BookFileAttacherComponent} from './book-file-attacher.component';
 import {AppSettingsService} from '../../../../shared/service/app-settings.service';
 
@@ -51,6 +52,13 @@ function setup(options: {
     data: options.dialogData ?? {},
   };
   const booksSignal = signal<Book[]>(options.books ?? []);
+  const getPage = vi.fn((filters: {libraryId?: number}, _sort: unknown, size: number, search: string) => {
+    const query = search.toLowerCase();
+    return of(booksSignal().filter(book =>
+      book.libraryId === filters.libraryId
+      && (!query || `${book.metadata?.title} ${book.metadata?.authors?.join(' ')}`.toLowerCase().includes(query))
+    ).slice(0, size));
+  });
   const bookFileService = {
     attachBookFiles: vi.fn().mockReturnValue(
       options.attachResult ?? of({updatedBook: buildBook({id: 999}), deletedSourceBookIds: []})
@@ -72,6 +80,7 @@ function setup(options: {
       {provide: DynamicDialogRef, useValue: dialogRef},
       {provide: DynamicDialogConfig, useValue: config},
       {provide: BookService, useValue: {books: booksSignal}},
+      {provide: AppBooksApiService, useValue: {getPage}},
       {provide: BookFileService, useValue: bookFileService},
       {provide: AppSettingsService, useValue: appSettingsService},
       {provide: TranslocoService, useValue: translocoService},
@@ -88,11 +97,23 @@ function setup(options: {
     appSettingsService,
     translocoService,
     booksSignal,
+    getPage,
   };
 }
 
 describe('BookFileAttacherComponent', () => {
-  it('bootstraps a single source book, filters candidates by library/source ids, and applies the moveFiles setting', () => {
+  beforeEach(() => vi.useFakeTimers());
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
+  async function flushSearch(): Promise<void> {
+    await vi.advanceTimersByTimeAsync(150);
+  }
+
+  it('bootstraps a single source book, filters candidates by library/source ids, and applies the moveFiles setting', async () => {
     const sourceBook = buildBook({id: 1, libraryId: 7, metadata: {bookId: 1, title: 'Source', authors: ['Origin']}});
     const siblingCandidate = buildBook({id: 2, libraryId: 7, metadata: {bookId: 2, title: 'Sibling', authors: ['Match']}});
     const foreignLibraryBook = buildBook({id: 3, libraryId: 99, metadata: {bookId: 3, title: 'Foreign', authors: ['Other']}});
@@ -107,6 +128,7 @@ describe('BookFileAttacherComponent', () => {
     });
 
     component.ngOnInit();
+    await flushSearch();
 
     expect(component.sourceBooks).toEqual([sourceBook]);
     expect(component.isBulkMode).toBe(false);
@@ -114,7 +136,7 @@ describe('BookFileAttacherComponent', () => {
     expect(component.filteredBooks).toEqual([siblingCandidate]);
   });
 
-  it('bootstraps bulk mode from sourceBooks and defaults moveFiles to false when settings are unavailable', () => {
+  it('bootstraps bulk mode from sourceBooks and defaults moveFiles to false when settings are unavailable', async () => {
     const sourceA = buildBook({id: 10, libraryId: 4});
     const sourceB = buildBook({id: 11, libraryId: 4});
     const target = buildBook({id: 12, libraryId: 4});
@@ -125,6 +147,7 @@ describe('BookFileAttacherComponent', () => {
     });
 
     component.ngOnInit();
+    await flushSearch();
 
     expect(component.sourceBooks).toEqual([sourceA, sourceB]);
     expect(component.isBulkMode).toBe(true);
@@ -145,7 +168,7 @@ describe('BookFileAttacherComponent', () => {
     expect(appSettingsService.appSettings).not.toHaveBeenCalled();
   });
 
-  it('filters candidate books by title and author and resets blank queries to the first twenty matches', () => {
+  it('searches candidates by title and author and resets blank queries to the first twenty matches', async () => {
     const sourceBook = buildBook({id: 1, libraryId: 5, metadata: {bookId: 1, title: 'Source', authors: ['Keeper']}});
     const matchingByTitle = buildBook({id: 2, libraryId: 5, metadata: {bookId: 2, title: 'Dune Messiah', authors: ['Frank Herbert']}});
     const matchingByAuthor = buildBook({id: 3, libraryId: 5, metadata: {bookId: 3, title: 'Fahrenheit 451', authors: ['Ray Bradbury']}});
@@ -162,16 +185,20 @@ describe('BookFileAttacherComponent', () => {
     });
 
     component.ngOnInit();
+    await flushSearch();
 
     expect(component.filteredBooks).toHaveLength(20);
 
     component.filterBooks({query: ' dune '});
+    await flushSearch();
     expect(component.filteredBooks).toEqual([matchingByTitle]);
 
     component.filterBooks({query: 'bradbury'});
+    await flushSearch();
     expect(component.filteredBooks).toEqual([matchingByAuthor]);
 
     component.filterBooks({query: '   '});
+    await flushSearch();
     expect(component.filteredBooks).toHaveLength(20);
     expect(component.filteredBooks[0]).toEqual(matchingByTitle);
   });

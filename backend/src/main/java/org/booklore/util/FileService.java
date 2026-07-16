@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -115,6 +116,34 @@ public class FileService {
 
     public String getAuthorThumbnailFile(long authorId) {
         return Paths.get(appProperties.getPathConfig(), AUTHOR_IMAGES_DIR, String.valueOf(authorId), AUTHOR_THUMBNAIL_FILENAME).toString();
+    }
+
+    // Author thumbnails live in one subdirectory per author id under AUTHOR_IMAGES_DIR, so a single
+    // directory listing yields every author that has a photo — far cheaper than a Files.exists per
+    // author on the hot listing path. Returns the ids whose thumbnail file is actually present.
+    public Set<Long> listAuthorIdsWithThumbnail() {
+        Path root = Paths.get(appProperties.getPathConfig(), AUTHOR_IMAGES_DIR);
+        if (!Files.isDirectory(root)) {
+            return Set.of();
+        }
+        Set<Long> ids = new HashSet<>();
+        try (Stream<Path> dirs = Files.list(root)) {
+            dirs.filter(Files::isDirectory).forEach(dir -> {
+                long authorId;
+                try {
+                    authorId = Long.parseLong(dir.getFileName().toString());
+                } catch (NumberFormatException e) {
+                    return;
+                }
+                if (Files.exists(dir.resolve(AUTHOR_THUMBNAIL_FILENAME))) {
+                    ids.add(authorId);
+                }
+            });
+        } catch (IOException e) {
+            log.warn("Failed to list author thumbnail directory {}: {}", root, e.getMessage());
+            return Set.of();
+        }
+        return Set.copyOf(ids);
     }
 
     public String getBackgroundsFolder(Long userId) {

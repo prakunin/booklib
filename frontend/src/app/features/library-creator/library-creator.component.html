@@ -74,24 +74,49 @@
             }
           </div>
         </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="library-source-type">{{ t('sourceType') }}</label>
+            <p-select
+              inputId="library-source-type"
+              [ngModel]="sourceType()"
+              (ngModelChange)="onSourceTypeChange($event)"
+              [options]="sourceTypeOptions()"
+              optionLabel="label"
+              optionValue="value"
+              [disabled]="mode() === 'edit'"
+              appendTo="body"
+              class="metadata-source-select"
+            />
+            <small>{{ sourceType() === 'INPX' ? t('sourceTypeInpxHint') : t('sourceTypeFilesystemHint') }}</small>
+          </div>
+        </div>
       </section>
 
       <section class="form-section">
         <div class="section-header">
           <i class="pi pi-folder-open"></i>
-          <span>{{ t('bookFolders') }}</span>
+          <span>{{ sourceType() === 'INPX' ? t('archiveFolder') : t('bookFolders') }}</span>
           <span class="section-badge">{{ folders().length }}</span>
         </div>
 
         <div class="folders-zone">
-          <div class="folder-structure-hint">
-            <i class="pi pi-exclamation-triangle"></i>
-            <span [innerHTML]="t('folderStructureHint')"></span>
-          </div>
+          @if (sourceType() === 'INPX') {
+            <div class="folder-structure-hint">
+              <i class="pi pi-info-circle"></i>
+              <span>{{ t('inpxArchiveHint') }}</span>
+            </div>
+          } @else {
+            <div class="folder-structure-hint">
+              <i class="pi pi-exclamation-triangle"></i>
+              <span [innerHTML]="t('folderStructureHint')"></span>
+            </div>
+          }
 
           <button class="add-folder-trigger" (click)="openDirectoryPicker()" type="button">
             <i class="pi pi-plus-circle"></i>
-            <span>{{ t('addFolder') }}</span>
+            <span>{{ sourceType() === 'INPX' ? t('selectArchiveFolder') : t('addFolder') }}</span>
           </button>
 
           @if (folders().length > 0) {
@@ -112,6 +137,55 @@
             </div>
           }
         </div>
+
+        @if (sourceType() === 'INPX') {
+          <div class="form-field">
+            <label for="inpx-index-path">{{ t('inpxPath') }}</label>
+
+            @if (isDetectingInpx()) {
+              <small>{{ t('inpxDetecting') }}</small>
+            } @else if (showInpxIndexSelect()) {
+              <p-select
+                inputId="inpx-index-path"
+                [ngModel]="inpxPath()"
+                (ngModelChange)="inpxPath.set($event)"
+                [options]="inpxIndexSelectOptions()"
+                optionLabel="label"
+                optionValue="value"
+                [placeholder]="t('inpxSelectPlaceholder')"
+                appendTo="body"
+                class="metadata-source-select"
+              />
+              <small>{{ t('inpxFoundCount', {count: inpxIndexOptions().length}) }}</small>
+              <button type="button" class="link-button" (click)="useManualInpxEntry()">{{ t('inpxEnterManually') }}</button>
+            } @else {
+              <input
+                id="inpx-index-path"
+                pInputText
+                [ngModel]="inpxPath()"
+                (ngModelChange)="inpxPath.set($event)"
+                [placeholder]="t('inpxPathPlaceholder')"
+                class="input-full"
+              />
+              @if (inpxDetectFailed()) {
+                <small>{{ t('inpxDetectFailed') }}</small>
+              } @else if (inpxIndexOptions().length === 1) {
+                <small>{{ t('inpxAutoDetected', {name: inpxIndexOptions()[0].fileName, size: formatIndexSize(inpxIndexOptions()[0].sizeBytes)}) }}</small>
+              } @else if (inpxDetectionRan() && inpxIndexOptions().length === 0) {
+                <small>{{ t('inpxNoneFound') }}</small>
+              } @else {
+                <small>{{ t('inpxPathHint') }}</small>
+              }
+              @if (inpxIndexOptions().length > 1) {
+                <button type="button" class="link-button" (click)="useDetectedInpxIndexes()">{{ t('inpxUseDetected') }}</button>
+              }
+            }
+
+            @if (!inpxPath().trim()) {
+              <small>{{ t('inpxOptionalHint') }}</small>
+            }
+          </div>
+        }
       </section>
 
       <section class="form-section">
@@ -121,6 +195,7 @@
         </div>
 
         <div class="options-list">
+          @if (sourceType() === 'FILESYSTEM') {
           <div class="option-row">
             <div class="option-label">
               <span>{{ t('watchFolders') }}</span>
@@ -135,7 +210,9 @@
               (ngModelChange)="watch.set($event)"
             />
           </div>
+          }
 
+          @if (sourceType() === 'FILESYSTEM') {
           <div class="option-row">
             <div class="option-label">
               <span>{{ t('metadataSource') }}</span>
@@ -156,7 +233,9 @@
               appendTo="body"
             />
           </div>
+          }
 
+          @if (sourceType() === 'FILESYSTEM') {
           <div class="option-row">
             <div class="option-label">
               <span>{{ t('organizationMode') }}</span>
@@ -177,7 +256,9 @@
               appendTo="body"
             />
           </div>
+          }
 
+          @if (sourceType() === 'FILESYSTEM') {
           <div class="option-divider"></div>
 
           <div class="option-row option-row-stacked">
@@ -255,6 +336,12 @@
                 <span>{{ t('deselectedFormatsWarning') }}</span>
               </div>
             }
+          }
+          } @else {
+            <div class="folder-structure-hint">
+              <i class="pi pi-database"></i>
+              <span>{{ t('inpxScanBehavior') }}</span>
+            </div>
           }
         </div>
       </section>

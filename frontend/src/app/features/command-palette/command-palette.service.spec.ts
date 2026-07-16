@@ -1,14 +1,15 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MessageService } from 'primeng/api';
 import { getTranslocoModule } from '../../core/testing/transloco-testing';
 import { BookDialogHelperService } from '../book/components/book-browser/book-dialog-helper.service';
 import { Book } from '../book/model/book.model';
-import { BookService } from '../book/service/book.service';
+import type { AppBookSummary } from '../book/model/app-book.model';
+import { AppBooksApiService } from '../book/service/app-books-api.service';
 import { LibraryService } from '../book/service/library.service';
 import { ShelfService } from '../book/service/shelf.service';
 import { MagicShelfService } from '../magic-shelf/service/magic-shelf.service';
@@ -41,6 +42,7 @@ describe('CommandPaletteService', () => {
     getThumbnailUrl: ReturnType<typeof vi.fn>;
     getAudiobookThumbnailUrl: ReturnType<typeof vi.fn>;
   };
+  let searchBooks: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -56,12 +58,28 @@ describe('CommandPaletteService', () => {
       getThumbnailUrl: vi.fn(() => null),
       getAudiobookThumbnailUrl: vi.fn(() => null),
     };
+    searchBooks = vi.fn((query: string) => {
+      const normalized = query.toLowerCase();
+      const content = books()
+        .filter(book => `${book.metadata?.title} ${book.metadata?.authors?.join(' ')}`.toLowerCase().includes(normalized))
+        .map(book => ({
+          id: book.id,
+          title: book.metadata?.title ?? '',
+          authors: book.metadata?.authors ?? [],
+          libraryId: book.libraryId,
+          primaryFileId: book.primaryFile?.id ?? null,
+          primaryFileType: book.primaryFile?.bookType ?? null,
+          primaryFileName: book.primaryFile?.fileName ?? null,
+          audiobookCoverUpdatedOn: book.metadata?.audiobookCoverUpdatedOn ?? null,
+        } as AppBookSummary));
+      return of({content, page: 0, size: 50, totalElements: content.length, totalPages: 1, hasNext: false, hasPrevious: false});
+    });
 
     TestBed.configureTestingModule({
       imports: [getTranslocoModule()],
       providers: [
         { provide: Router, useValue: { navigate: vi.fn(() => Promise.resolve(true)) } },
-        { provide: BookService, useValue: { books: books.asReadonly() } },
+        { provide: AppBooksApiService, useValue: { searchBooks } },
         { provide: ShelfService, useValue: { shelves: signal([]) } },
         { provide: MagicShelfService, useValue: { shelves: signal([]) } },
         { provide: LibraryService, useValue: { libraries: signal([]) } },
@@ -97,7 +115,7 @@ describe('CommandPaletteService', () => {
     vi.restoreAllMocks();
   });
 
-  it('queries matching book groups locally after the debounce window', async () => {
+  it('queries matching book groups through the specialized search API after the debounce window', async () => {
     service.query.set('tolkien');
     TestBed.flushEffects();
     await vi.advanceTimersByTimeAsync(200);
@@ -110,6 +128,7 @@ describe('CommandPaletteService', () => {
       'The Hobbit',
       'The Fellowship of the Ring',
     ]);
+    expect(searchBooks).toHaveBeenCalledWith('tolkien', 50);
   });
 
   it('does not show book groups for one-character searches', async () => {
@@ -119,6 +138,45 @@ describe('CommandPaletteService', () => {
     TestBed.flushEffects();
 
     expect(service.groups().find((group) => group.kind === 'book')).toBeUndefined();
+    expect(searchBooks).not.toHaveBeenCalled();
+  });
+
+  it('keeps the searching state active until the book request completes', async () => {
+    const response = new Subject<{
+      content: AppBookSummary[];
+      page: number;
+      size: number;
+      totalElements: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrevious: boolean;
+    }>();
+    searchBooks.mockReturnValue(response.asObservable());
+
+    service.query.set('dune');
+    TestBed.flushEffects();
+
+    expect(service.isSearching()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(200);
+    TestBed.flushEffects();
+
+    expect(searchBooks).toHaveBeenCalledWith('dune', 50);
+    expect(service.isSearching()).toBe(true);
+
+    response.next({
+      content: [],
+      page: 0,
+      size: 50,
+      totalElements: 0,
+      totalPages: 0,
+      hasNext: false,
+      hasPrevious: false,
+    });
+    response.complete();
+    TestBed.flushEffects();
+
+    expect(service.isSearching()).toBe(false);
   });
 
   it('returns no groups when the query is empty', () => {

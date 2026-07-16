@@ -8,6 +8,7 @@ example-chart/charts/
 
 ## MacOS ###
 .DS_Store
+._*
 
 ### STS ###
 .apt_generated
@@ -56,3 +57,12 @@ backend/src/main/resources/application-local.yaml
 /pnpm-debug.log
 /.pnpm-store/
 .worktrees/
+
+### Local AI tooling and memories ###
+/.serena/
+/docs/superpowers/
+
+### Temporary editor and backup files ###
+*.bak
+*.bak-*
+*~

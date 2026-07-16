@@ -57,9 +57,9 @@ describe('BookSorter', () => {
     const sorter = new BookSorter(onSortChange);
 
     sorter.addSortCriterion('title');
-    sorter.addSortCriterion('author');
+    sorter.addSortCriterion('publisher');
     sorter.addSortCriterion('title');
-    expect(sorter.selectedSortCriteria.map((criterion) => criterion.field)).toEqual(['title', 'author']);
+    expect(sorter.selectedSortCriteria.map((criterion) => criterion.field)).toEqual(['title', 'publisher']);
 
     sorter.toggleCriterionDirection(1);
     expect(sorter.selectedSortCriteria[1].direction).toBe(SortDirection.DESCENDING);
@@ -68,7 +68,7 @@ describe('BookSorter', () => {
       previousIndex: 1,
       currentIndex: 0
     } as unknown as CdkDragDrop<SortOption[]>);
-    expect(sorter.selectedSortCriteria.map((criterion) => criterion.field)).toEqual(['author', 'title']);
+    expect(sorter.selectedSortCriteria.map((criterion) => criterion.field)).toEqual(['publisher', 'title']);
 
     sorter.removeSortCriterion(0);
     expect(sorter.selectedSortCriteria.map((criterion) => criterion.field)).toEqual(['title']);

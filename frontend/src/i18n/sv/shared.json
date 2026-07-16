@@ -124,7 +124,7 @@
         "saveErrorDetail": "Det uppstod ett fel vid sparning av inställningarna."
     },
     "setup": {
-        "title": "Välkommen till Grimmory",
+        "title": "Välkommen till BookLib",
         "subtitle": "Ställ in ditt initiala administratörskonto för att komma igång",
         "usernameLabel": "Användarnamn",
         "usernamePlaceholder": "Välj ett användarnamn",

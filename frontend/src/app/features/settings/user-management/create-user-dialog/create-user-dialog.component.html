@@ -95,10 +95,11 @@
                   [placeholder]="t('createDialog.enterPassword')"
                   class="field-input"
                 />
+                <app-password-policy-requirements [policy]="passwordPolicy" />
                 @if (userForm.get('password')?.invalid && (userForm.get('password')?.dirty || userForm.get('password')?.touched)) {
                   <small class="field-error">
                     <i class="pi pi-exclamation-circle"></i>
-                    {{ t('createDialog.passwordMinLength') }}
+                    {{ t('createDialog.passwordInvalid') }}
                   </small>
                 }
               </div>

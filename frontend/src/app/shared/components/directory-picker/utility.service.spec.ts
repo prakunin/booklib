@@ -3,7 +3,7 @@ import {HttpTestingController, provideHttpClientTesting} from '@angular/common/h
 import {TestBed} from '@angular/core/testing';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 
-import {UtilityService} from './utility.service';
+import {InpxIndexOption, UtilityService} from './utility.service';
 
 describe('UtilityService', () => {
   let service: UtilityService;
@@ -41,5 +41,21 @@ describe('UtilityService', () => {
     request.flush(response);
 
     expect(result).toEqual(response);
+  });
+
+  it('requests inpx indexes for a folder', () => {
+    const indexes: InpxIndexOption[] = [
+      {path: '/books/flibusta.inpx', fileName: 'flibusta.inpx', sizeBytes: 2048}
+    ];
+    let received: InpxIndexOption[] | undefined;
+
+    service.getInpxFiles('/books').subscribe(result => (received = result));
+
+    const request = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/path/inpx'));
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('path')).toBe('/books');
+    request.flush(indexes);
+
+    expect(received).toEqual(indexes);
   });
 });

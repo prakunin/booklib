@@ -1,18 +1,73 @@
 package org.booklore.repository;
 
+import jakarta.persistence.QueryHint;
 import org.booklore.model.entity.BookFileEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> {
+
+    // Deliberately queries the raw columns (not CONCAT(...)) so MariaDB can use the
+    // idx_book_file_archive_source composite index; wrapping both columns in CONCAT made the
+    // predicate non-sargable, forcing a full scan of the library's book_file rows on every
+    // one of the ~842 batches a 421k-book INPX index produces. The archives/entries cross
+    // product can over-fetch relative to the batch's own keys, but that is harmless at the
+    // batch size used here (500), since a batch's records come from a handful of archives.
+    @Query("""
+            SELECT bf.sourceArchive, bf.sourceArchiveEntry
+            FROM BookFileEntity bf
+            WHERE bf.book.library.id = :libraryId
+            AND bf.sourceArchive IN :archives
+            AND bf.sourceArchiveEntry IN :entries
+            """)
+    List<Object[]> findExistingArchiveEntries(@Param("libraryId") Long libraryId,
+                                               @Param("archives") Collection<String> archives,
+                                               @Param("entries") Collection<String> entries);
+
+    @Query("""
+            SELECT bf.sourceArchive, COUNT(bf)
+            FROM BookFileEntity bf
+            WHERE bf.book.library.id = :libraryId
+            AND bf.sourceArchive IS NOT NULL
+            GROUP BY bf.sourceArchive
+            """)
+    List<Object[]> countArchiveEntriesByLibraryId(@Param("libraryId") Long libraryId);
+
+    // Full grouped aggregation over the library's book_file rows; bounded by a per-query timeout
+    // (tighter than the global hibernate.query.timeout) so a pathologically slow run cannot hold a
+    // pooled connection for the full global timeout. Results are cached in InpxArchiveCatalogService.
+    @QueryHints(@QueryHint(name = "jakarta.persistence.query.timeout", value = "20000"))
+    @Query("""
+            SELECT bf.sourceArchive, COUNT(bf), MIN(b.addedOn), MAX(b.scannedOn),
+                   SUM(CASE WHEN b.bookCoverHash IS NOT NULL THEN 1 ELSE 0 END)
+            FROM BookFileEntity bf
+            JOIN bf.book b
+            WHERE b.library.id = :libraryId
+            AND bf.sourceArchive IS NOT NULL
+            GROUP BY bf.sourceArchive
+            """)
+    List<Object[]> findArchiveStatistics(@Param("libraryId") Long libraryId);
+
+    @Query("""
+            SELECT b.id
+            FROM BookFileEntity bf
+            JOIN bf.book b
+            WHERE b.library.id = :libraryId
+            AND bf.sourceArchive = :archiveName
+            ORDER BY b.id
+            """)
+    List<Long> findBookIdsByArchive(@Param("libraryId") Long libraryId,
+                                    @Param("archiveName") String archiveName);
 
     @Query("""
             SELECT bf FROM BookFileEntity bf

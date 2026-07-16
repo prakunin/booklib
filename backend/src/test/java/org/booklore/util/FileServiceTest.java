@@ -1555,4 +1555,59 @@ class FileServiceTest {
         ImageIO.write(image, "JPEG", baos);
         return baos.toByteArray();
     }
+
+    @Nested
+    @DisplayName("listAuthorIdsWithThumbnail")
+    class ListAuthorIdsWithThumbnailTests {
+
+        private Path authorImages;
+
+        @BeforeEach
+        void stubPathConfig() throws IOException {
+            when(appProperties.getPathConfig()).thenReturn(tempDir.toString());
+            authorImages = tempDir.resolve("author-images");
+            Files.createDirectories(authorImages);
+        }
+
+        private void writeThumbnail(long authorId) throws IOException {
+            Path dir = Files.createDirectories(authorImages.resolve(String.valueOf(authorId)));
+            Files.writeString(dir.resolve("thumbnail.jpg"), "x");
+        }
+
+        @Test
+        @DisplayName("returns only ids whose thumbnail file is present")
+        void returnsIdsWithThumbnail() throws IOException {
+            writeThumbnail(1L);
+            writeThumbnail(3L);
+            // Author 2 has a directory (e.g. a photo but no generated thumbnail) but no thumbnail file.
+            Files.createDirectories(authorImages.resolve("2"));
+
+            assertEquals(Set.of(1L, 3L), fileService.listAuthorIdsWithThumbnail());
+        }
+
+        @Test
+        @DisplayName("ignores non-numeric directory names")
+        void ignoresNonNumericDirectories() throws IOException {
+            writeThumbnail(5L);
+            Path junk = Files.createDirectories(authorImages.resolve("not-an-id"));
+            Files.writeString(junk.resolve("thumbnail.jpg"), "x");
+
+            assertEquals(Set.of(5L), fileService.listAuthorIdsWithThumbnail());
+        }
+
+        @Test
+        @DisplayName("returns empty set when the author-images directory is absent")
+        void emptyWhenDirectoryMissing() throws IOException {
+            Files.walk(authorImages)
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .forEach(p -> {
+                        try {
+                            Files.delete(p);
+                        } catch (IOException ignored) {
+                        }
+                    });
+
+            assertTrue(fileService.listAuthorIdsWithThumbnail().isEmpty());
+        }
+    }
 }

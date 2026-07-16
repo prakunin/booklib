@@ -12,7 +12,8 @@ import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {Library} from '../../../model/library.model';
 import {Shelf} from '../../../model/shelf.model';
 import {MagicShelf} from '../../../../magic-shelf/service/magic-shelf.service';
-import {EntityType} from '../book-browser.component';
+import {EntityType} from '../book-browser-entity-type';
+import {AppBooksApiService} from '../../../service/app-books-api.service';
 
 interface FilterModeOption {
   label: string;
@@ -44,6 +45,7 @@ export class BookFilterComponent {
   private readonly filterService = inject(BookFilterService);
   private readonly userService = inject(UserService);
   private readonly t = inject(TranslocoService);
+  private readonly appBooksApi = inject(AppBooksApiService);
 
   readonly activeFilters = signal<Record<string, unknown[]>>({});
   readonly expandedPanels = signal<number[]>([]);
@@ -67,12 +69,7 @@ export class BookFilterComponent {
   private readonly _selectedFilterMode = signal<BookFilterMode>('and');
   readonly selectedFilterMode = this._selectedFilterMode.asReadonly();
 
-  filterSignals: Record<FilterType, Signal<Filter[]>> = this.filterService.createFilterSignals(
-    this.entity,
-    this.entityType,
-    this.activeFilters,
-    this.selectedFilterMode
-  );
+  filterSignals: Record<FilterType, Signal<Filter[]>> = this.filterService.createFilterSignals();
   get filterTypes(): FilterType[] {
     return Object.keys(this.filterSignals) as FilterType[];
   }
@@ -81,6 +78,9 @@ export class BookFilterComponent {
     const user = this.userService.currentUser();
     if (!user) return;
     this.visibleFilters.set(user.userSettings.visibleFilters ?? [...DEFAULT_VISIBLE_FILTERS]);
+  });
+  private readonly syncFilterOptionsEnabled = effect(() => {
+    this.appBooksApi.setFilterOptionsEnabled(this.showFilter());
   });
 
   onFilterModeChange(mode: BookFilterMode): void {

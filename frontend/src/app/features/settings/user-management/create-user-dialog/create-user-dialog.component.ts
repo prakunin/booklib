@@ -12,6 +12,9 @@ import {MessageService} from 'primeng/api';
 import {DynamicDialogRef} from 'primeng/dynamicdialog';
 import {passwordMatchValidator} from '../../../../shared/validators/password-match.validator';
 import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
+import {AppSettingsService} from '../../../../shared/service/app-settings.service';
+import {PasswordPolicyRequirementsComponent} from '../../../../shared/components/password-policy-requirements/password-policy-requirements.component';
+import {DEFAULT_PASSWORD_POLICY, passwordPolicyValidator} from '../../../../shared/validators/password-policy.validator';
 
 
 @Component({
@@ -25,7 +28,8 @@ import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/tran
     MultiSelect,
     Button,
     TranslocoDirective,
-    TranslocoPipe
+    TranslocoPipe,
+    PasswordPolicyRequirementsComponent
   ],
   templateUrl: './create-user-dialog.component.html',
   styleUrl: './create-user-dialog.component.scss'
@@ -40,6 +44,11 @@ export class CreateUserDialogComponent implements OnInit {
   private ref = inject(DynamicDialogRef);
   private t = inject(TranslocoService);
   private destroyRef = inject(DestroyRef);
+  private appSettingsService = inject(AppSettingsService);
+
+  get passwordPolicy() {
+    return this.appSettingsService.appSettings()?.passwordPolicy ?? DEFAULT_PASSWORD_POLICY;
+  }
 
   get libraries(): Library[] {
     return this.libraryService.libraries();
@@ -50,7 +59,7 @@ export class CreateUserDialogComponent implements OnInit {
       name: ['', [Validators.required, Validators.minLength(3)]],
       email: ['', [Validators.required, Validators.email]],
       username: ['', Validators.required],
-      password: ['', [Validators.required, Validators.minLength(8)]],
+      password: ['', [Validators.required, passwordPolicyValidator(() => this.passwordPolicy)]],
       confirmPassword: ['', Validators.required],
       selectedLibraries: [[], Validators.required],
       permissionUpload: [false],

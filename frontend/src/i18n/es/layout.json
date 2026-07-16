@@ -18,7 +18,7 @@
         "tools": "Herramientas",
         "collapseSidebar": "Contraer barra lateral",
         "expandSidebar": "Expandir barra lateral",
-        "goToDashboard": "Grimmory — Ir al panel de control",
+        "goToDashboard": "BookLib — Ir al panel de control",
         "notifications": "Notificaciones",
         "resizeSidebar": "Cambiar tamaño de la barra lateral",
         "search": "Buscar",
@@ -60,7 +60,7 @@
         "customPrimary": "Color personalizado",
         "syncAcrossDevices": "Sincronizar mi tema en todos mis dispositivos",
         "options": {
-            "grimmory": "Grimmory",
+            "grimmory": "BookLib",
             "violet": "",
             "crimson": "",
             "teal": "",

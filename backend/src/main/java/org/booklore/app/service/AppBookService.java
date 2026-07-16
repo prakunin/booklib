@@ -4,10 +4,13 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
 import org.booklore.config.security.service.AuthenticationService;
+import org.booklore.browse.SortParser;
+import org.booklore.browse.SortTerm;
 import org.booklore.exception.ApiError;
 import org.booklore.app.dto.AppBookDetail;
 import org.booklore.app.dto.AppBookProgressResponse;
 import org.booklore.app.dto.AppBookSummary;
+import org.booklore.app.dto.AppCatalogSummary;
 import org.booklore.app.dto.AppFilterOptions;
 import org.booklore.app.dto.AppPageResponse;
 import org.booklore.app.dto.UpdateProgressRequest;
@@ -20,13 +23,21 @@ import org.booklore.model.dto.Library;
 import org.booklore.model.dto.request.ReadProgressRequest;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.ComicCreatorRole;
+import org.booklore.model.enums.ContentRestrictionMode;
+import org.booklore.model.enums.ContentRestrictionType;
+import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.enums.ReadStatus;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.ShelfRepository;
 import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
+import org.booklore.repository.UserContentRestrictionRepository;
+import org.booklore.security.policy.ContentRestrictionSpecification;
 import org.booklore.service.book.BookService;
+import org.booklore.service.browse.BookSortRegistry;
+import org.booklore.service.inpx.InpxCoverGenerationRequestedEvent;
 import org.booklore.service.opds.MagicShelfBookService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -54,7 +65,8 @@ public class AppBookService {
 
     private static final int DEFAULT_PAGE_SIZE = 50;
     private static final int MAX_PAGE_SIZE = 50;
-    private static final String DEFAULT_SORT = "addedon";
+    private static final String DEFAULT_SORT = "addedOn";
+    private static final int ISBN_QUERY_BATCH_SIZE = 500;
 
     private final BookRepository bookRepository;
     private final UserBookProgressRepository userBookProgressRepository;
@@ -65,10 +77,18 @@ public class AppBookService {
     private final BookService bookService;
     private final MagicShelfBookService magicShelfBookService;
     private final EntityManager entityManager;
+    private final UserContentRestrictionRepository restrictionRepository;
+    private final BookSortRegistry bookSortRegistry;
+    private final ApplicationEventPublisher eventPublisher;
+    private final CatalogSummaryCache catalogSummaryCache;
 
     private final Cache<String, AppFilterOptions> filterOptionsCache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
             .maximumSize(50)
+            .build();
+    private final Cache<Long, RestrictionQueryScope> restrictionQueryScopeCache = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofSeconds(30))
+            .maximumSize(100)
             .build();
 
     public AppBookService(BookRepository bookRepository,
@@ -79,7 +99,11 @@ public class AppBookService {
                           AppBookMapper mobileBookMapper,
                           BookService bookService,
                           MagicShelfBookService magicShelfBookService,
-                          EntityManager entityManager) {
+                          EntityManager entityManager,
+                          UserContentRestrictionRepository restrictionRepository,
+                          BookSortRegistry bookSortRegistry,
+                          ApplicationEventPublisher eventPublisher,
+                          CatalogSummaryCache catalogSummaryCache) {
         this.bookRepository = bookRepository;
         this.userBookProgressRepository = userBookProgressRepository;
         this.userBookFileProgressRepository = userBookFileProgressRepository;
@@ -89,6 +113,10 @@ public class AppBookService {
         this.bookService = bookService;
         this.magicShelfBookService = magicShelfBookService;
         this.entityManager = entityManager;
+        this.restrictionRepository = restrictionRepository;
+        this.bookSortRegistry = bookSortRegistry;
+        this.eventPublisher = eventPublisher;
+        this.catalogSummaryCache = catalogSummaryCache;
     }
 
     public AppPageResponse<AppBookSummary> getBooks(BookListRequest req) {
@@ -102,30 +130,30 @@ public class AppBookService {
 
         // Handle magic shelf: compose the DB-side specification directly (no IN-list)
         if (req.magicShelfId() != null) {
-            Sort sort = buildSort(req.sort(), req.dir());
-            Pageable pageable = PageRequest.of(pageNum, pageSize, sort);
+            Pageable pageable = PageRequest.of(pageNum, pageSize);
 
             Specification<BookEntity> spec = buildSpecification(
-                    accessibleLibraryIds, userId, req);
+                    accessibleLibraryIds, userId, user.getPermissions().isAdmin(), req);
             spec = spec.and(magicShelfBookService.toSpecification(userId, req.magicShelfId()));
 
             if (Boolean.TRUE.equals(req.unshelved())) {
                 spec = spec.and(AppBookSpecification.unshelved());
             }
+            spec = withSort(spec, req.sort(), req.dir(), userId);
 
             Page<BookEntity> bookPage = bookRepository.findAll(spec, pageable);
             return buildPageResponse(bookPage, userId, pageNum, pageSize);
         }
 
-        Sort sort = buildSort(req.sort(), req.dir());
-        Pageable pageable = PageRequest.of(pageNum, pageSize, sort);
+        Pageable pageable = PageRequest.of(pageNum, pageSize);
 
         Specification<BookEntity> spec = buildSpecification(
-                accessibleLibraryIds, userId, req);
+                accessibleLibraryIds, userId, user.getPermissions().isAdmin(), req);
 
         if (Boolean.TRUE.equals(req.unshelved())) {
             spec = spec.and(AppBookSpecification.unshelved());
         }
+        spec = withSort(spec, req.sort(), req.dir(), userId);
 
         Page<BookEntity> bookPage = bookRepository.findAll(spec, pageable);
         return buildPageResponse(bookPage, userId, pageNum, pageSize);
@@ -136,7 +164,8 @@ public class AppBookService {
         Long userId = user.getId();
         Set<Long> accessibleLibraryIds = getAccessibleLibraryIds(user);
 
-        Specification<BookEntity> spec = buildSpecification(accessibleLibraryIds, userId, req);
+        Specification<BookEntity> spec = buildSpecification(
+                accessibleLibraryIds, userId, user.getPermissions().isAdmin(), req);
 
         if (req.magicShelfId() != null) {
             spec = spec.and(magicShelfBookService.toSpecification(userId, req.magicShelfId()));
@@ -158,6 +187,167 @@ public class AppBookService {
         return entityManager.createQuery(cq).getResultList();
     }
 
+    public AppCatalogSummary getCatalogSummary() {
+        BookLoreUser user = authenticationService.getAuthenticatedUser();
+        Set<Long> accessibleLibraryIds = getAccessibleLibraryIds(user);
+        boolean admin = user.getPermissions().isAdmin();
+        // Key encodes the visibility scope so a permission / library-assignment change immediately
+        // yields a different key instead of serving an authorization-stale count.
+        String key = catalogSummaryKey(user.getId(), admin, accessibleLibraryIds);
+        return catalogSummaryCache.get(key, () -> computeCatalogSummary(user, accessibleLibraryIds, admin));
+    }
+
+    static String catalogSummaryKey(Long userId, boolean admin, Set<Long> accessibleLibraryIds) {
+        String libraries = accessibleLibraryIds == null
+                ? "*"
+                : accessibleLibraryIds.stream().sorted()
+                        .map(String::valueOf).collect(Collectors.joining(","));
+        return userId + "|" + admin + "|" + libraries;
+    }
+
+    private AppCatalogSummary computeCatalogSummary(BookLoreUser user, Set<Long> accessibleLibraryIds, boolean admin) {
+        Long userId = user.getId();
+        Specification<BookEntity> visibleBooks = buildBaseSpecification(
+                accessibleLibraryIds, null, userId, admin);
+
+        long totalBooks = bookRepository.count(visibleBooks);
+        long totalAuthors = countDistinctAuthors(visibleBooks);
+        long totalSeries = countDistinctSeries(visibleBooks);
+        long unshelvedBooks = bookRepository.count(visibleBooks.and(AppBookSpecification.unshelved()));
+        return new AppCatalogSummary(
+                totalBooks,
+                totalAuthors,
+                totalSeries,
+                unshelvedBooks,
+                countBooksByLibrary(visibleBooks));
+    }
+
+    public long getCatalogBookCount() {
+        BookLoreUser user = authenticationService.getAuthenticatedUser();
+        return bookRepository.count(buildBaseSpecification(
+                getAccessibleLibraryIds(user), null, user.getId(), user.getPermissions().isAdmin()));
+    }
+
+    public List<AppBookSummary> getBookSummariesByIds(Set<Long> bookIds) {
+        if (bookIds == null || bookIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        BookLoreUser user = authenticationService.getAuthenticatedUser();
+        Long userId = user.getId();
+        Specification<BookEntity> matchingIds = (root, query, cb) -> root.get("id").in(bookIds);
+        List<BookEntity> books = bookRepository.findAll(buildBaseSpecification(
+                getAccessibleLibraryIds(user), null, userId, user.getPermissions().isAdmin()).and(matchingIds));
+        Map<Long, UserBookProgressEntity> progress = getProgressMapForBooks(userId, books);
+        return books.stream()
+                .map(book -> mobileBookMapper.toSummary(book, progress.get(book.getId())))
+                .toList();
+    }
+
+    private long countDistinctAuthors(Specification<BookEntity> spec) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<BookEntity> root = query.from(BookEntity.class);
+        query.select(cb.countDistinct(root.join("metadata").join("authors").get("id")));
+        query.where(spec.toPredicate(root, query, cb));
+        return entityManager.createQuery(query).getSingleResult();
+    }
+
+    private long countDistinctSeries(Specification<BookEntity> spec) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<BookEntity> root = query.from(BookEntity.class);
+        var seriesName = root.join("metadata").get("seriesName");
+        query.select(cb.countDistinct(seriesName));
+        query.where(cb.and(
+                spec.toPredicate(root, query, cb),
+                cb.isNotNull(seriesName),
+                cb.notEqual(seriesName, "")));
+        return entityManager.createQuery(query).getSingleResult();
+    }
+
+    private Map<Long, Long> countBooksByLibrary(Specification<BookEntity> spec) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<BookEntity> root = query.from(BookEntity.class);
+        var libraryId = root.get("library").get("id");
+        query.multiselect(libraryId, cb.countDistinct(root.get("id")));
+        query.where(spec.toPredicate(root, query, cb));
+        query.groupBy(libraryId);
+        return entityManager.createQuery(query).getResultList().stream()
+                .collect(Collectors.toMap(
+                        tuple -> tuple.get(0, Long.class),
+                        tuple -> tuple.get(1, Long.class)));
+    }
+
+    public Set<String> findExistingIsbns(Long libraryId, Set<String> requestedIsbns) {
+        BookLoreUser user = authenticationService.getAuthenticatedUser();
+        validateLibraryAccess(getAccessibleLibraryIds(user), libraryId);
+
+        if (requestedIsbns == null || requestedIsbns.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        List<String> normalized = requestedIsbns.stream()
+                .filter(Objects::nonNull)
+                .map(this::normalizeIsbn)
+                .filter(value -> !value.isBlank())
+                .distinct()
+                .toList();
+
+        Set<String> matches = new HashSet<>();
+        for (int offset = 0; offset < normalized.size(); offset += ISBN_QUERY_BATCH_SIZE) {
+            List<String> batch = normalized.subList(offset, Math.min(offset + ISBN_QUERY_BATCH_SIZE, normalized.size()));
+            List<Tuple> rows = entityManager.createQuery("""
+                            SELECT m.book.id, m.isbn13, m.isbn10
+                            FROM BookMetadataEntity m
+                            WHERE m.book.library.id = :libraryId
+                              AND (m.book.deleted IS NULL OR m.book.deleted = false)
+                              AND (REPLACE(REPLACE(UPPER(m.isbn13), '-', ''), ' ', '') IN :isbns
+                                   OR REPLACE(REPLACE(UPPER(m.isbn10), '-', ''), ' ', '') IN :isbns)
+                            """, Tuple.class)
+                    .setParameter("libraryId", libraryId)
+                    .setParameter("isbns", batch)
+                    .getResultList();
+            Set<Long> visibleBookIds = findVisibleBookIds(user, rows.stream()
+                    .map(row -> row.get(0, Long.class))
+                    .collect(Collectors.toSet()));
+            for (Tuple row : rows) {
+                if (!visibleBookIds.contains(row.get(0, Long.class))) {
+                    continue;
+                }
+                addNormalizedIsbn(matches, row.get(1, String.class));
+                addNormalizedIsbn(matches, row.get(2, String.class));
+            }
+        }
+        matches.retainAll(new HashSet<>(normalized));
+        return matches;
+    }
+
+    private Set<Long> findVisibleBookIds(BookLoreUser user, Set<Long> bookIds) {
+        if (bookIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Specification<BookEntity> matchingIds = (root, query, cb) -> root.get("id").in(bookIds);
+        Specification<BookEntity> visible = contentRestrictions(
+                user.getId(), user.getPermissions().isAdmin()).and(matchingIds);
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<BookEntity> root = query.from(BookEntity.class);
+        query.select(root.get("id"));
+        query.where(visible.toPredicate(root, query, cb));
+        return new HashSet<>(entityManager.createQuery(query).getResultList());
+    }
+
+    private void addNormalizedIsbn(Set<String> target, String isbn) {
+        if (isbn != null && !isbn.isBlank()) {
+            target.add(normalizeIsbn(isbn));
+        }
+    }
+
+    private String normalizeIsbn(String isbn) {
+        return isbn.replaceAll("[-\\s]", "").toUpperCase(Locale.ROOT);
+    }
+
     public AppBookDetail getBookDetail(Long bookId) {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
         Long userId = user.getId();
@@ -166,9 +356,7 @@ public class AppBookService {
         BookEntity book = bookRepository.findByIdWithBookFiles(bookId)
                 .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
 
-        if (accessibleLibraryIds != null && !accessibleLibraryIds.contains(book.getLibrary().getId())) {
-            throw ApiError.FORBIDDEN.createException("Access denied to this book");
-        }
+        validateBookAccess(userId, accessibleLibraryIds, book);
 
         UserBookProgressEntity progress = userBookProgressRepository
                 .findByUserIdAndBookId(userId, bookId)
@@ -190,9 +378,7 @@ public class AppBookService {
         BookEntity book = bookRepository.findByIdWithBookFiles(bookId)
                 .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
 
-        if (accessibleLibraryIds != null && !accessibleLibraryIds.contains(book.getLibrary().getId())) {
-            throw ApiError.FORBIDDEN.createException("Access denied to this book");
-        }
+        validateBookAccess(userId, accessibleLibraryIds, book);
 
         UserBookProgressEntity progress = userBookProgressRepository
                 .findByUserIdAndBookId(userId, bookId)
@@ -208,12 +394,13 @@ public class AppBookService {
     @Transactional
     public void updateBookProgress(Long bookId, UpdateProgressRequest request) {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
+        Long userId = user.getId();
         Set<Long> accessibleLibraryIds = getAccessibleLibraryIds(user);
 
         BookEntity book = bookRepository.findByIdWithBookFiles(bookId)
                 .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
 
-        validateLibraryAccess(accessibleLibraryIds, book.getLibrary().getId());
+        validateBookAccess(userId, accessibleLibraryIds, book);
 
         ReadProgressRequest progressRequest = new ReadProgressRequest();
         progressRequest.setBookId(bookId);
@@ -250,7 +437,8 @@ public class AppBookService {
                 AppBookSpecification.notDeleted(),
                 AppBookSpecification.hasDigitalFileOrIsPhysical(),
                 AppBookSpecification.inLibraries(accessibleLibraryIds),
-                AppBookSpecification.searchText(query)
+                AppBookSpecification.searchText(query),
+                contentRestrictions(userId, user.getPermissions().isAdmin())
         );
 
         Page<BookEntity> bookPage = bookRepository.findAll(spec, pageable);
@@ -271,7 +459,7 @@ public class AppBookService {
 
         Map<Long, UserBookProgressEntity> progressMap = getProgressMap(userId, new HashSet<>(topIds));
 
-        Map<Long, BookEntity> enrichedMap = bookRepository.findAllById(topIds)
+        Map<Long, BookEntity> enrichedMap = findVisibleBooksByIds(user, userId, topIds)
                 .stream().collect(Collectors.toMap(BookEntity::getId, b -> b));
 
         return topIds.stream()
@@ -294,7 +482,7 @@ public class AppBookService {
 
         Map<Long, UserBookProgressEntity> progressMap = getProgressMap(userId, new HashSet<>(topIds));
 
-        Map<Long, BookEntity> enrichedMap = bookRepository.findAllById(topIds)
+        Map<Long, BookEntity> enrichedMap = findVisibleBooksByIds(user, userId, topIds)
                 .stream().collect(Collectors.toMap(BookEntity::getId, b -> b));
 
         return topIds.stream()
@@ -314,7 +502,8 @@ public class AppBookService {
                 AppBookSpecification.notDeleted(),
                 AppBookSpecification.hasDigitalFileOrIsPhysical(),
                 AppBookSpecification.inLibraries(accessibleLibraryIds),
-                AppBookSpecification.addedWithinDays(30)
+                AppBookSpecification.addedWithinDays(30),
+                contentRestrictions(userId, user.getPermissions().isAdmin())
         );
 
         Pageable pageable = PageRequest.of(0, maxItems, Sort.by(Sort.Direction.DESC, "addedOn"));
@@ -336,7 +525,8 @@ public class AppBookService {
         Specification<BookEntity> spec = AppBookSpecification.combine(
                 AppBookSpecification.notDeleted(),
                 AppBookSpecification.hasScannedOn(),
-                AppBookSpecification.inLibraries(accessibleLibraryIds)
+                AppBookSpecification.inLibraries(accessibleLibraryIds),
+                contentRestrictions(userId, user.getPermissions().isAdmin())
         );
 
         Pageable pageable = PageRequest.of(0, maxItems, Sort.by(Sort.Direction.DESC, "scannedOn"));
@@ -360,7 +550,8 @@ public class AppBookService {
         int pageNum = validatePageNumber(page);
         int pageSize = validatePageSize(size);
 
-        Specification<BookEntity> spec = buildBaseSpecification(accessibleLibraryIds, libraryId);
+        Specification<BookEntity> spec = buildBaseSpecification(
+                accessibleLibraryIds, libraryId, userId, user.getPermissions().isAdmin());
 
         long totalElements = bookRepository.count(spec);
 
@@ -438,24 +629,14 @@ public class AppBookService {
             return cached;
         }
 
-        // Build unified scoping Specification for all aggregate queries
-        Specification<BookEntity> baseSpec = buildBaseSpecification(accessibleLibraryIds, libraryId);
-        Specification<BookEntity> magicShelfSpec = null;
+        // Validate magic-shelf access. Its arbitrary rule Specification cannot be embedded in
+        // the JPQL facet aggregates without first materializing every matching ID, so facets
+        // remain library-scoped while the paginated book query applies the shelf rule itself.
         if (magicShelfId != null) {
-            magicShelfSpec = magicShelfBookService.toSpecification(userId, magicShelfId);
-            baseSpec = baseSpec.and(magicShelfSpec);
-        }
-        if (shelfId != null) {
-            baseSpec = baseSpec.and(AppBookSpecification.inShelf(shelfId));
+            magicShelfBookService.toSpecification(userId, magicShelfId);
         }
 
         Set<Long> magicBookIds = null;
-        if (magicShelfId != null) {
-            magicBookIds = resolveMagicShelfBookIds(magicShelfSpec);
-            if (magicBookIds.isEmpty()) {
-                return emptyFilterOptions(cacheKey);
-            }
-        }
 
         String libraryClause = "";
         String shelfClause = "";
@@ -470,7 +651,11 @@ public class AppBookService {
         } else if (accessibleLibraryIds != null) {
             libraryClause = "AND b.library.id IN :libraryIds";
         }
-        String scopeClause = buildScopeClause(libraryClause, shelfClause, magicBookClause);
+        RestrictionQueryScope restrictionScope = user.getPermissions().isAdmin()
+                ? new RestrictionQueryScope("", Map.of())
+                : restrictionQueryScope(userId);
+        String scopeClause = buildScopeClause(libraryClause, shelfClause, magicBookClause)
+                + restrictionScope.clause();
 
         List<AppFilterOptions.CountedOption> authors = queryCountedOptions(
                 "a.name", "JOIN b.metadata m JOIN m.authors a", "",
@@ -751,7 +936,7 @@ public class AppBookService {
         BookEntity book = bookRepository.findByIdWithBookFiles(bookId)
                 .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
 
-        validateLibraryAccess(accessibleLibraryIds, book.getLibrary().getId());
+        validateBookAccess(userId, accessibleLibraryIds, book);
 
         return userBookProgressRepository
                 .findByUserIdAndBookId(userId, bookId)
@@ -760,6 +945,15 @@ public class AppBookService {
 
     private void validateLibraryAccess(Set<Long> accessibleLibraryIds, Long libraryId) {
         if (accessibleLibraryIds != null && !accessibleLibraryIds.contains(libraryId)) {
+            throw ApiError.FORBIDDEN.createException("Access denied to this book");
+        }
+    }
+
+    private void validateBookAccess(Long userId, Set<Long> accessibleLibraryIds, BookEntity book) {
+        validateLibraryAccess(accessibleLibraryIds, book.getLibrary().getId());
+        Specification<BookEntity> sameBook = (root, query, cb) -> cb.equal(root.get("id"), book.getId());
+        if (!bookRepository.exists(contentRestrictions(
+                userId, accessibleLibraryIds == null).and(sameBook))) {
             throw ApiError.FORBIDDEN.createException("Access denied to this book");
         }
     }
@@ -794,14 +988,25 @@ public class AppBookService {
                 ));
     }
 
+    private List<BookEntity> findVisibleBooksByIds(BookLoreUser user, Long userId, Collection<Long> bookIds) {
+        if (bookIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Specification<BookEntity> matchingIds = (root, query, cb) -> root.get("id").in(bookIds);
+        return bookRepository.findAll(buildBaseSpecification(
+                getAccessibleLibraryIds(user), null, userId, user.getPermissions().isAdmin()).and(matchingIds));
+    }
+
     private Specification<BookEntity> buildSpecification(
             Set<Long> accessibleLibraryIds,
             Long userId,
+            boolean isAdmin,
             BookListRequest req) {
 
         List<Specification<BookEntity>> specs = new ArrayList<>();
         specs.add(AppBookSpecification.notDeleted());
         specs.add(AppBookSpecification.hasDigitalFileOrIsPhysical());
+        specs.add(contentRestrictions(userId, isAdmin));
 
         if (accessibleLibraryIds != null) {
             if (req.libraryId() != null && accessibleLibraryIds.contains(req.libraryId())) {
@@ -824,15 +1029,17 @@ public class AppBookService {
             specs.add(AppBookSpecification.inShelf(req.shelfId()));
         }
 
+        if (req.search() != null && !req.search().trim().isEmpty()) {
+            specs.add(AppBookSpecification.searchText(req.search()));
+        }
+
+        int filterStartIndex = specs.size();
+
         if (req.status() != null && !req.status().isEmpty()) {
             List<String> cleaned = BookListRequest.cleanValues(req.status());
             if (!cleaned.isEmpty()) {
                 specs.add(AppBookSpecification.withReadStatuses(cleaned, userId, req.effectiveFilterMode()));
             }
-        }
-
-        if (req.search() != null && !req.search().trim().isEmpty()) {
-            specs.add(AppBookSpecification.searchText(req.search()));
         }
 
         if (req.fileType() != null && !req.fileType().isEmpty()) {
@@ -1046,49 +1253,40 @@ public class AppBookService {
             }
         }
 
-        // Any of the user book progress sorting we need to filter to only the current user's progress.
-        String field = getSortField(req.sort());
-        if (field.startsWith("userBookProgress.")) {
-            specs.add(AppBookSpecification.withProgress(userId, true));
+        List<Specification<BookEntity>> baseSpecs = new ArrayList<>(specs.subList(0, filterStartIndex));
+        List<Specification<BookEntity>> filterSpecs = specs.subList(filterStartIndex, specs.size());
+
+        Specification<BookEntity> combinedFilters = null;
+        if (!filterSpecs.isEmpty()) {
+            if ("or".equals(req.effectiveFilterMode())) {
+                combinedFilters = filterSpecs.stream()
+                        .reduce(Specification::or)
+                        .orElse(null);
+            } else {
+                combinedFilters = AppBookSpecification.combine(filterSpecs.toArray(Specification[]::new));
+            }
         }
 
-        return AppBookSpecification.combine(specs.toArray(Specification[]::new));
+        Specification<BookEntity> result = AppBookSpecification.combine(baseSpecs.toArray(Specification[]::new));
+        return combinedFilters == null ? result : result.and(combinedFilters);
     }
 
-    private String getSortField(String sortBy) {
-        return switch (sortBy != null ? sortBy.toLowerCase() : DEFAULT_SORT) {
-            case "addedon" -> "addedOn";
-            case "title" -> "metadata.title";
-            case "seriesname", "series" -> "metadata.seriesName";
-            case "seriesnumber" -> "metadata.seriesNumber";
-            case "pagecount" -> "metadata.pageCount";
-            case "language" -> "metadata.language";
-            case "publisher" -> "metadata.publisher";
-            case "publisheddate" -> "metadata.publishedDate";
-            case "amazonrating" -> "metadata.amazonRating";
-            case "amazonreviewcount" -> "metadata.amazonReviewCount";
-            case "goodreadsrating" -> "metadata.goodreadsRating";
-            case "goodreadsreviewcount" -> "metadata.goodreadsReviewCount";
-            case "hardcoverrating" -> "metadata.hardcoverRating";
-            case "hardcoverreviewcount" -> "metadata.hardcoverReviewCount";
-            case "ranobedbrating" -> "metadata.ranobedbRating";
-            case "narrator" -> "metadata.narrator";
-            case "lastreadtime" -> "userBookProgress.lastReadTime";
-            case "readstatus" -> "userBookProgress.readStatus";
-            case "datefinished" -> "userBookProgress.dateFinished";
-            case "personalrating" -> "userBookProgress.personalRating";
-            default -> "addedOn";
+    private Specification<BookEntity> withSort(
+            Specification<BookEntity> filter,
+            String sort,
+            String direction,
+            Long userId) {
+        String sortString = sort == null || sort.isBlank() ? DEFAULT_SORT : sort;
+        if (!sortString.contains(",") && !sortString.startsWith("-") && !"asc".equalsIgnoreCase(direction)) {
+            sortString = "-" + sortString;
+        }
+        List<SortTerm> terms = SortParser.parse(sortString, bookSortRegistry.registry().keys());
+        return (root, query, cb) -> {
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                query.orderBy(bookSortRegistry.registry().toOrders(terms, root, query, cb, userId));
+            }
+            return filter.toPredicate(root, query, cb);
         };
-    }
-
-    private Sort buildSort(String sortBy, String sortDir) {
-        Sort.Direction direction = "asc".equalsIgnoreCase(sortDir)
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
-
-        String field = getSortField(sortBy);
-
-        return Sort.by(direction, field);
     }
 
     private int validatePageNumber(Integer page) {
@@ -1103,10 +1301,12 @@ public class AppBookService {
         return limit != null && limit > 0 ? Math.min(limit, MAX_PAGE_SIZE) : defaultValue;
     }
 
-    private Specification<BookEntity> buildBaseSpecification(Set<Long> accessibleLibraryIds, Long libraryId) {
+    private Specification<BookEntity> buildBaseSpecification(
+            Set<Long> accessibleLibraryIds, Long libraryId, Long userId, boolean isAdmin) {
         List<Specification<BookEntity>> specs = new ArrayList<>();
         specs.add(AppBookSpecification.notDeleted());
         specs.add(AppBookSpecification.hasDigitalFileOrIsPhysical());
+        specs.add(contentRestrictions(userId, isAdmin));
 
         if (accessibleLibraryIds != null) {
             if (libraryId != null && !accessibleLibraryIds.contains(libraryId)) {
@@ -1122,6 +1322,13 @@ public class AppBookService {
         return AppBookSpecification.combine(specs.toArray(Specification[]::new));
     }
 
+    private Specification<BookEntity> contentRestrictions(Long userId, boolean isAdmin) {
+        if (isAdmin) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+        return ContentRestrictionSpecification.from(restrictionRepository.findByUserId(userId));
+    }
+
     private AppPageResponse<AppBookSummary> buildPageResponse(
             Page<BookEntity> bookPage,
             Long userId,
@@ -1135,9 +1342,27 @@ public class AppBookService {
                 .map(book -> mobileBookMapper.toSummary(book, progressMap.get(book.getId())))
                 .toList();
 
+        requestMissingInpxCovers(books);
+
         return AppPageResponse.of(summaries, pageNum, pageSize, bookPage.getTotalElements());
     }
 
+    private void requestMissingInpxCovers(List<BookEntity> books) {
+        Set<Long> bookIds = books.stream()
+                .filter(book -> book.getBookCoverHash() == null)
+                .filter(book -> book.getLibrary() != null
+                        && book.getLibrary().getSourceType() == LibrarySourceType.INPX)
+                .map(BookEntity::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (bookIds.isEmpty()) {
+            return;
+        }
+        BookLoreUser user = authenticationService.getAuthenticatedUser();
+        if (user != null && user.getUsername() != null) {
+            eventPublisher.publishEvent(new InpxCoverGenerationRequestedEvent(bookIds, user.getUsername()));
+        }
+    }
 
     private Map<Long, UserBookProgressEntity> getProgressMapForBooks(Long userId, List<BookEntity> books) {
         if (books.isEmpty()) {
@@ -1188,16 +1413,122 @@ public class AppBookService {
         if (magicBookIds != null) {
             query.setParameter("magicBookIds", magicBookIds);
         }
+        Set<String> parameterNames = query.getParameters().stream()
+                .map(parameter -> parameter.getName())
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        BookLoreUser currentUser = authenticationService.getAuthenticatedUser();
+        RestrictionQueryScope restrictionScope = currentUser.getPermissions().isAdmin()
+                ? new RestrictionQueryScope("", Map.of())
+                : restrictionQueryScope(currentUser.getId());
+        restrictionScope.parameters()
+                .forEach((name, value) -> {
+                    if (parameterNames.contains(name)) {
+                        query.setParameter(name, value);
+                    }
+                });
     }
 
-    private Set<Long> resolveMagicShelfBookIds(Specification<BookEntity> spec) {
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Long> cq = cb.createQuery(Long.class);
-        Root<BookEntity> root = cq.from(BookEntity.class);
-        cq.select(root.get("id"));
-        cq.where(spec.toPredicate(root, cq, cb));
-        return new HashSet<>(entityManager.createQuery(cq)
-                .getResultList());
+    private RestrictionQueryScope restrictionQueryScope(Long userId) {
+        return restrictionQueryScopeCache.get(userId, ignored -> {
+            List<UserContentRestrictionEntity> restrictions = restrictionRepository.findByUserId(userId);
+            StringBuilder clause = new StringBuilder();
+            Map<String, Object> parameters = new HashMap<>();
+
+            appendCollectionRestriction(clause, parameters, restrictions,
+                    ContentRestrictionType.CATEGORY, "categories", "Categories");
+            appendCollectionRestriction(clause, parameters, restrictions,
+                    ContentRestrictionType.TAG, "tags", "Tags");
+            appendCollectionRestriction(clause, parameters, restrictions,
+                    ContentRestrictionType.MOOD, "moods", "Moods");
+            appendScalarRestriction(clause, parameters, restrictions,
+                    ContentRestrictionType.CONTENT_RATING, "b.metadata.contentRating", "ContentRatings");
+
+            Integer maxAgeRating = restrictions.stream()
+                    .filter(restriction -> restriction.getRestrictionType() == ContentRestrictionType.AGE_RATING)
+                    .filter(restriction -> restriction.getMode() == ContentRestrictionMode.EXCLUDE)
+                    .map(UserContentRestrictionEntity::getValue)
+                    .map(value -> {
+                        try {
+                            return Integer.parseInt(value);
+                        } catch (NumberFormatException ignoredException) {
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .min(Integer::compareTo)
+                    .orElse(null);
+            if (maxAgeRating != null) {
+                clause.append(" AND (b.metadata.ageRating IS NULL OR b.metadata.ageRating < :restrictionMaxAgeRating)");
+                parameters.put("restrictionMaxAgeRating", maxAgeRating);
+            }
+            return new RestrictionQueryScope(clause.toString(), Map.copyOf(parameters));
+        });
+    }
+
+    private void appendCollectionRestriction(
+            StringBuilder clause,
+            Map<String, Object> parameters,
+            List<UserContentRestrictionEntity> restrictions,
+            ContentRestrictionType type,
+            String attribute,
+            String parameterSuffix) {
+        Set<String> excluded = restrictionValues(restrictions, type, ContentRestrictionMode.EXCLUDE);
+        if (!excluded.isEmpty()) {
+            String parameter = "restrictionExcluded" + parameterSuffix;
+            clause.append(" AND NOT EXISTS (SELECT restrictedMetadata.bookId FROM BookMetadataEntity restrictedMetadata")
+                    .append(" JOIN restrictedMetadata.").append(attribute).append(" restrictedValue")
+                    .append(" WHERE restrictedMetadata.bookId = b.id AND LOWER(restrictedValue.name) IN :")
+                    .append(parameter).append(")");
+            parameters.put(parameter, excluded);
+        }
+        Set<String> allowed = restrictionValues(restrictions, type, ContentRestrictionMode.ALLOW_ONLY);
+        if (!allowed.isEmpty()) {
+            String parameter = "restrictionAllowed" + parameterSuffix;
+            clause.append(" AND EXISTS (SELECT restrictedMetadata.bookId FROM BookMetadataEntity restrictedMetadata")
+                    .append(" JOIN restrictedMetadata.").append(attribute).append(" restrictedValue")
+                    .append(" WHERE restrictedMetadata.bookId = b.id AND LOWER(restrictedValue.name) IN :")
+                    .append(parameter).append(")");
+            parameters.put(parameter, allowed);
+        }
+    }
+
+    private void appendScalarRestriction(
+            StringBuilder clause,
+            Map<String, Object> parameters,
+            List<UserContentRestrictionEntity> restrictions,
+            ContentRestrictionType type,
+            String attribute,
+            String parameterSuffix) {
+        Set<String> excluded = restrictionValues(restrictions, type, ContentRestrictionMode.EXCLUDE);
+        if (!excluded.isEmpty()) {
+            String parameter = "restrictionExcluded" + parameterSuffix;
+            clause.append(" AND (").append(attribute).append(" IS NULL OR LOWER(")
+                    .append(attribute).append(") NOT IN :").append(parameter).append(")");
+            parameters.put(parameter, excluded);
+        }
+        Set<String> allowed = restrictionValues(restrictions, type, ContentRestrictionMode.ALLOW_ONLY);
+        if (!allowed.isEmpty()) {
+            String parameter = "restrictionAllowed" + parameterSuffix;
+            clause.append(" AND LOWER(").append(attribute).append(") IN :").append(parameter);
+            parameters.put(parameter, allowed);
+        }
+    }
+
+    private Set<String> restrictionValues(
+            List<UserContentRestrictionEntity> restrictions,
+            ContentRestrictionType type,
+            ContentRestrictionMode mode) {
+        return restrictions.stream()
+                .filter(restriction -> restriction.getRestrictionType() == type)
+                .filter(restriction -> restriction.getMode() == mode)
+                .map(UserContentRestrictionEntity::getValue)
+                .filter(Objects::nonNull)
+                .map(value -> value.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+    }
+
+    private record RestrictionQueryScope(String clause, Map<String, Object> parameters) {
     }
 
     private List<AppFilterOptions.CountedOption> queryReadStatusCounts(

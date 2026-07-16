@@ -61,6 +61,7 @@ public class AuthorMetadataService {
     private final DuckDuckGoCoverService duckDuckGoCoverService;
     private final AuthenticationService authenticationService;
     private final AppSettingService appSettingService;
+    private final AuthorPhotoIndex authorPhotoIndex;
 
     public List<AuthorSummary> getAllAuthors() {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
@@ -124,6 +125,7 @@ public class AuthorMetadataService {
 
         if (!author.isPhotoLocked() && result.getImageUrl() != null && !result.getImageUrl().isBlank()) {
             fileService.createAuthorThumbnailFromUrl(author.getId(), result.getImageUrl());
+            authorPhotoIndex.invalidate();
         }
 
         auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
@@ -145,6 +147,7 @@ public class AuthorMetadataService {
 
                 if (!author.isPhotoLocked() && result.getImageUrl() != null && !result.getImageUrl().isBlank()) {
                     fileService.createAuthorThumbnailFromUrl(author.getId(), result.getImageUrl());
+                    authorPhotoIndex.invalidate();
                 }
 
                 auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
@@ -192,6 +195,7 @@ public class AuthorMetadataService {
             author.setAsin(null);
             authorRepository.save(author);
             fileService.deleteAuthorImages(authorId);
+            authorPhotoIndex.invalidate();
 
             auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
                     "Unmatched author '" + author.getName() + "'");
@@ -213,6 +217,7 @@ public class AuthorMetadataService {
             }
 
             fileService.deleteAuthorImages(authorId);
+            authorPhotoIndex.invalidate();
             authorRepository.delete(author);
 
             auditService.log(AuditAction.AUTHOR_DELETED, "Author", authorId,
@@ -257,6 +262,7 @@ public class AuthorMetadataService {
                 throw ApiError.FILE_READ_ERROR.createException("Failed to decode image");
             }
             fileService.saveAuthorImages(image, authorId);
+            authorPhotoIndex.invalidate();
             image.flush();
         } catch (IOException e) {
             throw ApiError.FILE_READ_ERROR.createException(e.getMessage());
@@ -310,6 +316,7 @@ public class AuthorMetadataService {
                 .orElseThrow(() -> ApiError.AUTHOR_NOT_FOUND.createException(authorId));
 
         fileService.createAuthorThumbnailFromUrl(authorId, imageUrl);
+        authorPhotoIndex.invalidate();
     }
 
     public AuthorDetails getAuthorByName(String name) {

@@ -1,4 +1,4 @@
-import {Component, computed, effect, inject, Injector, OnInit} from '@angular/core';
+import {Component, computed, inject, OnInit} from '@angular/core';
 import {FormBuilder, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
 
 import {InputText} from 'primeng/inputtext';
@@ -14,6 +14,7 @@ import {Checkbox} from 'primeng/checkbox';
 import {AutoComplete} from 'primeng/autocomplete';
 import {AutoCompleteSelectEvent} from 'primeng/autocomplete';
 import {ProgressSpinner} from 'primeng/progressspinner';
+import {AppBooksApiService} from '../../../book/service/app-books-api.service';
 
 @Component({
   selector: 'app-bulk-metadata-update-component',
@@ -60,9 +61,9 @@ export class BulkMetadataUpdateComponent implements OnInit {
   readonly ref = inject(DynamicDialogRef);
   private readonly fb = inject(FormBuilder);
   private readonly bookService = inject(BookService);
+  private readonly appBooksApi = inject(AppBooksApiService);
   private readonly bookMetadataManageService = inject(BookMetadataManageService);
   private readonly messageService = inject(MessageService);
-  private readonly injector = inject(Injector);
   private readonly uniqueMetadata = computed(() => this.bookService.uniqueMetadata());
 
   get allAuthors(): string[] { return this.uniqueMetadata().authors; }
@@ -122,7 +123,9 @@ export class BulkMetadataUpdateComponent implements OnInit {
 
   ngOnInit(): void {
     this.bookIds = this.config.data?.bookIds ?? [];
-    this.books = this.bookService.getBooksByIds(this.bookIds);
+    this.appBooksApi.getBooksByIds(this.bookIds).subscribe(books => {
+      this.books = books;
+    });
 
     this.metadataForm = this.fb.group({
       authors: [],
@@ -136,9 +139,6 @@ export class BulkMetadataUpdateComponent implements OnInit {
       tags: []
     });
 
-    effect(() => {
-      this.books = this.bookService.books().filter(book => this.bookIds.includes(book.id));
-    }, {injector: this.injector});
   }
 
   onFieldClearToggle(field: keyof typeof this.clearFields): void {

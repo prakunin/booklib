@@ -4,15 +4,12 @@ import {Subject} from 'rxjs';
 import {ReaderStateService} from '../../state/reader-state.service';
 import {ReaderSidebarService} from '../sidebar/sidebar.service';
 import {ReaderLeftSidebarService} from '../panel/panel.service';
-import {BookService} from '../../../../book/service/book.service';
-import {EbookViewerSetting} from '../../../../book/model/book.model';
 
 @Injectable()
 export class ReaderHeaderService {
   private stateService = inject(ReaderStateService);
   private sidebarService = inject(ReaderSidebarService);
   private leftSidebarService = inject(ReaderLeftSidebarService);
-  private bookService = inject(BookService);
   private location = inject(Location);
 
   private bookId!: number;
@@ -97,22 +94,7 @@ export class ReaderHeaderService {
   }
 
   private syncSettingsToBackend(): void {
-    const state = this.stateService.state();
-    const setting: EbookViewerSetting = {
-      lineHeight: state.lineHeight,
-      justify: state.justify,
-      hyphenate: state.hyphenate,
-      maxColumnCount: state.maxColumnCount,
-      gap: state.gap,
-      fontSize: state.fontSize,
-      theme: state.theme.name,
-      maxInlineSize: state.maxInlineSize,
-      maxBlockSize: state.maxBlockSize,
-      fontFamily: state.fontFamily,
-      isDark: state.isDark,
-      flow: state.flow,
-    };
-    this.bookService.updateViewerSetting({ebookSettings: setting}, this.bookId).subscribe();
+    this.stateService.persistSettings(this.bookId);
   }
 
   reset(): void {

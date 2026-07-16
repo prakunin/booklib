@@ -31,6 +31,11 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     @Query("SELECT b FROM BookEntity b WHERE b.id = :id AND (b.deleted IS NULL OR b.deleted = false)")
     Optional<BookEntity> findByIdWithBookFiles(@Param("id") Long id);
 
+    @EntityGraph(attributePaths = { "metadata", "metadata.authors", "metadata.categories", "metadata.moods",
+            "metadata.tags", "metadata.comicMetadata", "bookFiles", "libraryPath", "library" })
+    @Query("SELECT b FROM BookEntity b WHERE b.id = :id AND (b.deleted IS NULL OR b.deleted = false)")
+    Optional<BookEntity> findByIdForInpxArchiveRefresh(@Param("id") Long id);
+
     @EntityGraph(attributePaths = { "metadata", "bookFiles", "libraryPath", "library" })
     @Query("SELECT b FROM BookEntity b WHERE b.id = :id AND (b.deleted IS NULL OR b.deleted = false)")
     Optional<BookEntity> findByIdForStreaming(@Param("id") Long id);
@@ -470,19 +475,6 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     long countByLibraryIdNonDeleted(@Param("libraryId") Long libraryId);
 
     /**
-     * Lightweight query for recommendation: loads only metadata with authors and categories (no bookFiles, shelves, etc.)
-     */
-    @Query("""
-            SELECT DISTINCT b FROM BookEntity b
-            LEFT JOIN FETCH b.metadata m
-            LEFT JOIN FETCH m.authors
-            LEFT JOIN FETCH m.categories
-            WHERE (b.deleted IS NULL OR b.deleted = false)
-            AND b.id <> :excludeBookId
-            """)
-    List<BookEntity> findAllForRecommendation(@Param("excludeBookId") Long excludeBookId);
-
-    /**
      * Paginated query for all non-deleted books (main UI listing).
      * Only ToOne paths in EntityGraph to avoid Cartesian product with LIMIT;
      * collections (authors, categories, tags, moods, shelves, bookFiles) loaded via @BatchSize.
@@ -510,17 +502,42 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     List<BookEntity> findAllFullBooksBatch(Pageable pageable);
 
     /**
-     * Lightweight projection for on-demand recommendation: returns only bookId, embedding vector,
-     * and series name. Avoids loading full entities when pre-computed embeddings are available.
+     * Keyset-paginated candidates for bounded-memory on-demand recommendation generation.
      */
+    @Query("""
+            SELECT b.id FROM BookEntity b
+            WHERE (b.deleted IS NULL OR b.deleted = false)
+            AND b.id > :afterId
+            AND b.id <> :excludeBookId
+            ORDER BY b.id
+            """)
+    List<Long> findRecommendationCandidateIdsAfterId(
+            @Param("excludeBookId") Long excludeBookId,
+            @Param("afterId") Long afterId,
+            Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT b FROM BookEntity b
+            LEFT JOIN FETCH b.metadata m
+            LEFT JOIN FETCH m.authors
+            LEFT JOIN FETCH m.categories
+            WHERE b.id IN :bookIds
+            """)
+    List<BookEntity> findRecommendationCandidatesByIds(@Param("bookIds") Collection<Long> bookIds);
+
     @Query("""
             SELECT b.id as bookId, m.embeddingVector as embeddingVector, m.seriesName as seriesName
             FROM BookEntity b
             LEFT JOIN b.metadata m
             WHERE (b.deleted IS NULL OR b.deleted = false)
+            AND b.id > :afterId
             AND b.id <> :excludeBookId
             AND m.embeddingVector IS NOT NULL
+            ORDER BY b.id
             """)
-    List<BookEmbeddingProjection> findAllEmbeddingsForRecommendation(@Param("excludeBookId") Long excludeBookId);
+    List<BookEmbeddingProjection> findEmbeddingCandidatesAfterId(
+            @Param("excludeBookId") Long excludeBookId,
+            @Param("afterId") Long afterId,
+            Pageable pageable);
 
 }
