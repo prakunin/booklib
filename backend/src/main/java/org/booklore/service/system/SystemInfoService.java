@@ -3,6 +3,7 @@ package org.booklore.service.system;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.dto.system.ApplicationInfo;
+import org.booklore.model.dto.system.DatabaseInfo;
 import org.booklore.model.dto.system.OsInfo;
 import org.booklore.model.dto.system.RuntimeInfo;
 import org.booklore.model.dto.system.SystemInfoDto;
@@ -10,8 +11,12 @@ import org.booklore.service.VersionService;
 import org.springframework.boot.SpringBootVersion;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryUsage;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.SQLException;
 
 @Slf4j
 @Service
@@ -19,12 +24,14 @@ import java.lang.management.MemoryUsage;
 public class SystemInfoService {
 
     private final VersionService versionService;
+    private final DataSource dataSource;
 
     public SystemInfoDto getSystemInfo() {
         return SystemInfoDto.builder()
                 .application(applicationInfo())
                 .runtime(runtimeInfo())
                 .os(osInfo())
+                .database(databaseInfo())
                 .build();
     }
 
@@ -54,5 +61,20 @@ public class SystemInfoService {
                 .version(System.getProperty("os.version"))
                 .arch(System.getProperty("os.arch"))
                 .build();
+    }
+
+    private DatabaseInfo databaseInfo() {
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseMetaData metaData = connection.getMetaData();
+            return DatabaseInfo.builder()
+                    .status("UP")
+                    .vendor(metaData.getDatabaseProductName())
+                    .version(metaData.getDatabaseProductVersion())
+                    .build();
+        } catch (SQLException e) {
+            // A diagnostics page must still render when the database is the thing that is broken.
+            log.warn("Could not read database metadata for system info: {}", e.getMessage());
+            return DatabaseInfo.builder().status("DOWN").build();
+        }
     }
 }
