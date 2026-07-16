@@ -3,6 +3,8 @@
   "description": "Snímek jen pro čtení stavu aplikace, běhového prostředí a úložiště serveru. Zobrazuje vše, co se serveru podařilo získat, i když některé části nejsou dostupné.",
   "loading": "Načítání systémových informací...",
   "loadError": "Nepodařilo se načíst systémové informace. Zkuste obnovit stránku.",
+  "refreshError": "Nepodařilo se obnovit informace o systému. Zobrazují se poslední známé hodnoty.",
+  "staleDataNote": "Zobrazují se data z posledního úspěšného načtení; poslední obnovení selhalo.",
   "notAvailable": "Nedostupné",
   "copied": "Systémové informace zkopírovány do schránky",
   "copyFailed": "Nepodařilo se zkopírovat systémové informace do schránky",
@@ -44,7 +46,8 @@
     "free": "volné",
     "total": "celkem",
     "libraryPaths": "Cesty knihoven",
-    "noLibraryPaths": "Nejsou nakonfigurovány žádné cesty knihoven."
+    "noLibraryPaths": "Nejsou nakonfigurovány žádné cesty knihoven.",
+    "libraryPathsUnavailable": "Nepodařilo se zjistit cesty knihoven; databáze je nedostupná."
   },
   "tools": {
     "title": "Nástroje",

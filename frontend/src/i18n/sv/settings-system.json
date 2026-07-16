@@ -3,6 +3,8 @@
     "description": "En skrivskyddad ögonblicksbild av serverns applikations-, körnings- och lagringsstatus. Visar allt som servern kunde samla in, även om delar av det är nedstängt.",
     "loading": "Läser in systeminformation...",
     "loadError": "Det gick inte att läsa in systeminformation. Försök att uppdatera.",
+    "refreshError": "Det gick inte att uppdatera systeminformationen. Visar de senast kända värdena.",
+    "staleDataNote": "Visar data från senaste lyckade inläsning; senaste uppdateringen misslyckades.",
     "notAvailable": "Ej tillgänglig",
     "copied": "Systeminformation kopierad till urklipp",
     "copyFailed": "Det gick inte att kopiera systeminformation till urklipp",
@@ -44,7 +46,8 @@
         "free": "fritt",
         "total": "totalt",
         "libraryPaths": "Biblioteksökvägar",
-        "noLibraryPaths": "Inga biblioteksökvägar är konfigurerade."
+        "noLibraryPaths": "Inga biblioteksökvägar är konfigurerade.",
+        "libraryPathsUnavailable": "Det gick inte att fastställa bibliotekssökvägar; databasen är inte nåbar."
     },
     "tools": {
         "title": "Verktyg",

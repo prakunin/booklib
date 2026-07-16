@@ -54,7 +54,7 @@ class ToolVersionServiceTest {
         void executesEachBinaryOnlyOnceAcrossCalls() {
             when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
             when(fileService.findSystemFile("kepubify")).thenReturn(Path.of("/usr/local/bin/kepubify"));
-            when(processRunner.firstLine(any(), any())).thenReturn(Optional.of("v1"));
+            when(processRunner.firstLine(any(), any())).thenReturn(Optional.of("tool version 1.0.0"));
 
             service.toolsInfo();
             service.toolsInfo();
@@ -62,6 +62,88 @@ class ToolVersionServiceTest {
 
             verify(processRunner, times(1)).firstLine(Path.of("/usr/local/bin/ffprobe"), "-version");
             verify(processRunner, times(1)).firstLine(Path.of("/usr/local/bin/kepubify"), "--version");
+        }
+    }
+
+    @Nested
+    class WhenTheOutputDoesNotLookLikeAVersion {
+
+        @Test
+        void reportsNullInsteadOfAnEnvironmentAssignment() {
+            when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
+            when(fileService.findSystemFile("kepubify")).thenReturn(Path.of("/usr/local/bin/kepubify"));
+            when(processRunner.firstLine(Path.of("/usr/local/bin/ffprobe"), "-version"))
+                    .thenReturn(Optional.of("TOKEN=secret123"));
+            when(processRunner.firstLine(Path.of("/usr/local/bin/kepubify"), "--version"))
+                    .thenReturn(Optional.of("kepubify v4.0.4"));
+
+            var tools = service.toolsInfo();
+
+            assertThat(tools.getFfprobeVersion()).isNull();
+            assertThat(tools.getKepubifyVersion()).isEqualTo("kepubify v4.0.4");
+        }
+
+        @Test
+        void reportsNullInsteadOfAConfigLikeAssignment() {
+            when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
+            when(fileService.findSystemFile("kepubify")).thenReturn(null);
+            when(processRunner.firstLine(Path.of("/usr/local/bin/ffprobe"), "-version"))
+                    .thenReturn(Optional.of("DATABASE_URL=jdbc:mariadb://db:3306/booklore"));
+
+            assertThat(service.toolsInfo().getFfprobeVersion()).isNull();
+        }
+
+        @Test
+        void reportsNullInsteadOfAnOverlyLongLine() {
+            when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
+            when(fileService.findSystemFile("kepubify")).thenReturn(null);
+            when(processRunner.firstLine(Path.of("/usr/local/bin/ffprobe"), "-version"))
+                    .thenReturn(Optional.of("ffprobe version 1.0.0 " + "x".repeat(200)));
+
+            assertThat(service.toolsInfo().getFfprobeVersion()).isNull();
+        }
+
+        @Test
+        void acceptsAPlausibleVersionLineUnchanged() {
+            when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
+            when(fileService.findSystemFile("kepubify")).thenReturn(null);
+            when(processRunner.firstLine(Path.of("/usr/local/bin/ffprobe"), "-version"))
+                    .thenReturn(Optional.of("ffprobe version 8.1.2"));
+
+            assertThat(service.toolsInfo().getFfprobeVersion()).isEqualTo("ffprobe version 8.1.2");
+        }
+    }
+
+    @Nested
+    class WhenAProbeFailsTransiently {
+
+        @Test
+        void doesNotCacheAnEmptyResultAndRetriesOnTheNextCall() {
+            when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
+            when(fileService.findSystemFile("kepubify")).thenReturn(null);
+            when(processRunner.firstLine(Path.of("/usr/local/bin/ffprobe"), "-version"))
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of("ffprobe version 8.1.2"));
+
+            assertThat(service.toolsInfo().getFfprobeVersion()).isNull();
+            assertThat(service.toolsInfo().getFfprobeVersion()).isEqualTo("ffprobe version 8.1.2");
+
+            verify(processRunner, times(2)).firstLine(Path.of("/usr/local/bin/ffprobe"), "-version");
+        }
+
+        @Test
+        void stillCachesASuccessAfterAnEarlierFailureRatherThanProbingForever() {
+            when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
+            when(fileService.findSystemFile("kepubify")).thenReturn(null);
+            when(processRunner.firstLine(Path.of("/usr/local/bin/ffprobe"), "-version"))
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of("ffprobe version 8.1.2"));
+
+            service.toolsInfo();
+            service.toolsInfo();
+            service.toolsInfo();
+
+            verify(processRunner, times(2)).firstLine(Path.of("/usr/local/bin/ffprobe"), "-version");
         }
     }
 

@@ -3,6 +3,8 @@
     "description": "Csak olvasható pillanatkép a szerver alkalmazás-, futásidejű és tárolási állapotáról. Mindent megjelenít, amit a szerver össze tudott gyűjteni, még akkor is, ha egyes részek nem működnek.",
     "loading": "Rendszerinformációk betöltése...",
     "loadError": "Nem sikerült betölteni a rendszerinformációkat. Próbálja frissíteni.",
+    "refreshError": "Nem sikerült frissíteni a rendszerinformációkat. Az utoljára ismert értékek jelennek meg.",
+    "staleDataNote": "Az utolsó sikeres betöltés adatai láthatók; a legutóbbi frissítés sikertelen volt.",
     "notAvailable": "Nem elérhető",
     "copied": "Rendszerinformációk vágólapra másolva",
     "copyFailed": "Nem sikerült a rendszerinformációkat a vágólapra másolni",
@@ -44,7 +46,8 @@
         "free": "szabad",
         "total": "összesen",
         "libraryPaths": "Könyvtárútvonalak",
-        "noLibraryPaths": "Nincsenek beállított könyvtárútvonalak."
+        "noLibraryPaths": "Nincsenek beállított könyvtárútvonalak.",
+        "libraryPathsUnavailable": "Nem sikerült meghatározni a könyvtár elérési útjait; az adatbázis nem érhető el."
     },
     "tools": {
         "title": "Eszközök",

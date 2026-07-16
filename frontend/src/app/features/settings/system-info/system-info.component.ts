@@ -36,6 +36,9 @@ export class SystemInfoComponent {
   protected data = computed<SystemInfo | undefined>(() => this.snapshot() ?? this.query.data());
   protected loading = computed(() => !this.snapshot() && this.query.isFetching());
   protected error = computed(() => !this.snapshot() && this.query.isError());
+  // TanStack Query keeps the last successful `data` around when a later fetch fails, so a failed
+  // refresh must stay visible (and the shown data marked stale) even though `data()` is non-empty.
+  protected stale = computed(() => this.error() && !!this.data());
 
   protected refresh(): void {
     void this.query.refetch();
@@ -67,8 +70,18 @@ export class SystemInfoComponent {
     return PATH_STATUS_COLOR[status] ?? 'gray';
   }
 
+  /**
+   * An empty libraryPaths list is ambiguous: it can mean "none configured" or "the database was
+   * unreachable and we could not determine them". The backend already knows which via
+   * database.status, so use that instead of presenting a probe failure as configuration state.
+   */
+  protected noLibraryPathsKey(info: SystemInfo): string {
+    return info.database.status === 'DOWN' ? 'storage.libraryPathsUnavailable' : 'storage.noLibraryPaths';
+  }
+
   protected heapUsagePercent(runtime: SystemInfo['runtime']): number {
-    if (!runtime.heapMaxBytes) {
+    // heapMaxBytes is -1 when the JVM defines no maximum; there is no meaningful percentage then.
+    if (!runtime.heapMaxBytes || runtime.heapMaxBytes < 0) {
       return 0;
     }
     return Math.min(100, Math.max(0, Math.round((runtime.heapUsedBytes / runtime.heapMaxBytes) * 100)));
@@ -83,15 +96,16 @@ export class SystemInfoComponent {
   }
 
   protected formatBytes(bytes: number | null | undefined): string {
-    if (bytes === null || bytes === undefined || Number.isNaN(bytes)) {
+    // The backend deliberately passes heapMaxBytes = -1 through when the JVM defines no maximum:
+    // that is "not available", not "0 bytes", so a negative value must not be clamped up to 0.
+    if (bytes === null || bytes === undefined || Number.isNaN(bytes) || bytes < 0) {
       return this.t.translate('settingsSystem.notAvailable');
     }
-    const safeBytes = Math.max(0, bytes);
-    if (safeBytes === 0) {
+    if (bytes === 0) {
       return `0 ${BYTE_UNITS[0]}`;
     }
-    const exponent = Math.min(Math.floor(Math.log(safeBytes) / Math.log(1024)), BYTE_UNITS.length - 1);
-    const value = safeBytes / Math.pow(1024, exponent);
+    const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), BYTE_UNITS.length - 1);
+    const value = bytes / Math.pow(1024, exponent);
     return `${value.toFixed(exponent === 0 ? 0 : 2)} ${BYTE_UNITS[exponent]}`;
   }
 
@@ -127,7 +141,7 @@ export class SystemInfoComponent {
     lines.push(`${tr('os.title')}: ${info.os.name} ${info.os.version} (${info.os.arch})`);
     lines.push(`${tr('database.title')}: ${info.database.status}`
       + (info.database.vendor ? ` - ${info.database.vendor} ${info.database.version ?? ''}` : ''));
-    lines.push(`${tr('storage.title')}: ${info.storage.diskType}`);
+    lines.push(`${tr('storage.title')}: ${info.storage.diskType ?? na}`);
 
     if (info.filesystems.length) {
       lines.push(`${tr('storage.filesystems')}:`);
@@ -145,7 +159,7 @@ export class SystemInfoComponent {
         lines.push(`  [${lp.status}] ${lp.path}`);
       }
     } else {
-      lines.push(`${tr('storage.libraryPaths')}: ${tr('storage.noLibraryPaths')}`);
+      lines.push(`${tr('storage.libraryPaths')}: ${tr(this.noLibraryPathsKey(info))}`);
     }
 
     lines.push(`${tr('tools.title')}: ffprobe ${info.tools.ffprobeVersion ?? na}, kepubify ${info.tools.kepubifyVersion ?? na}`);

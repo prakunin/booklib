@@ -18,7 +18,7 @@ export interface SystemInfo {
   };
   os: {name: string; version: string; arch: string};
   database: {vendor: string | null; version: string | null; status: 'UP' | 'DOWN'};
-  storage: {diskType: string};
+  storage: {diskType: string | null};
   filesystems: {paths: string[]; totalBytes: number; usableBytes: number}[];
   libraryPaths: {path: string; status: PathStatus}[];
   tools: {ffprobeVersion: string | null; kepubifyVersion: string | null};

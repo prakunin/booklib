@@ -3,6 +3,8 @@
     "description": "Snímka len na čítanie o stave aplikácie, behového prostredia a úložiska servera. Zobrazuje všetko, čo sa serveru podarilo zhromaždiť, aj keď časti sú nedostupné.",
     "loading": "Načítavanie systémových informácií...",
     "loadError": "Nepodarilo sa načítať systémové informácie. Skúste obnoviť.",
+    "refreshError": "Nepodarilo sa obnoviť informácie o systéme. Zobrazujú sa posledné známe hodnoty.",
+    "staleDataNote": "Zobrazujú sa údaje z posledného úspešného načítania; posledné obnovenie zlyhalo.",
     "notAvailable": "Nedostupné",
     "copied": "Systémové informácie skopírované do schránky",
     "copyFailed": "Nepodarilo sa skopírovať systémové informácie do schránky",
@@ -44,7 +46,8 @@
         "free": "voľné",
         "total": "celkovo",
         "libraryPaths": "Cesty knižníc",
-        "noLibraryPaths": "Nie sú nakonfigurované žiadne cesty knižníc."
+        "noLibraryPaths": "Nie sú nakonfigurované žiadne cesty knižníc.",
+        "libraryPathsUnavailable": "Nepodarilo sa zistiť cesty knižníc; databáza je nedostupná."
     },
     "tools": {
         "title": "Nástroje",

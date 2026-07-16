@@ -3,6 +3,8 @@
     "description": "Una instantánea de solo lectura del estado de la aplicación, el entorno de ejecución y el almacenamiento del servidor. Muestra todo lo que el servidor pudo recopilar, incluso si algunas partes no funcionan.",
     "loading": "Cargando información del sistema...",
     "loadError": "No se pudo cargar la información del sistema. Intente actualizar.",
+    "refreshError": "No se pudo actualizar la información del sistema. Mostrando los últimos valores conocidos.",
+    "staleDataNote": "Mostrando datos de la última carga correcta; la última actualización falló.",
     "notAvailable": "No disponible",
     "copied": "Información del sistema copiada al portapapeles",
     "copyFailed": "No se pudo copiar la información del sistema al portapapeles",
@@ -44,7 +46,8 @@
         "free": "libre",
         "total": "total",
         "libraryPaths": "Rutas de bibliotecas",
-        "noLibraryPaths": "No hay rutas de bibliotecas configuradas."
+        "noLibraryPaths": "No hay rutas de bibliotecas configuradas.",
+        "libraryPathsUnavailable": "No se pudieron determinar las rutas de la biblioteca; la base de datos no está disponible."
     },
     "tools": {
         "title": "Herramientas",

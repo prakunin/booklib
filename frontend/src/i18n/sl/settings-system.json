@@ -3,6 +3,8 @@
     "description": "Posnetek stanja aplikacije, izvajalnega okolja in shrambe strežnika samo za branje. Prikazuje vse, kar je strežnik lahko zbral, tudi če deli ne delujejo.",
     "loading": "Nalaganje sistemskih informacij...",
     "loadError": "Sistemskih informacij ni bilo mogoče naložiti. Poskusite znova naložiti.",
+    "refreshError": "Sistemskih informacij ni bilo mogoče osvežiti. Prikazane so zadnje znane vrednosti.",
+    "staleDataNote": "Prikazani so podatki zadnjega uspešnega nalaganja; zadnje osveževanje ni uspelo.",
     "notAvailable": "Ni na voljo",
     "copied": "Sistemske informacije so kopirane v odložišče",
     "copyFailed": "Sistemskih informacij ni bilo mogoče kopirati v odložišče",
@@ -44,7 +46,8 @@
         "free": "prosto",
         "total": "skupaj",
         "libraryPaths": "Poti knjižnic",
-        "noLibraryPaths": "Nastavljenih ni nobenih poti knjižnic."
+        "noLibraryPaths": "Nastavljenih ni nobenih poti knjižnic.",
+        "libraryPathsUnavailable": "Poti knjižnic ni bilo mogoče določiti; podatkovna baza ni dosegljiva."
     },
     "tools": {
         "title": "Orodja",

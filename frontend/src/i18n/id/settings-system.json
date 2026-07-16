@@ -3,6 +3,8 @@
     "description": "Cuplikan hanya-baca dari status aplikasi, runtime, dan penyimpanan server. Menampilkan semua yang berhasil dikumpulkan server, meskipun sebagian tidak berfungsi.",
     "loading": "Memuat informasi sistem...",
     "loadError": "Tidak dapat memuat informasi sistem. Coba segarkan.",
+    "refreshError": "Tidak dapat menyegarkan informasi sistem. Menampilkan nilai terakhir yang diketahui.",
+    "staleDataNote": "Menampilkan data dari pemuatan terakhir yang berhasil; penyegaran terakhir gagal.",
     "notAvailable": "Tidak tersedia",
     "copied": "Informasi sistem disalin ke clipboard",
     "copyFailed": "Tidak dapat menyalin informasi sistem ke clipboard",
@@ -44,7 +46,8 @@
         "free": "bebas",
         "total": "total",
         "libraryPaths": "Jalur pustaka",
-        "noLibraryPaths": "Tidak ada jalur pustaka yang dikonfigurasi."
+        "noLibraryPaths": "Tidak ada jalur pustaka yang dikonfigurasi.",
+        "libraryPathsUnavailable": "Tidak dapat menentukan jalur pustaka; basis data tidak dapat dijangkau."
     },
     "tools": {
         "title": "Alat",

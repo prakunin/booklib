@@ -3,6 +3,8 @@
     "description": "Een alleen-lezen momentopname van de applicatie-, runtime- en opslagstatus van de server. Toont alles wat de server kon verzamelen, ook als delen ervan niet werken.",
     "loading": "Systeeminformatie wordt geladen...",
     "loadError": "Kan systeeminformatie niet laden. Probeer te vernieuwen.",
+    "refreshError": "Kan systeeminformatie niet vernieuwen. De laatst bekende waarden worden weergegeven.",
+    "staleDataNote": "Gegevens van de laatst geslaagde keer laden worden weergegeven; de laatste vernieuwing is mislukt.",
     "notAvailable": "Niet beschikbaar",
     "copied": "Systeeminformatie gekopieerd naar klembord",
     "copyFailed": "Kan systeeminformatie niet naar klembord kopiëren",
@@ -44,7 +46,8 @@
         "free": "vrij",
         "total": "totaal",
         "libraryPaths": "Bibliotheekpaden",
-        "noLibraryPaths": "Er zijn geen bibliotheekpaden geconfigureerd."
+        "noLibraryPaths": "Er zijn geen bibliotheekpaden geconfigureerd.",
+        "libraryPathsUnavailable": "Kan bibliotheekpaden niet bepalen; de database is onbereikbaar."
     },
     "tools": {
         "title": "Hulpmiddelen",

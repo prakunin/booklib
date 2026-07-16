@@ -2,6 +2,7 @@ package org.booklore.service.system;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -77,6 +78,26 @@ class TimeoutProcessRunnerTest {
                     Path.of("/definitely/not/a/real/binary-xyz-123"), "--version");
 
             assertThat(result).isEmpty();
+        }
+
+        /**
+         * Pins the regression: {@code Thread.join(0)} means "wait forever", not "don't wait". A
+         * zero-second budget means the deadline is already in the past by the time the internal
+         * read thread is joined, so this exercises exactly that "already exhausted" branch. Before
+         * the fix, this hung until the 60s sleep completed (or forever); the {@link Timeout}
+         * annotation turns a regression into a fast failure instead of a wedged test run.
+         */
+        @Test
+        @Timeout(10)
+        void returnsPromptlyWhenTheDeadlineHasAlreadyElapsedBeforeTheJoin() {
+            TimeoutProcessRunner expiredRunner = new TimeoutProcessRunner(0);
+            Instant start = Instant.now();
+
+            Optional<String> result = expiredRunner.firstLine(Path.of("sh"), "-c", "sleep 60");
+
+            Duration elapsed = Duration.between(start, Instant.now());
+            assertThat(result).isEmpty();
+            assertThat(elapsed).isLessThan(Duration.ofSeconds(5));
         }
     }
 }

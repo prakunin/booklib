@@ -1,8 +1,10 @@
 import {TestBed} from '@angular/core/testing';
+import {HttpTestingController} from '@angular/common/http/testing';
 import {TranslocoService} from '@jsverse/transloco';
-import {describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it} from 'vitest';
 import {getTranslocoModule} from '../../../core/testing/transloco-testing';
-import {createQueryClientHarness} from '../../../core/testing/query-testing';
+import {createQueryClientHarness, flushQueryAsync} from '../../../core/testing/query-testing';
+import {API_CONFIG} from '../../../core/config/api-config';
 import {SystemInfo} from '../../../core/services/system-info.service';
 import {SystemInfoComponent} from './system-info.component';
 
@@ -131,5 +133,103 @@ describe('SystemInfoComponent', () => {
 
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('2d 3h 4m 5s');
+  });
+
+  it('renders "Not available" instead of "0 B" for the -1 heapMaxBytes sentinel', async () => {
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      runtime: {
+        ...BASE_SNAPSHOT.runtime,
+        heapMaxBytes: -1,
+      },
+    });
+
+    const text = fixture.nativeElement.textContent;
+    const notAvailable = translate('notAvailable');
+    // "100 B" (the heap-used side) legitimately contains the substring "0 B", so assert the
+    // heap-max side precisely instead of a broad "does not contain '0 B'" check.
+    expect(text).toContain(`/ ${notAvailable}`);
+    expect(text).not.toContain('/ 0 B');
+  });
+
+  it('renders "Not available" for a null storage disk type instead of a blank value', async () => {
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      storage: {diskType: null},
+    });
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain(translate('notAvailable'));
+  });
+
+  it('distinguishes "none configured" from "could not determine" for empty library paths', async () => {
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      libraryPaths: [],
+      database: {vendor: null, version: null, status: 'DOWN'},
+    });
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain(translate('storage.libraryPathsUnavailable'));
+    expect(text).not.toContain(translate('storage.noLibraryPaths'));
+  });
+
+  it('reports "none configured" for empty library paths when the database is reachable', async () => {
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      libraryPaths: [],
+      database: {vendor: 'PostgreSQL', version: '16.1', status: 'UP'},
+    });
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain(translate('storage.noLibraryPaths'));
+    expect(text).not.toContain(translate('storage.libraryPathsUnavailable'));
+  });
+});
+
+describe('SystemInfoComponent driven by a real query (failed refresh)', () => {
+  let httpTestingController: HttpTestingController;
+
+  afterEach(() => {
+    httpTestingController?.verify();
+    TestBed.resetTestingModule();
+  });
+
+  it('keeps a failed refresh visible and marks the stale snapshot, instead of hiding the failure', async () => {
+    const harness = createQueryClientHarness();
+    harness.queryClient.setDefaultOptions({queries: {retry: false}});
+
+    await TestBed.configureTestingModule({
+      imports: [SystemInfoComponent, getTranslocoModule()],
+      providers: harness.providers,
+    }).compileComponents();
+
+    httpTestingController = TestBed.inject(HttpTestingController);
+    const t = TestBed.inject(TranslocoService);
+    const translate = (key: string) => t.translate(`settingsSystem.${key}`);
+
+    const fixture = TestBed.createComponent(SystemInfoComponent);
+    fixture.detectChanges();
+
+    const url = `${API_CONFIG.BASE_URL}/api/v1/admin/system-info`;
+    httpTestingController.expectOne(url).flush(BASE_SNAPSHOT);
+    await flushQueryAsync();
+
+    // First load succeeded: no error, no stale marker yet.
+    expect(fixture.nativeElement.textContent).toContain('v1.2.3');
+    expect(fixture.nativeElement.textContent).not.toContain(translate('refreshError'));
+
+    fixture.componentInstance['refresh']();
+    httpTestingController.expectOne(url).flush('boom', {status: 500, statusText: 'Server Error'});
+    await flushQueryAsync();
+
+    const text = fixture.nativeElement.textContent;
+    // The last successful snapshot is still shown (TanStack Query does not clear `data` on error)...
+    expect(text).toContain('v1.2.3');
+    // ...but the failed refresh must be visible, not silently swallowed behind the stale snapshot.
+    expect(text).toContain(translate('refreshError'));
+    expect(text).toContain(translate('staleDataNote'));
+    const staleContainer = fixture.nativeElement.querySelector('.settings-content-stale');
+    expect(staleContainer).not.toBeNull();
   });
 });

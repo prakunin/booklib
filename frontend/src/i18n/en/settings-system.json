@@ -3,6 +3,8 @@
   "description": "A read-only snapshot of the server's application, runtime, and storage state. Renders whatever the server could gather, even if parts of it are down.",
   "loading": "Loading system information...",
   "loadError": "Could not load system information. Try refreshing.",
+  "refreshError": "Could not refresh system information. Showing the last known values.",
+  "staleDataNote": "Showing data from the last successful load; the last refresh failed.",
   "notAvailable": "Not available",
   "copied": "System info copied to clipboard",
   "copyFailed": "Could not copy system info to clipboard",
@@ -44,7 +46,8 @@
     "free": "free",
     "total": "total",
     "libraryPaths": "Library Paths",
-    "noLibraryPaths": "No library paths are configured."
+    "noLibraryPaths": "No library paths are configured.",
+    "libraryPathsUnavailable": "Could not determine library paths; the database is unreachable."
   },
   "tools": {
     "title": "Tools",

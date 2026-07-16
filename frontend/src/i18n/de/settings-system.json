@@ -3,6 +3,8 @@
     "description": "Eine schreibgeschützte Momentaufnahme des Anwendungs-, Laufzeit- und Speicherzustands des Servers. Zeigt alles an, was der Server erfassen konnte, selbst wenn Teile davon ausgefallen sind.",
     "loading": "Systeminformationen werden geladen...",
     "loadError": "Systeminformationen konnten nicht geladen werden. Bitte aktualisieren.",
+    "refreshError": "Systeminformationen konnten nicht aktualisiert werden. Zeigt die zuletzt bekannten Werte.",
+    "staleDataNote": "Zeigt Daten aus dem letzten erfolgreichen Laden; die letzte Aktualisierung ist fehlgeschlagen.",
     "notAvailable": "Nicht verfügbar",
     "copied": "Systeminformationen in die Zwischenablage kopiert",
     "copyFailed": "Systeminformationen konnten nicht in die Zwischenablage kopiert werden",
@@ -44,7 +46,8 @@
         "free": "frei",
         "total": "gesamt",
         "libraryPaths": "Bibliothekspfade",
-        "noLibraryPaths": "Es sind keine Bibliothekspfade konfiguriert."
+        "noLibraryPaths": "Es sind keine Bibliothekspfade konfiguriert.",
+        "libraryPathsUnavailable": "Bibliothekspfade konnten nicht ermittelt werden; die Datenbank ist nicht erreichbar."
     },
     "tools": {
         "title": "Werkzeuge",

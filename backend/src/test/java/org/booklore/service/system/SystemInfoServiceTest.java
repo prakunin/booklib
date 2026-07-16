@@ -19,8 +19,10 @@ import java.sql.SQLException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -65,6 +67,23 @@ class SystemInfoServiceTest {
         @Test
         void reportsANonBlankSpringBootVersion() {
             assertThat(service.getSystemInfo().getApplication().getSpringBootVersion()).isNotBlank();
+        }
+
+        @Test
+        void degradesToEmptyBuilderWithoutFailingTheResponseWhenVersionServiceFails() {
+            // versionService.getAppVersion() is the only unchecked-throw seam in this block; an
+            // unguarded throw here previously aborted the entire response, including database,
+            // runtime and os, which have nothing to do with the app version.
+            when(versionService.getAppVersion()).thenThrow(new RuntimeException("boom"));
+
+            var info = service.getSystemInfo();
+
+            assertThat(info.getApplication()).isNotNull();
+            assertThat(info.getApplication().getVersion()).isNull();
+            // The rest of the response must still populate.
+            assertThat(info.getOs().getName()).isNotBlank();
+            assertThat(info.getRuntime().getAvailableProcessors()).isPositive();
+            assertThat(info.getDatabase().getStatus()).isEqualTo("UP");
         }
     }
 
@@ -150,9 +169,9 @@ class SystemInfoServiceTest {
 
         @Test
         void filesystemsAndLibraryPathsDegradeToEmptyWhenStorageInfoServiceFails() {
-            when(storageInfoService.filesystems())
+            when(storageInfoService.filesystems(any()))
                     .thenThrow(new DataAccessResourceFailureException("connection refused"));
-            when(storageInfoService.libraryPaths())
+            when(storageInfoService.libraryPaths(any()))
                     .thenThrow(new DataAccessResourceFailureException("connection refused"));
             when(versionService.getAppVersion()).thenReturn("v1.2.3");
 
@@ -178,9 +197,9 @@ class SystemInfoServiceTest {
 
         @Test
         void storageBlocksSucceedIndependentlyWhenOnlyOneFails() {
-            when(storageInfoService.filesystems())
+            when(storageInfoService.filesystems(any()))
                     .thenThrow(new DataAccessResourceFailureException("connection refused"));
-            when(storageInfoService.libraryPaths()).thenReturn(List.of(
+            when(storageInfoService.libraryPaths(any())).thenReturn(List.of(
                     LibraryPathInfo.builder().path("/books").build()));
             when(storageInfoService.storageInfo()).thenReturn(StorageInfo.builder().diskType("LOCAL").build());
 
@@ -189,6 +208,31 @@ class SystemInfoServiceTest {
             assertThat(info.getFilesystems()).isEmpty();
             assertThat(info.getLibraryPaths()).extracting(LibraryPathInfo::getPath).containsExactly("/books");
             assertThat(info.getStorage().getDiskType()).isEqualTo("LOCAL");
+        }
+
+        @Test
+        void fetchesConfiguredLibraryPathsOnceAndSharesThemWithBothBlocks() {
+            when(storageInfoService.configuredLibraryPaths()).thenReturn(List.of("/books/shared"));
+            when(storageInfoService.libraryPaths(List.of("/books/shared"))).thenReturn(List.of(
+                    LibraryPathInfo.builder().path("/books/shared").build()));
+            when(storageInfoService.filesystems(List.of("/books/shared"))).thenReturn(List.of());
+
+            var info = service.getSystemInfo();
+
+            assertThat(info.getLibraryPaths()).extracting(LibraryPathInfo::getPath).containsExactly("/books/shared");
+            // configuredLibraryPaths() is fetched exactly once per request, not once per block.
+            verify(storageInfoService, org.mockito.Mockito.times(1)).configuredLibraryPaths();
+        }
+
+        @Test
+        void configuredLibraryPathsFailureDegradesToEmptyWithoutFailingTheResponse() {
+            when(storageInfoService.configuredLibraryPaths())
+                    .thenThrow(new DataAccessResourceFailureException("connection refused"));
+            when(versionService.getAppVersion()).thenReturn("v1.2.3");
+
+            var info = service.getSystemInfo();
+
+            assertThat(info.getApplication().getVersion()).isEqualTo("v1.2.3");
         }
     }
 

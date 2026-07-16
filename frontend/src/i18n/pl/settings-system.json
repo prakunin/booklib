@@ -3,6 +3,8 @@
     "description": "Zrzut stanu tylko do odczytu obejmujący aplikację, środowisko wykonawcze i magazyn serwera. Wyświetla wszystko, co serwer zdołał zebrać, nawet jeśli część danych jest niedostępna.",
     "loading": "Wczytywanie informacji o systemie...",
     "loadError": "Nie można wczytać informacji o systemie. Spróbuj odświeżyć.",
+    "refreshError": "Nie udało się odświeżyć informacji o systemie. Wyświetlane są ostatnie znane wartości.",
+    "staleDataNote": "Wyświetlane są dane z ostatniego udanego wczytania; ostatnie odświeżenie nie powiodło się.",
     "notAvailable": "Niedostępne",
     "copied": "Informacje o systemie skopiowano do schowka",
     "copyFailed": "Nie udało się skopiować informacji o systemie do schowka",
@@ -44,7 +46,8 @@
         "free": "wolne",
         "total": "łącznie",
         "libraryPaths": "Ścieżki bibliotek",
-        "noLibraryPaths": "Nie skonfigurowano żadnych ścieżek bibliotek."
+        "noLibraryPaths": "Nie skonfigurowano żadnych ścieżek bibliotek.",
+        "libraryPathsUnavailable": "Nie udało się ustalić ścieżek bibliotek; baza danych jest niedostępna."
     },
     "tools": {
         "title": "Narzędzia",

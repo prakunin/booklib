@@ -3,6 +3,8 @@
     "description": "Un'istantanea in sola lettura dello stato dell'applicazione, del runtime e dell'archiviazione del server. Mostra tutto ciò che il server è riuscito a raccogliere, anche se alcune parti non funzionano.",
     "loading": "Caricamento informazioni di sistema...",
     "loadError": "Impossibile caricare le informazioni di sistema. Provare ad aggiornare.",
+    "refreshError": "Impossibile aggiornare le informazioni di sistema. Vengono mostrati gli ultimi valori noti.",
+    "staleDataNote": "Vengono mostrati i dati dell'ultimo caricamento riuscito; l'ultimo aggiornamento non è riuscito.",
     "notAvailable": "Non disponibile",
     "copied": "Informazioni di sistema copiate negli appunti",
     "copyFailed": "Impossibile copiare le informazioni di sistema negli appunti",
@@ -44,7 +46,8 @@
         "free": "liberi",
         "total": "totali",
         "libraryPaths": "Percorsi delle librerie",
-        "noLibraryPaths": "Nessun percorso di libreria configurato."
+        "noLibraryPaths": "Nessun percorso di libreria configurato.",
+        "libraryPathsUnavailable": "Impossibile determinare i percorsi della libreria; il database non è raggiungibile."
     },
     "tools": {
         "title": "Strumenti",

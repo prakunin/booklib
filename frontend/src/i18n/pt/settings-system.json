@@ -3,6 +3,8 @@
     "description": "Um instantâneo somente leitura do estado da aplicação, do runtime e do armazenamento do servidor. Exibe tudo o que o servidor conseguiu coletar, mesmo que partes estejam indisponíveis.",
     "loading": "Carregando informações do sistema...",
     "loadError": "Não foi possível carregar as informações do sistema. Tente atualizar.",
+    "refreshError": "Não foi possível atualizar as informações do sistema. Mostrando os últimos valores conhecidos.",
+    "staleDataNote": "Mostrando dados do último carregamento bem-sucedido; a última atualização falhou.",
     "notAvailable": "Não disponível",
     "copied": "Informações do sistema copiadas para a área de transferência",
     "copyFailed": "Não foi possível copiar as informações do sistema para a área de transferência",
@@ -44,7 +46,8 @@
         "free": "livre",
         "total": "total",
         "libraryPaths": "Caminhos das bibliotecas",
-        "noLibraryPaths": "Nenhum caminho de biblioteca configurado."
+        "noLibraryPaths": "Nenhum caminho de biblioteca configurado.",
+        "libraryPathsUnavailable": "Não foi possível determinar os caminhos da biblioteca; o banco de dados está inacessível."
     },
     "tools": {
         "title": "Ferramentas",

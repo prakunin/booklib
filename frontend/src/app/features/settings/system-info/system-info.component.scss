@@ -49,6 +49,21 @@
   gap: 1.3125rem;
 }
 
+// A failed refresh keeps the last successful snapshot visible (TanStack Query does not clear
+// `data` on error) — dim it so it reads as "stale", not "current", alongside the error banner.
+.settings-content-stale {
+  opacity: 0.72;
+}
+
+.stale-note {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  margin: 0;
+  font-size: settings.$settings-description-size;
+  color: var(--p-amber-400, #f59e0b);
+}
+
 .settings-card {
   @include settings.settings-card;
 }

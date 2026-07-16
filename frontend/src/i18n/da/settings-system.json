@@ -3,6 +3,8 @@
     "description": "Et skrivebeskyttet øjebliksbillede af serverens applikations-, runtime- og lagringstilstand. Viser alt, hvad serveren kunne indsamle, selv hvis dele af det er nede.",
     "loading": "Indlæser systemoplysninger...",
     "loadError": "Kunne ikke indlæse systemoplysninger. Prøv at opdatere.",
+    "refreshError": "Kunne ikke opdatere systemoplysninger. Viser de sidst kendte værdier.",
+    "staleDataNote": "Viser data fra sidste vellykkede indlæsning; sidste opdatering mislykkedes.",
     "notAvailable": "Ikke tilgængelig",
     "copied": "Systemoplysninger kopieret til udklipsholderen",
     "copyFailed": "Kunne ikke kopiere systemoplysninger til udklipsholderen",
@@ -44,7 +46,8 @@
         "free": "fri",
         "total": "i alt",
         "libraryPaths": "Biblioteksstier",
-        "noLibraryPaths": "Der er ikke konfigureret nogen biblioteksstier."
+        "noLibraryPaths": "Der er ikke konfigureret nogen biblioteksstier.",
+        "libraryPathsUnavailable": "Kunne ikke bestemme biblioteksstier; databasen er utilgængelig."
     },
     "tools": {
         "title": "Værktøjer",

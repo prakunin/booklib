@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -92,8 +93,12 @@ public class TimeoutProcessRunner implements ProcessRunner {
             }
         });
         reader.start();
-        long remainingMillis = TimeUnit.NANOSECONDS.toMillis(deadlineNanos - System.nanoTime());
-        reader.join(Math.max(0, remainingMillis));
+        // Thread.join(long millis) treats 0 as "wait forever", not "don't wait" — so clamping an
+        // already-exhausted deadline to 0 with Math.max(0, ...) previously reintroduced the exact
+        // hang this class exists to prevent. Thread.join(Duration) does not have that trap: per its
+        // javadoc, a duration of zero or less means "do not wait", which is exactly "give up now"
+        // semantics an exhausted deadline needs.
+        reader.join(Duration.ofNanos(deadlineNanos - System.nanoTime()));
         return result.get();
     }
 }

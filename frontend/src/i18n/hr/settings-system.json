@@ -3,6 +3,8 @@
     "description": "Snimka stanja aplikacije, radnog okruženja i pohrane servera samo za čitanje. Prikazuje sve što je server uspio prikupiti, čak i ako neki dijelovi ne rade.",
     "loading": "Učitavanje sistemskih informacija...",
     "loadError": "Nije moguće učitati sistemske informacije. Pokušajte ponovno učitati.",
+    "refreshError": "Nije moguće osvježiti podatke o sustavu. Prikazane su posljednje poznate vrijednosti.",
+    "staleDataNote": "Prikazani su podaci iz posljednjeg uspješnog učitavanja; posljednje osvježavanje nije uspjelo.",
     "notAvailable": "Nedostupno",
     "copied": "Sistemske informacije kopirane u međuspremnik",
     "copyFailed": "Nije moguće kopirati sistemske informacije u međuspremnik",
@@ -44,7 +46,8 @@
         "free": "slobodno",
         "total": "ukupno",
         "libraryPaths": "Putanje knjižnica",
-        "noLibraryPaths": "Nisu konfigurirane putanje knjižnica."
+        "noLibraryPaths": "Nisu konfigurirane putanje knjižnica.",
+        "libraryPathsUnavailable": "Nije moguće utvrditi putanje knjižnica; baza podataka nije dostupna."
     },
     "tools": {
         "title": "Alati",

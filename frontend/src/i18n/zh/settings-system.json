@@ -3,6 +3,8 @@
     "description": "服务器应用程序、运行时和存储状态的只读快照。即使部分数据不可用，也会显示服务器能够收集到的所有信息。",
     "loading": "正在加载系统信息...",
     "loadError": "无法加载系统信息。请尝试刷新。",
+    "refreshError": "无法刷新系统信息。显示最后已知的值。",
+    "staleDataNote": "显示的是最后一次成功加载的数据；最近一次刷新失败。",
     "notAvailable": "不可用",
     "copied": "系统信息已复制到剪贴板",
     "copyFailed": "无法将系统信息复制到剪贴板",
@@ -44,7 +46,8 @@
         "free": "可用",
         "total": "总计",
         "libraryPaths": "库路径",
-        "noLibraryPaths": "未配置任何库路径。"
+        "noLibraryPaths": "未配置任何库路径。",
+        "libraryPathsUnavailable": "无法确定库路径；数据库不可访问。"
     },
     "tools": {
         "title": "工具",

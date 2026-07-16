@@ -14,4 +14,12 @@ public interface LibraryPathRepository extends JpaRepository<LibraryPathEntity, 
 
     @Query("SELECT lp FROM LibraryPathEntity lp JOIN FETCH lp.library")
     List<LibraryPathEntity> findAllWithLibrary();
+
+    /**
+     * Plain path strings, with no {@code JOIN FETCH} of the owning library. For callers that only
+     * ever read the path — unlike {@link #findAllWithLibrary()}, which {@code LibraryHealthService}
+     * needs the association for.
+     */
+    @Query("SELECT lp.path FROM LibraryPathEntity lp")
+    List<String> findAllPaths();
 }
