@@ -85,7 +85,7 @@ For full control over each component or IDE integration (debugging, hot-reload, 
 | ----------------------- | ------- | -------------------------------------------- |
 | Java                    | 25+     | [Adoptium](https://adoptium.net/)            |
 | Node.js + pnpm          | 24+     | [nodejs.org](https://nodejs.org/)            |
-| MariaDB                 | 10.6+   | [mariadb.org](https://mariadb.org/download/) |
+| MariaDB                 | 12.3+   | [mariadb.org](https://mariadb.org/download/) |
 | Git                     | latest  | [git-scm.com](https://git-scm.com/)          |
 
 #### 1. Database

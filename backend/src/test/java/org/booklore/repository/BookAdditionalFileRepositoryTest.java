@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 class BookAdditionalFileRepositoryTest {
 
     @Container
-    static MariaDBContainer<?> mariaDB = new MariaDBContainer<>("mariadb:11.4.5")
+    static MariaDBContainer<?> mariaDB = new MariaDBContainer<>("mariadb:12.3.2")
             .withDatabaseName("booklore_test")
             .withUsername("test")
             .withPassword("test");

@@ -54,7 +54,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-4200}:4200"
   backend_db:
-    image: mariadb:11.4
+    image: mariadb:12.3.2
     volumes:
       - backend_db:/var/lib/mysql
     restart: unless-stopped
@@ -63,13 +63,18 @@ services:
       - MYSQL_DATABASE=grimmory
       - MYSQL_USER=grimmory
       - MYSQL_PASSWORD=grimmory
+      # Existing dev volumes hold an 11.4 datadir. The image does not run
+      # mariadb-upgrade unless asked, and would otherwise start 12.3 on 11.4
+      # system tables. Safe here because the dev database is disposable.
+      - MARIADB_AUTO_UPGRADE=1
     ports:
       - "${DB_PORT:-3366}:3306"
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-uroot", "-pgrimmory"]
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
 volumes:
   frontend_workspace_node_modules:
   frontend_node_modules:

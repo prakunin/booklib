@@ -44,6 +44,7 @@ local/
 local-scripts/
 
 ### Dev config, books, and data ###
+/.env
 booklore-ui/test-results/
 frontend/test-results/
 frontend/output/

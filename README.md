@@ -72,8 +72,6 @@ API_DOCS_ENABLED=false
 DISK_TYPE=LOCAL
 
 # MariaDB
-DB_USER_ID=1000
-DB_GROUP_ID=1000
 MYSQL_ROOT_PASSWORD=ChangeMe_MariaDBRoot_2025!
 MYSQL_DATABASE=booklib
 ```
@@ -83,7 +81,13 @@ MYSQL_DATABASE=booklib
 The image is built locally from the repository via `build: .` — no external registry is required.
 
 > [!NOTE]
-> Migrating from an existing Booklore or Grimmory container? Keep your current `container_name`, database name and user, ports, and mounted volumes the same. Replace only the `image:` line with `build: .` and run `docker compose up -d --build`.
+> Migrating from an existing Booklore or Grimmory container? Keep your current `container_name`, database name and user, and ports the same. Replace only the `image:` line with `build: .` and run `docker compose up -d --build`.
+
+> [!IMPORTANT]
+> The mariadb volume is the one thing you must **not** keep as-is. Grimmory now runs the official
+> MariaDB image, whose data directory is `/var/lib/mysql` rather than the linuxserver `/config`.
+> Reusing your old mapping starts an **empty** database and leaves your library invisible.
+> Read [docs/UPGRADING-MARIADB-12.md](docs/UPGRADING-MARIADB-12.md) first.
 
 Create a `docker-compose.yml` or copy and adapt [`deploy/compose/docker-compose.yml`](deploy/compose/docker-compose.yml):
 
@@ -119,24 +123,27 @@ services:
     restart: unless-stopped
 
   mariadb:
-    image: lscr.io/linuxserver/mariadb:11.4.5
+    image: mariadb:12.3.2
     environment:
-      - PUID=${DB_USER_ID}
-      - PGID=${DB_GROUP_ID}
       - TZ=${TZ}
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${DB_USER}
       - MYSQL_PASSWORD=${DB_PASSWORD}
     volumes:
-      - ./mariadb/config:/config
+      - ./mariadb/data:/var/lib/mysql
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 30s
 ```
+
+> **Upgrading from an older release?** Grimmory now uses the official MariaDB image instead of the
+> linuxserver one, which stores data in a different directory. See
+> [docs/UPGRADING-MARIADB-12.md](docs/UPGRADING-MARIADB-12.md) before pulling.
 
 ### Step 3: Launch
 
