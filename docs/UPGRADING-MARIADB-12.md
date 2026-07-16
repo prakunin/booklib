@@ -91,12 +91,20 @@ mariadb:
 
 Caveats:
 
-- **Ownership.** linuxserver wrote those files as your `PUID`/`PGID` (typically `1000:1000`); the
-  official image runs as `mysql`. If the container fails to start with permission errors, chown the
-  tree to the `mysql` uid used by the image (`999` by default):
+- **Ownership is handled for you — as long as the container starts as root.** linuxserver wrote
+  those files as your `PUID`/`PGID` (typically `1000:1000`). The official entrypoint starts as root,
+  chowns anything under the data directory that is not already owned by `mysql`, and only then drops
+  to the `mysql` user, so a linuxserver-owned tree is adopted automatically.
+
+  This breaks if you pin a `user:` in your compose file: the entrypoint can no longer chown and the
+  server fails with permission errors. If you must run as a fixed user, chown the tree yourself
+  first. Do **not** assume the uid is `999` — the image creates its account with `useradd -r`, which
+  allocates the id dynamically, so read it from the image:
 
   ```bash
-  sudo chown -R 999:999 ./config/databases
+  uid=$(docker run --rm mariadb:12.3.2 id -u mysql)
+  gid=$(docker run --rm mariadb:12.3.2 id -g mysql)
+  sudo chown -R "$uid:$gid" ./config/databases
   ```
 
 - **Your `custom.cnf` is not carried over.** Anything you set in `/config/custom.cnf` must be moved
