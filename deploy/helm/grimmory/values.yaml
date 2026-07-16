@@ -5,6 +5,8 @@
 mariadb:
   enabled: true
   image:
+    # Pinned here rather than inherited from the subchart's appVersion, so that
+    # bumping the chart cannot change the database engine on its own.
     tag: 12.3.2
   auth:
     database: grimmory
