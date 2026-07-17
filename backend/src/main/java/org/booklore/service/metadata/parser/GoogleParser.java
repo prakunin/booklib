@@ -163,7 +163,7 @@ public class GoogleParser implements BookParser {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            return handleApiResponse(response);
+            return handleApiResponse(response, query, isIsbnSearch);
         } catch (IOException e) {
             log.error("IO error while fetching metadata from Google Books API: {}", e.getMessage());
             return List.of();
@@ -174,13 +174,13 @@ public class GoogleParser implements BookParser {
         }
     }
 
-    private List<BookMetadata> handleApiResponse(HttpResponse<String> response) throws IOException {
+    private List<BookMetadata> handleApiResponse(HttpResponse<String> response, String query, boolean isIsbnSearch) throws IOException {
         int statusCode = response.statusCode();
-        
+
         if (statusCode == 200) {
             List<BookMetadata> results = parseGoogleBooksApiResponse(response.body());
             List<BookMetadata> filtered = filterIrrelevantResults(results);
-            return sortByCompleteness(filtered);
+            return rank(filtered, query, isIsbnSearch);
         }
         
         if (statusCode == 429) {
@@ -608,19 +608,65 @@ public class GoogleParser implements BookParser {
      * Sort results by metadata completeness.
      * Items with more populated fields come first.
      */
-    private List<BookMetadata> sortByCompleteness(List<BookMetadata> results) {
+    /**
+     * Orders results by how well each one answers the query that produced it, strongest signal
+     * first: an exact ISBN match, then a language matching the query's own script, then how
+     * complete the record is.
+     * <p>
+     * This only ever reorders — nothing is dropped. {@code langRestrict} (configured through the
+     * Google provider's language setting) already filters, and a filter makes a mis-tagged edition
+     * vanish outright; an empty result list is worse than an unsorted one. That is why the language
+     * signal is a boost and lives here.
+     */
+    static List<BookMetadata> rank(List<BookMetadata> results, String query, boolean isIsbnSearch) {
         if (results == null || results.isEmpty()) {
             return List.of();
         }
-        
+
+        String wantedIsbn = isIsbnSearch ? normaliseIsbn(query) : null;
+        String wantedLanguage = queryLanguage(query);
+
         return results.stream()
-                .sorted((a, b) -> Integer.compare(
-                        countPopulatedFields(b),
-                        countPopulatedFields(a)))
+                .sorted(Comparator
+                        .comparing((BookMetadata m) -> matchesIsbn(m, wantedIsbn)).reversed()
+                        .thenComparing(Comparator.comparing((BookMetadata m) -> matchesLanguage(m, wantedLanguage)).reversed())
+                        .thenComparing(Comparator.comparingInt(GoogleParser::countPopulatedFields).reversed()))
                 .toList();
     }
 
-    private int countPopulatedFields(BookMetadata metadata) {
+    private static boolean matchesIsbn(BookMetadata metadata, String wantedIsbn) {
+        if (wantedIsbn == null || wantedIsbn.isBlank()) {
+            return false;
+        }
+        return wantedIsbn.equals(normaliseIsbn(metadata.getIsbn13()))
+                || wantedIsbn.equals(normaliseIsbn(metadata.getIsbn10()));
+    }
+
+    private static boolean matchesLanguage(BookMetadata metadata, String wantedLanguage) {
+        if (wantedLanguage == null) {
+            return false;
+        }
+        return wantedLanguage.equals(LanguageNormalizer.normalize(metadata.getLanguage()));
+    }
+
+    /**
+     * The language the query itself is written in, or null when it carries no signal. Only Cyrillic
+     * is inferred: a Latin-script query must rank exactly as it did before this existed.
+     */
+    private static String queryLanguage(String query) {
+        if (query == null) {
+            return null;
+        }
+        boolean hasCyrillic = query.codePoints()
+                .anyMatch(cp -> Character.UnicodeScript.of(cp) == Character.UnicodeScript.CYRILLIC);
+        return hasCyrillic ? LanguageNormalizer.normalize("ru") : null;
+    }
+
+    private static String normaliseIsbn(String isbn) {
+        return isbn == null ? null : isbn.replaceAll("[\\s-]", "");
+    }
+
+    private static int countPopulatedFields(BookMetadata metadata) {
         int count = 0;
         
         if (metadata.getTitle() != null && !metadata.getTitle().isBlank()) count++;
