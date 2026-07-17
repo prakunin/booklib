@@ -68,11 +68,21 @@ public class BookEntity {
     private String audiobookCoverHash;
 
     /**
-     * Set once a lazy INPX cover probe successfully reads the archived FB2 and finds no embedded
-     * cover. Only ever set on a genuinely completed probe - never on a read failure - so the lazy
-     * path ({@link org.booklore.service.metadata.BookCoverService#tryGenerateMissingInpxCover}) can
-     * skip re-opening the archive without mistaking "we could not look" for "we looked and there is
-     * nothing". Cleared on rescan so an archive that gains a cover is picked up again.
+     * Set once a lazy INPX cover probe completes and establishes that this book will never yield a
+     * cover from its archive: either the archived FB2 was read through and has no cover binary, or
+     * it has one that can never be turned into an image (an SVG, say). The lazy path
+     * ({@link org.booklore.service.metadata.BookCoverService#tryGenerateMissingInpxCover}) then
+     * skips re-opening the archive. Cleared on rescan so an archive that gains a cover is picked up
+     * again, and cleared by {@link #setBookCoverHash} the moment the book gets a cover by any route.
+     * <p>
+     * Set only on a completed probe, never on a failure to read - that is the whole point of the
+     * column, and it is a real invariant rather than an aspiration only because
+     * {@code Fb2MetadataExtractor.extractCover} distinguishes the two. It could not until recently:
+     * it answered both "this FB2 has no cover" and "this FB2 could not be opened, parsed, or
+     * base64-decoded" with a bare {@code null}, {@code Fb2Processor} mapped that {@code null} to
+     * {@code NO_COVER_FOUND}, and a transient IO error was recorded here permanently. This javadoc
+     * asserted the invariant throughout, which is exactly what stopped four fix waves from looking
+     * here: the guarantee is only ever as good as the layer that can actually tell the difference.
      */
     @Column(name = "cover_probed_at")
     private Instant coverProbedAt;

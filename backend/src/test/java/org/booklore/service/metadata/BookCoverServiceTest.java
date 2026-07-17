@@ -299,7 +299,7 @@ class BookCoverServiceTest {
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
             when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
-            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.WRITE_FAILED);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.SAVE_FAILED);
 
             boolean generated = service.tryGenerateMissingInpxCover(42L);
 
@@ -431,7 +431,7 @@ class BookCoverServiceTest {
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
             when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
-            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.WRITE_FAILED);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.SAVE_FAILED);
 
             service.tryGenerateMissingInpxCover(42L);
             service.tryGenerateMissingInpxCover(42L);
@@ -777,7 +777,7 @@ class BookCoverServiceTest {
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.found(new byte[]{1, 2, 3}));
-            when(fileService.saveCoverImageFromBytes(eq(1L), any())).thenReturn(CoverSaveOutcome.WRITE_FAILED);
+            when(fileService.saveCoverImageFromBytes(eq(1L), any())).thenReturn(CoverSaveOutcome.SAVE_FAILED);
 
             assertThatThrownBy(() -> service.regenerateCover(1L))
                     .isInstanceOf(APIException.class)
@@ -803,7 +803,7 @@ class BookCoverServiceTest {
 
             assertThatThrownBy(() -> service.regenerateCover(1L))
                     .isInstanceOf(APIException.class)
-                    .hasMessageContaining("cannot be read")
+                    .hasMessageContaining("cannot be turned into a picture")
                     .hasMessageContaining("SVG")
                     .hasMessageNotContaining("could not be saved");
             verify(bookRepository, never()).save(any());

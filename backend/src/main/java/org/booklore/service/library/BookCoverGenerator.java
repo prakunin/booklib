@@ -7,6 +7,7 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.metadata.extractor.AudiobookMetadataExtractor;
+import org.booklore.service.metadata.extractor.CoverExtractionException;
 import org.booklore.service.metadata.extractor.MetadataExtractorFactory;
 import org.booklore.util.BookCoverUtils;
 import org.booklore.util.FileService;
@@ -78,7 +79,16 @@ public class BookCoverGenerator {
                 return;
             }
 
-            byte[] coverData = audiobookMetadataExtractor.extractCover(file);
+            byte[] coverData;
+            try {
+                coverData = audiobookMetadataExtractor.extractCover(file);
+            } catch (CoverExtractionException e) {
+                // Generating a cover for an extra file attached to an existing book is best-effort,
+                // so a failed read is still just "no cover this time" here - but it is logged as the
+                // different thing it is, rather than as the clean miss below.
+                log.warn("Could not read a cover from audiobook '{}': {}", audioFile.getFileName(), e.getMessage());
+                return;
+            }
             if (coverData == null) {
                 log.debug("No cover image found in audiobook '{}'", audioFile.getFileName());
                 return;
@@ -123,7 +133,13 @@ public class BookCoverGenerator {
                 return;
             }
 
-            byte[] coverData = extractor.extractCover(file);
+            byte[] coverData;
+            try {
+                coverData = extractor.extractCover(file);
+            } catch (CoverExtractionException e) {
+                log.warn("Could not read a cover from ebook '{}': {}", ebookFile.getFileName(), e.getMessage());
+                return;
+            }
             if (coverData == null) {
                 log.debug("No cover image found in ebook '{}'", ebookFile.getFileName());
                 return;

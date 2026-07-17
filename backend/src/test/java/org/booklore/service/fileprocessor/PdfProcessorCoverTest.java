@@ -20,6 +20,7 @@ import org.grimmory.pdfium4j.model.PageSize;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -31,6 +32,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
@@ -62,10 +66,17 @@ class PdfProcessorCoverTest {
                 bookMapper, fileService, metadataMatchService, sidecarMetadataWriter, pdfMetadataExtractor);
     }
 
+    /** A0: 2384x3370pt. At 150 DPI that is 4967x7021 = 34.9M pixels - past FileService's 20M cap. */
+    private static final PageSize A0 = new PageSize(2384, 3370);
+
     private BookEntity bookWithRealPdf() throws Exception {
+        return bookWithRealPdf(PageSize.A4);
+    }
+
+    private BookEntity bookWithRealPdf(PageSize pageSize) throws Exception {
         Path pdf = tempDir.resolve("book.pdf");
         try (PdfDocument doc = PdfDocument.create()) {
-            doc.insertBlankPage(0, PageSize.A4);
+            doc.insertBlankPage(0, pageSize);
             doc.save(pdf);
         }
         BookEntity book = BookEntity.builder()
@@ -126,5 +137,54 @@ class PdfProcessorCoverTest {
         CoverExtraction extraction = processor().extractCover(book, book.getBookFiles().getFirst());
 
         assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.READ_FAILED);
+    }
+
+    /**
+     * A large page must still produce a usable cover.
+     * <p>
+     * Once {@code extractCover} started PNG-encoding its render for {@code saveCoverImageFromBytes}
+     * to decode again, the render had to survive {@code FileService.readImage}'s 20M-pixel
+     * decompression-bomb cap - and an A0 page at 150 DPI is 34.9M pixels, so it did not. The render
+     * worked, the decode refused it, and the user was told their perfectly good PDF had a cover "in
+     * a format that cannot be read (for example SVG)". Anything past roughly 889 square inches
+     * tripped it.
+     * <p>
+     * This drives the real render and then the real (static) {@code readImage} the bytes are
+     * actually handed to, because the defect lives precisely in the handover between them - either
+     * one alone looks fine.
+     */
+    @Test
+    void oversizedPageRendersToACoverFileServiceCanActuallyDecode() throws Exception {
+        BookEntity book = bookWithRealPdf(A0);
+
+        CoverExtraction extraction = processor().extractCover(book, book.getBookFiles().getFirst());
+
+        assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.COVER_FOUND);
+        BufferedImage decoded = FileService.readImage(extraction.data());
+        assertThat(decoded).isNotNull();
+        assertThat(decoded.getWidth()).isLessThanOrEqualTo(FileService.MAX_ORIGINAL_WIDTH);
+        assertThat(decoded.getHeight()).isLessThanOrEqualTo(FileService.MAX_ORIGINAL_HEIGHT);
+        // Bounded, not squashed: an A0 page is 1:1.41, and a cover that lost its proportions would
+        // satisfy the bounds above just as well.
+        assertThat((double) decoded.getWidth() / decoded.getHeight())
+                .isCloseTo(2384.0 / 3370.0, within(0.01));
+    }
+
+    /**
+     * The same bound on the other path. {@code generateCover} hands its raster straight to
+     * {@code FileService} without the encode/decode round trip, so it never hit the cap - but
+     * rendering 34.9M pixels to have {@code saveCoverImages} immediately scale them into a 1000x1500
+     * box is work done only to be thrown away, and both paths share one render for a reason.
+     */
+    @Test
+    void oversizedPageIsNotRenderedLargerThanTheCoverItWillBecome() throws Exception {
+        BookEntity book = bookWithRealPdf(A0);
+        ArgumentCaptor<BufferedImage> rendered = ArgumentCaptor.forClass(BufferedImage.class);
+
+        processor().generateCover(book, book.getBookFiles().getFirst());
+
+        verify(fileService).saveCoverImages(rendered.capture(), eq(42L));
+        assertThat(rendered.getValue().getWidth()).isLessThanOrEqualTo(FileService.MAX_ORIGINAL_WIDTH);
+        assertThat(rendered.getValue().getHeight()).isLessThanOrEqualTo(FileService.MAX_ORIGINAL_HEIGHT);
     }
 }

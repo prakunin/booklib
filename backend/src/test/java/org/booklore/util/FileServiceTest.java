@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -33,11 +34,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -650,7 +653,7 @@ class FileServiceTest {
 
                 CoverSaveOutcome outcome = fileService.saveCoverImageFromBytes(bookId, png);
 
-                assertEquals(CoverSaveOutcome.WRITE_FAILED, outcome);
+                assertEquals(CoverSaveOutcome.SAVE_FAILED, outcome);
             }
 
             /**
@@ -667,6 +670,113 @@ class FileServiceTest {
                 CoverSaveOutcome outcome = fileService.saveCoverImageFromBytes(bookId, "<svg/>".getBytes(StandardCharsets.UTF_8));
 
                 assertEquals(CoverSaveOutcome.UNDECODABLE, outcome);
+            }
+
+            /**
+             * A cover with an absurd aspect ratio must still produce a cover.
+             * <p>
+             * 20000x1 decodes perfectly well; it is the <em>processing</em> that used to fail.
+             * Scaling it to fit 1000 wide computes a height of {@code (int) (1 * 0.05) == 0}, and
+             * {@code new BufferedImage(1000, 0, ...)} throws. Since crop-and-resize sat under the
+             * same {@code catch} as the file write, that was reported as a transient write failure -
+             * so the INPX probe set no marker, left the book eligible, and re-read the archive on
+             * every scan forever. Byte-intrinsic, classified transient: the exact defect the marker
+             * exists to prevent, through the adjacent door.
+             * <p>
+             * Both orientations and both cropping settings, because the same absurd bytes reach the
+             * degenerate geometry by two different routes - {@code resizeImage} rounding a scaled
+             * side to zero, and {@code applyCoverCropping} asking {@code getSubimage} for a zero-wide
+             * crop - and fixing only the one named in the report would have left the other live.
+             */
+            @ParameterizedTest(name = "{0}x{1}, cropping enabled: {2}")
+            @CsvSource({
+                    // resizeImage: scaled height rounds to 0
+                    "20000, 1, false",
+                    // applyCoverCropping: (int) (1 / 1.5) == 0 wide
+                    "20000, 1, true",
+                    // resizeImage: scaled width rounds to 0
+                    "1, 20000, false",
+                    "1, 20000, true",
+            })
+            void savesACoverWithAnExtremeAspectRatioRatherThanFailing(int width, int height, boolean croppingEnabled)
+                    throws IOException {
+                long bookId = 7L;
+                AppSettings settings = AppSettings.builder()
+                        .coverCroppingSettings(CoverCroppingSettings.builder()
+                                .verticalCroppingEnabled(croppingEnabled)
+                                .horizontalCroppingEnabled(croppingEnabled)
+                                .aspectRatioThreshold(2.5)
+                                .smartCroppingEnabled(false)
+                                .build())
+                        .build();
+                when(appSettingService.getAppSettings()).thenReturn(settings);
+                byte[] png = encodePng(createTestImage(width, height));
+
+                CoverSaveOutcome outcome = fileService.saveCoverImageFromBytes(bookId, png);
+
+                assertAll(
+                        () -> assertEquals(CoverSaveOutcome.SAVED, outcome),
+                        () -> assertTrue(Files.exists(Path.of(fileService.getCoverFile(bookId)))),
+                        () -> assertTrue(Files.exists(Path.of(fileService.getThumbnailFile(bookId))))
+                );
+            }
+
+            /**
+             * A full disk must not make a perfectly good cover permanently undecodable.
+             * <p>
+             * {@code ImageIO}'s disk cache is on by default, so decoding an in-memory {@code byte[]}
+             * spooled it through a temp file that buys nothing at all. When that file cannot be
+             * created - a full disk, an unwritable tmpdir - {@code createImageInputStream} throws
+             * {@code IIOException("Can't create cache file!")}, {@code readImage} propagates it, and
+             * this method reports {@code UNDECODABLE}: a permanent verdict on the file, from a
+             * transient failure that has nothing to do with it. The INPX probe then sets the marker
+             * and the book's cover is written off until the next rescan.
+             * <p>
+             * That is the mirror of the defect wave 4 fixed and the reason its fix could not fire:
+             * it named a full disk as <em>the</em> transient failure and built {@code SAVE_FAILED}
+             * for it, but the decode runs before the write, so this branch got there first.
+             * <p>
+             * The unwritable {@code ImageIO} cache directory is the honest way to stage it: the
+             * {@code java.io.tmpdir} property is read into a static at JVM start, so overriding it
+             * does nothing, whereas {@code setCacheDirectory} is honoured live.
+             */
+            @Test
+            void aFullDiskDoesNotMakeADecodableCoverPermanentlyUndecodable() throws IOException {
+                // Encoded before the cache is sabotaged: ImageIO.write to a ByteArrayOutputStream
+                // takes the very same cache route out, so this would fail for the wrong reason.
+                // (That it does is itself the reason ImageIoConfig sets the flag globally rather
+                // than only where covers are decoded - PdfProcessor.extractCover encodes this way.)
+                byte[] png = encodePng(createTestImage(300, 450));
+                Path readOnlyCacheDir = Files.createDirectory(tempDir.resolve("imageio-cache"));
+                Files.setPosixFilePermissions(readOnlyCacheDir, PosixFilePermissions.fromString("r-xr-xr-x"));
+                File previousCacheDir = ImageIO.getCacheDirectory();
+                boolean previousUseCache = ImageIO.getUseCache();
+                try {
+                    ImageIO.setCacheDirectory(readOnlyCacheDir.toFile());
+                    ImageIO.setUseCache(true);
+                    // Establish the hazard actually bites in this environment before claiming a fix.
+                    // Root ignores the permission bits, so skip rather than pass vacuously.
+                    assumeTrue(cacheFileCreationFails(), "ImageIO cache dir is still writable (running as root?)");
+
+                    CoverSaveOutcome outcome = fileService.saveCoverImageFromBytes(9L, png);
+
+                    assertEquals(CoverSaveOutcome.SAVED, outcome,
+                            "an unwritable ImageIO cache dir must not be reported as a property of the bytes");
+                } finally {
+                    ImageIO.setUseCache(previousUseCache);
+                    ImageIO.setCacheDirectory(previousCacheDir);
+                    Files.setPosixFilePermissions(readOnlyCacheDir, PosixFilePermissions.fromString("rwxr-xr-x"));
+                }
+            }
+
+            private boolean cacheFileCreationFails() {
+                try {
+                    File probe = File.createTempFile("probe", ".tmp", ImageIO.getCacheDirectory());
+                    Files.deleteIfExists(probe.toPath());
+                    return false;
+                } catch (IOException expected) {
+                    return true;
+                }
             }
 
             private byte[] encodePng(BufferedImage image) throws IOException {

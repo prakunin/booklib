@@ -35,6 +35,15 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     private static final Pattern ISBN_CLEANER_PATTERN = Pattern.compile("[^0-9Xx]");
     private static final Pattern ISO_DATE_PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Every {@code return null} below is reached only after the document has parsed, so each one
+     * means "this FB2 was read and has no cover". Everything else - the file missing, a truncated
+     * document that fails to parse, corrupt base64 in a binary element - leaves through the catch as
+     * a {@link CoverExtractionException}. That split used to be a single swallowed {@code null},
+     * which {@code BookCoverService}'s lazy probe recorded as a permanent "no cover" verdict.
+     */
     @Override
     public byte[] extractCover(File file) {
         try (InputStream inputStream = getInputStream(file)) {
@@ -81,10 +90,10 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                 }
             }
 
+            // Parsed all the way through and found no cover binary: a genuine, permanent miss.
             return null;
         } catch (Exception e) {
-            log.warn("Failed to extract cover from FB2: {}", file.getName(), e);
-            return null;
+            throw new CoverExtractionException("Failed to extract cover from FB2: " + file.getName(), e);
         }
     }
 

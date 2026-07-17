@@ -284,9 +284,9 @@ public class BookCoverService {
                     case SAVED -> {
                     }
                     case UNDECODABLE -> throw ApiError.FAILED_TO_REGENERATE_COVER.createException(
-                            "the file's cover image is in a format that cannot be read (for example SVG)");
-                    case WRITE_FAILED -> throw ApiError.FAILED_TO_REGENERATE_COVER.createException(
-                            "the cover image was found but could not be saved");
+                            "the file's cover image cannot be turned into a picture (for example an SVG, or an unsupported format)");
+                    case SAVE_FAILED -> throw ApiError.FAILED_TO_REGENERATE_COVER.createException(
+                            "the cover image was found but could not be saved - please try again");
                 }
             }
         }
@@ -379,11 +379,11 @@ public class BookCoverService {
                         markProbed(bookEntity);
                         yield false;
                     }
-                    // Nothing is wrong with the file - only with this attempt to write it. Release
+                    // Nothing is wrong with the file - only with this attempt to save it. Release
                     // the claim and set no marker, so the book is retried rather than written off
                     // for a full disk. Releasing also stops it advertising a hash with no image
                     // behind it; the guard makes sure only our own claim is released.
-                    case WRITE_FAILED -> {
+                    case SAVE_FAILED -> {
                         log.warn("Failed to write lazily extracted cover for book {}; releasing the claim so it can be retried", bookId);
                         bookRepository.clearCoverHashIfStillClaimed(bookEntity.getId(), coverHash);
                         yield false;

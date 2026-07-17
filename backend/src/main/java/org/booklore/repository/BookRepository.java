@@ -292,7 +292,9 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
      * This deliberately writes <em>only</em> the two cover columns and does not touch
      * {@code metadataUpdatedAt}, even though a book that gains a cover has had its metadata change.
      * The reason is that a claim is not a commitment: {@link #clearCoverHashIfStillClaimed} can
-     * revert it, and it can only revert what this statement wrote. Stamping {@code metadataUpdatedAt}
+     * revert it, and the fewer columns this statement writes, the less there is for that revert to
+     * miss - it already does not restore {@code coverProbedAt}, for the reasons set out there.
+     * Stamping {@code metadataUpdatedAt}
      * here made the pair asymmetric - the release put the hash back but left the timestamp bumped,
      * so every failed probe permanently looked like a metadata change to
      * {@code KoboSnapshotBookRepository#findChangedBooks} and re-pushed the book to every paired
@@ -310,9 +312,23 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
 
     /**
      * Releases a cover claim taken by {@link #markCoverFoundIfStillMissing} when the image could not
-     * actually be written, putting the book back in the no-cover state that makes it eligible for a
-     * later retry. Reverts exactly the column the claim set, so a claim followed by a release is a
-     * no-op.
+     * actually be saved, putting the book back in the no-cover state that makes it eligible for a
+     * later retry.
+     * <p>
+     * A claim followed by a release is <em>not</em> a no-op, and it is worth being exact about why
+     * rather than claiming a symmetry that does not hold. The claim writes two columns - it sets
+     * {@code bookCoverHash} and clears {@code coverProbedAt} - and this reverts only the first. If
+     * the row carried a probe marker at claim time, the pair erases it.
+     * <p>
+     * That gap needs a concurrent probe to reach at all: {@code tryGenerateMissingInpxCover} only
+     * claims for a book it read with no marker, so another probe must have marked the same book in
+     * between - which means the two disagree about whether the file has a cover. When that happens,
+     * dropping the marker is the outcome we want anyway, not damage to be repaired: this claim found
+     * a cover, so the other probe's "no cover" verdict was simply wrong, and the transient failure
+     * that brought us here is not a reason to reinstate it. Leaving the book eligible for a retry is
+     * exactly right. So the asymmetry is deliberate and harmless - but it is an asymmetry, and a
+     * reader who needs to know whether {@code coverProbedAt} can survive a claim must not be told
+     * otherwise.
      * <p>
      * The guard on the claimed hash is defence in depth, not a defence against a concurrent writer.
      * {@code BookCoverService} is class-level {@code @Transactional}, so the claim's UPDATE holds an

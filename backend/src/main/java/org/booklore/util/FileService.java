@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+import javax.imageio.stream.MemoryCacheImageInputStream;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -52,6 +53,20 @@ public class FileService {
 
     private static final int MAX_REDIRECTS = 5;
 
+    /**
+     * The size a stored cover is capped at: {@link #saveCoverImages} scales anything larger down to
+     * fit inside this box, so no cover on disk is ever bigger.
+     * <p>
+     * Public because a producer that <em>renders</em> its cover rather than reading it - see
+     * {@code PdfProcessor} - can render straight to this size instead of producing a full-resolution
+     * raster for this class to throw most of away. That is not merely an optimisation: an A0 page
+     * rendered at full DPI exceeds {@link #MAX_IMAGE_PIXELS} and was rejected outright as a
+     * decompression bomb. Sharing the constant is what stops the renderer's idea of "big enough for
+     * a cover" drifting from this class's.
+     */
+    public static final int MAX_ORIGINAL_WIDTH = 1000;
+    /** @see #MAX_ORIGINAL_WIDTH */
+    public static final int MAX_ORIGINAL_HEIGHT = 1500;
 
     private static final double TARGET_COVER_ASPECT_RATIO = 1.5;
     private static final int SMART_CROP_COLOR_TOLERANCE = 30;
@@ -77,8 +92,6 @@ public class FileService {
     private static final int    THUMBNAIL_WIDTH               = 250;
     private static final int    THUMBNAIL_HEIGHT              = 350;
     private static final int    SQUARE_THUMBNAIL_SIZE         = 250;
-    private static final int    MAX_ORIGINAL_WIDTH            = 1000;
-    private static final int    MAX_ORIGINAL_HEIGHT           = 1500;
     private static final int    MAX_SQUARE_SIZE               = 1000;
     private static final String IMAGE_FORMAT                  = "JPEG";
     // @formatter:on
@@ -261,7 +274,15 @@ public class FileService {
             throw new IOException("Image data is null or empty");
         }
 
-        try (ImageInputStream iis = ImageIO.createImageInputStream(new ByteArrayInputStream(imageData))) {
+        // MemoryCacheImageInputStream, not ImageIO.createImageInputStream: the latter honours the
+        // global ImageIO.setUseCache (true by default) and would spool this array through a temp
+        // file in java.io.tmpdir. We are decoding from a byte[] that is already in memory, so the
+        // disk cache buys nothing and costs everything - on a full disk it fails the decode with
+        // IIOException("Can't create cache file!"), which every caller above reads as "these bytes
+        // are not an image" and the INPX probe records as a permanent verdict on the book. See
+        // ImageIoConfig, which turns the global off for the other ImageIO entry points; naming the
+        // stream here means this one does not depend on that having happened first.
+        try (ImageInputStream iis = new MemoryCacheImageInputStream(new ByteArrayInputStream(imageData))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
             if (readers.hasNext()) {
                 ImageReader reader = readers.next();
@@ -290,9 +311,23 @@ public class FileService {
         throw new IOException("Unable to decode image, likely unsupported format");
     }
 
+    /**
+     * Scales an image to {@code width} x {@code height}.
+     * <p>
+     * Both are floored at 1. Scaling a cover down preserves its aspect ratio, and any ratio extreme
+     * enough rounds the short side to zero: a 20000x1 cover scaled to fit 1000 wide computes a
+     * height of 0, and {@code new BufferedImage(1000, 0, ...)} throws
+     * {@code IllegalArgumentException: Width (1000) and height (0) cannot be <= 0}. That is a
+     * property of the bytes, so it recurred on every retry forever, and it was reported as a
+     * transient write failure - leaving the INPX probe re-reading the same archive on every scan.
+     * A one-pixel-tall cover is a silly image, but it is an image, and the caller asked for a
+     * picture rather than an exception.
+     */
     public static BufferedImage resizeImage(BufferedImage originalImage, int width, int height) {
-        Image tmp = originalImage.getScaledInstance(width, height, Image.SCALE_SMOOTH);
-        BufferedImage resizedImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        int targetWidth = Math.max(1, width);
+        int targetHeight = Math.max(1, height);
+        Image tmp = originalImage.getScaledInstance(targetWidth, targetHeight, Image.SCALE_SMOOTH);
+        BufferedImage resizedImage = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
         Graphics2D g2d = resizedImage.createGraphics();
         g2d.drawImage(tmp, 0, 0, null);
         g2d.dispose();
@@ -529,14 +564,32 @@ public class FileService {
      * outcomes for a cover pulled out of an arbitrary book file, and callers need to react to them,
      * not be interrupted by them. It reports which of the two happened rather than a bare boolean
      * because they are not the same kind of fact, and a caller that persists a permanent marker
-     * needs to tell them apart - see {@link CoverSaveOutcome}. Decoding is therefore guarded
-     * separately from writing: a failure in the first is a fact about the bytes, a failure in the
-     * second is a fact about this attempt, and one {@code catch} around both cannot say which.
+     * needs to tell them apart - see {@link CoverSaveOutcome}.
+     * <p>
+     * The work is therefore in three guarded steps, not two, and the middle one is the one that was
+     * missing. {@code saveCoverImages} does image <em>processing</em> - convert, crop, resize - as
+     * well as writing, and both used to sit under a single {@code catch -> WRITE_FAILED}. Processing
+     * failures are facts about the bytes, exactly like decode failures: a 20000x1 cover decodes
+     * fine, then scales to a height of zero and throws, identically, forever. Calling that transient
+     * left the INPX probe re-reading the same archive on every scan - the very defect the marker
+     * exists to prevent, alive through the adjacent door. Decode, prepare, write are guarded apart
+     * because a failure in each says something different, and one {@code catch} around them cannot
+     * say which.
+     * <p>
+     * {@code OutOfMemoryError} is caught across all three and is deliberately <em>not</em> permanent:
+     * heap exhaustion is a fact about this moment, and the same bytes may well decode on a quieter
+     * server. It is caught at all because the alternative is worse than the usual argument against
+     * catching it - {@code PdfProcessor} already degrades gracefully on OOM while rendering, and
+     * once the render moved behind this method's decode, an OOM that used to cost one cover instead
+     * escaped {@code regenerateCover} as an HTTP 500.
      */
     public CoverSaveOutcome saveCoverImageFromBytes(long bookId, byte[] imageData) {
         BufferedImage originalImage;
         try {
             originalImage = readImage(imageData);
+        } catch (OutOfMemoryError e) {
+            log.error("Out of memory decoding cover image for book {}; leaving it eligible for a retry", bookId);
+            return CoverSaveOutcome.SAVE_FAILED;
         } catch (Exception e) {
             // readImage throws (it does not return null) for empty input, for bytes no ImageIO
             // reader claims - an SVG cover is the common one - and for dimensions that look like a
@@ -551,13 +604,30 @@ public class FileService {
             log.warn("Cover image for book {} decoded to nothing (possibly SVG or an unsupported format)", bookId);
             return CoverSaveOutcome.UNDECODABLE;
         }
+
+        PreparedCover prepared;
         try {
-            return saveCoverImages(originalImage, bookId) ? CoverSaveOutcome.SAVED : CoverSaveOutcome.WRITE_FAILED;
+            prepared = prepareCoverImages(originalImage, getCoverCroppingSettings());
+        } catch (OutOfMemoryError e) {
+            log.error("Out of memory processing cover image for book {}; leaving it eligible for a retry", bookId);
+            return CoverSaveOutcome.SAVE_FAILED;
         } catch (Exception e) {
-            log.error("Failed to write cover image for book {}: {}", bookId, e.getMessage(), e);
-            return CoverSaveOutcome.WRITE_FAILED;
+            log.warn("Cover image for book {} decoded but could not be processed into a cover: {}", bookId, e.getMessage(), e);
+            return CoverSaveOutcome.UNDECODABLE;
         } finally {
             originalImage.flush();
+        }
+
+        try {
+            return writeCoverImages(prepared, bookId) ? CoverSaveOutcome.SAVED : CoverSaveOutcome.SAVE_FAILED;
+        } catch (OutOfMemoryError e) {
+            log.error("Out of memory writing cover image for book {}; leaving it eligible for a retry", bookId);
+            return CoverSaveOutcome.SAVE_FAILED;
+        } catch (Exception e) {
+            log.error("Failed to write cover image for book {}: {}", bookId, e.getMessage(), e);
+            return CoverSaveOutcome.SAVE_FAILED;
+        } finally {
+            prepared.flush();
         }
     }
 
@@ -811,84 +881,94 @@ public class FileService {
     }
 
     public boolean saveCoverImages(BufferedImage coverImage, long bookId) throws IOException {
-        BufferedImage rgbImage = null;
-        BufferedImage cropped = null;
-        BufferedImage resized = null;
-        BufferedImage thumb = null;
+        PreparedCover prepared = prepareCoverImages(coverImage, getCoverCroppingSettings());
         try {
-            String folderPath = getImagesFolder(bookId);
-            File folder = new File(folderPath);
-            if (!folder.exists() && !folder.mkdirs()) {
-                throw new IOException("Failed to create directory: " + folder.getAbsolutePath());
-            }
-
-            rgbImage = new BufferedImage(
-                    coverImage.getWidth(),
-                    coverImage.getHeight(),
-                    BufferedImage.TYPE_INT_RGB
-            );
-            Graphics2D g = rgbImage.createGraphics();
-            g.drawImage(coverImage, 0, 0, Color.WHITE, null);
-            g.dispose();
-            // Note: coverImage is not flushed here - caller is responsible for its lifecycle
-
-            cropped = applyCoverCropping(rgbImage);
-            if (cropped != rgbImage) {
-                rgbImage.flush();
-                rgbImage = cropped;
-            }
-
-            // Resize original image if too large to prevent OOM
-            double scale = Math.min(
-                    (double) MAX_ORIGINAL_WIDTH / rgbImage.getWidth(),
-                    (double) MAX_ORIGINAL_HEIGHT / rgbImage.getHeight()
-            );
-            if (scale < 1.0) {
-                resized = resizeImage(rgbImage, (int) (rgbImage.getWidth() * scale), (int) (rgbImage.getHeight() * scale));
-                rgbImage.flush(); // Release resources of the original large image
-                rgbImage = resized;
-            }
-
-            File originalFile = new File(folder, COVER_FILENAME);
-            boolean originalSaved = ImageIO.write(rgbImage, IMAGE_FORMAT, originalFile);
-
-            // Determine thumbnail dimensions based on source aspect ratio
-            int thumbWidth, thumbHeight;
-            double aspectRatio = (double) rgbImage.getWidth() / rgbImage.getHeight();
-            if (aspectRatio >= 0.85 && aspectRatio <= 1.15) {
-                // Square-ish image (e.g., audiobook covers) - keep square
-                thumbWidth = THUMBNAIL_WIDTH;
-                thumbHeight = THUMBNAIL_WIDTH;
-            } else {
-                // Portrait/landscape - use standard dimensions
-                thumbWidth = THUMBNAIL_WIDTH;
-                thumbHeight = THUMBNAIL_HEIGHT;
-            }
-            thumb = resizeImage(rgbImage, thumbWidth, thumbHeight);
-            File thumbnailFile = new File(folder, THUMBNAIL_FILENAME);
-            boolean thumbnailSaved = ImageIO.write(thumb, IMAGE_FORMAT, thumbnailFile);
-
-            return originalSaved && thumbnailSaved;
+            return writeCoverImages(prepared, bookId);
         } finally {
-            // Cleanup resources created within this method
-            // Note: cropped/resized may equal rgbImage after reassignment, avoid double-flush
-            if (rgbImage != null) {
-                rgbImage.flush();
-            }
-            if (cropped != null && cropped != rgbImage) {
-                cropped.flush();
-            }
-            if (resized != null && resized != rgbImage) {
-                resized.flush();
-            }
-            if (thumb != null) {
-                thumb.flush();
+            prepared.flush();
+        }
+    }
+
+    /**
+     * A cover and its thumbnail, processed and ready to write. Splitting these out of
+     * {@link #saveCoverImages} is what lets {@link #saveCoverImageFromBytes} say <em>which</em> half
+     * failed - see there for why one {@code catch} around both could not.
+     */
+    private record PreparedCover(BufferedImage cover, BufferedImage thumbnail) {
+        void flush() {
+            cover.flush();
+            if (thumbnail != cover) {
+                thumbnail.flush();
             }
         }
     }
 
-    private BufferedImage applyCoverCropping(BufferedImage image) {
-        CoverCroppingSettings settings = appSettingService.getAppSettings().getCoverCroppingSettings();
+    private CoverCroppingSettings getCoverCroppingSettings() {
+        return appSettingService.getAppSettings().getCoverCroppingSettings();
+    }
+
+    /**
+     * Turns a decoded image into the cover and thumbnail rasters. Pure: no IO, no settings lookup
+     * (they are passed in, so that a settings-service failure cannot be mistaken for a fact about
+     * the image), and nothing here can fail transiently.
+     */
+    private PreparedCover prepareCoverImages(BufferedImage coverImage, CoverCroppingSettings croppingSettings) {
+        BufferedImage rgbImage = new BufferedImage(
+                coverImage.getWidth(),
+                coverImage.getHeight(),
+                BufferedImage.TYPE_INT_RGB
+        );
+        Graphics2D g = rgbImage.createGraphics();
+        g.drawImage(coverImage, 0, 0, Color.WHITE, null);
+        g.dispose();
+        // Note: coverImage is not flushed here - caller is responsible for its lifecycle
+
+        BufferedImage cropped = applyCoverCropping(rgbImage, croppingSettings);
+        if (cropped != rgbImage) {
+            rgbImage.flush();
+            rgbImage = cropped;
+        }
+
+        // Resize original image if too large to prevent OOM
+        double scale = Math.min(
+                (double) MAX_ORIGINAL_WIDTH / rgbImage.getWidth(),
+                (double) MAX_ORIGINAL_HEIGHT / rgbImage.getHeight()
+        );
+        if (scale < 1.0) {
+            BufferedImage resized = resizeImage(rgbImage, (int) (rgbImage.getWidth() * scale), (int) (rgbImage.getHeight() * scale));
+            rgbImage.flush(); // Release resources of the original large image
+            rgbImage = resized;
+        }
+
+        // Determine thumbnail dimensions based on source aspect ratio
+        int thumbWidth, thumbHeight;
+        double aspectRatio = (double) rgbImage.getWidth() / rgbImage.getHeight();
+        if (aspectRatio >= 0.85 && aspectRatio <= 1.15) {
+            // Square-ish image (e.g., audiobook covers) - keep square
+            thumbWidth = THUMBNAIL_WIDTH;
+            thumbHeight = THUMBNAIL_WIDTH;
+        } else {
+            // Portrait/landscape - use standard dimensions
+            thumbWidth = THUMBNAIL_WIDTH;
+            thumbHeight = THUMBNAIL_HEIGHT;
+        }
+        return new PreparedCover(rgbImage, resizeImage(rgbImage, thumbWidth, thumbHeight));
+    }
+
+    /** Writes prepared rasters to disk. Every failure here is a fact about this attempt, not the image. */
+    private boolean writeCoverImages(PreparedCover prepared, long bookId) throws IOException {
+        String folderPath = getImagesFolder(bookId);
+        File folder = new File(folderPath);
+        if (!folder.exists() && !folder.mkdirs()) {
+            throw new IOException("Failed to create directory: " + folder.getAbsolutePath());
+        }
+
+        boolean originalSaved = ImageIO.write(prepared.cover(), IMAGE_FORMAT, new File(folder, COVER_FILENAME));
+        boolean thumbnailSaved = ImageIO.write(prepared.thumbnail(), IMAGE_FORMAT, new File(folder, THUMBNAIL_FILENAME));
+        return originalSaved && thumbnailSaved;
+    }
+
+    private BufferedImage applyCoverCropping(BufferedImage image, CoverCroppingSettings settings) {
         if (settings == null) {
             return image;
         }
@@ -902,7 +982,7 @@ public class FileService {
 
         boolean isExtremelyTall = settings.isVerticalCroppingEnabled() && heightToWidthRatio > threshold;
         if (isExtremelyTall) {
-            int croppedHeight = (int) (width * TARGET_COVER_ASPECT_RATIO);
+            int croppedHeight = clamp((int) (width * TARGET_COVER_ASPECT_RATIO), height);
             log.debug("Cropping tall image: {}x{} (ratio {}) -> {}x{}, smartCrop={}",
                     width, height, String.format("%.2f", heightToWidthRatio), width, croppedHeight, smartCrop);
             return cropFromTop(image, width, croppedHeight, smartCrop);
@@ -910,13 +990,27 @@ public class FileService {
 
         boolean isExtremelyWide = settings.isHorizontalCroppingEnabled() && widthToHeightRatio > threshold;
         if (isExtremelyWide) {
-            int croppedWidth = (int) (height / TARGET_COVER_ASPECT_RATIO);
+            int croppedWidth = clamp((int) (height / TARGET_COVER_ASPECT_RATIO), width);
             log.debug("Cropping wide image: {}x{} (ratio {}) -> {}x{}, smartCrop={}",
                     width, height, String.format("%.2f", widthToHeightRatio), croppedWidth, height, smartCrop);
             return cropFromLeft(image, croppedWidth, height, smartCrop);
         }
 
         return image;
+    }
+
+    /**
+     * Holds a crop target inside {@code [1, available]}.
+     * <p>
+     * Both ends are reachable from real settings and real bytes, and {@code getSubimage} throws
+     * {@code RasterFormatException} at either. The low end is the mirror of {@link #resizeImage}'s
+     * floor: a 20000x1 cover asks for a crop {@code (int) (1 / 1.5) = 0} pixels wide. The high end
+     * is reachable whenever {@code aspectRatioThreshold} is configured below
+     * {@link #TARGET_COVER_ASPECT_RATIO}, which makes a merely tallish image "extremely tall" and
+     * then asks to crop it to a height greater than it has.
+     */
+    private static int clamp(int target, int available) {
+        return Math.max(1, Math.min(target, available));
     }
 
     private BufferedImage cropFromTop(BufferedImage image, int targetWidth, int targetHeight, boolean smartCrop) {

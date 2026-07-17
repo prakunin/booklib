@@ -186,12 +186,17 @@ class BookRepositoryDataJpaTest {
         }
 
         /**
-         * Claim then release must be a round trip: whatever the claim wrote, the release takes back.
-         * Any column the claim touches and the release does not is a leak that accumulates on every
-         * failed probe.
+         * For a book with no probe marker - which is every book the lazy probe actually claims,
+         * since it only claims for one it read as unmarked - claim then release is a round trip.
+         * <p>
+         * Note what this cannot see, and did not: it starts from {@code coverProbedAt = null}, so a
+         * release that fails to restore that column passes anyway. See
+         * {@link #claimFollowedByReleaseDropsAProbeMarkerThatWasThereBefore} for the case that does
+         * see it. The two together are the honest statement; this one alone was read as a general
+         * "claim and release are symmetric" guarantee, which is not true.
          */
         @Test
-        void claimFollowedByReleaseLeavesTheRowAsItWas() {
+        void claimFollowedByReleaseLeavesTheRowAsItWasWhenThereWasNoMarker() {
             BookEntity book = persistBookWithoutCover();
 
             bookRepository.markCoverFoundIfStillMissing(book.getId(), "hash-1");
@@ -202,6 +207,36 @@ class BookRepositoryDataJpaTest {
             assertThat(reloaded.getBookCoverHash()).isNull();
             assertThat(reloaded.getMetadataUpdatedAt()).isNull();
             assertThat(reloaded.getCoverProbedAt()).isNull();
+        }
+
+        /**
+         * Pins the asymmetry that {@code clearCoverHashIfStillClaimed} really has, rather than the
+         * round trip its javadoc used to promise. The claim writes two columns - it sets
+         * {@code bookCoverHash} <em>and</em> clears {@code coverProbedAt} - and the release reverts
+         * only the first, so a marker present at claim time does not come back.
+         * <p>
+         * This is asserted as correct, not merely tolerated. Reaching it needs a concurrent probe to
+         * have marked the book between this one's read and its claim, which means the two disagree
+         * about whether the file has a cover - and this one found one, so the other's "no cover" was
+         * wrong and is no loss. Leaving the book eligible for a retry after a transient save failure
+         * is exactly what should happen. What must not stand is the claim that the pair is a no-op:
+         * a reader deciding whether {@code coverProbedAt} survives a claim needs the real answer.
+         */
+        @Test
+        void claimFollowedByReleaseDropsAProbeMarkerThatWasThereBefore() {
+            BookEntity book = persistBookWithoutCover();
+            book.setCoverProbedAt(Instant.parse("2026-01-01T00:00:00Z"));
+            entityManager.flush();
+            entityManager.clear();
+
+            bookRepository.markCoverFoundIfStillMissing(book.getId(), "hash-1");
+            bookRepository.clearCoverHashIfStillClaimed(book.getId(), "hash-1");
+
+            BookEntity reloaded = reload(book.getId());
+            assertThat(reloaded.getBookCoverHash()).isNull();
+            assertThat(reloaded.getCoverProbedAt())
+                    .as("the claim cleared the marker and the release does not restore it")
+                    .isNull();
         }
 
         @Test

@@ -273,10 +273,35 @@ public class PdfProcessor extends AbstractFileProcessor implements BookFileProce
     /**
      * The one place a PDF's cover is read. Both {@link #generateCover} and {@link #extractCover}
      * come through here so they cannot drift apart on what "the cover of a PDF" means.
+     * <p>
+     * The render is bounded to the size a cover is actually stored at rather than taken at the full
+     * {@link #RENDER_DPI}. {@code FileService} scales every cover down into
+     * {@link FileService#MAX_ORIGINAL_WIDTH} x {@link FileService#MAX_ORIGINAL_HEIGHT} regardless,
+     * so rendering an A0 page to 4965x7020 in order to shrink it to ~1000px wide was work done to be
+     * thrown away - and worse, {@link #extractCover} now PNG-encodes this raster and
+     * {@code saveCoverImageFromBytes} decodes it back through {@code readImage}, which rejects
+     * anything over {@code MAX_IMAGE_PIXELS} as a decompression bomb. At 150 DPI that cap is 34.8M
+     * pixels for an A0 page: the render succeeded, the decode refused it, and the user was told
+     * their perfectly good PDF had "a cover image in a format that cannot be read".
+     * <p>
+     * Bounding here rather than raising the cap is the right side to fix. The cap defends
+     * {@code readImage} against <em>untrusted</em> bytes, and it should keep doing so; these bytes
+     * are a raster we just produced ourselves, and the honest way to say "this is not a bomb" is not
+     * to let the front door stand open but to not build a 34.8M-pixel image we never wanted. Note
+     * {@code renderBounded} scales at render time, so the oversized raster is never allocated at all
+     * - which is also why the {@code OutOfMemoryError} this used to hit is now far harder to reach.
+     * <p>
+     * The <em>stored</em> cover is unchanged for ordinary PDFs, which is the property that matters:
+     * an A4 page renders to 1240x1754 at 150 DPI and {@code saveCoverImages} scaled that to 1000x1414
+     * anyway, which is exactly what bounding produces here. It is not that small pages are untouched
+     * - A4 already exceeds the box - but that the size they are scaled to is the same either way, and
+     * rasterising straight to it is if anything better than downsampling to it afterwards. Only a
+     * page small enough to fit within the box outright is rendered at the full DPI.
      */
     private BufferedImage renderFirstPage(PdfDocument doc) {
         try (PdfPage page = doc.page(0)) {
-            return page.render(RENDER_DPI).toBufferedImage();
+            return page.renderBounded(RENDER_DPI, FileService.MAX_ORIGINAL_WIDTH, FileService.MAX_ORIGINAL_HEIGHT)
+                    .toBufferedImage();
         }
     }
 }

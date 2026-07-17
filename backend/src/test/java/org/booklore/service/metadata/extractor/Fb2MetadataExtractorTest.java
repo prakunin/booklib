@@ -2,6 +2,7 @@ package org.booklore.service.metadata.extractor;
 
 import org.booklore.model.dto.BookMetadata;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,6 +15,7 @@ import java.util.Base64;
 import java.util.zip.GZIPOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class Fb2MetadataExtractorTest {
 
@@ -592,14 +594,101 @@ class Fb2MetadataExtractorTest {
         assertThat(cover).isEqualTo(imageData);
     }
 
-    @Test
-    void extractCover_invalidFileReturnsNull() throws IOException {
-        Path file = tempDir.resolve("bad.fb2");
-        Files.writeString(file, "not xml");
+    /**
+     * The root of the defect four fix waves chased one floor too high, pinned at the layer that can
+     * actually see it.
+     * <p>
+     * {@code extractCover} answered every one of these with the same bare {@code null} it uses for
+     * "this FB2 has no cover". {@code Fb2Processor} mapped that {@code null} to
+     * {@code NO_COVER_FOUND}, {@code BookCoverService.tryGenerateMissingInpxCover} took it for a
+     * completed probe, and {@code cover_probed_at} was set <em>permanently</em> - so a file that was
+     * merely unreadable for a moment had its cover written off until the next rescan. The processor
+     * layer's {@code catch (Exception e) -> readFailed()} was already written and already correct,
+     * and could never run, because nothing below it ever threw.
+     * <p>
+     * Every case here uses the real extractor against a real file on disk. That is the point: the
+     * test that was supposed to cover this stubbed {@code extractCover} to throw, which the real
+     * extractor could not do, so it passed while production did the opposite.
+     */
+    @Nested
+    class ExtractCoverDistinguishesAFailedReadFromACleanMiss {
 
-        byte[] cover = extractor.extractCover(file.toFile());
+        @Test
+        void malformedXmlThrowsRatherThanClaimingThereIsNoCover() throws IOException {
+            Path file = tempDir.resolve("bad.fb2");
+            Files.writeString(file, "not xml");
 
-        assertThat(cover).isNull();
+            assertThatThrownBy(() -> extractor.extractCover(file.toFile()))
+                    .isInstanceOf(CoverExtractionException.class)
+                    .hasMessageContaining("bad.fb2");
+        }
+
+        @Test
+        void truncatedFb2ThrowsRatherThanClaimingThereIsNoCover() throws IOException {
+            byte[] imageData = {0x10, 0x20, 0x30};
+            String base64 = Base64.getEncoder().encodeToString(imageData);
+            String full = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <FictionBook xmlns="%s" xmlns:l="%s">
+                    <description><title-info/></description>
+                    <binary id="cover.png" content-type="image/png">%s</binary>
+                    </FictionBook>
+                    """.formatted(NS, XLINK, base64);
+            // Cut mid-document: well-formed right up to the point it stops, which is exactly the
+            // shape a half-written or half-transferred file has.
+            Path file = tempDir.resolve("truncated.fb2");
+            Files.writeString(file, full.substring(0, full.length() / 2), StandardCharsets.UTF_8);
+
+            assertThatThrownBy(() -> extractor.extractCover(file.toFile()))
+                    .isInstanceOf(CoverExtractionException.class)
+                    .hasMessageContaining("truncated.fb2");
+        }
+
+        @Test
+        void corruptBase64InTheCoverBinaryThrowsRatherThanClaimingThereIsNoCover() throws IOException {
+            // Parses fine; the failure is inside the cover binary, so this is the case that proves
+            // the distinction is drawn on the cover read itself and not merely on the XML parse.
+            File file = writeFb2("""
+                    <description><title-info/></description>
+                    <binary id="cover.png" content-type="image/png">!!!not@@base64###</binary>
+                    """);
+
+            assertThatThrownBy(() -> extractor.extractCover(file))
+                    .isInstanceOf(CoverExtractionException.class);
+        }
+
+        @Test
+        void missingFileThrowsRatherThanClaimingThereIsNoCover() {
+            File missing = tempDir.resolve("gone.fb2").toFile();
+
+            assertThatThrownBy(() -> extractor.extractCover(missing))
+                    .isInstanceOf(CoverExtractionException.class)
+                    .hasRootCauseInstanceOf(FileNotFoundException.class);
+        }
+
+        @Test
+        void unreadableGzipThrowsRatherThanClaimingThereIsNoCover() throws IOException {
+            // Named .gz, so getInputStream wraps it in a GZIPInputStream that will reject the bytes.
+            Path file = tempDir.resolve("broken.fb2.gz");
+            Files.write(file, new byte[]{0x00, 0x01, 0x02, 0x03});
+
+            assertThatThrownBy(() -> extractor.extractCover(file.toFile()))
+                    .isInstanceOf(CoverExtractionException.class);
+        }
+
+        /**
+         * The other half of the distinction, and the reason the failures above cannot simply be
+         * "throw on anything": a file that really has no cover must still say so, definitively,
+         * because that answer is the one the probe marker is allowed to persist.
+         */
+        @Test
+        void anFb2ThatGenuinelyHasNoCoverStillReturnsNull() throws IOException {
+            File file = writeFb2("""
+                    <description><title-info/></description>
+                    """);
+
+            assertThat(extractor.extractCover(file)).isNull();
+        }
     }
 
     @Test
