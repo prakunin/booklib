@@ -200,6 +200,21 @@
             </div>
           </div>
 
+          @if (state.flow === 'paginated') {
+            <div class="toggle-control">
+              <span>{{ t('fullWidth') }}</span>
+              <button
+                type="button"
+                class="switch"
+                [class.active]="state.pageMargin === 0"
+                [attr.aria-pressed]="state.pageMargin === 0"
+                [attr.aria-label]="t('fullWidth')"
+                (click)="toggleFullWidth()">
+                <span class="slider"></span>
+              </button>
+            </div>
+          }
+
           <div class="section-header">{{ t('textOptions') }}</div>
 
           <div class="toggle-control">

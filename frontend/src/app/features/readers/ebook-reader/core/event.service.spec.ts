@@ -318,6 +318,57 @@ describe('ReaderEventService', () => {
     ]));
   });
 
+  it('turns browser zoom shortcuts and gestures into reader font-size changes', () => {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const inputZoom = new KeyboardEvent('keydown', {key: '=', ctrlKey: true, bubbles: true, cancelable: true});
+    input.dispatchEvent(inputZoom);
+
+    const chromeWheel = new WheelEvent('wheel', {deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true});
+    document.dispatchEvent(chromeWheel);
+
+    const zoomIn = new KeyboardEvent('keydown', {key: '=', ctrlKey: true, bubbles: true, cancelable: true});
+    const zoomOut = new KeyboardEvent('keydown', {key: '-', metaKey: true, bubbles: true, cancelable: true});
+
+    document.dispatchEvent(zoomIn);
+    document.dispatchEvent(zoomOut);
+
+    const readerWheel = new WheelEvent('wheel', {deltaY: -40, ctrlKey: true, bubbles: true, cancelable: true});
+    const readerWheelContinuation = new WheelEvent('wheel', {deltaY: -60, ctrlKey: true, bubbles: true, cancelable: true});
+    view.dispatchEvent(readerWheel);
+    view.dispatchEvent(readerWheelContinuation);
+
+    const firefoxWheel = new WheelEvent('wheel', {
+      deltaY: 3,
+      deltaMode: WheelEvent.DOM_DELTA_LINE,
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    view.dispatchEvent(firefoxWheel);
+
+    view.dispatchEvent(new CustomEvent('load', {detail: {doc}}));
+    const iframeWheel = new WheelEvent('wheel', {deltaY: 100, ctrlKey: true, bubbles: true, cancelable: true});
+    doc.dispatchEvent(iframeWheel);
+
+    expect(emittedEvents.filter(event => event.type === 'change-font-size')).toEqual([
+      {type: 'change-font-size', delta: 1},
+      {type: 'change-font-size', delta: -1},
+      {type: 'change-font-size', delta: 1},
+      {type: 'change-font-size', delta: -1},
+      {type: 'change-font-size', delta: -1},
+    ]);
+    expect(zoomIn.defaultPrevented).toBe(true);
+    expect(zoomOut.defaultPrevented).toBe(true);
+    expect(inputZoom.defaultPrevented).toBe(false);
+    expect(chromeWheel.defaultPrevented).toBe(false);
+    expect(readerWheel.defaultPrevented).toBe(true);
+    expect(readerWheelContinuation.defaultPrevented).toBe(true);
+    expect(firefoxWheel.defaultPrevented).toBe(true);
+    expect(iframeWheel.defaultPrevented).toBe(true);
+    input.remove();
+  });
+
   it('handles iframe clicks with double-click suppression and middle tap fallback', () => {
     privateService.longHoldTimeout = setTimeout(() => undefined, 1_000);
 

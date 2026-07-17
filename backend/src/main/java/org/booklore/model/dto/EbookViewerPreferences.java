@@ -22,7 +22,7 @@ public class EbookViewerPreferences {
     private Integer maxBlockSize;
     private Integer maxColumnCount;
     private Integer maxInlineSize;
+    private Integer pageMargin;
     private String theme;
     private String flow;
 }
-

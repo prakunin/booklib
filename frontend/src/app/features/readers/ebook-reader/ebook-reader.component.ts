@@ -112,6 +112,7 @@ export class EbookReaderComponent implements OnInit {
   private sectionFractionsTimeout?: ReturnType<typeof setTimeout>;
   private pendingInitialChapterRestore: PendingInitialChapterRestore | null = null;
   private pendingInitialChapterRestoreTimeout?: ReturnType<typeof setTimeout>;
+  private fontSizePersistTimeout?: ReturnType<typeof setTimeout>;
 
   isLoading = signal(true);
   showQuickSettings = signal(false);
@@ -134,6 +135,7 @@ export class EbookReaderComponent implements OnInit {
 
   constructor() {
     this.destroyRef.onDestroy(() => {
+      this.persistPendingFontSize();
       this.wakeLockService.disable();
       this.viewManager.destroy();
       this.annotationService.reset();
@@ -346,6 +348,9 @@ export class EbookReaderComponent implements OnInit {
             break;
           case 'toggle-immersive':
             this.toggleImmersiveMode();
+            break;
+          case 'change-font-size':
+            this.changeFontSize(event.delta);
             break;
           case 'go-first-section':
             this.viewManager.goToSection(0).pipe(catchError(() => of(undefined))).subscribe();
@@ -562,6 +567,53 @@ export class EbookReaderComponent implements OnInit {
         catchError(() => of(undefined))
       )
       .subscribe();
+  }
+
+  private changeFontSize(delta: number): void {
+    this.stateService.updateFontSize(delta);
+    if (this.fontSizePersistTimeout) clearTimeout(this.fontSizePersistTimeout);
+    this.fontSizePersistTimeout = setTimeout(() => {
+      this.stateService.persistSettings(this.bookId);
+      this.fontSizePersistTimeout = undefined;
+    }, 250);
+  }
+
+  private persistPendingFontSize(): void {
+    if (!this.fontSizePersistTimeout) return;
+
+    clearTimeout(this.fontSizePersistTimeout);
+    this.fontSizePersistTimeout = undefined;
+    if (Number.isFinite(this.bookId)) {
+      this.stateService.persistSettings(this.bookId);
+    }
+  }
+
+  goToPreviousChapter(): void {
+    const section = this.progressData()?.section;
+    if (section && section.current > 0) {
+      this.viewManager.goToSection(section.current - 1)
+        .pipe(takeUntilDestroyed(this.destroyRef), catchError(() => of(undefined)))
+        .subscribe();
+    }
+  }
+
+  goToNextChapter(): void {
+    const section = this.progressData()?.section;
+    if (section && section.current < section.total - 1) {
+      this.viewManager.goToSection(section.current + 1)
+        .pipe(takeUntilDestroyed(this.destroyRef), catchError(() => of(undefined)))
+        .subscribe();
+    }
+  }
+
+  canGoToPreviousChapter(): boolean {
+    const section = this.progressData()?.section;
+    return !!section && section.current > 0;
+  }
+
+  canGoToNextChapter(): boolean {
+    const section = this.progressData()?.section;
+    return !!section && section.current < section.total - 1;
   }
 
   private toggleHeaderNavbarPinned(): void {

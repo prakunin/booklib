@@ -154,6 +154,8 @@ public class BookUpdateService {
         prefs.setMaxBlockSize(epubSettings.getMaxBlockSize());
         prefs.setMaxColumnCount(epubSettings.getMaxColumnCount());
         prefs.setMaxInlineSize(epubSettings.getMaxInlineSize());
+        Integer pageMargin = epubSettings.getPageMargin();
+        prefs.setPageMargin(pageMargin == null ? 40 : Math.max(0, Math.min(80, pageMargin)));
         prefs.setTheme(epubSettings.getTheme());
         prefs.setFlow(epubSettings.getFlow());
 

@@ -1,6 +1,8 @@
 {
   "reader": {
-    "loadingBook": "Loading book..."
+    "loadingBook": "Loading book...",
+    "previousChapter": "Previous chapter",
+    "nextChapter": "Next chapter"
   },
   "metadataDialog": {
     "title": "Book Information",
@@ -56,6 +58,7 @@
     "columnGap": "Column Gap",
     "maxWidth": "Max Width",
     "maxHeight": "Max Height",
+    "fullWidth": "Full-width pages",
     "textOptions": "Text Options",
     "justifyText": "Justify Text",
     "hyphenate": "Hyphenate",

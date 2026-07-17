@@ -20,6 +20,7 @@ describe('ReaderHeaderService', () => {
       theme: {...themes[0], fg: themes[0].dark.fg, bg: themes[0].dark.bg, link: themes[0].dark.link},
       maxInlineSize: 720,
       maxBlockSize: 1440,
+      pageMargin: 40,
       fontFamily: null,
       isDark: true,
       flow: 'paginated',

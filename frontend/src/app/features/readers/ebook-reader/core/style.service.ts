@@ -199,8 +199,9 @@ export class ReaderStyleService {
     if (!renderer) return;
 
     renderer.setAttribute('max-column-count', state.maxColumnCount);
-    renderer.setAttribute('gap', `${state.gap * 100}%`);
-    renderer.setAttribute('max-inline-size', `${state.maxInlineSize}px`);
+    const isFullWidth = state.flow === 'paginated' && state.pageMargin === 0;
+    renderer.setAttribute('gap', isFullWidth ? '0%' : `${state.gap * 100}%`);
+    renderer.setAttribute('max-inline-size', isFullWidth ? '10000px' : `${state.maxInlineSize}px`);
     renderer.setAttribute('max-block-size', `${state.maxBlockSize}px`);
     if (typeof renderer.setStyles === 'function') {
       const css = this.generateCSS(state);
@@ -208,7 +209,7 @@ export class ReaderStyleService {
     }
 
     if (state.flow === 'paginated') {
-      renderer.setAttribute('margin', '40px');
+      renderer.setAttribute('margin', `${state.pageMargin}px`);
     } else {
       renderer.removeAttribute('margin');
     }

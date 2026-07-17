@@ -18,6 +18,7 @@ export interface ReaderState {
   theme: Theme;
   maxInlineSize: number;
   maxBlockSize: number;
+  pageMargin: number;
   fontFamily: string | null;
   isDark: boolean;
   flow: 'paginated' | 'scrolled';
@@ -59,6 +60,7 @@ export class ReaderStateService {
     },
     maxInlineSize: 720,
     maxBlockSize: 1440,
+    pageMargin: 40,
     fontFamily: null,
     isDark: true,
     flow: 'paginated',
@@ -140,6 +142,7 @@ export class ReaderStateService {
         if (settings.maxColumnCount != null) newState.maxColumnCount = settings.maxColumnCount;
         if (settings.maxInlineSize != null) newState.maxInlineSize = settings.maxInlineSize;
         if (settings.maxBlockSize != null) newState.maxBlockSize = settings.maxBlockSize;
+        if (settings.pageMargin != null) newState.pageMargin = Math.max(0, Math.min(80, settings.pageMargin));
         if (settings.isDark != null) newState.isDark = settings.isDark;
         if (settings.flow) newState.flow = settings.flow;
         if (settings.theme) {
@@ -216,6 +219,10 @@ export class ReaderStateService {
     this.updateState({maxBlockSize: newValue});
   }
 
+  toggleFullWidth(): void {
+    this.updateState({pageMargin: this._state().pageMargin === 0 ? 40 : 0});
+  }
+
   toggleDarkMode() {
     const currentState = this._state();
     const currentTheme = currentState.theme;
@@ -285,6 +292,7 @@ export class ReaderStateService {
       theme: state.theme.name,
       maxInlineSize: state.maxInlineSize,
       maxBlockSize: state.maxBlockSize,
+      pageMargin: state.pageMargin,
       fontFamily: state.fontFamily,
       isDark: state.isDark,
       flow: state.flow,

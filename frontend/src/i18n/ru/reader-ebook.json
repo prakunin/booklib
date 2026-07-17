@@ -1,6 +1,8 @@
 {
     "reader": {
-        "loadingBook": "Загрузка книги..."
+        "loadingBook": "Загрузка книги...",
+        "previousChapter": "Предыдущая глава",
+        "nextChapter": "Следующая глава"
     },
     "metadataDialog": {
         "title": "Информация о книге",
@@ -56,6 +58,7 @@
         "columnGap": "Отступ между столбцами",
         "maxWidth": "Макс. ширина",
         "maxHeight": "Макс. высота",
+        "fullWidth": "Страницы на всю ширину",
         "textOptions": "Настройки текста",
         "justifyText": "Выравнивание по ширине",
         "hyphenate": "Переносы",

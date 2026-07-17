@@ -83,6 +83,7 @@ describe('ReaderStateService', () => {
           maxColumnCount: 4,
           maxInlineSize: 900,
           maxBlockSize: 1800,
+          pageMargin: 0,
           isDark: false,
           flow: 'scrolled',
           theme: 'gray',
@@ -105,6 +106,7 @@ describe('ReaderStateService', () => {
     expect(service.state().maxColumnCount).toBe(4);
     expect(service.state().maxInlineSize).toBe(900);
     expect(service.state().maxBlockSize).toBe(1800);
+    expect(service.state().pageMargin).toBe(0);
     expect(service.state().isDark).toBe(false);
     expect(service.state().flow).toBe('scrolled');
     expect(service.state().theme.name).toBe('gray');
@@ -142,6 +144,7 @@ describe('ReaderStateService', () => {
         maxColumnCount: 3,
         maxInlineSize: 800,
         maxBlockSize: 1500,
+        pageMargin: 12,
         isDark: true,
         flow: 'paginated',
         theme: 'ember',
@@ -156,6 +159,7 @@ describe('ReaderStateService', () => {
     expect(service.state().fontSize).toBe(20);
     expect(service.state().lineHeight).toBe(2);
     expect(service.state().gap).toBe(0.3);
+    expect(service.state().pageMargin).toBe(12);
     expect(service.state().theme.name).toBe('ember');
     expect(service.state().theme.fg).toBe(emberTheme?.dark.fg);
   });
@@ -260,6 +264,7 @@ describe('ReaderStateService', () => {
     service.updateFontSize(20);
     service.updateMaxInlineSize(-500);
     service.updateMaxBlockSize(2000);
+    service.toggleFullWidth();
     service.setThemeByName('sepia');
     service.setFontFamily('12');
     service.toggleDarkMode();
@@ -273,6 +278,7 @@ describe('ReaderStateService', () => {
     expect(service.state().fontSize).toBe(32);
     expect(service.state().maxInlineSize).toBe(400);
     expect(service.state().maxBlockSize).toBe(2400);
+    expect(service.state().pageMargin).toBe(0);
     expect(service.state().theme.name).toBe('sepia');
     expect(service.state().fontFamily).toBe('custom:12');
     expect(service.state().isDark).toBe(false);
