@@ -28,6 +28,15 @@ public class InpxCoverGenerationListener {
     private final BookCoverService bookCoverService;
     private final BookRepository bookRepository;
     private final NotificationService notificationService;
+    /**
+     * Dedups in-flight probes for the same book within this JVM only: it stops this single process
+     * from firing off redundant concurrent archive reads for a book that's already being probed.
+     * It provides no cross-process guarantee (a second app instance, or a request handled on a
+     * different thread pool entirely, is not covered) and is not what makes concurrent persistence
+     * safe - that correctness guarantee lives in {@link BookCoverService#tryGenerateMissingInpxCover}
+     * via atomic conditional updates. Do not rely on this set for correctness, only for reducing
+     * redundant work.
+     */
     private final Set<Long> processingBookIds = ConcurrentHashMap.newKeySet();
     private final ConcurrentMap<Long, Set<String>> waitingUsers = new ConcurrentHashMap<>();
     private final Cache<Long, Boolean> attemptedBooks = Caffeine.newBuilder()

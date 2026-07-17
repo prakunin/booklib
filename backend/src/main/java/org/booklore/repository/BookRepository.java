@@ -264,6 +264,38 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
             @Param("libraryPath") LibraryPathEntity libraryPath);
 
     /**
+     * Atomically records a completed "no cover" probe, but only if the book still has neither a
+     * cover nor a marker: the {@code bookCoverHash IS NULL} guard is what stops a stale in-flight
+     * lazy probe from clobbering a cover that a concurrent explicit regeneration or archive refresh
+     * gave the book in the meantime, and {@code coverProbedAt IS NULL} makes the write idempotent
+     * against a second concurrent probe reaching the same conclusion. Returns the number of rows
+     * changed (0 or 1) so the caller can tell whether it actually won the race.
+     */
+    @Modifying
+    @Query("""
+            UPDATE BookEntity b SET b.coverProbedAt = :probedAt
+            WHERE b.id = :bookId AND b.bookCoverHash IS NULL AND b.coverProbedAt IS NULL
+            """)
+    int markCoverProbedIfStillMissing(@Param("bookId") Long bookId, @Param("probedAt") Instant probedAt);
+
+    /**
+     * Atomically records a freshly found cover, but only if the book does not already have one.
+     * Guards against two concurrent probes of the same archived book (or a probe racing an explicit
+     * regeneration) both persisting - and both notifying about - the same cover. Returns the number
+     * of rows changed (0 or 1); a caller that gets 0 lost the race, but the postcondition it wanted
+     * (the book has a cover) already holds.
+     */
+    @Modifying
+    @Query("""
+            UPDATE BookEntity b SET
+                b.bookCoverHash = :coverHash,
+                b.coverProbedAt = NULL,
+                b.metadataUpdatedAt = :now
+            WHERE b.id = :bookId AND b.bookCoverHash IS NULL
+            """)
+    int markCoverFoundIfStillMissing(@Param("bookId") Long bookId, @Param("coverHash") String coverHash, @Param("now") Instant now);
+
+    /**
      * Get distinct series names for a library when groupUnknown=true.
      * Books without series name are grouped as "Unknown Series".
      */

@@ -212,6 +212,7 @@ class BookCoverServiceTest {
             when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.probeCover(book, bookFile)).thenReturn(CoverProbeOutcome.COVER_FOUND);
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any(), any())).thenReturn(1);
 
             boolean generated = service.tryGenerateMissingInpxCover(42L);
 
@@ -219,7 +220,31 @@ class BookCoverServiceTest {
             assertThat(book.getBookCoverHash()).isNotBlank();
             assertThat(book.getMetadata().getCoverUpdatedOn()).isNotNull();
             assertThat(book.getCoverProbedAt()).isNull();
+            verify(bookRepository).markCoverFoundIfStillMissing(eq(42L), any(), any());
             verify(bookRepository).save(book);
+        }
+
+        /**
+         * The atomic conditional update is what actually makes "probed at most once" safe under
+         * concurrency: a second, slower caller that also found a cover must not clobber whatever a
+         * faster concurrent writer (another probe, an explicit regeneration, an archive refresh)
+         * already persisted. Losing the race still reports success, since the postcondition the
+         * caller cares about - the book has a cover - already holds.
+         */
+        @Test
+        void losingTheCoverFoundRaceStillReportsSuccessWithoutOverwritingConcurrentState() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.probeCover(book, bookFile)).thenReturn(CoverProbeOutcome.COVER_FOUND);
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any(), any())).thenReturn(0);
+
+            boolean generated = service.tryGenerateMissingInpxCover(42L);
+
+            assertThat(generated).isTrue();
+            assertThat(book.getBookCoverHash()).isNull();
+            verify(bookRepository, never()).save(any());
         }
 
         @Test
@@ -268,19 +293,23 @@ class BookCoverServiceTest {
         }
 
         @Test
-        void completedProbeWithNoCoverSetsAndPersistsTheMarker() {
+        void completedProbeWithNoCoverAtomicallyPersistsTheMarker() {
             BookFileEntity bookFile = buildArchivedFb2File();
             BookEntity book = buildArchivedInpxBook(bookFile);
             when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.probeCover(book, bookFile)).thenReturn(CoverProbeOutcome.NO_COVER_FOUND);
+            when(bookRepository.markCoverProbedIfStillMissing(eq(42L), any())).thenReturn(1);
 
             boolean generated = service.tryGenerateMissingInpxCover(42L);
 
             assertThat(generated).isFalse();
             assertThat(book.getCoverProbedAt()).isNotNull();
             assertThat(book.getBookCoverHash()).isNull();
-            verify(bookRepository).save(book);
+            verify(bookRepository).markCoverProbedIfStillMissing(eq(42L), any());
+            // The marker write is a standalone atomic UPDATE, not a full-entity save - a full save
+            // here would risk clobbering fields a concurrent writer just changed.
+            verify(bookRepository, never()).save(any());
         }
 
         @Test
@@ -296,6 +325,30 @@ class BookCoverServiceTest {
             assertThat(generated).isFalse();
             assertThat(book.getCoverProbedAt()).isNull();
             assertThat(book.getBookCoverHash()).isNull();
+            verify(bookRepository, never()).save(any());
+            verify(bookRepository, never()).markCoverProbedIfStillMissing(anyLong(), any());
+            verify(bookRepository, never()).markCoverFoundIfStillMissing(anyLong(), any(), any());
+        }
+
+        /**
+         * Mirrors the worse race called out in review: a concurrent archive refresh clears the
+         * marker and regenerates a cover (setting bookCoverHash) after this call already read the
+         * book but before it persists its own "no cover" conclusion. The atomic guard must refuse
+         * to overwrite that newer state instead of reinstating an obsolete "no cover".
+         */
+        @Test
+        void losingTheNoCoverRaceDoesNotReinstateAnObsoleteMarker() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.probeCover(book, bookFile)).thenReturn(CoverProbeOutcome.NO_COVER_FOUND);
+            when(bookRepository.markCoverProbedIfStillMissing(eq(42L), any())).thenReturn(0);
+
+            boolean generated = service.tryGenerateMissingInpxCover(42L);
+
+            assertThat(generated).isFalse();
+            assertThat(book.getCoverProbedAt()).isNull();
             verify(bookRepository, never()).save(any());
         }
     }
@@ -399,6 +452,33 @@ class BookCoverServiceTest {
             verify(bookRepository).save(book);
         }
 
+        /**
+         * A successful explicit regeneration must not leave contradictory durable state: the
+         * archive just yielded a cover, so any earlier "no cover" probe marker is now stale and
+         * must be cleared - otherwise the lazy path stays permanently blocked if the hash is later
+         * cleared without a rescan.
+         */
+        @Test
+        void successfulRegenerationClearsAStaleNoCoverMarker() {
+            BookEntity book = buildBook(1L, false);
+            book.setCoverProbedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
+            BookFileEntity ebookFile = BookFileEntity.builder()
+                    .bookType(BookFileType.EPUB)
+                    .isBookFormat(true)
+                    .build();
+            book.setBookFiles(List.of(ebookFile));
+            when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(book));
+
+            BookFileProcessor processor = mock(BookFileProcessor.class);
+            when(processorRegistry.getProcessorOrThrow(BookFileType.EPUB)).thenReturn(processor);
+            when(processor.generateCover(book, ebookFile)).thenReturn(true);
+
+            service.regenerateCover(1L);
+
+            assertThat(book.getCoverProbedAt()).isNull();
+            verify(bookRepository).save(book);
+        }
+
         @Test
         void explicitRegenerationIsNotBlockedByThePreviouslyProbedMarker() {
             // Only the lazy tryGenerateMissingInpxCover path honours coverProbedAt. An explicit,
@@ -420,6 +500,7 @@ class BookCoverServiceTest {
 
             verify(processor).generateCover(book, ebookFile);
             assertThat(book.getBookCoverHash()).isNotNull();
+            assertThat(book.getCoverProbedAt()).isNull();
             verify(bookRepository).save(book);
         }
     }

@@ -263,6 +263,10 @@ public class BookCoverService {
         if (!success) {
             throw ApiError.FAILED_TO_REGENERATE_COVER.createException("no embedded cover image found in the file");
         }
+        // The archive just yielded a cover, so any earlier "no cover" probe result is obsolete.
+        // Leaving it set would permanently block the lazy path if the hash is later cleared
+        // without a rescan (rescans already clear it themselves).
+        bookEntity.setCoverProbedAt(null);
         updateBookCoverMetadata(bookEntity);
         bookRepository.save(bookEntity);
     }
@@ -274,6 +278,17 @@ public class BookCoverService {
      * book is only ever marked once the archive was read successfully and genuinely had no cover.
      * A read failure (IO error, corrupt or temporarily unavailable archive) leaves the marker unset
      * so the book remains eligible for a later retry - see {@link CoverProbeOutcome}.
+     * <p>
+     * The initial guard-clause read above is <em>not</em> itself a concurrency guarantee: two
+     * concurrent calls for the same book can both pass it and both go on to probe the archive.
+     * What actually makes "probed at most once" safe is that persisting the outcome below goes
+     * through {@link BookRepository#markCoverProbedIfStillMissing} / {@link
+     * BookRepository#markCoverFoundIfStillMissing}, atomic conditional updates that only take
+     * effect if the book's cover state hasn't moved on since - so a losing writer's answer is
+     * discarded instead of clobbering fresher state (e.g. a concurrent archive refresh that cleared
+     * the marker and regenerated a cover). Duplicate marker writes are harmless by construction
+     * (idempotent); a duplicate {@code COVER_FOUND} is treated as success rather than clobbering
+     * whatever concurrently won.
      */
     public boolean tryGenerateMissingInpxCover(long bookId) {
         BookEntity bookEntity = bookRepository.findByIdWithBookFiles(bookId).orElse(null);
@@ -295,13 +310,30 @@ public class BookCoverService {
         CoverProbeOutcome outcome = processor.probeCover(bookEntity, ebookFile);
         return switch (outcome) {
             case COVER_FOUND -> {
-                updateBookCoverMetadata(bookEntity);
+                String coverHash = BookCoverUtils.generateCoverHash();
+                Instant now = Instant.now();
+                int updated = bookRepository.markCoverFoundIfStillMissing(bookEntity.getId(), coverHash, now);
+                if (updated == 0) {
+                    // Lost the race to a concurrent write that already gave the book a cover
+                    // (another lazy probe, an explicit regeneration, or an archive refresh). The
+                    // postcondition we care about already holds, so report success without
+                    // touching state that something else now owns.
+                    yield true;
+                }
+                bookEntity.setBookCoverHash(coverHash);
+                bookEntity.setCoverProbedAt(null);
+                bookEntity.setMetadataUpdatedAt(now);
+                bookEntity.getMetadata().setCoverUpdatedOn(now);
                 bookRepository.save(bookEntity);
                 yield true;
             }
             case NO_COVER_FOUND -> {
-                bookEntity.setCoverProbedAt(Instant.now());
-                bookRepository.save(bookEntity);
+                Instant probedAt = Instant.now();
+                if (bookRepository.markCoverProbedIfStillMissing(bookEntity.getId(), probedAt) > 0) {
+                    bookEntity.setCoverProbedAt(probedAt);
+                }
+                // Whether this call won the race or lost it to a concurrent write, this call
+                // itself found no cover - nothing to notify either way.
                 yield false;
             }
             case READ_FAILED -> false;
@@ -393,6 +425,9 @@ public class BookCoverService {
                                 boolean success = processor.generateCover(book);
 
                                 if (success) {
+                                    // Same contradictory-state hazard as the single-book regenerateCover path:
+                                    // a stale "no cover" marker must not survive a successful regeneration.
+                                    book.setCoverProbedAt(null);
                                     updateBookCoverMetadata(book);
                                     bookRepository.save(book);
                                     notifyBulkCoverUpdate(List.of(book.getId()), username);
@@ -481,6 +516,9 @@ public class BookCoverService {
                             boolean success = processor.generateCover(book);
 
                             if (success) {
+                                // Same contradictory-state hazard as the single-book regenerateCover path:
+                                // a stale "no cover" marker must not survive a successful regeneration.
+                                book.setCoverProbedAt(null);
                                 updateBookCoverMetadata(book);
                                 bookRepository.save(book);
                                 notifyBulkCoverUpdate(List.of(book.getId()), username);

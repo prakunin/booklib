@@ -90,7 +90,16 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
             return CoverProbeOutcome.READ_FAILED;
         }
 
-        byte[] coverData = fb2MetadataExtractor.extractCover(fb2File);
+        byte[] coverData;
+        try {
+            coverData = fb2MetadataExtractor.extractCover(fb2File);
+        } catch (Exception e) {
+            // A malformed or unexpectedly-shaped FB2 must not propagate out of here: both callers
+            // (the lazy probe and explicit regeneration) would otherwise turn one bad file into a
+            // permanent 500, since the old generateCover caught everything and just returned false.
+            log.error("Error extracting cover from FB2 '{}': {}", bookFile.getFileName(), e.getMessage(), e);
+            return CoverProbeOutcome.READ_FAILED;
+        }
         if (coverData == null || coverData.length == 0) {
             log.warn("No cover image found in FB2 '{}'", bookFile.getFileName());
             return CoverProbeOutcome.NO_COVER_FOUND;

@@ -32,10 +32,14 @@ public interface BookFileProcessor {
      * instead of {@link #generateCover(BookEntity, BookFileEntity)} so a transient read failure is
      * never recorded as a permanent answer.
      * <p>
-     * Defaults to collapsing any generateCover failure into {@code NO_COVER_FOUND}, which is fine
-     * for processors nobody probes lazily. Override where the distinction is actually needed.
+     * Defaults to {@link CoverProbeOutcome#READ_FAILED} on anything short of a proven cover: {@link
+     * #generateCover(BookEntity, BookFileEntity)} returns {@code false} for read failures, parse
+     * failures and write failures alike, so collapsing that into {@code NO_COVER_FOUND} here would
+     * let any archived format - present or future - persist a transient failure as a permanent "no
+     * cover". Only override this to return {@code NO_COVER_FOUND} once a processor can actually
+     * prove a clean miss (see {@link org.booklore.service.fileprocessor.Fb2Processor}).
      */
     default CoverProbeOutcome probeCover(BookEntity bookEntity, BookFileEntity bookFile) {
-        return generateCover(bookEntity, bookFile) ? CoverProbeOutcome.COVER_FOUND : CoverProbeOutcome.NO_COVER_FOUND;
+        return generateCover(bookEntity, bookFile) ? CoverProbeOutcome.COVER_FOUND : CoverProbeOutcome.READ_FAILED;
     }
 }

@@ -117,6 +117,46 @@ class Fb2ProcessorArchivedSourceTest {
             assertThat(outcome).isEqualTo(CoverProbeOutcome.NO_COVER_FOUND);
         }
 
+        /**
+         * Drives the same processor call that {@code BookCoverService.tryGenerateMissingInpxCover}
+         * makes on the processor. Before this fix, an exception thrown by the extractor escaped
+         * probeCover() entirely instead of being reported as a failed probe.
+         */
+        @Test
+        void extractionThrowingDuringProbeCoverIsReportedAsReadFailedNotPropagated() {
+            Fb2Processor processor = buildProcessor();
+            BookEntity book = BookEntity.builder().id(42L).build();
+            BookFileEntity bookFile = buildArchivedFile(book);
+            Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
+            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri())))
+                    .thenThrow(new RuntimeException("malformed FB2"));
+
+            CoverProbeOutcome outcome = processor.probeCover(book, bookFile);
+
+            assertThat(outcome).isEqualTo(CoverProbeOutcome.READ_FAILED);
+        }
+
+        /**
+         * Drives the same processor call that {@code BookCoverService.regenerateCover} makes on the
+         * processor for explicit, user-triggered regeneration. Before this fix, this call would
+         * throw instead of returning false, turning one malformed FB2 into a repeated HTTP 500.
+         */
+        @Test
+        void extractionThrowingDuringGenerateCoverReturnsFalseWithoutPropagating() {
+            Fb2Processor processor = buildProcessor();
+            BookEntity book = BookEntity.builder().id(42L).build();
+            BookFileEntity bookFile = buildArchivedFile(book);
+            Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
+            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri())))
+                    .thenThrow(new RuntimeException("malformed FB2"));
+
+            boolean generated = processor.generateCover(book, bookFile);
+
+            assertThat(generated).isFalse();
+        }
+
         @Test
         void successfulReadWithCoverBinaryIsReportedAsCoverFound() throws IOException {
             Fb2Processor processor = buildProcessor();
