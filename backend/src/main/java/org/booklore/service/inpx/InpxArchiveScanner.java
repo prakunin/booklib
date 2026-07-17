@@ -148,11 +148,11 @@ public class InpxArchiveScanner {
                     try (InputStream input = archive.getInputStream(entry)) {
                         BookMetadata metadata = fb2MetadataExtractor.extractMetadata(
                                 input, candidate.archiveName() + "!" + entry.getName());
-                        consumer.accept(toBook(candidate.archiveName(), entry.getName(), metadata));
+                        consumer.accept(toBook(candidate.archiveName(), entry.getName(), entry.getSize(), metadata));
                     } catch (IOException e) {
                         log.warn("Unable to read FB2 entry {} from {}: {}",
                                 entry.getName(), candidate.archiveName(), e.getMessage());
-                        consumer.accept(toBook(candidate.archiveName(), entry.getName(), null));
+                        consumer.accept(toBook(candidate.archiveName(), entry.getName(), entry.getSize(), null));
                     }
                 }
             }
@@ -173,7 +173,7 @@ public class InpxArchiveScanner {
                 .collect(Collectors.toSet());
     }
 
-    private InpxBookDto toBook(String archiveName, String entryName, BookMetadata metadata) {
+    private InpxBookDto toBook(String archiveName, String entryName, long sizeBytes, BookMetadata metadata) {
         String fileName = entryName.substring(0, entryName.length() - ".fb2".length());
         String title = metadata == null || metadata.getTitle() == null || metadata.getTitle().isBlank()
                 ? fileName
@@ -201,7 +201,42 @@ public class InpxArchiveScanner {
                 .language(metadata == null ? null : metadata.getLanguage())
                 .rating(metadata == null ? null : metadata.getRating())
                 .archiveName(archiveName)
+                .fileSizeKb(toKilobytes(sizeBytes))
                 .build();
+    }
+
+    void populateFileSizes(List<InpxBookDto> books, String archiveRoot) {
+        if (books.isEmpty() || archiveRoot == null || archiveRoot.isBlank()) {
+            return;
+        }
+        books.stream()
+                .filter(book -> book.getFileSizeKb() == null)
+                .collect(Collectors.groupingBy(InpxBookDto::getArchiveName))
+                .forEach((archiveName, archiveBooks) -> populateFileSizes(archiveBooks, archiveRoot, archiveName));
+    }
+
+    private void populateFileSizes(List<InpxBookDto> books, String archiveRoot, String archiveName) {
+        try {
+            Path root = Path.of(archiveRoot).toAbsolutePath().normalize();
+            Path archivePath = root.resolve(archiveName).normalize();
+            if (!archivePath.startsWith(root) || !Files.isRegularFile(archivePath)) {
+                return;
+            }
+            try (ZipFile archive = new ZipFile(archivePath.toFile())) {
+                for (InpxBookDto book : books) {
+                    ZipEntry entry = archive.getEntry(book.getFileName() + "." + book.getExtension());
+                    if (entry != null) {
+                        book.setFileSizeKb(toKilobytes(entry.getSize()));
+                    }
+                }
+            }
+        } catch (IOException | InvalidPathException e) {
+            log.warn("Unable to read file sizes from INPX archive {}: {}", archiveName, e.getMessage());
+        }
+    }
+
+    private Long toKilobytes(long sizeBytes) {
+        return sizeBytes >= 0 ? sizeBytes / 1024 : null;
     }
 
     private Map<String, Long> persistedCounts(long libraryId) {

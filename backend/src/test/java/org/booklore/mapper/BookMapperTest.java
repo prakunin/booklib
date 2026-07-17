@@ -41,6 +41,7 @@ class BookMapperTest {
         primaryFile.setFileSubPath(".");
         primaryFile.setBookFormat(true);
         primaryFile.setBookType(BookFileType.EPUB);
+        primaryFile.setSourceArchive("catalog.zip");
         entity.setBookFiles(List.of(primaryFile));
         entity.setLibrary(library);
         entity.setLibraryPath(libraryPath);
@@ -54,6 +55,7 @@ class BookMapperTest {
         assertThat(dto.getLibraryPath()).isNotNull();
         assertThat(dto.getLibraryPath().getId()).isEqualTo(1L);
         assertThat(dto.getPrimaryFile().getBookType()).isEqualTo(BookFileType.EPUB);
+        assertThat(dto.getPrimaryFile().getSourceArchive()).isEqualTo("catalog.zip");
         assertThat(dto.getAlternativeFormats()).isEmpty();
         assertThat(dto.getSupplementaryFiles()).isEmpty();
 

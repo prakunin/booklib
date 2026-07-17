@@ -31,6 +31,7 @@ public class SystemInfoService {
     private final DataSource dataSource;
     private final StorageInfoService storageInfoService;
     private final ToolVersionService toolVersionService;
+    private final TimeoutGuard timeoutGuard;
 
     public SystemInfoDto getSystemInfo() {
         // Fetched once and shared: filesystems() and libraryPaths() both classify the same set of
@@ -93,19 +94,28 @@ public class SystemInfoService {
     }
 
     private DatabaseInfo databaseInfo() {
-        try (Connection connection = dataSource.getConnection()) {
-            DatabaseMetaData metaData = connection.getMetaData();
-            return DatabaseInfo.builder()
-                    .status("UP")
-                    .vendor(metaData.getDatabaseProductName())
-                    .version(metaData.getDatabaseProductVersion())
-                    .build();
-        } catch (Exception e) {
-            // A diagnostics page must still render when the database is the thing that is broken.
-            // Spring Data/JDBC can surface failures as unchecked exceptions, not just SQLException.
-            log.warn("Could not read database metadata for system info: {}", e.getMessage());
+        // dataSource.getConnection() can block for as long as Hikari's connection-timeout (30s) when
+        // the database is down, and that is a *separate* budget from timeoutGuard's — in the worst
+        // case this whole call could otherwise stall the request for tens of seconds. Bounding it
+        // here caps that at timeoutGuard's own budget, independent of configuredLibraryPaths()'s.
+        return timeoutGuard.run("database metadata", () -> {
+            try (Connection connection = dataSource.getConnection()) {
+                DatabaseMetaData metaData = connection.getMetaData();
+                return DatabaseInfo.builder()
+                        .status("UP")
+                        .vendor(metaData.getDatabaseProductName())
+                        .version(metaData.getDatabaseProductVersion())
+                        .build();
+            } catch (Exception e) {
+                // A diagnostics page must still render when the database is the thing that is broken.
+                // Spring Data/JDBC can surface failures as unchecked exceptions, not just SQLException.
+                log.warn("Could not read database metadata for system info: {}", e.getMessage());
+                return DatabaseInfo.builder().status("DOWN").build();
+            }
+        }).orElseGet(() -> {
+            log.warn("Timed out reading database metadata for system info");
             return DatabaseInfo.builder().status("DOWN").build();
-        }
+        });
     }
 
     private StorageInfo storageInfo() {
@@ -118,12 +128,20 @@ public class SystemInfoService {
     }
 
     private List<String> configuredLibraryPaths() {
-        try {
-            return storageInfoService.configuredLibraryPaths();
-        } catch (Exception e) {
-            log.warn("Could not read configured library paths for system info: {}", e.getMessage());
+        // Same reasoning as databaseInfo(): the repository call is a separate blocking DB round
+        // trip and gets its own independent budget here, so a slow or stuck query here cannot eat
+        // into databaseInfo()'s allowance (or vice versa).
+        return timeoutGuard.run("configured library paths", () -> {
+            try {
+                return storageInfoService.configuredLibraryPaths();
+            } catch (Exception e) {
+                log.warn("Could not read configured library paths for system info: {}", e.getMessage());
+                return List.<String>of();
+            }
+        }).orElseGet(() -> {
+            log.warn("Timed out reading configured library paths for system info");
             return List.of();
-        }
+        });
     }
 
     private List<FilesystemInfo> filesystems(List<String> configuredPaths) {

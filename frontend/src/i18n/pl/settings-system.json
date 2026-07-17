@@ -47,7 +47,8 @@
         "total": "łącznie",
         "libraryPaths": "Ścieżki bibliotek",
         "noLibraryPaths": "Nie skonfigurowano żadnych ścieżek bibliotek.",
-        "libraryPathsUnavailable": "Nie udało się ustalić ścieżek bibliotek; baza danych jest niedostępna."
+        "libraryPathsUnavailable": "Nie udało się ustalić ścieżek bibliotek; baza danych jest niedostępna.",
+        "pathStatusUnknownNote": "Niektórych ścieżek nie udało się sprawdzić na czas (np. zawieszony dysk sieciowy) i są oznaczone jako Nieznane, zamiast uznawane za brakujące."
     },
     "tools": {
         "title": "Narzędzia",

@@ -213,6 +213,11 @@
                         {{ currentBook.primaryFile.extension | uppercase }}
                       </span>
                       <span class="file-name" [pTooltip]="currentBook.primaryFile.filePath" tooltipPosition="top">{{ currentBook.primaryFile.fileName }}</span>
+                      @if (currentBook.primaryFile.sourceArchive) {
+                        <span class="file-archive" [pTooltip]="t('archive')" tooltipPosition="top">
+                          <i class="pi pi-box"></i> {{ currentBook.primaryFile.sourceArchive }}
+                        </span>
+                      }
                       <span class="file-size">{{ getFileSizeInMB(currentBook.primaryFile) }}</span>
                     </div>
                     <div class="file-actions">

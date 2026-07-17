@@ -47,7 +47,8 @@
         "total": "skupaj",
         "libraryPaths": "Poti knjižnic",
         "noLibraryPaths": "Nastavljenih ni nobenih poti knjižnic.",
-        "libraryPathsUnavailable": "Poti knjižnic ni bilo mogoče določiti; podatkovna baza ni dosegljiva."
+        "libraryPathsUnavailable": "Poti knjižnic ni bilo mogoče določiti; podatkovna baza ni dosegljiva.",
+        "pathStatusUnknownNote": "Nekaterih poti ni bilo mogoče preveriti pravočasno (na primer obviseli omrežni disk), zato so prikazane kot Neznano namesto da bi veljale za manjkajoče."
     },
     "tools": {
         "title": "Orodja",

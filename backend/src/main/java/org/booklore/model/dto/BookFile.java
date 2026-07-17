@@ -17,6 +17,7 @@ public class BookFile {
     private String fileName;
     private String filePath;
     private String fileSubPath;
+    private String sourceArchive;
     private boolean isBook;
     private boolean folderBased;
     private BookFileType bookType;

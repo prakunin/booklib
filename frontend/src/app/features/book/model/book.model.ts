@@ -15,6 +15,7 @@ export interface FileInfo {
   filePath?: string;
   fileSubPath?: string;
   fileSizeKb?: number;
+  sourceArchive?: string;
 }
 
 export interface BookFile extends FileInfo {

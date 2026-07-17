@@ -47,7 +47,8 @@
         "total": "总计",
         "libraryPaths": "库路径",
         "noLibraryPaths": "未配置任何库路径。",
-        "libraryPathsUnavailable": "无法确定库路径；数据库不可访问。"
+        "libraryPathsUnavailable": "无法确定库路径；数据库不可访问。",
+        "pathStatusUnknownNote": "部分路径未能在规定时间内检查完成（例如挂起的网络挂载点），因此显示为「未知」，而不是被视为缺失。"
     },
     "tools": {
         "title": "工具",

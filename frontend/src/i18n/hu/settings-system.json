@@ -47,7 +47,8 @@
         "total": "összesen",
         "libraryPaths": "Könyvtárútvonalak",
         "noLibraryPaths": "Nincsenek beállított könyvtárútvonalak.",
-        "libraryPathsUnavailable": "Nem sikerült meghatározni a könyvtár elérési útjait; az adatbázis nem érhető el."
+        "libraryPathsUnavailable": "Nem sikerült meghatározni a könyvtár elérési útjait; az adatbázis nem érhető el.",
+        "pathStatusUnknownNote": "Egyes elérési utakat nem sikerült időben ellenőrizni (például egy lefagyott hálózati meghajtó miatt), ezért Ismeretlen állapotban jelennek meg ahelyett, hogy hiányzónak tekintenénk őket."
     },
     "tools": {
         "title": "Eszközök",

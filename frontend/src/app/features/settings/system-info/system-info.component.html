@@ -218,6 +218,12 @@
                 </div>
               }
             </div>
+            @if (hasUnknownLibraryPath(info)) {
+              <p class="warning-note">
+                <i class="pi pi-exclamation-triangle"></i>
+                {{ t('storage.pathStatusUnknownNote') }}
+              </p>
+            }
           }
         </div>
       </div>

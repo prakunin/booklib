@@ -58,6 +58,7 @@ public class InpxBatchWriter {
 
         List<String> keys = batch.stream().map(this::archiveKey).toList();
         Set<String> existing = findExistingKeys(libraryId, batch, keys);
+        backfillExistingFileSizes(libraryId, batch);
 
         LibraryEntity library = entityManager.getReference(LibraryEntity.class, libraryId);
         LibraryPathEntity libraryPath = entityManager.getReference(LibraryPathEntity.class, libraryPathId);
@@ -89,6 +90,24 @@ public class InpxBatchWriter {
         }
         registerCachePromotion(caches, pendingAuthors, pendingCategories);
         return new BatchResult(books.size(), skipped);
+    }
+
+    private void backfillExistingFileSizes(long libraryId, List<InpxBookDto> batch) {
+        Map<String, Long> sizesByKey = batch.stream()
+                .filter(source -> source.getFileSizeKb() != null)
+                .collect(Collectors.toMap(this::archiveKey, InpxBookDto::getFileSizeKb, (first, ignored) -> first));
+        if (sizesByKey.isEmpty()) {
+            return;
+        }
+
+        Set<String> archives = batch.stream().map(InpxBookDto::getArchiveName).collect(Collectors.toSet());
+        Set<String> entries = batch.stream().map(this::entryName).collect(Collectors.toSet());
+        for (BookFileEntity file : bookFileRepository.findArchiveEntriesMissingSize(libraryId, archives, entries)) {
+            Long size = sizesByKey.get(file.getSourceArchive() + "|" + file.getSourceArchiveEntry());
+            if (size != null) {
+                file.setFileSizeKb(size);
+            }
+        }
     }
 
     /**
@@ -171,6 +190,7 @@ public class InpxBatchWriter {
                 .bookType(BookFileType.FB2)
                 .sourceArchive(source.getArchiveName())
                 .sourceArchiveEntry(entryName)
+                .fileSizeKb(source.getFileSizeKb())
                 .addedOn(now)
                 .build();
         book.setBookFiles(new ArrayList<>(List.of(file)));

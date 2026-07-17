@@ -21,4 +21,5 @@ public class InpxBookDto {
     private String language;
     private Double rating;
     private String archiveName;
+    private Long fileSizeKb;
 }

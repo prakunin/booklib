@@ -12,6 +12,9 @@ const PATH_STATUS_COLOR: Record<PathStatus, TagColor> = {
   OK: 'green',
   MISSING: 'red',
   UNREADABLE: 'amber',
+  // Neither healthy (green) nor confirmed broken (red/amber): the probe simply could not answer
+  // within its time budget (e.g. a hung network mount), so this reads as neutral/unresolved.
+  UNKNOWN: 'gray',
 };
 
 @Component({
@@ -77,6 +80,16 @@ export class SystemInfoComponent {
    */
   protected noLibraryPathsKey(info: SystemInfo): string {
     return info.database.status === 'DOWN' ? 'storage.libraryPathsUnavailable' : 'storage.noLibraryPaths';
+  }
+
+  /**
+   * A path probe that could not be determined within its time budget (e.g. a hung network mount)
+   * is reported as UNKNOWN rather than silently folded into MISSING or OK. Surface an explanatory
+   * note whenever at least one path carries that status, mirroring how `database.downNote` explains
+   * a DOWN database instead of leaving the admin to guess why a status looks unusual.
+   */
+  protected hasUnknownLibraryPath(info: SystemInfo): boolean {
+    return info.libraryPaths.some(lp => lp.status === 'UNKNOWN');
   }
 
   /**

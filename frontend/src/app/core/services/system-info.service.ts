@@ -4,7 +4,7 @@ import {injectQuery} from '@tanstack/angular-query-experimental';
 import {lastValueFrom} from 'rxjs';
 import {API_CONFIG} from '../config/api-config';
 
-export type PathStatus = 'OK' | 'MISSING' | 'UNREADABLE';
+export type PathStatus = 'OK' | 'MISSING' | 'UNREADABLE' | 'UNKNOWN';
 
 export interface SystemInfo {
   // Every field below that the backend can report as a bare, unguarded builder default (e.g. when

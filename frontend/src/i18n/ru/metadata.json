@@ -214,6 +214,7 @@
         "physicalBookMessage": "Эта книга является записью физической книги без цифровых файлов.",
         "downloadAll": "Скачать все ({{ count }} файлов)",
         "primaryFile": "Основной файл",
+        "archive": "ZIP-архив",
         "alternativeFormats": "Альтернативные форматы",
         "supplementaryFiles": "Дополнительные файлы",
         "readTooltip": "Читать",

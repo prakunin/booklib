@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import org.booklore.model.dto.inpx.InpxBookDto;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
+import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.CategoryEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
@@ -114,6 +115,24 @@ class InpxBatchWriterTest {
         ArgumentCaptor<List<BookEntity>> captor = ArgumentCaptor.forClass(List.class);
         verify(bookRepository).saveAll(captor.capture());
         assertThat(captor.getValue().getFirst().getMetadata().getRating()).isEqualTo(5.0);
+    }
+
+    @Test
+    void storesAndBackfillsArchiveEntrySize() {
+        InpxBookDto source = book("fb2-1.zip", "sized", "Sized", null, null);
+        source.setFileSizeKb(321L);
+        BookFileEntity existing = BookFileEntity.builder()
+                .sourceArchive("fb2-1.zip")
+                .sourceArchiveEntry("sized.fb2")
+                .build();
+        when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any()))
+                .thenReturn(List.<Object[]>of(new Object[]{"fb2-1.zip", "sized.fb2"}));
+        when(bookFileRepository.findArchiveEntriesMissingSize(eq(7L), any(), any()))
+                .thenReturn(List.of(existing));
+
+        writer.persist(List.of(source), 7L, 3L, caches);
+
+        assertThat(existing.getFileSizeKb()).isEqualTo(321L);
     }
 
     @Test

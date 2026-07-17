@@ -47,7 +47,8 @@
         "total": "totali",
         "libraryPaths": "Percorsi delle librerie",
         "noLibraryPaths": "Nessun percorso di libreria configurato.",
-        "libraryPathsUnavailable": "Impossibile determinare i percorsi della libreria; il database non è raggiungibile."
+        "libraryPathsUnavailable": "Impossibile determinare i percorsi della libreria; il database non è raggiungibile.",
+        "pathStatusUnknownNote": "Alcuni percorsi non sono stati verificati in tempo (ad esempio un'unità di rete bloccata) e vengono mostrati come Sconosciuto anziché considerati mancanti."
     },
     "tools": {
         "title": "Strumenti",

@@ -47,7 +47,8 @@
         "total": "total",
         "libraryPaths": "Chemins des bibliothèques",
         "noLibraryPaths": "Aucun chemin de bibliothèque n'est configuré.",
-        "libraryPathsUnavailable": "Impossible de déterminer les chemins de bibliothèque ; la base de données est inaccessible."
+        "libraryPathsUnavailable": "Impossible de déterminer les chemins de bibliothèque ; la base de données est inaccessible.",
+        "pathStatusUnknownNote": "Certains chemins n'ont pas pu être vérifiés à temps (par exemple un point de montage réseau bloqué) et sont affichés comme Inconnu plutôt que considérés comme manquants."
     },
     "tools": {
         "title": "Outils",

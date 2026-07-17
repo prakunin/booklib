@@ -47,7 +47,8 @@
         "total": "gesamt",
         "libraryPaths": "Bibliothekspfade",
         "noLibraryPaths": "Es sind keine Bibliothekspfade konfiguriert.",
-        "libraryPathsUnavailable": "Bibliothekspfade konnten nicht ermittelt werden; die Datenbank ist nicht erreichbar."
+        "libraryPathsUnavailable": "Bibliothekspfade konnten nicht ermittelt werden; die Datenbank ist nicht erreichbar.",
+        "pathStatusUnknownNote": "Einige Pfade konnten nicht rechtzeitig geprüft werden (z. B. eine hängende Netzwerkfreigabe) und werden als Unbekannt angezeigt, anstatt als fehlend angenommen zu werden."
     },
     "tools": {
         "title": "Werkzeuge",

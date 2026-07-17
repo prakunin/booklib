@@ -107,6 +107,25 @@ class InpxArchiveScannerTest {
         assertThat(books).extracting(InpxBookDto::getArchiveName).containsOnly("new.zip");
     }
 
+    @Test
+    void populatesFileSizeFromTheUncompressedZipEntry(@TempDir Path root) throws IOException {
+        byte[] content = new byte[2500];
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(root.resolve("books.zip")))) {
+            output.putNextEntry(new ZipEntry("42.fb2"));
+            output.write(content);
+            output.closeEntry();
+        }
+        InpxBookDto book = InpxBookDto.builder()
+                .archiveName("books.zip")
+                .fileName("42")
+                .extension("fb2")
+                .build();
+
+        scanner.populateFileSizes(List.of(book), root.toString());
+
+        assertThat(book.getFileSizeKb()).isEqualTo(2L);
+    }
+
     private void createArchive(Path path, String... entries) throws IOException {
         try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(path))) {
             for (String entry : entries) {
