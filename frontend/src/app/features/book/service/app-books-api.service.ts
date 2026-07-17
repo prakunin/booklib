@@ -6,6 +6,7 @@ import {API_CONFIG} from '../../../core/config/api-config';
 import {AuthService} from '../../../shared/service/auth.service';
 import {
   AppBookFilters,
+  AppBookQuickSearchResult,
   AppCatalogSummary,
   AppBookSort,
   AppBookSummary,
@@ -196,6 +197,14 @@ export class AppBooksApiService {
       .set('size', Math.max(1, size).toString());
 
     return this.http.get<AppPageResponse<AppBookSummary>>(`${this.booksUrl}/search`, {params});
+  }
+
+  quickSearchBooks(query: string, limit = 50): Observable<AppBookQuickSearchResult[]> {
+    const params = new HttpParams()
+      .set('q', query.trim())
+      .set('limit', Math.max(1, Math.min(limit, 50)).toString());
+
+    return this.http.get<AppBookQuickSearchResult[]>(`${this.booksUrl}/quick-search`, {params});
   }
 
   getContinueReading(limit = 10): Observable<Book[]> {

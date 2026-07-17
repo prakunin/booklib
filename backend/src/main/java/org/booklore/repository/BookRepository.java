@@ -1,6 +1,7 @@
 package org.booklore.repository;
 
 import org.booklore.repository.projection.BookEmbeddingProjection;
+import org.booklore.repository.projection.BookSearchHitProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +59,28 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     @EntityGraph(attributePaths = { "metadata", "library", "bookFiles" })
     @Query("SELECT b FROM BookEntity b WHERE b.id IN :bookIds AND (b.deleted IS NULL OR b.deleted = false)")
     List<BookEntity> findAllForSummaryByIds(@Param("bookIds") Collection<Long> bookIds);
+
+    @Query(value = """
+            SELECT b.id AS bookId
+            FROM book b
+            JOIN book_metadata m ON m.book_id = b.id
+            WHERE (b.deleted IS NULL OR b.deleted = FALSE)
+              AND (b.is_physical = TRUE OR EXISTS (
+                    SELECT 1 FROM book_file bf WHERE bf.book_id = b.id
+              ))
+              AND (:restrictLibraries = FALSE OR b.library_id IN (:libraryIds))
+              AND MATCH(m.search_text) AGAINST (:searchQuery IN BOOLEAN MODE)
+            ORDER BY MATCH(m.search_text) AGAINST (:searchQuery IN BOOLEAN MODE) DESC,
+                     b.added_on DESC,
+                     b.id DESC
+            LIMIT :resultLimit OFFSET :resultOffset
+            """, nativeQuery = true)
+    List<BookSearchHitProjection> searchBookIds(
+            @Param("searchQuery") String searchQuery,
+            @Param("restrictLibraries") boolean restrictLibraries,
+            @Param("libraryIds") Collection<Long> libraryIds,
+            @Param("resultLimit") int resultLimit,
+            @Param("resultOffset") int resultOffset);
 
     @EntityGraph(attributePaths = {"bookFiles", "metadata", "library", "libraryPath"})
     @Query("SELECT b FROM BookEntity b JOIN b.bookFiles bf WHERE bf.currentHash = :currentHash AND bf.isBookFormat = true AND (b.deleted IS NULL OR b.deleted = false) ORDER BY b.id DESC LIMIT 1")
