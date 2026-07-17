@@ -324,6 +324,10 @@ describe('ReaderEventService', () => {
     const inputZoom = new KeyboardEvent('keydown', {key: '=', ctrlKey: true, bubbles: true, cancelable: true});
     input.dispatchEvent(inputZoom);
 
+    view.appendChild(input);
+    const inputWheel = new WheelEvent('wheel', {deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true});
+    input.dispatchEvent(inputWheel);
+
     const chromeWheel = new WheelEvent('wheel', {deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true});
     document.dispatchEvent(chromeWheel);
 
@@ -361,6 +365,7 @@ describe('ReaderEventService', () => {
     expect(zoomIn.defaultPrevented).toBe(true);
     expect(zoomOut.defaultPrevented).toBe(true);
     expect(inputZoom.defaultPrevented).toBe(false);
+    expect(inputWheel.defaultPrevented).toBe(false);
     expect(chromeWheel.defaultPrevented).toBe(false);
     expect(readerWheel.defaultPrevented).toBe(true);
     expect(readerWheelContinuation.defaultPrevented).toBe(true);

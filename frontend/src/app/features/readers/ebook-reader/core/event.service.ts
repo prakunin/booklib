@@ -227,8 +227,7 @@ export class ReaderEventService {
 
   private attachKeyboardHandler(): void {
     this.keydownHandler = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
-      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
+      if (this.isEditableTarget(event.target)) {
         return;
       }
 
@@ -299,6 +298,7 @@ export class ReaderEventService {
   }
 
   private handleZoomWheel(event: WheelEvent): boolean {
+    if (this.isEditableTarget(event.target)) return false;
     if (!(event.ctrlKey || event.metaKey) || event.deltaY === 0) return false;
 
     event.preventDefault();
@@ -317,6 +317,11 @@ export class ReaderEventService {
       this.zoomWheelDelta %= 100;
     }
     return true;
+  }
+
+  private isEditableTarget(target: EventTarget | null): boolean {
+    return target instanceof HTMLElement
+      && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
   }
 
   private normalizeWheelDelta(event: WheelEvent): number {
