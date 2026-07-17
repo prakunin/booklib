@@ -54,10 +54,13 @@ public class EbookViewerPreferenceEntity {
     @Column(name = "max_inline_size", nullable = false)
     private Integer maxInlineSize;
 
+    @Column(name = "page_margin", nullable = false)
+    @Builder.Default
+    private Integer pageMargin = 40;
+
     @Column(name = "theme", nullable = false)
     private String theme;
 
     @Column(name = "flow", nullable = false)
     private String flow;
 }
-

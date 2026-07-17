@@ -79,7 +79,8 @@ export type ViewEvent =
   | { type: 'toggle-toc' }
   | { type: 'toggle-search' }
   | { type: 'toggle-notes' }
-  | { type: 'toggle-immersive' };
+  | { type: 'toggle-immersive' }
+  | { type: 'change-font-size'; delta: number };
 
 interface ViewCallbacks {
   prev: () => void;
@@ -107,6 +108,8 @@ export class ReaderEventService {
   private lastClickZone: 'left' | 'middle' | 'right' | null = null;
   private longHoldTimeout: ReturnType<typeof setTimeout> | null = null;
   private keydownHandler?: (event: KeyboardEvent) => void;
+  private wheelHandler?: (event: WheelEvent) => void;
+  private zoomWheelDelta = 0;
   private clickedDocs = new WeakSet<Document>();
   private iframeCleanupFns: (() => void)[] = [];
 
@@ -127,6 +130,7 @@ export class ReaderEventService {
     this.viewCallbacks = callbacks;
     this.attachViewEventListeners();
     this.attachKeyboardHandler();
+    this.attachZoomWheelHandler();
     this.attachWindowMessageHandler();
   }
 
@@ -137,6 +141,10 @@ export class ReaderEventService {
     if (this.keydownHandler) {
       document.removeEventListener('keydown', this.keydownHandler);
       this.keydownHandler = undefined;
+    }
+    if (this.wheelHandler) {
+      this.view?.removeEventListener('wheel', this.wheelHandler);
+      this.wheelHandler = undefined;
     }
     if (this.longHoldTimeout) {
       clearTimeout(this.longHoldTimeout);
@@ -153,6 +161,7 @@ export class ReaderEventService {
     this.lastClickZone = null;
     this.currentSectionIndex = null;
     this.sectionCount = null;
+    this.zoomWheelDelta = 0;
     this.clickedDocs = new WeakSet<Document>();
   }
 
@@ -218,10 +227,23 @@ export class ReaderEventService {
 
   private attachKeyboardHandler(): void {
     this.keydownHandler = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
-      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
+      if (this.isEditableTarget(event.target)) {
         return;
       }
+
+      if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+        if (event.key === '+' || event.key === '=') {
+          this.eventSubject.next({type: 'change-font-size', delta: 1});
+          event.preventDefault();
+          return;
+        }
+        if (event.key === '-' || event.key === '_') {
+          this.eventSubject.next({type: 'change-font-size', delta: -1});
+          event.preventDefault();
+          return;
+        }
+      }
+
       const k = event.key;
       if (k === 'ArrowLeft' || k === 'PageUp') {
         this.viewCallbacks?.prev();
@@ -265,6 +287,49 @@ export class ReaderEventService {
       }
     };
     document.addEventListener('keydown', this.keydownHandler);
+  }
+
+  private attachZoomWheelHandler(): void {
+    if (!this.view) return;
+    this.wheelHandler = (event: WheelEvent) => {
+      this.handleZoomWheel(event);
+    };
+    this.view.addEventListener('wheel', this.wheelHandler, {passive: false});
+  }
+
+  private handleZoomWheel(event: WheelEvent): boolean {
+    if (this.isEditableTarget(event.target)) return false;
+    if (!(event.ctrlKey || event.metaKey) || event.deltaY === 0) return false;
+
+    event.preventDefault();
+    const normalizedDelta = this.normalizeWheelDelta(event);
+    if (this.zoomWheelDelta !== 0 && Math.sign(this.zoomWheelDelta) !== Math.sign(normalizedDelta)) {
+      this.zoomWheelDelta = 0;
+    }
+    this.zoomWheelDelta += normalizedDelta;
+
+    const steps = Math.trunc(Math.abs(this.zoomWheelDelta) / 100);
+    if (steps > 0) {
+      this.eventSubject.next({
+        type: 'change-font-size',
+        delta: this.zoomWheelDelta < 0 ? steps : -steps
+      });
+      this.zoomWheelDelta %= 100;
+    }
+    return true;
+  }
+
+  private isEditableTarget(target: EventTarget | null): boolean {
+    return target instanceof HTMLElement
+      && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+  }
+
+  private normalizeWheelDelta(event: WheelEvent): number {
+    if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * 40;
+    if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+      return event.deltaY * (this.view?.clientHeight || window.innerHeight);
+    }
+    return event.deltaY;
   }
 
   private readonly windowMessageHandler = (event: MessageEvent): void => {
@@ -339,6 +404,7 @@ export class ReaderEventService {
     }) as EventListener, {passive: false});
 
     track(doc, 'wheel', ((event: WheelEvent) => {
+      if (this.handleZoomWheel(event)) return;
       if (this.tryNavigateAcrossScrolledBoundary(event.deltaY)) {
         event.preventDefault();
       }

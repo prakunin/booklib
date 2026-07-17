@@ -227,6 +227,7 @@ public class BookService {
                             .maxBlockSize(epubPref.getMaxBlockSize())
                             .maxColumnCount(epubPref.getMaxColumnCount())
                             .maxInlineSize(epubPref.getMaxInlineSize())
+                            .pageMargin(epubPref.getPageMargin())
                             .theme(epubPref.getTheme())
                             .flow(epubPref.getFlow())
                             .build()));

@@ -48,6 +48,7 @@ describe('ReaderStyleService', () => {
       theme: {...themes[0], fg: themes[0].dark.fg, bg: themes[0].dark.bg, link: themes[0].dark.link},
       maxInlineSize: 720,
       maxBlockSize: 1440,
+      pageMargin: 40,
       fontFamily: 'custom:7',
       isDark: true,
       flow: 'paginated',
@@ -73,6 +74,7 @@ describe('ReaderStyleService', () => {
       theme: {...themes[1], fg: themes[1].light.fg, bg: themes[1].light.bg, link: themes[1].light.link},
       maxInlineSize: 720,
       maxBlockSize: 1440,
+      pageMargin: 40,
       fontFamily: 'serif',
       isDark: false,
       flow: 'scrolled',
@@ -96,6 +98,7 @@ describe('ReaderStyleService', () => {
       theme: {...themes[0], fg: themes[0].dark.fg, bg: themes[0].dark.bg, link: themes[0].dark.link},
       maxInlineSize: 720,
       maxBlockSize: 1440,
+      pageMargin: 40,
       fontFamily: 'Academy Book',
       isDark: true,
       flow: 'paginated',
@@ -125,6 +128,7 @@ describe('ReaderStyleService', () => {
       theme: {...themes[0], fg: themes[0].dark.fg, bg: themes[0].dark.bg, link: themes[0].dark.link},
       maxInlineSize: 800,
       maxBlockSize: 1500,
+      pageMargin: 40,
       fontFamily: null,
       isDark: true,
       flow: 'paginated',
@@ -147,6 +151,7 @@ describe('ReaderStyleService', () => {
       theme: {...themes[0], fg: themes[0].dark.fg, bg: themes[0].dark.bg, link: themes[0].dark.link},
       maxInlineSize: 800,
       maxBlockSize: 1500,
+      pageMargin: 40,
       fontFamily: null,
       isDark: true,
       flow: 'scrolled',
@@ -163,9 +168,38 @@ describe('ReaderStyleService', () => {
       theme: {...themes[0], fg: themes[0].dark.fg, bg: themes[0].dark.bg, link: themes[0].dark.link},
       maxInlineSize: 800,
       maxBlockSize: 1500,
+      pageMargin: 40,
       fontFamily: null,
       isDark: true,
       flow: 'scrolled',
     })).not.toThrow();
+  });
+
+  it('uses the complete viewport when full-width pages are enabled', () => {
+    const renderer = {
+      setAttribute: vi.fn(),
+      removeAttribute: vi.fn(),
+      setStyles: vi.fn(),
+    };
+
+    service.applyStylesToRenderer(renderer, {
+      lineHeight: 1.5,
+      justify: true,
+      hyphenate: true,
+      maxColumnCount: 2,
+      gap: 0.05,
+      fontSize: 18,
+      theme: {...themes[0], fg: themes[0].dark.fg, bg: themes[0].dark.bg, link: themes[0].dark.link},
+      maxInlineSize: 720,
+      maxBlockSize: 1440,
+      pageMargin: 0,
+      fontFamily: null,
+      isDark: true,
+      flow: 'paginated',
+    });
+
+    expect(renderer.setAttribute).toHaveBeenCalledWith('gap', '0%');
+    expect(renderer.setAttribute).toHaveBeenCalledWith('max-inline-size', '10000px');
+    expect(renderer.setAttribute).toHaveBeenCalledWith('margin', '0px');
   });
 });

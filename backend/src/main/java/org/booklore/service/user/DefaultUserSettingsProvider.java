@@ -89,6 +89,7 @@ public class DefaultUserSettingsProvider {
                 .maxBlockSize(1440)
                 .maxColumnCount(2)
                 .maxInlineSize(720)
+                .pageMargin(40)
                 .theme("gray")
                 .flow("paginated")
                 .build();

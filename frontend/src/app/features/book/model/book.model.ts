@@ -333,6 +333,7 @@ export interface EbookViewerSetting {
   theme: string
   maxInlineSize: number;
   maxBlockSize: number;
+  pageMargin?: number;
   fontFamily: string | null;
   isDark: boolean;
   flow: 'paginated' | 'scrolled';

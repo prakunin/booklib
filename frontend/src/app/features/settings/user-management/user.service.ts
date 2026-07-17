@@ -183,6 +183,7 @@ export interface EbookReaderSetting {
   theme: string
   maxInlineSize: number;
   maxBlockSize: number;
+  pageMargin?: number;
   fontFamily: string;
   isDark: boolean;
   flow: 'paginated' | 'scrolled';

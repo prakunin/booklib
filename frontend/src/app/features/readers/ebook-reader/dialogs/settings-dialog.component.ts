@@ -145,6 +145,11 @@ export class ReaderSettingsDialogComponent implements OnInit {
     this.syncSettingsToBackend();
   }
 
+  toggleFullWidth() {
+    this.stateService.toggleFullWidth();
+    this.syncSettingsToBackend();
+  }
+
   toggleDarkMode() {
     this.stateService.toggleDarkMode();
     this.syncSettingsToBackend();

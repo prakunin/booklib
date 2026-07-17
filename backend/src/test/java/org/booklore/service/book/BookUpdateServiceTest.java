@@ -129,6 +129,7 @@ class BookUpdateServiceTest {
                         .maxBlockSize(800)
                         .maxColumnCount(3)
                         .maxInlineSize(1200)
+                        .pageMargin(0)
                         .theme("dark")
                         .flow("paginated")
                         .build())
@@ -147,8 +148,18 @@ class BookUpdateServiceTest {
         assertEquals(800, epubPrefs.getMaxBlockSize());
         assertEquals(3, epubPrefs.getMaxColumnCount());
         assertEquals(1200, epubPrefs.getMaxInlineSize());
+        assertEquals(0, epubPrefs.getPageMargin());
         assertEquals("dark", epubPrefs.getTheme());
         assertEquals("paginated", epubPrefs.getFlow());
+
+        settings.getEbookSettings().setPageMargin(12);
+        bookUpdateService.updateBookViewerSetting(bookId, settings);
+        assertEquals(12, epubPrefs.getPageMargin());
+
+        settings.getEbookSettings().setPageMargin(null);
+        bookUpdateService.updateBookViewerSetting(bookId, settings);
+
+        assertEquals(40, epubPrefs.getPageMargin());
     }
 
     @Test

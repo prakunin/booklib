@@ -31,6 +31,24 @@
       </div>
     }
     <div id="foliate-container" tabindex="0"></div>
+    <button
+      type="button"
+      class="chapter-navigation chapter-navigation-previous"
+      [disabled]="!canGoToPreviousChapter()"
+      [attr.aria-label]="'readerEbook.reader.previousChapter' | transloco"
+      [title]="'readerEbook.reader.previousChapter' | transloco"
+      (click)="goToPreviousChapter()">
+      <span aria-hidden="true">&#10094;</span>
+    </button>
+    <button
+      type="button"
+      class="chapter-navigation chapter-navigation-next"
+      [disabled]="!canGoToNextChapter()"
+      [attr.aria-label]="'readerEbook.reader.nextChapter' | transloco"
+      [title]="'readerEbook.reader.nextChapter' | transloco"
+      (click)="goToNextChapter()">
+      <span aria-hidden="true">&#10095;</span>
+    </button>
   </div>
 
   <app-reader-navbar
