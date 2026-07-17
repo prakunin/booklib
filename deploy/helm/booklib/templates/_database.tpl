@@ -4,7 +4,7 @@ Validation — database configuration preconditions.
 Ensures that the bundled MariaDB subchart and external database
 configuration are not both specified, and that at least one is set.
 */}}
-{{- define "grimmory.validate-database" -}}
+{{- define "booklib.validate-database" -}}
 	{{- if and .Values.mariadb.enabled .Values.externalDatabase.enabled }}
 		{{- fail "mariadb.enabled and externalDatabase.enabled are mutually exclusive: disable the bundled MariaDB subchart or remove the externalDatabase" }}
 	{{- end }}
@@ -26,9 +26,9 @@ configuration are not both specified, and that at least one is set.
 {{/*
 Connection helpers — resolve a single database configuration value.
 
-Usage:  {{ include "grimmory.dbHostname" . }}
+Usage:  {{ include "booklib.dbHostname" . }}
 */}}
-{{- define "grimmory.dbHostname" -}}
+{{- define "booklib.dbHostname" -}}
 	{{- if .Values.externalDatabase.enabled }}
 		{{- with .Values.externalDatabase }}
 			{{- if and .existingSecret.enabled .existingSecret.hostnameKey }}
@@ -42,7 +42,7 @@ Usage:  {{ include "grimmory.dbHostname" . }}
 	{{- end }}
 {{- end -}}
 
-{{- define "grimmory.dbPort" -}}
+{{- define "booklib.dbPort" -}}
 	{{- if .Values.externalDatabase.enabled }}
 		{{- with .Values.externalDatabase }}
 			{{- if and .existingSecret.enabled .existingSecret.portKey }}
@@ -56,7 +56,7 @@ Usage:  {{ include "grimmory.dbHostname" . }}
 	{{- end }}
 {{- end -}}
 
-{{- define "grimmory.dbName" -}}
+{{- define "booklib.dbName" -}}
 	{{- if .Values.externalDatabase.enabled }}
 		{{- with .Values.externalDatabase }}
 			{{- if and .existingSecret.enabled .existingSecret.databaseKey }}
@@ -70,7 +70,7 @@ Usage:  {{ include "grimmory.dbHostname" . }}
 	{{- end }}
 {{- end -}}
 
-{{- define "grimmory.dbUserName" -}}
+{{- define "booklib.dbUserName" -}}
 	{{- if .Values.externalDatabase.enabled }}
 		{{- with .Values.externalDatabase }}
 			{{- if and .existingSecret.enabled .existingSecret.usernameKey }}
@@ -85,7 +85,7 @@ Usage:  {{ include "grimmory.dbHostname" . }}
 {{- end -}}
 
 
-{{- define "grimmory.dbPasswordSecretName" -}}
+{{- define "booklib.dbPasswordSecretName" -}}
 	{{- if .Values.externalDatabase.enabled }}
 		{{- with .Values.externalDatabase }}
 			{{- required "No secretName was set for the externalDatabase existingSecret." .existingSecret.secretName }}
@@ -101,7 +101,7 @@ Usage:  {{ include "grimmory.dbHostname" . }}
 	{{- end }}
 {{- end -}}
 
-{{- define "grimmory.dbPasswordSecretKey" -}}
+{{- define "booklib.dbPasswordSecretKey" -}}
 	{{- if .Values.externalDatabase.enabled }}
 		{{- with .Values.externalDatabase }}
 			{{- required "No passwordKey was set for the externalDatabase existingSecret." .existingSecret.passwordKey }}

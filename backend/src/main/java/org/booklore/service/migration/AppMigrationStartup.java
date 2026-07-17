@@ -14,6 +14,7 @@ public class AppMigrationStartup {
     private final GenerateInstallationIdMigration generateInstallationIdMigration;
     private final MigrateInstallationIdToJsonMigration migrateInstallationIdToJsonMigration;
     private final PopulateMissingFileSizesMigration populateMissingFileSizesMigration;
+    private final PopulateArchiveFileSizesMigration populateArchiveFileSizesMigration;
     private final PopulateMetadataScoresMigration populateMetadataScoresMigration;
     private final PopulateFileHashesMigration populateFileHashesMigration;
     private final PopulateCoversAndResizeThumbnailsMigration populateCoversAndResizeThumbnailsMigration;
@@ -28,6 +29,7 @@ public class AppMigrationStartup {
         appMigrationService.executeMigration(generateInstallationIdMigration);
         appMigrationService.executeMigration(migrateInstallationIdToJsonMigration);
         appMigrationService.executeMigration(populateMissingFileSizesMigration);
+        appMigrationService.executeMigration(populateArchiveFileSizesMigration);
         appMigrationService.executeMigration(populateMetadataScoresMigration);
         appMigrationService.executeMigration(populateFileHashesMigration);
         appMigrationService.executeMigration(populateCoversAndResizeThumbnailsMigration);

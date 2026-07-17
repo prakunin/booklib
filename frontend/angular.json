@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "grimmory": {
+    "booklib": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -24,7 +24,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
-            "outputPath": "dist/grimmory",
+            "outputPath": "dist/booklib",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [],
@@ -128,17 +128,17 @@
           },
           "configurations": {
             "production": {
-              "buildTarget": "grimmory:build:production"
+              "buildTarget": "booklib:build:production"
             },
             "development": {
-              "buildTarget": "grimmory:build:development",
+              "buildTarget": "booklib:build:development",
               "allowedHosts": [
                 "books.home",
                 "books.prakuninhome.duckdns.org"
               ]
             },
             "development-low-memory": {
-              "buildTarget": "grimmory:build:development-low-memory",
+              "buildTarget": "booklib:build:development-low-memory",
               "allowedHosts": [
                 "books.home",
                 "books.prakuninhome.duckdns.org"

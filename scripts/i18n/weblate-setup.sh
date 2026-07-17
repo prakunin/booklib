@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Weblate Setup Script for Grimmory
+# Weblate Setup Script for BookLib
 #
 # Creates the Weblate project and all translation components via the API.
 # Run once after creating your Hosted Weblate account.
 #
 # Prerequisites:
 #   1. Get your API token from https://hosted.weblate.org/accounts/profile/#api
-#   2. Ensure your GitHub repo (grimmory-tools/grimmory) is public (required for Libre plan)
+#   2. Ensure your GitHub repo (prakunin/booklib) is public (required for Libre plan)
 #
 # Usage:
 #   WEBLATE_TOKEN=your-api-token ./scripts/weblate-setup.sh
@@ -20,11 +20,11 @@ WEBLATE_URL="${WEBLATE_URL:-https://hosted.weblate.org}"
 API="${WEBLATE_URL}/api"
 TOKEN="${WEBLATE_TOKEN:?Set WEBLATE_TOKEN to your Weblate API token}"
 
-PROJECT_NAME="Grimmory"
-PROJECT_SLUG="grimmory"
-PROJECT_WEB="https://github.com/grimmory-tools/grimmory"
+PROJECT_NAME="BookLib"
+PROJECT_SLUG="booklib"
+PROJECT_WEB="https://github.com/prakunin/booklib"
 
-REPO_URL="https://github.com/grimmory-tools/grimmory.git"
+REPO_URL="https://github.com/prakunin/booklib.git"
 REPO_BRANCH="develop"
 FILE_BASE="frontend/src/i18n"
 

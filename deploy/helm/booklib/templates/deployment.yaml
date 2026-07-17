@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
-{{- include "grimmory.validate-database" . }}
+{{- include "booklib.validate-database" . }}
 metadata:
-  name: {{ include "grimmory.fullname" . }}
+  name: {{ include "booklib.fullname" . }}
   labels:
-    {{- include "grimmory.labels" . | nindent 4 }}
+    {{- include "booklib.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "grimmory.selectorLabels" . | nindent 6 }}
+      {{- include "booklib.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -16,7 +16,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "grimmory.labels" . | nindent 8 }}
+        {{- include "booklib.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -25,7 +25,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "grimmory.serviceAccountName" . }}
+      serviceAccountName: {{ include "booklib.serviceAccountName" . }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -34,7 +34,7 @@ spec:
         - name: wait-for-database
           image: busybox:1.36
           env:
-          - name: GRIMMORY_DB_HOST
+          - name: BOOKLIB_DB_HOST
             {{- if and .Values.externalDatabase.enabled .Values.externalDatabase.existingSecret.enabled .Values.externalDatabase.existingSecret.hostnameKey }}
             {{- with .Values.externalDatabase.existingSecret }}
             valueFrom:
@@ -43,9 +43,9 @@ spec:
                 key: {{ .hostnameKey }}
             {{- end }}
             {{- else }}
-            value: {{ include "grimmory.dbHostname" . | quote }}
+            value: {{ include "booklib.dbHostname" . | quote }}
             {{- end }}
-          - name: GRIMMORY_DB_PORT
+          - name: BOOKLIB_DB_PORT
             {{- if and .Values.externalDatabase.enabled .Values.externalDatabase.existingSecret.enabled .Values.externalDatabase.existingSecret.portKey }}
             {{- with .Values.externalDatabase.existingSecret }}
             valueFrom:
@@ -54,14 +54,14 @@ spec:
                 key: {{ .portKey }}
             {{- end }}
             {{- else }}
-            value: {{ include "grimmory.dbPort" . | quote }}
+            value: {{ include "booklib.dbPort" . | quote }}
             {{- end }}
           command:
             - /bin/sh
             - -c
             - |
-              echo "Waiting for database at $GRIMMORY_DB_HOST:$GRIMMORY_DB_PORT ..."
-              until nc -z -v -w5 "$GRIMMORY_DB_HOST" "$GRIMMORY_DB_PORT"; do
+              echo "Waiting for database at $BOOKLIB_DB_HOST:$BOOKLIB_DB_PORT ..."
+              until nc -z -v -w5 "$BOOKLIB_DB_HOST" "$BOOKLIB_DB_PORT"; do
                 echo "Waiting for database..."
                 sleep 2
               done
@@ -89,7 +89,7 @@ spec:
                   key: {{ .hostnameKey }}
               {{- end }}
               {{- else }}
-              value: {{ include "grimmory.dbHostname" . | quote }}
+              value: {{ include "booklib.dbHostname" . | quote }}
               {{- end }}
             - name: DATABASE_PORT
               {{- if and .Values.externalDatabase.enabled .Values.externalDatabase.existingSecret.enabled .Values.externalDatabase.existingSecret.portKey }}
@@ -100,7 +100,7 @@ spec:
                   key: {{ .portKey }}
               {{- end }}
               {{- else }}
-              value: {{ include "grimmory.dbPort" . | quote }}
+              value: {{ include "booklib.dbPort" . | quote }}
               {{- end }}
             - name: DATABASE_USERNAME
               {{- if and .Values.externalDatabase.enabled .Values.externalDatabase.existingSecret.enabled .Values.externalDatabase.existingSecret.usernameKey }}
@@ -111,14 +111,14 @@ spec:
                   key: {{ .usernameKey }}
               {{- end }}
               {{- else }}
-              value: {{ include "grimmory.dbUserName" . }}
+              value: {{ include "booklib.dbUserName" . }}
               {{- end }}
             - name: DATABASE_PASSWORD
               {{- if or (and .Values.externalDatabase.enabled .Values.externalDatabase.existingSecret.enabled) (not .Values.externalDatabase.enabled) }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "grimmory.dbPasswordSecretName" . }}
-                  key: {{ include "grimmory.dbPasswordSecretKey" . }}
+                  name: {{ include "booklib.dbPasswordSecretName" . }}
+                  key: {{ include "booklib.dbPasswordSecretKey" . }}
               {{- else }}
               value: {{ .Values.externalDatabase.password | quote }}
               {{- end }}
@@ -131,7 +131,7 @@ spec:
                   key: {{ .databaseKey }}
               {{- end }}
               {{- else }}
-              value: {{ include "grimmory.dbName" . | quote }}
+              value: {{ include "booklib.dbName" . | quote }}
               {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
@@ -171,12 +171,12 @@ spec:
         {{- if .Values.persistence.dataVolume.enabled }}
         - name: data
           persistentVolumeClaim:
-            claimName: {{ .Values.persistence.dataVolume.existingClaim | default (printf "%s-data" (include "grimmory.fullname" .)) }}
+            claimName: {{ .Values.persistence.dataVolume.existingClaim | default (printf "%s-data" (include "booklib.fullname" .)) }}
         {{- end }}
         {{- if .Values.persistence.booksVolume.enabled }}
         - name: books
           persistentVolumeClaim:
-            claimName: {{ .Values.persistence.booksVolume.existingClaim | default (printf "%s-books" (include "grimmory.fullname" .)) }}
+            claimName: {{ .Values.persistence.booksVolume.existingClaim | default (printf "%s-books" (include "booklib.fullname" .)) }}
         {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}

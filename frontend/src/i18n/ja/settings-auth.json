@@ -25,7 +25,7 @@
         "clientId": "クライアントID",
         "clientIdPlaceholder": "OIDCクライアントID",
         "issuerUri": "発行者URI",
-        "issuerPlaceholder": "例: https://auth.example.com/realms/grimmory",
+        "issuerPlaceholder": "例: https://auth.example.com/realms/booklib",
         "scope": "スコープ",
         "scopeHint": "OIDCログインに必要なスコープ。プロバイダーでサポートされている必要があります。",
         "claimMappings": "クレームマッピング",

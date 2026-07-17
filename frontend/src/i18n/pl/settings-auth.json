@@ -25,7 +25,7 @@
         "clientId": "ID klienta",
         "clientIdPlaceholder": "Twoje ID klienta OIDC",
         "issuerUri": "URI wydawcy",
-        "issuerPlaceholder": "np. https://auth.example.com/realms/grimmory",
+        "issuerPlaceholder": "np. https://auth.example.com/realms/booklib",
         "scope": "Zakres",
         "scopeHint": "Wymagane zakresy do logowania OIDC. Muszą być obsługiwane przez Twojego dostawcę.",
         "claimMappings": "Mapowanie roszczeń",

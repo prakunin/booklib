@@ -43,7 +43,7 @@ function buildAppSettings(overrides: Partial<AppSettings> = {}): AppSettings {
     remoteAuthEnabled: publicSettings.remoteAuthEnabled,
     oidcEnabled: publicSettings.oidcEnabled,
     oidcProviderDetails: publicSettings.oidcProviderDetails,
-    oidcRedirectUris: ['grimmory://oauth2-callback'],
+    oidcRedirectUris: ['booklib://oauth2-callback'],
     oidcAutoProvisionDetails: {
       enableAutoProvisioning: false,
       allowLocalAccountLinking: false,

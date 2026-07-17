@@ -60,7 +60,12 @@ backend/src/main/resources/application-local.yaml
 .worktrees/
 
 ### Local AI tooling and memories ###
+AGENTS.md
+AI_POLICY.md
+CLAUDE.md
 /.serena/
+/.claude/
+/.superpowers/
 /docs/superpowers/
 
 ### Temporary editor and backup files ###

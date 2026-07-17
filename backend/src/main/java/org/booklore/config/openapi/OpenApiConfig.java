@@ -17,9 +17,9 @@ public class OpenApiConfig {
 
     static final String API_DESCRIPTION = """
             > [!warning]
-            > This documentation is auto-generated and public, but the API is unstable; to join the conversation around changes to the API, visit our [GitHub](https://github.com/grimmory-tools/grimmory) or [Discord](https://discord.gg/9YJ7HB4n8T).
+            > This documentation is auto-generated and public, but the API is unstable; to join the conversation around changes to the API, visit our [GitHub](https://github.com/prakunin/booklib).
 
-            REST API documentation for managing libraries, readers, metadata, and device integrations in Grimmory.
+            REST API documentation for managing libraries, readers, metadata, and device integrations in BookLib.
             """;
 
     private final AppProperties appProperties;
@@ -28,12 +28,12 @@ public class OpenApiConfig {
     public OpenAPI openApi() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Grimmory API")
+                        .title("BookLib API")
                         .description(API_DESCRIPTION)
                         .version(appProperties.getVersion())
                         .contact(new Contact()
-                                .name("Grimmory")
-                                .url("https://github.com/grimmory-tools/grimmory"))
+                                .name("BookLib")
+                                .url("https://github.com/prakunin/booklib"))
                         .license(new License()
                                 .name("AGPL-3.0")
                                 .url("https://www.gnu.org/licenses/agpl-3.0.html")));

@@ -21,12 +21,12 @@ import java.util.regex.Pattern;
 public class VersionService {
     private static final Pattern VERSION_PATTERN = Pattern.compile("^\\d+\\.\\d+\\.\\d+$");
     private static final String DEVELOPMENT_VERSION = "development";
-    private static final String GITHUB_REPO = "grimmory-tools/grimmory";
+    private static final String GITHUB_REPO = "prakunin/booklib";
     private static final String BASE_URI = "https://api.github.com/repos/" + GITHUB_REPO;
     private static final int MAX_RELEASES = 15;
     private static final RestClient REST_CLIENT = RestClient.builder()
             .defaultHeader("Accept", "application/vnd.github+json")
-            .defaultHeader("User-Agent", "Grimmory-Version-Checker")
+            .defaultHeader("User-Agent", "BookLib-Version-Checker")
             .build();
     private final ObjectMapper objectMapper;
 
@@ -102,7 +102,7 @@ public class VersionService {
                 if (tag == null || !isVersionGreater(tag, currentVersion)) {
                     continue;
                 }
-                String url = "https://github.com/grimmory-tools/grimmory" + "/releases/tag/" + tag;
+                String url = "https://github.com/" + GITHUB_REPO + "/releases/tag/" + tag;
                 LocalDateTime published = LocalDateTime.parse(release.path("published_at").asText(), DateTimeFormatter.ISO_DATE_TIME);
                 updates.add(new ReleaseNote(tag, release.path("name").asText(tag), release.path("body").asText(""), url, published));
             }

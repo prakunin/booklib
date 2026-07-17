@@ -32,6 +32,7 @@ describe('nav-catalog', () => {
     ]);
 
     expect(buildAllNavPages(translate, {
+      admin: true,
       canAccessLibraryStats: true,
       canAccessUserStats: true,
       canEditMetadata: true,
@@ -47,6 +48,7 @@ describe('nav-catalog', () => {
       'readingStats',
       'metadataManager',
       'bookdrop',
+      'system',
     ]);
   });
 
@@ -56,6 +58,12 @@ describe('nav-catalog', () => {
     expect(findPageNavItem('bookdrop', translate, { canAccessBookdrop: true })?.id).toBe('bookdrop');
     expect(findPageNavItem('metadataManager', translate, { canManageLibrary: true })).toBeNull();
     expect(findPageNavItem('metadataManager', translate, { canEditMetadata: true })?.id).toBe('metadataManager');
+    expect(findPageNavItem('system', translate, {})).toBeNull();
+    expect(findPageNavItem('system', translate, { admin: true })).toMatchObject({
+      id: 'system',
+      routerLink: ['/settings'],
+      queryParams: {tab: 'system'},
+    });
     expect(findPageNavItem('unknown', translate, {})).toBeNull();
   });
 

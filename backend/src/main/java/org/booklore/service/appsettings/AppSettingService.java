@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 @Service
 @DependsOnDatabaseInitialization
 public class AppSettingService {
-    private static final String DEFAULT_MOBILE_REDIRECT_URI = "grimmory://oauth2-callback";
+    private static final String DEFAULT_MOBILE_REDIRECT_URI = "booklib://oauth2-callback";
     private static final String WILDCARD_REDIRECT_URI = "*";
 
     private final AppProperties appProperties;

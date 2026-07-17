@@ -1,5 +1,5 @@
 export const THEME_REGISTRY = [
-  {name: 'grimmory', labelKey: 'layout.theme.options.grimmory'},
+  {name: 'booklib', labelKey: 'layout.theme.options.booklib'},
   {name: 'cobalt', labelKey: 'layout.theme.options.cobalt'},
   {name: 'ember', labelKey: 'layout.theme.options.ember'},
   {name: 'crimson', labelKey: 'layout.theme.options.crimson'},
@@ -16,7 +16,7 @@ export const THEME_REGISTRY = [
 
 export type AppTheme = (typeof THEME_REGISTRY)[number]['name'];
 
-export const DEFAULT_APP_THEME: AppTheme = 'grimmory';
+export const DEFAULT_APP_THEME: AppTheme = 'booklib';
 export const APP_THEME_OPTIONS = THEME_REGISTRY;
 
 export const CUSTOM_PRIMARY_OPTIONS = [

@@ -36,7 +36,7 @@ public class UserService {
             "sv", "zh", "ja", "hu", "sl", "sk", "uk", "id", "da"
     );
     private static final Set<String> SUPPORTED_THEMES = Set.of(
-            "grimmory", "cobalt", "ember", "crimson", "rose", "forest",
+            "booklib", "grimmory", "cobalt", "ember", "crimson", "rose", "forest",
             "meadow", "teal", "lagoon", "violet", "fuchsia", "slate", "custom"
     );
     private static final Set<String> SUPPORTED_THEME_ACCENTS = Set.of(

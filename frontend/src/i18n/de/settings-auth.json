@@ -28,7 +28,7 @@
         "clientSecretPlaceholder": "Ihr OIDC-Client Secret",
         "clientSecretHint": "Für geschützte Clients erforderlich. Für öffentliche Clients, die nur PKCE nutzen, leer lassen.",
         "issuerUri": "Issuer-URI",
-        "issuerPlaceholder": "z.B. https://auth.example.com/realms/grimmory",
+        "issuerPlaceholder": "z.B. https://auth.example.com/realms/booklib",
         "scope": "Scopes",
         "scopeHint": "In der OIDC-Autorisierungsanfrage übermittelte Scopes. Bitte leer lassen, um die Standardeinstellung zu verwenden.",
         "claimMappings": "Claim-Zuordnungen",

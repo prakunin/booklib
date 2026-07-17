@@ -9,4 +9,4 @@ externalDatabase:
   port: 3306
   username: app_user
   password: my-password
-  database: grimmory
+  database: booklib

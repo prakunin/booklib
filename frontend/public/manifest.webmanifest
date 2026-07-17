@@ -1,6 +1,6 @@
 {
-  "name": "Grimmory",
-  "short_name": "Grimmory",
+  "name": "BookLib",
+  "short_name": "BookLib",
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone", "browser"],
   "scope": "./",

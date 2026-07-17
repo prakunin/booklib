@@ -1,6 +1,6 @@
 apiVersion: v2
-name: grimmory
-description: A Helm chart for [Grimmory](https://github.com/grimmory-tools/grimmory)
+name: booklib
+description: A Helm chart for [BookLib](https://github.com/prakunin/booklib)
 type: application
 version: 0.1.0
 

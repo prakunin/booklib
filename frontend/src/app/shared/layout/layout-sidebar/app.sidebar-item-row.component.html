@@ -37,6 +37,7 @@
       [class.active-route]="isRouteActive()"
       [attr.aria-current]="isRouteActive() ? 'page' : null"
       [routerLink]="currentItem.routerLink"
+      [queryParams]="currentItem.queryParams ?? null"
       [pTooltip]="currentItem.label"
       [tooltipDisabled]="!layoutService.desktopSidebarCollapsed()"
       tooltipPosition="right"

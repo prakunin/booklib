@@ -1,7 +1,7 @@
 [Unit]
-Description=Grimmory Pod
+Description=BookLib Pod
 After=network-online.target
 
 [Pod]
-PodName=grimmory
+PodName=booklib
 PublishPort=6060:6060

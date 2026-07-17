@@ -25,7 +25,7 @@
         "clientId": "Client ID",
         "clientIdPlaceholder": "Il tuo client ID OIDC",
         "issuerUri": "URI emittente",
-        "issuerPlaceholder": "es. https://auth.example.com/realms/grimmory",
+        "issuerPlaceholder": "es. https://auth.example.com/realms/booklib",
         "scope": "Scope",
         "scopeHint": "Scope richiesti per l'accesso OIDC. Devono essere supportati dal tuo provider.",
         "claimMappings": "Mappatura claim",

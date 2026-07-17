@@ -18,7 +18,7 @@ run profile='dev':
 build:
     {{ gradle }} build --no-daemon --parallel --build-cache
 
-# Build the backend jar and export build/openapi/grimmory-openapi.json.
+# Build the backend jar and export build/openapi/booklib-openapi.json.
 openapi-export:
     {{ gradle }} buildOpenApiArtifacts --no-daemon --parallel --build-cache
 

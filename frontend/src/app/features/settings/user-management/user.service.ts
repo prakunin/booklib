@@ -532,7 +532,7 @@ export class UserService {
 
   private normalizeUser(user: User): User {
     const permissions = user.permissions;
-    const theme = user.theme ?? 'grimmory';
+    const theme = user.theme ?? 'booklib';
     return {
       ...user,
       locale: user.locale ?? 'en',

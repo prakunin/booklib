@@ -1,8 +1,8 @@
 app:
   api-docs:
     enabled: true
-  path-config: ${OPENAPI_EXPORT_APP_PATH:${java.io.tmpdir}/grimmory-openapi-export/data}
-  bookdrop-folder: ${OPENAPI_EXPORT_BOOKDROP:${java.io.tmpdir}/grimmory-openapi-export/bookdrop}
+  path-config: ${OPENAPI_EXPORT_APP_PATH:${java.io.tmpdir}/booklib-openapi-export/data}
+  bookdrop-folder: ${OPENAPI_EXPORT_BOOKDROP:${java.io.tmpdir}/booklib-openapi-export/bookdrop}
   cors:
     allowed-origins: http://127.0.0.1
 

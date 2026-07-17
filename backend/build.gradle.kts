@@ -17,7 +17,12 @@ plugins {
 group = "org.booklore"
 version = (System.getenv("APP_VERSION") ?: "0.0.1-SNAPSHOT").replace(Regex("^v"), "")
 
-val defaultFrontendDistDir = file("${rootDir}/../frontend/dist/grimmory/browser")
+providers.gradleProperty("externalBuildDir")
+    .map { file(it) }
+    .orNull
+    ?.let { layout.buildDirectory.set(it) }
+
+val defaultFrontendDistDir = file("${rootDir}/../frontend/dist/booklib/browser")
 val configuredFrontendDistDir = providers.gradleProperty("frontendDistDir")
     .map { file(it) }
 
@@ -33,8 +38,12 @@ tasks.withType<JavaCompile>().configureEach {
 
 val useLocalLibs = providers.gradleProperty("useLocalLibs").isPresent
 val mainSourceSet = the<SourceSetContainer>()["main"]
+the<SourceSetContainer>().configureEach {
+    java.exclude("**/._*")
+    resources.exclude("**/._*")
+}
 val openApiOutputDir = layout.buildDirectory.dir("openapi")
-val openApiOutputFile = openApiOutputDir.map { it.file("grimmory-openapi.json") }
+val openApiOutputFile = openApiOutputDir.map { it.file("booklib-openapi.json") }
 val openApiLogFile = openApiOutputDir.map { it.file("export-openapi.log") }
 val openApiExportScript = layout.projectDirectory.file("scripts/export-openapi.sh")
 
@@ -310,7 +319,7 @@ tasks.named<BootJar>("bootJar") {
 
 tasks.register("exportOpenApi") {
     group = "documentation"
-    description = "Boot the backend with the openapi-export profile and write build/openapi/grimmory-openapi.json."
+    description = "Boot the backend with the openapi-export profile and write build/openapi/booklib-openapi.json."
     dependsOn(tasks.named("classes"))
     inputs.files(mainSourceSet.runtimeClasspath, openApiExportRuntimeOnly, openApiExportScript)
     outputs.file(openApiOutputFile)
@@ -344,6 +353,6 @@ tasks.register("exportOpenApi") {
 
 tasks.register("buildOpenApiArtifacts") {
     group = "build"
-    description = "Build the backend jar and export build/openapi/grimmory-openapi.json from the openapi-export profile."
+    description = "Build the backend jar and export build/openapi/booklib-openapi.json from the openapi-export profile."
     dependsOn(tasks.named("bootJar"), tasks.named("exportOpenApi"))
 }

@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/home/gradle/.gradle \
     ./gradlew --no-daemon dependencies
 
 COPY backend/ ./
-COPY --from=frontend-build /workspace/frontend/dist/grimmory/browser /tmp/frontend-dist
+COPY --from=frontend-build /workspace/frontend/dist/booklib/browser /tmp/frontend-dist
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
     TARGETARCH=${TARGETARCH} ./gradlew --no-daemon -PfrontendDistDir=/tmp/frontend-dist bootJar
@@ -110,11 +110,11 @@ COPY --from=backend-build /workspace/backend/app.jar /app/app.jar
 ARG APP_VERSION=development
 ARG APP_REVISION=unknown
 
-LABEL org.opencontainers.image.title="Grimmory" \
-    org.opencontainers.image.description="Grimmory: a self-hosted, multi-user digital library with smart shelves, auto metadata, Kobo and KOReader sync, BookDrop imports, OPDS support, and a built-in reader for EPUB, PDF, and comics." \
-    org.opencontainers.image.source="https://github.com/grimmory-tools/grimmory" \
-    org.opencontainers.image.url="https://github.com/grimmory-tools/grimmory" \
-    org.opencontainers.image.documentation="https://grimmory.org/docs/getting-started" \
+LABEL org.opencontainers.image.title="BookLib" \
+    org.opencontainers.image.description="BookLib: a self-hosted, multi-user digital library with smart shelves, auto metadata, Kobo and KOReader sync, BookDrop imports, OPDS support, and a built-in reader for EPUB, PDF, and comics." \
+    org.opencontainers.image.source="https://github.com/prakunin/booklib" \
+    org.opencontainers.image.url="https://github.com/prakunin/booklib" \
+    org.opencontainers.image.documentation="https://github.com/prakunin/booklib/tree/develop/docs" \
     org.opencontainers.image.version=$APP_VERSION \
     org.opencontainers.image.revision=$APP_REVISION \
     org.opencontainers.image.licenses="AGPL-3.0" \

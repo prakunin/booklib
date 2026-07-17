@@ -27,7 +27,7 @@
         "clientSecret": "Clé secrète client",
         "clientSecretPlaceholder": "Votre clé secrète du client OIDC",
         "issuerUri": "URI de l'émetteur",
-        "issuerPlaceholder": "ex. https://auth.exemple.com/realms/grimmory",
+        "issuerPlaceholder": "ex. https://auth.exemple.com/realms/booklib",
         "scope": "Scope",
         "scopeHint": "Scopes requis pour la connexion OIDC. Doivent être pris en charge par votre fournisseur.",
         "claimMappings": "Correspondance des claims",

@@ -92,14 +92,14 @@ describe('AppThemeService', () => {
 
   it('applies the default curated theme and system appearance on init', () => {
     expect(service.appState()).toEqual({
-      themePreference: 'grimmory',
+      themePreference: 'booklib',
       appearancePreference: 'system',
       customPrimary: 'orange',
       themeSyncEnabled: true,
       oledDarkMode: false,
     });
     expect(localStorageMock.getItem('appConfigState')).toBeNull();
-    expect(root.dataset['appTheme']).toBe('grimmory');
+    expect(root.dataset['appTheme']).toBe('booklib');
     expect(root.classList.contains('dark')).toBe(false);
     expect(rootStyle.getPropertyValue('color-scheme')).toBe('light');
     expect(rootStyle.getPropertyValue('--primary-300')).toBe('');
@@ -146,17 +146,17 @@ describe('AppThemeService', () => {
     service = TestBed.inject(AppThemeService);
 
     expect(service.appState()).toEqual({
-      themePreference: 'grimmory',
+      themePreference: 'booklib',
       appearancePreference: 'system',
       customPrimary: 'orange',
       themeSyncEnabled: true,
       oledDarkMode: false,
     });
-    expect(root.dataset['appTheme']).toBe('grimmory');
+    expect(root.dataset['appTheme']).toBe('booklib');
     expect(root.classList.contains('dark')).toBe(false);
     expect(localStorageMock.getItem('appConfigState')).toBe(JSON.stringify({
       appearancePreference: 'system',
-      themePreference: 'grimmory',
+      themePreference: 'booklib',
       customPrimary: 'orange',
       oledDarkMode: false,
     }));

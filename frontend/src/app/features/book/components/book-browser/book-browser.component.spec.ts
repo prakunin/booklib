@@ -54,7 +54,7 @@ function makeCurrentUser() {
     name: 'Tester',
     email: 'tester@example.com',
     locale: 'en',
-    theme: 'grimmory',
+    theme: 'booklib',
     themeAccent: null,
     themeSyncEnabled: true,
     assignedLibraries: [],

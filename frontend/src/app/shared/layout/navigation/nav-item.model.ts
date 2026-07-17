@@ -11,6 +11,7 @@ export interface NavItem {
   icon?: string;
   iconType?: IconType;
   routerLink?: string[];
+  queryParams?: Record<string, string>;
   type?: NavItemType;
   action?: () => void;
 }

@@ -1,23 +1,23 @@
 [Unit]
-Description=Grimmory Database Container Using MariaDB
+Description=BookLib Database Container Using MariaDB
 
 [Container]
-ContainerName=grimmory-db
+ContainerName=booklib-db
 Image=docker.io/library/mariadb:12.3.2
-Pod=grimmory.pod
+Pod=booklib.pod
 Pull=always
 
-# The official image's datadir. Deliberately a NEW volume: the old grimmory-db
+# The official image's datadir. Deliberately a NEW volume: the old booklib-db
 # volume holds a linuxserver /config tree, which this image would not recognise
 # as a datadir. Mounting it here would initialise an empty database on top of it.
 # See docs/UPGRADING-MARIADB-12.md before upgrading.
-Volume=grimmory-db-data:/var/lib/mysql
+Volume=booklib-db-data:/var/lib/mysql
 
 Environment=TZ=Etc/UTC
-Environment=MYSQL_USER=grimmory
-Secret=grimmory_db_pass,type=env,target=MYSQL_ROOT_PASSWORD
-Secret=grimmory_db_pass,type=env,target=MYSQL_PASSWORD
-Environment=MYSQL_DATABASE=grimmory
+Environment=MYSQL_USER=booklib
+Secret=booklib_db_pass,type=env,target=MYSQL_ROOT_PASSWORD
+Secret=booklib_db_pass,type=env,target=MYSQL_PASSWORD
+Environment=MYSQL_DATABASE=booklib
 
 HealthCmd=CMD-SHELL healthcheck.sh --su-mysql --connect --innodb_initialized
 HealthInterval=10s
@@ -26,7 +26,7 @@ HealthStartPeriod=60s
 HealthTimeout=5s
 
 # Without this, systemd considers the unit started as soon as the container
-# process exists, so grimmory.container's After= would release the app while
+# process exists, so booklib.container's After= would release the app while
 # MariaDB is still initialising. Notify=healthy defers that until the
 # healthcheck above passes.
 Notify=healthy

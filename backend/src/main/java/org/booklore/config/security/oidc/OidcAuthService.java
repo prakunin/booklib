@@ -39,9 +39,9 @@ import java.util.regex.Pattern;
 @AllArgsConstructor
 public class OidcAuthService {
 
-    private static final String DEFAULT_MOBILE_REDIRECT_URI = "grimmory://oauth2-callback";
-    // TODO(grimmory-cleanup): Remove after the Booklore to Grimmory migration window closes.
-    private static final String LEGACY_MOBILE_REDIRECT_URI = "booklore://oauth2-callback";
+    private static final String DEFAULT_MOBILE_REDIRECT_URI = "booklib://oauth2-callback";
+    private static final String LEGACY_GRIMMORY_MOBILE_REDIRECT_URI = "grimmory://oauth2-callback";
+    private static final String LEGACY_BOOKLORE_MOBILE_REDIRECT_URI = "booklore://oauth2-callback";
     private static final String WILDCARD_REDIRECT_URI = "*";
     private static final String OAUTH2_CALLBACK_PATH = "/oauth2-callback";
     private static final Pattern TRAILING_SLASH_PATTERN = Pattern.compile("/+$");
@@ -189,9 +189,13 @@ public class OidcAuthService {
                 ? new ArrayList<>(List.of(DEFAULT_MOBILE_REDIRECT_URI))
                 : new ArrayList<>(configuredRedirectUris);
 
-        if (effectiveRedirectUris.contains(DEFAULT_MOBILE_REDIRECT_URI)
-                && !effectiveRedirectUris.contains(LEGACY_MOBILE_REDIRECT_URI)) {
-            effectiveRedirectUris.add(LEGACY_MOBILE_REDIRECT_URI);
+        if (effectiveRedirectUris.contains(DEFAULT_MOBILE_REDIRECT_URI)) {
+            if (!effectiveRedirectUris.contains(LEGACY_GRIMMORY_MOBILE_REDIRECT_URI)) {
+                effectiveRedirectUris.add(LEGACY_GRIMMORY_MOBILE_REDIRECT_URI);
+            }
+            if (!effectiveRedirectUris.contains(LEGACY_BOOKLORE_MOBILE_REDIRECT_URI)) {
+                effectiveRedirectUris.add(LEGACY_BOOKLORE_MOBILE_REDIRECT_URI);
+            }
         }
 
         return effectiveRedirectUris;

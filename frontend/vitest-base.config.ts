@@ -16,7 +16,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json', 'json-summary', 'lcov'],
-      reportsDirectory: 'coverage/grimmory',
+      reportsDirectory: 'coverage/booklib',
       include: ['src/app/**/*.ts', 'src/main.ts'],
       exclude: ['src/app/**/*.spec.ts', 'src/app/**/*.module.ts', 'src/**/*.d.ts'],
       thresholds: shouldEnforceCoverageGate ? {

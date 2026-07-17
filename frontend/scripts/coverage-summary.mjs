@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(scriptDir, '..');
-const reportPath = path.resolve(frontendRoot, 'coverage/grimmory/coverage-final.json');
+const reportPath = path.resolve(frontendRoot, 'coverage/booklib/coverage-final.json');
 const rootPrefix = path.resolve(frontendRoot, 'src/app') + path.sep;
 const report = JSON.parse(readFileSync(reportPath, 'utf8'));
 

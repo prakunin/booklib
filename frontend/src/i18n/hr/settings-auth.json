@@ -28,7 +28,7 @@
         "clientSecretPlaceholder": "Tvoja tajna OIDC klijenta",
         "clientSecretHint": "Obavezno za povjerljive klijente. Ostavite prazno za javne klijente koji koriste samo PKCE.",
         "issuerUri": "URI izdavatelja",
-        "issuerPlaceholder": "npr. https://auth.example.com/realms/grimmory",
+        "issuerPlaceholder": "npr. https://auth.example.com/realms/booklib",
         "scope": "Opseg",
         "scopeHint": "Obavezni opsezi za OIDC prijavu. Moraju biti podržani od vašeg pružatelja.",
         "claimMappings": "Mapiranja zahtjeva",
@@ -96,7 +96,7 @@
         "descriptionPlaceholder": "Neobavezni opis",
         "permissionsLabel": "Dozvole",
         "librariesLabel": "Pristup knjižnici",
-        "groupClaimPlaceholder": "npr. grimmory administratori",
+        "groupClaimPlaceholder": "npr. booklib administratori",
         "adminLabel": "Admin odobenje",
         "colGroupClaim": "Zahtjev grupe"
     },

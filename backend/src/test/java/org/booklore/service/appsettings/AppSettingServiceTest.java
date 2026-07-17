@@ -63,7 +63,7 @@ class AppSettingServiceTest {
     void updateSetting_acceptsValidOidcRedirectUris() throws Exception {
         appSettingService.updateSetting(
                 AppSettingKey.OIDC_REDIRECT_URIS,
-                List.of("grimmory://oauth2-callback", "grimmory://auth/return")
+                List.of("booklib://oauth2-callback", "booklib://auth/return")
         );
 
         ArgumentCaptor<AppSettingEntity> settingCaptor = ArgumentCaptor.forClass(AppSettingEntity.class);
@@ -71,7 +71,7 @@ class AppSettingServiceTest {
 
         AppSettingEntity savedSetting = settingCaptor.getValue();
         assertThat(savedSetting.getName()).isEqualTo(AppSettingKey.OIDC_REDIRECT_URIS.toString());
-        assertThat(savedSetting.getVal()).isEqualTo("[\"grimmory://oauth2-callback\",\"grimmory://auth/return\"]");
+        assertThat(savedSetting.getVal()).isEqualTo("[\"booklib://oauth2-callback\",\"booklib://auth/return\"]");
         verify(auditService).log(AuditAction.OIDC_CONFIG_CHANGED, "Updated setting: " + AppSettingKey.OIDC_REDIRECT_URIS);
     }
 
@@ -121,7 +121,7 @@ class AppSettingServiceTest {
     void updateSetting_rejectsWildcardCombinedWithOtherUris() {
         assertThatThrownBy(() -> appSettingService.updateSetting(
                 AppSettingKey.OIDC_REDIRECT_URIS,
-                List.of("*", "grimmory://oauth2-callback")
+                List.of("*", "booklib://oauth2-callback")
         ))
                 .hasMessageContaining("Wildcard redirect URI must be the only value");
 
@@ -154,7 +154,7 @@ class AppSettingServiceTest {
     void updateSetting_rejectsDuplicateOidcMobileRedirectUris() {
         assertThatThrownBy(() -> appSettingService.updateSetting(
                 AppSettingKey.OIDC_REDIRECT_URIS,
-                List.of("grimmory://oauth2-callback", "grimmory://oauth2-callback")
+                List.of("booklib://oauth2-callback", "booklib://oauth2-callback")
         ))
                 .hasMessageContaining("Duplicate redirect URI");
 
@@ -176,7 +176,7 @@ class AppSettingServiceTest {
     void updateSetting_rejectsRedirectUriWithFragment() {
         assertThatThrownBy(() -> appSettingService.updateSetting(
                 AppSettingKey.OIDC_REDIRECT_URIS,
-                List.of("grimmory://oauth2-callback#done")
+                List.of("booklib://oauth2-callback#done")
         ))
                 .hasMessageContaining("Redirect URI must not contain a fragment");
 

@@ -110,7 +110,7 @@ function buildUser(overrides: BuildUserOverrides = {}): User {
     name: 'Reader',
     email: 'reader@example.test',
     locale: 'en',
-    theme: 'grimmory',
+    theme: 'booklib',
     themeAccent: null,
     themeSyncEnabled: true,
     assignedLibraries: [],

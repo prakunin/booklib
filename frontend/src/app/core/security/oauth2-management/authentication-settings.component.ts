@@ -46,7 +46,7 @@ import {DEFAULT_PASSWORD_POLICY} from '../../../shared/validators/password-polic
   styleUrls: ['./authentication-settings.component.scss']
 })
 export class AuthenticationSettingsComponent {
-  readonly defaultMobileRedirectUri = 'grimmory://oauth2-callback';
+  readonly defaultMobileRedirectUri = 'booklib://oauth2-callback';
   readonly wildcardMobileRedirectUri = '*';
   availablePermissions = [
     {label: 'Upload Books', value: 'permissionUpload', selected: false, translationKey: 'perms.uploadBooks'},

@@ -77,6 +77,7 @@ describe('buildToolsSection', () => {
 
   it('builds a permission-gated tools section', () => {
     const [section] = buildToolsSection(translate, {
+      admin: true,
       canAccessLibraryStats: true,
       canEditMetadata: true,
       canAccessBookdrop: true,
@@ -89,6 +90,7 @@ describe('buildToolsSection', () => {
       'libraryStats',
       'metadataManager',
       'bookdrop',
+      'system',
     ]);
   });
 });

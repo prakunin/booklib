@@ -25,7 +25,7 @@
         "clientId": "客户端 ID",
         "clientIdPlaceholder": "您的 OIDC 客户端 ID",
         "issuerUri": "签发者 URI",
-        "issuerPlaceholder": "例如 https://auth.example.com/realms/grimmory",
+        "issuerPlaceholder": "例如 https://auth.example.com/realms/booklib",
         "scope": "范围",
         "scopeHint": "OIDC 登录所需的范围。必须由您的提供商支持。",
         "claimMappings": "声明映射",

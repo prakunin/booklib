@@ -3,9 +3,11 @@ package org.booklore.repository;
 import jakarta.persistence.QueryHint;
 import org.booklore.model.entity.BookFileEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +47,23 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
     List<BookFileEntity> findArchiveEntriesMissingSize(@Param("libraryId") Long libraryId,
                                                         @Param("archives") Collection<String> archives,
                                                         @Param("entries") Collection<String> entries);
+
+    @EntityGraph(attributePaths = {"book", "book.library", "book.libraryPath"})
+    @Query("""
+            SELECT bf
+            FROM BookFileEntity bf
+            JOIN bf.book b
+            WHERE bf.id > :afterId
+            AND bf.isBookFormat = true
+            AND bf.fileSizeKb IS NULL
+            AND bf.sourceArchive IS NOT NULL
+            AND bf.sourceArchive <> ''
+            AND bf.sourceArchiveEntry IS NOT NULL
+            AND bf.sourceArchiveEntry <> ''
+            AND (b.deleted IS NULL OR b.deleted = false)
+            ORDER BY bf.id
+            """)
+    List<BookFileEntity> findArchivedBookFilesMissingSizeAfterId(@Param("afterId") long afterId, Pageable pageable);
 
     @Query("""
             SELECT bf.sourceArchive, COUNT(bf)

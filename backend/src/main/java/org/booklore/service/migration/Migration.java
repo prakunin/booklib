@@ -5,5 +5,9 @@ public interface Migration {
 
     String getDescription();
 
+    default boolean runsInSingleTransaction() {
+        return true;
+    }
+
     void execute();
 }

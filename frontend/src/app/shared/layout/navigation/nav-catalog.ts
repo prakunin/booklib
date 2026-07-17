@@ -24,6 +24,7 @@ interface PageDefinition {
   labelKey: string;
   icon: string;
   routerLink: string[];
+  queryParams?: Record<string, string>;
   type?: NavItemType;
   isVisible?: (permissions: ShellNavPermissions) => boolean;
 }
@@ -58,6 +59,10 @@ function canEditMetadata(permissions: ShellNavPermissions): boolean {
 
 function canUploadBooks(permissions: ShellNavPermissions): boolean {
   return !!permissions.admin || !!permissions.canUpload;
+}
+
+function isAdmin(permissions: ShellNavPermissions): boolean {
+  return !!permissions.admin;
 }
 
 const HOME_PAGE_DEFINITIONS: readonly PageDefinition[] = [
@@ -131,6 +136,14 @@ const SECONDARY_PAGE_DEFINITIONS: readonly PageDefinition[] = [
     routerLink: ['/bookdrop'],
     isVisible: canAccessBookdrop,
   },
+  {
+    id: 'system',
+    labelKey: 'layout.menu.system',
+    icon: 'server',
+    routerLink: ['/settings'],
+    queryParams: {tab: 'system'},
+    isVisible: isAdmin,
+  },
 ] as const;
 
 const CREATE_ACTION_DEFINITIONS: readonly ActionDefinition[] = [
@@ -179,6 +192,7 @@ function toPageNavItem(definition: PageDefinition, translate: TranslateFn): NavI
     label: translate(definition.labelKey),
     icon: definition.icon,
     routerLink: definition.routerLink,
+    queryParams: definition.queryParams,
     type: definition.type,
   };
 }

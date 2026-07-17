@@ -6,8 +6,8 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    {{- include "grimmory.labels" . | nindent 4 }}
-  name: {{ include "grimmory.fullname" . }}-data
+    {{- include "booklib.labels" . | nindent 4 }}
+  name: {{ include "booklib.fullname" . }}-data
 spec:
   accessModes:
     - ReadWriteOnce
@@ -23,8 +23,8 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    {{- include "grimmory.labels" . | nindent 4 }}
-  name: {{ include "grimmory.fullname" . }}-books
+    {{- include "booklib.labels" . | nindent 4 }}
+  name: {{ include "booklib.fullname" . }}-books
 spec:
   accessModes:
     - ReadWriteOnce

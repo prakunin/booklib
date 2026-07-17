@@ -19,7 +19,7 @@ function buildUser(overrides: Partial<User['permissions']> = {}): User {
     name: 'Admin',
     email: 'admin@example.com',
     locale: 'en',
-    theme: 'grimmory',
+    theme: 'booklib',
     themeAccent: null,
     themeSyncEnabled: true,
     assignedLibraries: [],

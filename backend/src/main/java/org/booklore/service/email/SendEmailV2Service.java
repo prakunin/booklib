@@ -95,7 +95,7 @@ public class SendEmailV2Service {
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
         helper.setFrom(StringUtils.firstNonEmpty(emailProvider.getFromAddress(), emailProvider.getUsername()));
         helper.setTo(recipientEmail);
-        helper.setSubject("Your Book from Grimmory: " + book.getMetadata().getTitle());
+        helper.setSubject("Your Book from BookLib: " + book.getMetadata().getTitle());
         helper.setText(generateEmailBody(book.getMetadata().getTitle()));
         var bookPath = FileUtils.getBookFullPath(book, bookFileEntity);
         if (bookPath == null) {
@@ -221,9 +221,9 @@ public class SendEmailV2Service {
         return String.format("""
                 Hello,
                 
-                You have received a book from Grimmory. Please find the attached file titled '%s' for your reading pleasure.
+                You have received a book from BookLib. Please find the attached file titled '%s' for your reading pleasure.
                 
-                Thank you for using Grimmory! Hope you enjoy your book.
+                Thank you for using BookLib! Hope you enjoy your book.
                 """, bookTitle);
     }
 

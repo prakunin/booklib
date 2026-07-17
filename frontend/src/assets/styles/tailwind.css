@@ -194,6 +194,7 @@
   --shadow-pop: 0 4px 12px -2px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 45%);
 }
 
+[data-app-theme="booklib"],
 [data-app-theme="grimmory"] {
   --app-primary-tint: 3%;
   --color-primary-50: var(--color-orange-50);
@@ -221,6 +222,7 @@
   --color-surface-950: var(--color-stone-950);
 }
 
+.dark[data-app-theme="booklib"],
 .dark[data-app-theme="grimmory"] {
   --color-surface-50: var(--color-neutral-50);
   --color-surface-100: var(--color-neutral-100);

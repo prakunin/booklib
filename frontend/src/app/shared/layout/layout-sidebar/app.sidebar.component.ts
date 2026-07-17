@@ -59,7 +59,7 @@ import { AppThemeService } from '../../service/app-theme.service';
 import type { AppearancePreference } from '../../model/app-state.model';
 import { APPEARANCE_OPTIONS } from '../theme/appearance-options';
 
-const DOCUMENTATION_URL = 'https://grimmory.org/docs/getting-started';
+const DOCUMENTATION_URL = 'https://github.com/prakunin/booklib/tree/develop/docs';
 const ABOVE_ALIGN_LEFT: ConnectedPosition[] = [
   { originX: 'start', originY: 'top', overlayX: 'start', overlayY: 'bottom', offsetY: -8 },
   { originX: 'start', originY: 'bottom', overlayX: 'start', overlayY: 'top', offsetY: 8 },
@@ -377,6 +377,7 @@ export class AppSidebarComponent {
         label: item.label,
         icon: AppSidebarComponent.ADD_MENU_ICONS[item.id],
         routerLink: item.routerLink,
+        queryParams: item.queryParams,
         command: item.action,
       }] : []
     );

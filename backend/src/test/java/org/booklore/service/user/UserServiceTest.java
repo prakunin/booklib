@@ -108,7 +108,7 @@ class UserServiceTest {
 
         userService.updateUserProfile(1L, request);
 
-        assertThat(user.getTheme()).isEqualTo("grimmory");
+        assertThat(user.getTheme()).isEqualTo("booklib");
         assertThat(user.getThemeAccent()).isNull();
         assertThat(user.isThemeSyncEnabled()).isFalse();
         verify(userRepository).save(user);
@@ -251,7 +251,7 @@ class UserServiceTest {
         user.setUsername("admin");
         user.setName("Admin");
         user.setLocale("en");
-        user.setTheme("grimmory");
+        user.setTheme("booklib");
         user.setPermissions(new UserPermissionsEntity());
         return user;
     }
@@ -264,7 +264,7 @@ class UserServiceTest {
                 .username("admin")
                 .name("Admin")
                 .locale("en")
-                .theme("grimmory")
+                .theme("booklib")
                 .permissions(permissions)
                 .build();
     }

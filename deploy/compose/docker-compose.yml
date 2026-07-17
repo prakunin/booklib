@@ -1,27 +1,27 @@
 services:
   # Upgrade path from Booklore:
   # Keep your existing service name, container_name, database names/users, and ports.
-  # Replace the image line(s) with Grimmory tags.
+  # Replace the image line(s) with BookLib tags.
   #
-  # The mariadb volume is the exception: Grimmory now runs the official mariadb
+  # The mariadb volume is the exception: BookLib now runs the official mariadb
   # image, whose datadir is /var/lib/mysql rather than the linuxserver /config.
   # Keeping your old volume mapping here will start an EMPTY database.
   # Read docs/UPGRADING-MARIADB-12.md before upgrading.
-  grimmory:
+  booklib:
     # Stable release example:
-    image: grimmory/grimmory:v0.38.2
+    image: prakunin/booklib:v0.38.2
     # Convenience tag:
-    # image: grimmory/grimmory:latest
+    # image: prakunin/booklib:latest
     # Or the GHCR image:
-    # image: ghcr.io/grimmory-tools/grimmory:v0.38.2
+    # image: ghcr.io/prakunin/booklib:v0.38.2
     # The image already embeds its own release version metadata.
-    container_name: grimmory
+    container_name: booklib
     environment:
       - USER_ID=1000
       - GROUP_ID=1000
       - TZ=Etc/UTC
-      - DATABASE_URL=jdbc:mariadb://mariadb:3306/grimmory
-      - DATABASE_USERNAME=grimmory
+      - DATABASE_URL=jdbc:mariadb://mariadb:3306/booklib
+      - DATABASE_USERNAME=booklib
       - DATABASE_PASSWORD=your_secure_password
       - SWAGGER_ENABLED=false
       - FORCE_DISABLE_OIDC=false
@@ -56,8 +56,8 @@ services:
     environment:
       - TZ=Etc/UTC
       - MYSQL_ROOT_PASSWORD=super_secure_password
-      - MYSQL_DATABASE=grimmory
-      - MYSQL_USER=grimmory
+      - MYSQL_DATABASE=booklib
+      - MYSQL_USER=booklib
       - MYSQL_PASSWORD=your_secure_password
     volumes:
       - ./mariadb/data:/var/lib/mysql

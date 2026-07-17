@@ -1,7 +1,7 @@
 {
-  "name": "grimmory-release-tooling",
+  "name": "booklib-release-tooling",
   "private": true,
-  "description": "Release automation tooling for Grimmory",
+  "description": "Release automation tooling for BookLib",
   "engines": {
     "node": ">=24"
   },

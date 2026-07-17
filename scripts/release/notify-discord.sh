@@ -29,8 +29,8 @@ release_name=$(jq -r '.name' <<< "$release_json")
 release_body=$(jq -r '.body' <<< "$release_json")
 release_url=$(jq -r '.url'  <<< "$release_json")
 
-dockerhub_image="https://hub.docker.com/r/grimmory/grimmory/tags/$NEW_TAG"
-ghcr_image="https://github.com/grimmory-tools/grimmory/pkgs/container/grimmory/$NEW_TAG"
+dockerhub_image="https://hub.docker.com/r/prakunin/booklib/tags/$NEW_TAG"
+ghcr_image="https://github.com/prakunin/booklib/pkgs/container/booklib/$NEW_TAG"
 
 # Clean up body for Discord
 clean_body=$(echo "$release_body" | tr -d '\r')

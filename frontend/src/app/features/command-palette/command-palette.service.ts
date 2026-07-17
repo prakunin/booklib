@@ -314,6 +314,7 @@ export class CommandPaletteService {
       icon: item.icon ? toIconSelection(item.icon, item.iconType) : undefined,
       searchText: normalizeSearchTerm(item.label),
       route: item.routerLink,
+      queryParams: item.queryParams,
       command: item.action,
     };
   }

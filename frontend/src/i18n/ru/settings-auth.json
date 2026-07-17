@@ -37,7 +37,7 @@
         "clientId": "Client ID",
         "clientIdPlaceholder": "Ваш OIDC Client ID",
         "issuerUri": "URI издателя",
-        "issuerPlaceholder": "например, https://auth.example.com/realms/grimmory",
+        "issuerPlaceholder": "например, https://auth.example.com/realms/booklib",
         "scope": "Область видимости",
         "scopeHint": "Обязательные области для входа OIDC. Должны поддерживаться Вашим провайдером.",
         "claimMappings": "Сопоставление утверждений",

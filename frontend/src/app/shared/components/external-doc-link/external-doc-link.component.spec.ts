@@ -26,7 +26,7 @@ describe('ExternalDocLinkComponent', () => {
 
     component.openLink();
 
-    expect(openSpy).toHaveBeenCalledWith('https://grimmory.org/docs/tools/task-manager', '_blank');
+    expect(openSpy).toHaveBeenCalledWith('https://github.com/prakunin/booklib/tree/develop/docs/tools/task-manager', '_blank');
   });
 
   it('does nothing when the doc type is unknown at runtime', () => {

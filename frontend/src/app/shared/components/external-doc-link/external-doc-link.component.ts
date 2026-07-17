@@ -29,7 +29,7 @@ export type DocType = 'kobo' | 'opds' | 'metadataManager' | 'koReader' | 'email'
   `]
 })
 export class ExternalDocLinkComponent {
-  private readonly BASE_URL = 'https://grimmory.org/docs';
+  private readonly BASE_URL = 'https://github.com/prakunin/booklib/tree/develop/docs';
 
   private readonly DOC_URLS: Record<DocType, string> = {
     kobo: `${this.BASE_URL}/integration/kobo`,

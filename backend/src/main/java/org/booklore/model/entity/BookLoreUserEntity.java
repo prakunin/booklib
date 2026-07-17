@@ -45,7 +45,7 @@ public class BookLoreUserEntity {
 
     @Builder.Default
     @Column(nullable = false, length = 32)
-    private String theme = "grimmory";
+    private String theme = "booklib";
 
     @Column(name = "theme_accent", length = 32)
     private String themeAccent;

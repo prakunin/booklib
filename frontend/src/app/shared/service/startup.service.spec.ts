@@ -23,7 +23,7 @@ describe('StartupService', () => {
   });
 
   it('loads the current user when a token is present', async () => {
-    const fetchQuery = vi.fn().mockResolvedValue({id: 1, username: 'admin', locale: 'en', theme: 'grimmory', themeAccent: null, themeSyncEnabled: true});
+    const fetchQuery = vi.fn().mockResolvedValue({id: 1, username: 'admin', locale: 'en', theme: 'booklib', themeAccent: null, themeSyncEnabled: true});
     const applySyncedTheme = vi.fn();
     const applyDeviceTheme = vi.fn();
     const useStoredDeviceTheme = vi.fn();
@@ -53,7 +53,7 @@ describe('StartupService', () => {
 
     await expect(service.load()).resolves.toBeUndefined();
     expect(fetchQuery).toHaveBeenCalledOnce();
-    expect(applySyncedTheme).toHaveBeenCalledWith('grimmory', 'orange');
+    expect(applySyncedTheme).toHaveBeenCalledWith('booklib', 'orange');
     expect(applyDeviceTheme).not.toHaveBeenCalled();
     expect(applyLocale).toHaveBeenCalledWith('en');
   });

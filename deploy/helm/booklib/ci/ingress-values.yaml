@@ -7,7 +7,7 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
-    - host: grimmory.example.com
+    - host: booklib.example.com
       paths:
         - path: /
           pathType: Prefix

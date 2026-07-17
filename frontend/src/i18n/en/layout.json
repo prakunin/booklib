@@ -51,6 +51,7 @@
         "readingStats": "Reading Stats",
         "metadataManager": "Metadata Manager",
         "bookdrop": "Bookdrop",
+        "system": "System",
         "createLibrary": "Create Library",
         "uploadBook": "Upload Book",
         "documentation": "Documentation",
@@ -83,6 +84,7 @@
         "customPrimary": "Custom color",
         "syncAcrossDevices": "Sync my theme across devices",
         "options": {
+            "booklib": "BookLib",
             "grimmory": "BookLib",
             "cobalt": "Cobalt",
             "ember": "Ember",
