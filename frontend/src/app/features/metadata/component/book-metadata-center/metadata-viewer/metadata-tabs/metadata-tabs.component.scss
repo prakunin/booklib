@@ -148,6 +148,19 @@
   flex-shrink: 0;
 }
 
+.file-archive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2188rem;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--text-color-secondary);
+  flex-shrink: 1;
+}
+
 .file-actions {
   display: flex;
   align-items: center;

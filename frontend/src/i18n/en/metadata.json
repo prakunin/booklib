@@ -214,6 +214,7 @@
     "physicalBookMessage": "This book is a physical book record without digital files.",
     "downloadAll": "Download All ({{ count }} files)",
     "primaryFile": "Primary File",
+    "archive": "ZIP archive",
     "alternativeFormats": "Alternative Formats",
     "supplementaryFiles": "Supplementary Files",
     "readTooltip": "Read",

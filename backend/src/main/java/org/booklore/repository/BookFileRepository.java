@@ -35,6 +35,18 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
                                                @Param("entries") Collection<String> entries);
 
     @Query("""
+            SELECT bf
+            FROM BookFileEntity bf
+            WHERE bf.book.library.id = :libraryId
+            AND bf.fileSizeKb IS NULL
+            AND bf.sourceArchive IN :archives
+            AND bf.sourceArchiveEntry IN :entries
+            """)
+    List<BookFileEntity> findArchiveEntriesMissingSize(@Param("libraryId") Long libraryId,
+                                                        @Param("archives") Collection<String> archives,
+                                                        @Param("entries") Collection<String> entries);
+
+    @Query("""
             SELECT bf.sourceArchive, COUNT(bf)
             FROM BookFileEntity bf
             WHERE bf.book.library.id = :libraryId

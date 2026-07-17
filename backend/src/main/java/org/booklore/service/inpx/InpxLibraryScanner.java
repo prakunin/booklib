@@ -74,7 +74,7 @@ public class InpxLibraryScanner {
                         cancelled[0] = true;
                         return;
                     }
-                    flush(batch, libraryId, libraryPathId, caches, counters);
+                    flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
                     publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
                 }
             });
@@ -83,7 +83,7 @@ public class InpxLibraryScanner {
             // count with the freshly committed database count, so archives already covered
             // by the INPX file are not needlessly parsed a second time.
             if (!cancelled[0] && !batch.isEmpty()) {
-                flush(batch, libraryId, libraryPathId, caches, counters);
+                flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
                 publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
             }
 
@@ -102,13 +102,13 @@ public class InpxLibraryScanner {
                             cancelled[0] = true;
                             return;
                         }
-                        flush(batch, libraryId, libraryPathId, caches, counters);
+                        flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
                         publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
                     }
                 }, () -> cancelled[0]);
 
                 if (!cancelled[0] && !batch.isEmpty()) {
-                    flush(batch, libraryId, libraryPathId, caches, counters);
+                    flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
                     publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
                 }
             }
@@ -138,9 +138,10 @@ public class InpxLibraryScanner {
         }
     }
 
-    private void flush(List<InpxBookDto> batch, long libraryId, long libraryPathId,
+    private void flush(List<InpxBookDto> batch, long libraryId, long libraryPathId, String archiveRoot,
                        InpxScanCaches caches, Counters counters) {
         int size = batch.size();
+        archiveScanner.populateFileSizes(batch, archiveRoot);
         InpxBatchWriter.BatchResult result = batchWriter.persist(List.copyOf(batch), libraryId, libraryPathId, caches);
         batch.clear();
         counters.processed += size;
