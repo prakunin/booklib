@@ -99,4 +99,30 @@ describe('AppBooksApiService', () => {
 
     expect(result).toEqual(ids);
   });
+
+  it('uses the bounded quick-search endpoint without requesting a page count', () => {
+    let titles: (string | null)[] = [];
+
+    service.quickSearchBooks('  Dune  ', 80).subscribe(results => {
+      titles = results.map(result => result.title);
+    });
+
+    const request = http.expectOne(req => req.url.endsWith('/api/v1/app/books/quick-search'));
+    expect(request.request.params.get('q')).toBe('Dune');
+    expect(request.request.params.get('limit')).toBe('50');
+    request.flush([{
+      id: 1,
+      title: 'Dune',
+      authors: ['Frank Herbert'],
+      seriesName: null,
+      seriesNumber: null,
+      publishedDate: null,
+      primaryFileType: 'EPUB',
+      primaryFileName: 'Dune.epub',
+      coverUpdatedOn: null,
+      audiobookCoverUpdatedOn: null,
+    }]);
+
+    expect(titles).toEqual(['Dune']);
+  });
 });

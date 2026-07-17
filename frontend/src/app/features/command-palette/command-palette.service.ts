@@ -7,8 +7,8 @@ import { catchError, debounceTime, defer, distinctUntilChanged, finalize, map, o
 
 import { BookDialogHelperService } from '../book/components/book-browser/book-dialog-helper.service';
 import { normalizeSearchTerm } from '../book/components/book-browser/filters/HeaderFilter';
-import { Book } from '../book/model/book.model';
-import { AppBooksApiService, summaryToBook } from '../book/service/app-books-api.service';
+import { AppBookQuickSearchResult } from '../book/model/app-book.model';
+import { AppBooksApiService } from '../book/service/app-books-api.service';
 import { LibraryService } from '../book/service/library.service';
 import { ShelfService } from '../book/service/shelf.service';
 import { MagicShelfService } from '../magic-shelf/service/magic-shelf.service';
@@ -35,8 +35,8 @@ interface CommandPaletteOverlayController {
 }
 
 const BOOK_RESULT_LIMIT = 50;
-const MIN_BOOK_SEARCH_LENGTH = 2;
-const BOOK_SEARCH_DEBOUNCE_MS = 200;
+const MIN_BOOK_SEARCH_LENGTH = 3;
+const BOOK_SEARCH_DEBOUNCE_MS = 350;
 
 @Injectable({ providedIn: 'root' })
 export class CommandPaletteService {
@@ -75,8 +75,8 @@ export class CommandPaletteService {
         ? of([])
         : defer(() => {
           this.bookSearchPending.set(true);
-          return this.appBooksApi.searchBooks(query, BOOK_RESULT_LIMIT).pipe(
-            map(response => response.content.map(summaryToBook).map(book => this.toPaletteBookItem(book))),
+          return this.appBooksApi.quickSearchBooks(query, BOOK_RESULT_LIMIT).pipe(
+            map(response => response.map(book => this.toPaletteBookItem(book))),
             catchError(() => of([])),
             finalize(() => this.bookSearchPending.set(false)),
           );
@@ -277,14 +277,13 @@ export class CommandPaletteService {
     this.trimmedQuery().length >= MIN_BOOK_SEARCH_LENGTH ? this.localBookItems() : []
   );
 
-  private toPaletteBookItem(book: Book): PaletteItem {
-    const metadata = book.metadata;
-    const title = metadata?.title ?? book.primaryFile?.fileName ?? book.fileName ?? '';
-    const authors = metadata?.authors ?? [];
-    const publishedDate = metadata?.publishedDate ?? '';
+  private toPaletteBookItem(book: AppBookQuickSearchResult): PaletteItem {
+    const title = book.title ?? book.primaryFileName ?? '';
+    const authors = book.authors ?? [];
+    const publishedDate = book.publishedDate ?? '';
     const year = publishedDate && /^\d{4}/.test(publishedDate) ? publishedDate.slice(0, 4) : null;
-    const haystack = [title, metadata?.seriesName ?? '', ...authors].filter(Boolean).join(' ');
-    const isAudiobook = book.primaryFile?.bookType === 'AUDIOBOOK';
+    const haystack = [title, book.seriesName ?? '', ...authors].filter(Boolean).join(' ');
+    const isAudiobook = book.primaryFileType === 'AUDIOBOOK';
 
     return {
       id: `book:${book.id}`,
@@ -296,11 +295,11 @@ export class CommandPaletteService {
       queryParams: { tab: 'view' },
       bookMeta: {
         thumbnailUrl: isAudiobook
-          ? this.urlHelper.getAudiobookThumbnailUrl(book.id, metadata?.audiobookCoverUpdatedOn)
-          : this.urlHelper.getThumbnailUrl(book.id, metadata?.coverUpdatedOn),
+          ? this.urlHelper.getAudiobookThumbnailUrl(book.id, book.audiobookCoverUpdatedOn ?? undefined)
+          : this.urlHelper.getThumbnailUrl(book.id, book.coverUpdatedOn ?? undefined),
         authors,
-        seriesName: metadata?.seriesName ?? null,
-        seriesNumber: metadata?.seriesNumber ?? null,
+        seriesName: book.seriesName,
+        seriesNumber: book.seriesNumber,
         year,
         isAudiobook,
       },

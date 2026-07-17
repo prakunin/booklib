@@ -64,6 +64,19 @@ export interface AppBookSummary {
   allMetadataLocked: boolean | null;
 }
 
+export interface AppBookQuickSearchResult {
+  id: number;
+  title: string | null;
+  authors: string[];
+  seriesName: string | null;
+  seriesNumber: number | null;
+  publishedDate: string | null;
+  primaryFileType: BookType | null;
+  primaryFileName: string | null;
+  coverUpdatedOn: string | null;
+  audiobookCoverUpdatedOn: string | null;
+}
+
 export interface AppFilterOptions {
   authors: CountedOption[];
   languages: LanguageOption[];

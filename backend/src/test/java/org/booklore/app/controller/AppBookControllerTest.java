@@ -1,6 +1,8 @@
 package org.booklore.app.controller;
 
 import org.booklore.app.service.AppBookService;
+import org.booklore.app.service.AppBookQuickSearchService;
+import org.booklore.app.dto.AppBookQuickSearchResult;
 import org.booklore.app.dto.AppCatalogSummary;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +16,8 @@ import static org.mockito.Mockito.when;
 class AppBookControllerTest {
 
     private final AppBookService appBookService = mock(AppBookService.class);
-    private final AppBookController controller = new AppBookController(appBookService);
+    private final AppBookQuickSearchService quickSearchService = mock(AppBookQuickSearchService.class);
+    private final AppBookController controller = new AppBookController(appBookService, quickSearchService);
 
     @Test
     void shouldReturnExistingIsbnMatches() {
@@ -37,5 +40,16 @@ class AppBookControllerTest {
 
         assertThat(response.getBody()).isEqualTo(summary);
         verify(appBookService).getCatalogSummary();
+    }
+
+    @Test
+    void shouldReturnQuickSearchResults() {
+        var result = AppBookQuickSearchResult.builder().id(7L).title("Dune").build();
+        when(quickSearchService.search("dune", 25)).thenReturn(java.util.List.of(result));
+
+        var response = controller.quickSearchBooks("dune", 25);
+
+        assertThat(response.getBody()).containsExactly(result);
+        verify(quickSearchService).search("dune", 25);
     }
 }

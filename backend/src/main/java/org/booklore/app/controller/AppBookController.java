@@ -4,7 +4,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.booklore.app.dto.*;
 import org.booklore.app.service.AppBookService;
+import org.booklore.app.service.AppBookQuickSearchService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +25,7 @@ import java.util.Set;
 public class AppBookController {
 
     private final AppBookService mobileBookService;
+    private final AppBookQuickSearchService quickSearchService;
 
     @Operation(
             summary = "List app books",
@@ -120,6 +124,19 @@ public class AppBookController {
             @RequestParam(required = false, defaultValue = "20") Integer size) {
 
         return ResponseEntity.ok(mobileBookService.searchBooks(q, page, size));
+    }
+
+    @Operation(
+            summary = "Quick search app books",
+            description = "Return a small relevance-ranked result set for interactive catalog search.",
+            operationId = "appQuickSearchBooks"
+    )
+    @GetMapping("/quick-search")
+    public ResponseEntity<List<AppBookQuickSearchResult>> quickSearchBooks(
+            @RequestParam @Size(min = 3, max = 200) String q,
+            @RequestParam(required = false, defaultValue = "50") @Min(1) @Max(50) Integer limit) {
+
+        return ResponseEntity.ok(quickSearchService.search(q, limit));
     }
 
     @Operation(
