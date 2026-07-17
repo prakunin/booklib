@@ -296,6 +296,23 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     int markCoverFoundIfStillMissing(@Param("bookId") Long bookId, @Param("coverHash") String coverHash, @Param("now") Instant now);
 
     /**
+     * Releases a cover claim taken by {@link #markCoverFoundIfStillMissing} when the image could not
+     * actually be written, putting the book back in the has-no-cover-and-no-marker state that makes
+     * it eligible for a later retry.
+     * <p>
+     * Guarded on the claimed hash rather than clearing unconditionally: between the failed write and
+     * this revert, another writer may have given the book a real cover of its own, and blanking that
+     * hash would strand an image that exists on disk with nothing to serve it by. Only the claim
+     * this caller still owns is released. Returns the number of rows changed (0 or 1).
+     */
+    @Modifying
+    @Query("""
+            UPDATE BookEntity b SET b.bookCoverHash = NULL
+            WHERE b.id = :bookId AND b.bookCoverHash = :coverHash
+            """)
+    int clearCoverHashIfStillClaimed(@Param("bookId") Long bookId, @Param("coverHash") String coverHash);
+
+    /**
      * Get distinct series names for a library when groupUnknown=true.
      * Books without series name are grouped as "Unknown Series".
      */

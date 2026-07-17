@@ -1,6 +1,7 @@
 package org.booklore.service.fileprocessor;
 
 import org.booklore.mapper.BookMapper;
+import org.booklore.model.CoverExtraction;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.CoverProbeOutcome;
@@ -77,7 +78,7 @@ class Fb2ProcessorArchivedSourceTest {
      * a failure to read the archive at all, so a transient failure is never mistaken for "no cover".
      */
     @Nested
-    class ProbeCoverOutcomes {
+    class ExtractCoverOutcomes {
 
         private BookFileEntity buildArchivedFile(BookEntity book) {
             return BookFileEntity.builder()
@@ -97,9 +98,9 @@ class Fb2ProcessorArchivedSourceTest {
             when(archivedBookContentService.resolve(bookFile))
                     .thenThrow(new RuntimeException("archive temporarily unavailable"));
 
-            CoverProbeOutcome outcome = processor.probeCover(book, bookFile);
+            CoverExtraction extraction = processor.extractCover(book, bookFile);
 
-            assertThat(outcome).isEqualTo(CoverProbeOutcome.READ_FAILED);
+            assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.READ_FAILED);
             verifyNoInteractions(fb2MetadataExtractor);
         }
 
@@ -112,18 +113,18 @@ class Fb2ProcessorArchivedSourceTest {
             when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(null);
 
-            CoverProbeOutcome outcome = processor.probeCover(book, bookFile);
+            CoverExtraction extraction = processor.extractCover(book, bookFile);
 
-            assertThat(outcome).isEqualTo(CoverProbeOutcome.NO_COVER_FOUND);
+            assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.NO_COVER_FOUND);
         }
 
         /**
          * Drives the same processor call that {@code BookCoverService.tryGenerateMissingInpxCover}
          * makes on the processor. Before this fix, an exception thrown by the extractor escaped
-         * probeCover() entirely instead of being reported as a failed probe.
+         * the probe entirely instead of being reported as a failed read.
          */
         @Test
-        void extractionThrowingDuringProbeCoverIsReportedAsReadFailedNotPropagated() {
+        void extractionThrowingDuringExtractCoverIsReportedAsReadFailedNotPropagated() {
             Fb2Processor processor = buildProcessor();
             BookEntity book = BookEntity.builder().id(42L).build();
             BookFileEntity bookFile = buildArchivedFile(book);
@@ -132,9 +133,9 @@ class Fb2ProcessorArchivedSourceTest {
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri())))
                     .thenThrow(new RuntimeException("malformed FB2"));
 
-            CoverProbeOutcome outcome = processor.probeCover(book, bookFile);
+            CoverExtraction extraction = processor.extractCover(book, bookFile);
 
-            assertThat(outcome).isEqualTo(CoverProbeOutcome.READ_FAILED);
+            assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.READ_FAILED);
         }
 
         /**
@@ -158,19 +159,75 @@ class Fb2ProcessorArchivedSourceTest {
         }
 
         @Test
-        void successfulReadWithCoverBinaryIsReportedAsCoverFound() throws IOException {
+        void successfulReadWithCoverBinaryReturnsTheBytes() throws IOException {
+            Fb2Processor processor = buildProcessor();
+            BookEntity book = BookEntity.builder().id(42L).build();
+            BookFileEntity bookFile = buildArchivedFile(book);
+            Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
+            byte[] png = encodePng();
+            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(png);
+
+            CoverExtraction extraction = processor.extractCover(book, bookFile);
+
+            assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.COVER_FOUND);
+            assertThat(extraction.data()).isEqualTo(png);
+        }
+
+        /**
+         * The contract {@code BookCoverService}'s claim-before-write ordering rests on: extraction
+         * reads and nothing more. If this ever starts writing again, the lazy path silently goes
+         * back to overwriting covers it hasn't yet earned the right to own.
+         */
+        @Test
+        void extractCoverWritesNothingAndLeavesTheEntityUntouched() throws IOException {
             Fb2Processor processor = buildProcessor();
             BookEntity book = BookEntity.builder().id(42L).build();
             BookFileEntity bookFile = buildArchivedFile(book);
             Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
             when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(encodePng());
-            when(fileService.saveCoverImages(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(42L)))
-                    .thenReturn(true);
 
-            CoverProbeOutcome outcome = processor.probeCover(book, bookFile);
+            processor.extractCover(book, bookFile);
 
-            assertThat(outcome).isEqualTo(CoverProbeOutcome.COVER_FOUND);
+            verifyNoInteractions(fileService);
+            verifyNoInteractions(bookRepository);
+            assertThat(book.getBookCoverHash()).isNull();
+        }
+
+        /**
+         * generateCover is the read plus the write, and must funnel its write through the one shared
+         * decode-and-save helper rather than growing its own copy.
+         */
+        @Test
+        void generateCoverWritesTheExtractedBytesThroughTheSharedHelper() throws IOException {
+            Fb2Processor processor = buildProcessor();
+            BookEntity book = BookEntity.builder().id(42L).build();
+            BookFileEntity bookFile = buildArchivedFile(book);
+            Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
+            byte[] png = encodePng();
+            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(png);
+            when(fileService.saveCoverImageFromBytes(42L, png)).thenReturn(true);
+
+            boolean generated = processor.generateCover(book, bookFile);
+
+            assertThat(generated).isTrue();
+            verify(fileService).saveCoverImageFromBytes(42L, png);
+        }
+
+        @Test
+        void generateCoverReportsFailureWhenTheImageCannotBeSaved() throws IOException {
+            Fb2Processor processor = buildProcessor();
+            BookEntity book = BookEntity.builder().id(42L).build();
+            BookFileEntity bookFile = buildArchivedFile(book);
+            Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
+            byte[] png = encodePng();
+            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(png);
+            when(fileService.saveCoverImageFromBytes(42L, png)).thenReturn(false);
+
+            assertThat(processor.generateCover(book, bookFile)).isFalse();
         }
 
         private byte[] encodePng() throws IOException {

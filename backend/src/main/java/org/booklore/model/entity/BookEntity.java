@@ -77,6 +77,26 @@ public class BookEntity {
     @Column(name = "cover_probed_at")
     private Instant coverProbedAt;
 
+    /**
+     * Stamping a cover hash clears any {@link #coverProbedAt} marker: the marker means "a probe read
+     * the source and it genuinely had no cover", which a book that now has one makes obsolete.
+     * Leaving it set would permanently block the lazy probe if the hash were ever cleared without a
+     * rescan.
+     * <p>
+     * This lives in the setter rather than in its callers because a dozen call sites stamp a hash -
+     * the six file processors, the library scanner, the metadata updater, the migration and the cover
+     * service - and keeping them in step by hand has already failed repeatedly. Hibernate hydrates
+     * through field access ({@code @Id} is on the field), so overriding the setter does not affect
+     * loading; the generated builder writes fields directly too, which is harmless because a book
+     * being built is new and has no marker yet.
+     */
+    public void setBookCoverHash(String bookCoverHash) {
+        this.bookCoverHash = bookCoverHash;
+        if (bookCoverHash != null) {
+            this.coverProbedAt = null;
+        }
+    }
+
     @Column(name = "deleted")
     @Builder.Default
     private Boolean deleted = Boolean.FALSE;

@@ -1,6 +1,7 @@
 package org.booklore.service.fileprocessor;
 
 import org.booklore.mapper.BookMapper;
+import org.booklore.model.CoverExtraction;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.settings.LibraryFile;
 import org.booklore.model.entity.BookEntity;
@@ -20,7 +21,6 @@ import org.booklore.util.FileService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
@@ -72,13 +72,28 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
         return generateCover(bookEntity, bookEntity.getPrimaryBookFile());
     }
 
+    /**
+     * Reads the cover and writes it, for callers that just want the file on disk and are entitled
+     * to overwrite whatever is there. Deliberately built on {@link #extractCover} so there is only
+     * one way to read a cover out of an FB2 - the read and the write are separate steps, and this
+     * method is simply both of them in a row.
+     */
     @Override
     public boolean generateCover(BookEntity bookEntity, BookFileEntity bookFile) {
-        return probeCover(bookEntity, bookFile) == CoverProbeOutcome.COVER_FOUND;
+        CoverExtraction extraction = extractCover(bookEntity, bookFile);
+        if (extraction.outcome() != CoverProbeOutcome.COVER_FOUND || !extraction.hasData()) {
+            return false;
+        }
+        return fileService.saveCoverImageFromBytes(bookEntity.getId(), extraction.data());
     }
 
+    /**
+     * Pure read: opens the archive, pulls the cover bytes out, writes nothing and touches no state.
+     * Keeping it side-effect free is what lets {@code BookCoverService} claim a book's cover before
+     * committing the image to disk.
+     */
     @Override
-    public CoverProbeOutcome probeCover(BookEntity bookEntity, BookFileEntity bookFile) {
+    public CoverExtraction extractCover(BookEntity bookEntity, BookFileEntity bookFile) {
         File fb2File;
         try {
             // Resolving is the actual archive read (opens the ZIP, extracts the entry): a failure
@@ -87,31 +102,24 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
             fb2File = archivedBookContentService.resolve(bookFile).toFile();
         } catch (Exception e) {
             log.error("Error resolving archived FB2 content for '{}': {}", bookFile.getFileName(), e.getMessage(), e);
-            return CoverProbeOutcome.READ_FAILED;
+            return CoverExtraction.readFailed();
         }
 
         byte[] coverData;
         try {
             coverData = fb2MetadataExtractor.extractCover(fb2File);
         } catch (Exception e) {
-            // A malformed or unexpectedly-shaped FB2 must not propagate out of here: both callers
+            // A malformed or unexpectedly-shaped FB2 must not propagate out of here: every caller
             // (the lazy probe and explicit regeneration) would otherwise turn one bad file into a
             // permanent 500, since the old generateCover caught everything and just returned false.
             log.error("Error extracting cover from FB2 '{}': {}", bookFile.getFileName(), e.getMessage(), e);
-            return CoverProbeOutcome.READ_FAILED;
+            return CoverExtraction.readFailed();
         }
         if (coverData == null || coverData.length == 0) {
             log.warn("No cover image found in FB2 '{}'", bookFile.getFileName());
-            return CoverProbeOutcome.NO_COVER_FOUND;
+            return CoverExtraction.noCoverFound();
         }
-
-        try {
-            boolean saved = saveCoverImage(coverData, bookEntity.getId());
-            return saved ? CoverProbeOutcome.COVER_FOUND : CoverProbeOutcome.READ_FAILED;
-        } catch (Exception e) {
-            log.error("Error generating cover for FB2 '{}': {}", bookFile.getFileName(), e.getMessage(), e);
-            return CoverProbeOutcome.READ_FAILED;
-        }
+        return CoverExtraction.found(coverData);
     }
 
     @Override
@@ -163,15 +171,5 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
                     .collect(Collectors.toSet());
             bookCreatorService.addCategoriesToBook(validSubjects, bookEntity);
         }
-    }
-
-    private boolean saveCoverImage(byte[] coverData, long bookId) throws Exception {
-        BufferedImage originalImage = FileService.readImage(coverData);
-        if (originalImage == null) {
-            log.warn("Failed to decode cover image for FB2");
-            return false;
-        }
-
-        return fileService.saveCoverImages(originalImage, bookId);
     }
 }

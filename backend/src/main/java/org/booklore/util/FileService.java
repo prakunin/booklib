@@ -516,6 +516,41 @@ public class FileService {
         }
     }
 
+    /**
+     * Decodes {@code imageData} and writes it as the book's cover and thumbnail, reporting whether
+     * the images actually landed on disk.
+     * <p>
+     * This is the one place that turns extracted cover bytes into cover files, so callers holding
+     * bytes from {@code BookFileProcessor#extractCover} - the processor itself and
+     * {@code BookCoverService} alike - do not each need their own copy of the decode-and-save
+     * dance, and neither has to know what an image format is.
+     * <p>
+     * Returns {@code false} rather than throwing when the bytes cannot be decoded or the files
+     * cannot be written: both are ordinary outcomes for a cover pulled out of an arbitrary book
+     * file, and callers here need to react to them, not be interrupted by them.
+     */
+    public boolean saveCoverImageFromBytes(long bookId, byte[] imageData) {
+        if (imageData == null || imageData.length == 0) {
+            return false;
+        }
+        BufferedImage originalImage = null;
+        try {
+            originalImage = readImage(imageData);
+            if (originalImage == null) {
+                log.warn("Cover image for book {} could not be decoded (possibly SVG or an unsupported format)", bookId);
+                return false;
+            }
+            return saveCoverImages(originalImage, bookId);
+        } catch (Exception e) {
+            log.error("Failed to save cover image for book {}: {}", bookId, e.getMessage(), e);
+            return false;
+        } finally {
+            if (originalImage != null) {
+                originalImage.flush();
+            }
+        }
+    }
+
     public void createThumbnailFromUrl(long bookId, String imageUrl) {
         try {
             BufferedImage originalImage = downloadImageFromUrl(imageUrl);
