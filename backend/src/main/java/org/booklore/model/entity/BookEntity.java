@@ -67,6 +67,16 @@ public class BookEntity {
     @Column(name = "audiobook_cover_hash", length = 20)
     private String audiobookCoverHash;
 
+    /**
+     * Set once a lazy INPX cover probe successfully reads the archived FB2 and finds no embedded
+     * cover. Only ever set on a genuinely completed probe - never on a read failure - so the lazy
+     * path ({@link org.booklore.service.metadata.BookCoverService#tryGenerateMissingInpxCover}) can
+     * skip re-opening the archive without mistaking "we could not look" for "we looked and there is
+     * nothing". Cleared on rescan so an archive that gains a cover is picked up again.
+     */
+    @Column(name = "cover_probed_at")
+    private Instant coverProbedAt;
+
     @Column(name = "deleted")
     @Builder.Default
     private Boolean deleted = Boolean.FALSE;

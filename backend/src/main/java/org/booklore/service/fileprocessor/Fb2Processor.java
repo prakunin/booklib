@@ -7,6 +7,7 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.CoverProbeOutcome;
 import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.book.BookCreatorService;
@@ -73,21 +74,34 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
 
     @Override
     public boolean generateCover(BookEntity bookEntity, BookFileEntity bookFile) {
+        return probeCover(bookEntity, bookFile) == CoverProbeOutcome.COVER_FOUND;
+    }
+
+    @Override
+    public CoverProbeOutcome probeCover(BookEntity bookEntity, BookFileEntity bookFile) {
+        File fb2File;
         try {
-            File fb2File = archivedBookContentService.resolve(bookFile).toFile();
-            byte[] coverData = fb2MetadataExtractor.extractCover(fb2File);
+            // Resolving is the actual archive read (opens the ZIP, extracts the entry): a failure
+            // here - IO error, corrupt or temporarily unavailable archive - means we could not look,
+            // not that there is no cover, so it must not be reported the same way as a clean miss.
+            fb2File = archivedBookContentService.resolve(bookFile).toFile();
+        } catch (Exception e) {
+            log.error("Error resolving archived FB2 content for '{}': {}", bookFile.getFileName(), e.getMessage(), e);
+            return CoverProbeOutcome.READ_FAILED;
+        }
 
-            if (coverData == null || coverData.length == 0) {
-                log.warn("No cover image found in FB2 '{}'", bookFile.getFileName());
-                return false;
-            }
+        byte[] coverData = fb2MetadataExtractor.extractCover(fb2File);
+        if (coverData == null || coverData.length == 0) {
+            log.warn("No cover image found in FB2 '{}'", bookFile.getFileName());
+            return CoverProbeOutcome.NO_COVER_FOUND;
+        }
 
+        try {
             boolean saved = saveCoverImage(coverData, bookEntity.getId());
-            return saved;
-
+            return saved ? CoverProbeOutcome.COVER_FOUND : CoverProbeOutcome.READ_FAILED;
         } catch (Exception e) {
             log.error("Error generating cover for FB2 '{}': {}", bookFile.getFileName(), e.getMessage(), e);
-            return false;
+            return CoverProbeOutcome.READ_FAILED;
         }
     }
 

@@ -9,6 +9,7 @@ import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.CoverProbeOutcome;
 import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.websocket.LogNotification;
 import org.booklore.model.websocket.Topic;
@@ -266,10 +267,19 @@ public class BookCoverService {
         bookRepository.save(bookEntity);
     }
 
+    /**
+     * Lazily generates a missing cover for an INPX book, probing the archive at most once.
+     * <p>
+     * The {@code coverProbedAt} guard is the durable record of a probe that actually completed: a
+     * book is only ever marked once the archive was read successfully and genuinely had no cover.
+     * A read failure (IO error, corrupt or temporarily unavailable archive) leaves the marker unset
+     * so the book remains eligible for a later retry - see {@link CoverProbeOutcome}.
+     */
     public boolean tryGenerateMissingInpxCover(long bookId) {
         BookEntity bookEntity = bookRepository.findByIdWithBookFiles(bookId).orElse(null);
         if (bookEntity == null
                 || bookEntity.getBookCoverHash() != null
+                || bookEntity.getCoverProbedAt() != null
                 || bookEntity.getLibrary() == null
                 || bookEntity.getLibrary().getSourceType() != LibrarySourceType.INPX
                 || isCoverLocked(bookEntity)) {
@@ -282,13 +292,20 @@ public class BookCoverService {
         }
 
         BookFileProcessor processor = processorRegistry.getProcessorOrThrow(ebookFile.getBookType());
-        if (!processor.generateCover(bookEntity, ebookFile)) {
-            return false;
-        }
-
-        updateBookCoverMetadata(bookEntity);
-        bookRepository.save(bookEntity);
-        return true;
+        CoverProbeOutcome outcome = processor.probeCover(bookEntity, ebookFile);
+        return switch (outcome) {
+            case COVER_FOUND -> {
+                updateBookCoverMetadata(bookEntity);
+                bookRepository.save(bookEntity);
+                yield true;
+            }
+            case NO_COVER_FOUND -> {
+                bookEntity.setCoverProbedAt(Instant.now());
+                bookRepository.save(bookEntity);
+                yield false;
+            }
+            case READ_FAILED -> false;
+        };
     }
 
     /**

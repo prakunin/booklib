@@ -6,6 +6,7 @@ import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.CoverProbeOutcome;
 import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.projection.BookCoverUpdateProjection;
@@ -184,14 +185,7 @@ class BookCoverServiceTest {
 
         @Mock private BookFileProcessor processor;
 
-        @Test
-        void generatesOnlyMissingArchivedCover() {
-            BookFileEntity bookFile = BookFileEntity.builder()
-                    .isBookFormat(true)
-                    .bookType(BookFileType.FB2)
-                    .sourceArchive("catalog.zip")
-                    .sourceArchiveEntry("book.fb2")
-                    .build();
+        private BookEntity buildArchivedInpxBook(BookFileEntity bookFile) {
             BookEntity book = BookEntity.builder()
                     .id(42L)
                     .library(LibraryEntity.builder().sourceType(LibrarySourceType.INPX).build())
@@ -199,15 +193,32 @@ class BookCoverServiceTest {
                     .bookFiles(new ArrayList<>(List.of(bookFile)))
                     .build();
             bookFile.setBook(book);
+            return book;
+        }
+
+        private BookFileEntity buildArchivedFb2File() {
+            return BookFileEntity.builder()
+                    .isBookFormat(true)
+                    .bookType(BookFileType.FB2)
+                    .sourceArchive("catalog.zip")
+                    .sourceArchiveEntry("book.fb2")
+                    .build();
+        }
+
+        @Test
+        void generatesOnlyMissingArchivedCover() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
             when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
-            when(processor.generateCover(book, bookFile)).thenReturn(true);
+            when(processor.probeCover(book, bookFile)).thenReturn(CoverProbeOutcome.COVER_FOUND);
 
             boolean generated = service.tryGenerateMissingInpxCover(42L);
 
             assertThat(generated).isTrue();
             assertThat(book.getBookCoverHash()).isNotBlank();
             assertThat(book.getMetadata().getCoverUpdatedOn()).isNotNull();
+            assertThat(book.getCoverProbedAt()).isNull();
             verify(bookRepository).save(book);
         }
 
@@ -240,6 +251,52 @@ class BookCoverServiceTest {
             assertThat(service.tryGenerateMissingInpxCover(42L)).isFalse();
 
             verifyNoInteractions(processorRegistry);
+        }
+
+        @Test
+        void skipsBookAlreadyProbedWithoutOpeningTheArchive() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
+            book.setCoverProbedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+
+            boolean generated = service.tryGenerateMissingInpxCover(42L);
+
+            assertThat(generated).isFalse();
+            verifyNoInteractions(processorRegistry);
+            verify(bookRepository, never()).save(any());
+        }
+
+        @Test
+        void completedProbeWithNoCoverSetsAndPersistsTheMarker() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.probeCover(book, bookFile)).thenReturn(CoverProbeOutcome.NO_COVER_FOUND);
+
+            boolean generated = service.tryGenerateMissingInpxCover(42L);
+
+            assertThat(generated).isFalse();
+            assertThat(book.getCoverProbedAt()).isNotNull();
+            assertThat(book.getBookCoverHash()).isNull();
+            verify(bookRepository).save(book);
+        }
+
+        @Test
+        void failedReadDoesNotSetTheMarkerSoTheBookStaysEligibleForRetry() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.probeCover(book, bookFile)).thenReturn(CoverProbeOutcome.READ_FAILED);
+
+            boolean generated = service.tryGenerateMissingInpxCover(42L);
+
+            assertThat(generated).isFalse();
+            assertThat(book.getCoverProbedAt()).isNull();
+            assertThat(book.getBookCoverHash()).isNull();
+            verify(bookRepository, never()).save(any());
         }
     }
 
@@ -338,6 +395,30 @@ class BookCoverServiceTest {
 
             assertThat(book.getMetadata().getCoverUpdatedOn()).isNotNull();
             assertThat(book.getMetadataUpdatedAt()).isNotNull();
+            assertThat(book.getBookCoverHash()).isNotNull();
+            verify(bookRepository).save(book);
+        }
+
+        @Test
+        void explicitRegenerationIsNotBlockedByThePreviouslyProbedMarker() {
+            // Only the lazy tryGenerateMissingInpxCover path honours coverProbedAt. An explicit,
+            // user-triggered regeneration must always be allowed to open the archive again.
+            BookEntity book = buildBook(1L, false);
+            book.setCoverProbedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
+            BookFileEntity ebookFile = BookFileEntity.builder()
+                    .bookType(BookFileType.FB2)
+                    .isBookFormat(true)
+                    .build();
+            book.setBookFiles(List.of(ebookFile));
+            when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(book));
+
+            BookFileProcessor processor = mock(BookFileProcessor.class);
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.generateCover(book, ebookFile)).thenReturn(true);
+
+            service.regenerateCover(1L);
+
+            verify(processor).generateCover(book, ebookFile);
             assertThat(book.getBookCoverHash()).isNotNull();
             verify(bookRepository).save(book);
         }
