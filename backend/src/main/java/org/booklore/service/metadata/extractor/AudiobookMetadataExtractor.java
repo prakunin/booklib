@@ -461,6 +461,12 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
         return value / 1000.0;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * An audio file that reads but carries no tag, or a tag with no artwork, genuinely has no cover.
+     * A file jaudiotagger cannot read at all says nothing about artwork either way.
+     */
     @Override
     public byte[] extractCover(File audioFile) {
         try {
@@ -468,6 +474,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             Tag tag = f.getTag();
 
             if (tag == null) {
+                // Read fine, simply untagged: nowhere for a cover to hide.
                 return null;
             }
 
@@ -478,8 +485,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
 
             return null;
         } catch (Exception e) {
-            log.warn("Failed to extract cover from audio file {}: {}", audioFile.getName(), e.getMessage());
-            return null;
+            throw new CoverExtractionException("Failed to extract cover from audio file: " + audioFile.getName(), e);
         }
     }
 }

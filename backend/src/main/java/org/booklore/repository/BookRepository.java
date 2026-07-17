@@ -287,6 +287,88 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
             @Param("libraryPath") LibraryPathEntity libraryPath);
 
     /**
+     * Atomically records a completed "no cover" probe, but only if the book still has neither a
+     * cover nor a marker: the {@code bookCoverHash IS NULL} guard is what stops a stale in-flight
+     * lazy probe from clobbering a cover that a concurrent explicit regeneration or archive refresh
+     * gave the book in the meantime, and {@code coverProbedAt IS NULL} makes the write idempotent
+     * against a second concurrent probe reaching the same conclusion. Returns the number of rows
+     * changed (0 or 1) so the caller can tell whether it actually won the race.
+     */
+    @Modifying
+    @Query("""
+            UPDATE BookEntity b SET b.coverProbedAt = :probedAt
+            WHERE b.id = :bookId AND b.bookCoverHash IS NULL AND b.coverProbedAt IS NULL
+            """)
+    int markCoverProbedIfStillMissing(@Param("bookId") Long bookId, @Param("probedAt") Instant probedAt);
+
+    /**
+     * Atomically claims the book's cover, but only if it does not already have one. Guards against
+     * two concurrent probes of the same archived book (or a probe racing an explicit regeneration)
+     * both persisting - and both notifying about - the same cover. Returns the number of rows
+     * changed (0 or 1); a caller that gets 0 lost the race, but the postcondition it wanted (the
+     * book has a cover) already holds.
+     * <p>
+     * {@code coverProbedAt} is cleared because stamping a hash and dropping the "this file has no
+     * cover" marker are one operation - a book with a cover contradicts the marker. This is the
+     * database-side twin of {@link org.booklore.model.entity.BookEntity#setBookCoverHash}.
+     * <p>
+     * This deliberately writes <em>only</em> the two cover columns and does not touch
+     * {@code metadataUpdatedAt}, even though a book that gains a cover has had its metadata change.
+     * The reason is that a claim is not a commitment: {@link #clearCoverHashIfStillClaimed} can
+     * revert it, and the fewer columns this statement writes, the less there is for that revert to
+     * miss - it already does not restore {@code coverProbedAt}, for the reasons set out there.
+     * Stamping {@code metadataUpdatedAt}
+     * here made the pair asymmetric - the release put the hash back but left the timestamp bumped,
+     * so every failed probe permanently looked like a metadata change to
+     * {@code KoboSnapshotBookRepository#findChangedBooks} and re-pushed the book to every paired
+     * Kobo device, on every scan, forever. The successful path stamps {@code metadataUpdatedAt} on
+     * the entity and saves it, which is the right place: by then there is something to commit to.
+     */
+    @Modifying
+    @Query("""
+            UPDATE BookEntity b SET
+                b.bookCoverHash = :coverHash,
+                b.coverProbedAt = NULL
+            WHERE b.id = :bookId AND b.bookCoverHash IS NULL
+            """)
+    int markCoverFoundIfStillMissing(@Param("bookId") Long bookId, @Param("coverHash") String coverHash);
+
+    /**
+     * Releases a cover claim taken by {@link #markCoverFoundIfStillMissing} when the image could not
+     * actually be saved, putting the book back in the no-cover state that makes it eligible for a
+     * later retry.
+     * <p>
+     * A claim followed by a release is <em>not</em> a no-op, and it is worth being exact about why
+     * rather than claiming a symmetry that does not hold. The claim writes two columns - it sets
+     * {@code bookCoverHash} and clears {@code coverProbedAt} - and this reverts only the first. If
+     * the row carried a probe marker at claim time, the pair erases it.
+     * <p>
+     * That gap needs a concurrent probe to reach at all: {@code tryGenerateMissingInpxCover} only
+     * claims for a book it read with no marker, so another probe must have marked the same book in
+     * between - which means the two disagree about whether the file has a cover. When that happens,
+     * dropping the marker is the outcome we want anyway, not damage to be repaired: this claim found
+     * a cover, so the other probe's "no cover" verdict was simply wrong, and the transient failure
+     * that brought us here is not a reason to reinstate it. Leaving the book eligible for a retry is
+     * exactly right. So the asymmetry is deliberate and harmless - but it is an asymmetry, and a
+     * reader who needs to know whether {@code coverProbedAt} can survive a claim must not be told
+     * otherwise.
+     * <p>
+     * The guard on the claimed hash is defence in depth, not a defence against a concurrent writer.
+     * {@code BookCoverService} is class-level {@code @Transactional}, so the claim's UPDATE holds an
+     * exclusive lock on the row until the transaction commits: no other transaction can give this
+     * book a cover between the claim and this revert - it would block on the claim. What the guard
+     * actually buys is that this statement cannot do damage if that stops being true (if the claim
+     * ever moves to its own transaction) or if a caller passes a hash it never owned. Returns the
+     * number of rows changed (0 or 1).
+     */
+    @Modifying
+    @Query("""
+            UPDATE BookEntity b SET b.bookCoverHash = NULL
+            WHERE b.id = :bookId AND b.bookCoverHash = :coverHash
+            """)
+    int clearCoverHashIfStillClaimed(@Param("bookId") Long bookId, @Param("coverHash") String coverHash);
+
+    /**
      * Get distinct series names for a library when groupUnknown=true.
      * Books without series name are grouped as "Unknown Series".
      */

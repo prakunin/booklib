@@ -13,6 +13,7 @@ import java.io.File;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.booklore.test.RequiresPdfium;
 
@@ -845,11 +846,18 @@ class PdfMetadataExtractorTest {
             assertThat(cover[1]).isEqualTo((byte) 0xD8);
         }
 
+        /**
+         * A PDF has no embedded cover that could be absent - the cover is a render of page one - so
+         * this extractor has no clean miss to report and a {@code null} from it never meant one. It
+         * meant "could not read", which is the thing that must not look like a verdict.
+         */
         @Test
-        void extractCover_nonExistentFile_returnsNull() {
+        void extractCover_nonExistentFile_throwsRatherThanReportingNoCover() {
             File nonExistent = new File("/tmp/no_such_file_ever.pdf");
-            byte[] cover = extractor.extractCover(nonExistent);
-            assertThat(cover).isNull();
+
+            assertThatThrownBy(() -> extractor.extractCover(nonExistent))
+                    .isInstanceOf(CoverExtractionException.class)
+                    .hasMessageContaining("no_such_file_ever.pdf");
         }
     }
 

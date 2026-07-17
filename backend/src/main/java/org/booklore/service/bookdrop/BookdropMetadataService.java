@@ -13,6 +13,7 @@ import org.booklore.model.enums.MetadataProvider;
 import org.booklore.repository.BookdropFileRepository;
 import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.metadata.MetadataRefreshService;
+import org.booklore.service.metadata.extractor.CoverExtractionException;
 import org.booklore.service.metadata.extractor.MetadataExtractorFactory;
 import org.booklore.util.FileService;
 import org.springframework.stereotype.Service;
@@ -175,11 +176,25 @@ public class BookdropMetadataService {
         return cleanInitialMetadata(metadataExtractorFactory.extractMetadata(fileExt, file));
     }
 
+    /**
+     * The cover here is a preview thumbnail for the bookdrop review screen, and it is optional: a
+     * file whose cover cannot be read is still a file a human can review and approve. So this is a
+     * caller that genuinely wants "no cover on any failure", and says so - rather than leaning on
+     * the extractor to swallow, which is what stopped callers who <em>do</em> need the distinction
+     * from getting it. Letting the exception out would abort {@code attachInitialMetadata}'s
+     * transaction and fail the whole staging of the file over a missing thumbnail.
+     */
     private void extractAndSaveCover(BookdropFileEntity entity) {
         File file = new File(entity.getFilePath());
         BookFileExtension fileExt = BookFileExtension.fromFileName(file.getName())
             .orElseThrow(() -> ApiError.INVALID_FILE_FORMAT.createException("Unsupported file extension"));
-        byte[] coverBytes = metadataExtractorFactory.extractCover(fileExt, file);
+        byte[] coverBytes;
+        try {
+            coverBytes = metadataExtractorFactory.extractCover(fileExt, file);
+        } catch (CoverExtractionException e) {
+            log.warn("Could not read a cover for bookdrop file {}: {}", entity.getFilePath(), e.getMessage());
+            return;
+        }
         if (coverBytes != null) {
             try {
                 FileService.saveImage(coverBytes, fileService.getTempBookdropCoverImagePath(entity.getId()));

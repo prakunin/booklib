@@ -4,10 +4,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.grimmory.pdfium4j.PdfDocument;
+import org.grimmory.pdfium4j.PdfPage;
 import org.grimmory.pdfium4j.XmpMetadataParser;
 import org.grimmory.pdfium4j.model.MetadataTag;
 import org.grimmory.pdfium4j.model.XmpMetadata;
 import org.booklore.model.dto.BookMetadata;
+import org.booklore.util.FileService;
 import org.booklore.util.SecureXmlUtils;
 import org.springframework.stereotype.Component;
 import org.grimmory.pdfium4j.model.XmpMetadata.QualifiedIdentifier;
@@ -49,13 +51,43 @@ public class PdfMetadataExtractor implements FileMetadataExtractor {
     private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("\\d{6}");
     private static final Pattern YEAR_PATTERN = Pattern.compile("\\d{4}");
 
+    /**
+     * The DPI an ordinary page is rendered at. Large pages are rendered at whatever lower resolution
+     * keeps them inside the cover bounds - see {@link #extractCover}.
+     */
+    private static final int RENDER_DPI = 300;
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This one never returns {@code null}. A PDF has no embedded cover that could be missing - the
+     * cover <em>is</em> a render of page one - so any PDF that opens has one, and a PDF that does
+     * not open is a failure to read rather than proof of absence. There is no clean miss to report.
+     * <p>
+     * The render is bounded rather than taken at the full {@link #RENDER_DPI}. The bytes go to
+     * {@code FileService}, which caps what it will decode at {@code MAX_IMAGE_PIXELS} and scales
+     * every cover down to {@link FileService#MAX_ORIGINAL_WIDTH} x
+     * {@link FileService#MAX_ORIGINAL_HEIGHT} anyway, so a full-resolution raster of a large page is
+     * work done only to be discarded - and past about 1075x1075 points it is not even discarded but
+     * <em>rejected</em>, as a decompression bomb, losing the cover entirely. Bounding at the source
+     * costs nothing for ordinary pages (a page that fits is rendered at the full DPI) and is the
+     * only thing that makes a poster-sized PDF yield a cover at all.
+     */
     @Override
     public byte[] extractCover(File file) {
-        try (PdfDocument doc = PdfDocument.open(file.toPath())) {
-            return doc.renderPageToBytes(0, 300, "jpeg");
+        try (PdfDocument doc = PdfDocument.open(file.toPath());
+             PdfPage page = doc.page(0)) {
+            byte[] bytes = page
+                    .renderBounded(RENDER_DPI, FileService.MAX_ORIGINAL_WIDTH, FileService.MAX_ORIGINAL_HEIGHT)
+                    .toJpegBytes();
+            if (bytes == null || bytes.length == 0) {
+                throw new CoverExtractionException("Rendering page 1 of PDF produced no bytes: " + file.getAbsolutePath());
+            }
+            return bytes;
+        } catch (CoverExtractionException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("Failed to extract cover from PDF: {}", file.getAbsolutePath(), e);
-            return null;
+            throw new CoverExtractionException("Failed to extract cover from PDF: " + file.getAbsolutePath(), e);
         }
     }
 

@@ -67,6 +67,84 @@ public class BookEntity {
     @Column(name = "audiobook_cover_hash", length = 20)
     private String audiobookCoverHash;
 
+    /**
+     * Set once a lazy INPX cover probe completes and establishes that this book will never yield a
+     * cover from its archive: either the archived FB2 was read through and has no cover binary, or
+     * it has one that can never be turned into an image (an SVG, say). The lazy path
+     * ({@link org.booklore.service.metadata.BookCoverService#tryGenerateMissingInpxCover}) then
+     * skips re-opening the archive. Cleared on rescan so an archive that gains a cover is picked up
+     * again, and cleared by {@link #setBookCoverHash} the moment the book gets a cover by any route.
+     * <p>
+     * Set only on a completed probe, never on a failure to read - that is the whole point of the
+     * column, and it is a real invariant rather than an aspiration only because
+     * {@code Fb2MetadataExtractor.extractCover} distinguishes the two. It could not until recently:
+     * it answered both "this FB2 has no cover" and "this FB2 could not be opened, parsed, or
+     * base64-decoded" with a bare {@code null}, {@code Fb2Processor} mapped that {@code null} to
+     * {@code NO_COVER_FOUND}, and a transient IO error was recorded here permanently. This javadoc
+     * asserted the invariant throughout, which is exactly what stopped four fix waves from looking
+     * here: the guarantee is only ever as good as the layer that can actually tell the difference.
+     */
+    @Column(name = "cover_probed_at")
+    private Instant coverProbedAt;
+
+    /**
+     * Stamping a cover hash clears any {@link #coverProbedAt} marker: the marker means "a probe read
+     * the source and it genuinely had no cover", which a book that now has one makes obsolete.
+     * Leaving it set would permanently block the lazy probe if the hash were ever cleared without a
+     * rescan.
+     * <p>
+     * This lives in the setter rather than in its callers because a dozen call sites stamp a hash -
+     * the six file processors, the library scanner, the metadata updater, the migration and the cover
+     * service - and keeping them in step by hand has already failed repeatedly. Hibernate hydrates
+     * through field access ({@code @Id} is on the field), so overriding the setter does not affect
+     * loading.
+     * <p>
+     * Two routes still write the fields directly and this setter cannot see them. {@link
+     * BookEntityBuilder} is hand-patched below to close its half. {@code @AllArgsConstructor}
+     * remains a genuine hole: {@code new BookEntity(...)} with every field positionally can still
+     * produce a book holding both a hash and a marker. Nothing in the codebase calls it - Lombok
+     * generates it for the builder's benefit - and it is stated here rather than papered over,
+     * because a reader deciding whether to trust this invariant needs to know its exact edge.
+     */
+    public void setBookCoverHash(String bookCoverHash) {
+        this.bookCoverHash = bookCoverHash;
+        if (bookCoverHash != null) {
+            this.coverProbedAt = null;
+        }
+    }
+
+    /**
+     * Holds the {@link #setBookCoverHash(String)} invariant across the builder, which would
+     * otherwise assign both fields directly and let {@code builder().bookCoverHash(h)
+     * .coverProbedAt(t).build()} produce the contradictory state the setter exists to prevent.
+     * Lombok fills in the rest of the builder around these two methods.
+     * <p>
+     * Both setters are patched, not just the hash one, because the invariant has to hold whichever
+     * order the caller calls them in: patching {@code bookCoverHash} alone still leaves a later
+     * {@code coverProbedAt} free to reinstate the marker. The rule mirrors the entity's - a hash
+     * always wins over a marker - so the two cannot be combined in either direction.
+     * <p>
+     * Only test fixtures build books with a cover hash today, so this is not fixing a live defect.
+     * It is closing the route by which one arrives: the previous javadoc argued the builder was
+     * "harmless because a book being built is new and has no marker yet", which is exactly the
+     * reasoning-about-callers that pushed this invariant into the setter in the first place.
+     */
+    public static class BookEntityBuilder {
+
+        public BookEntityBuilder bookCoverHash(String bookCoverHash) {
+            this.bookCoverHash = bookCoverHash;
+            if (bookCoverHash != null) {
+                this.coverProbedAt = null;
+            }
+            return this;
+        }
+
+        public BookEntityBuilder coverProbedAt(Instant coverProbedAt) {
+            this.coverProbedAt = this.bookCoverHash != null ? null : coverProbedAt;
+            return this;
+        }
+    }
+
     @Column(name = "deleted")
     @Builder.Default
     private Boolean deleted = Boolean.FALSE;

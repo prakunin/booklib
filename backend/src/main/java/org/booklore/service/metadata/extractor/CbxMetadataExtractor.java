@@ -17,7 +17,6 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -485,17 +484,56 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         return extractCover(file.toPath());
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The only honest "no cover" a comic archive has is an archive with no page images in it at all
+     * - a CBZ holding nothing but a readme. That is the single {@code null} below, and it is reached
+     * only after the archive has been opened and its entries listed.
+     * <p>
+     * Everything else that ends without a cover is a failure to read, not proof of absence, and the
+     * three used to be one swallowed {@code null}: an archive that would not open (an unsupported
+     * RAR5, say) came back the same as an empty one, because {@link #listComicImageEntries} turned
+     * the failure into an empty stream. So did an archive whose pages are all there but unreadable,
+     * because {@link #canDecode} filtered them away silently. Both now leave as a
+     * {@link CoverExtractionException}: a comic whose pages we cannot decode plainly has pages, and
+     * telling the user it has no cover would be a lie.
+     */
     public byte[] extractCover(Path path) {
-        return Stream.<Supplier<Stream<String>>>of(
-                        () -> extractCoverEntryNameFromComicInfo(path),
-                        () -> extractCoverEntryNameFallback(path)
+        List<String> imageEntries = listComicImageEntries(path);
+
+        List<String> candidates = Stream.concat(
+                        coverEntryNamesFromComicInfo(path, imageEntries),
+                        imageEntries.stream().sorted(
+                                (a, b) -> Boolean.compare(likelyCoverName(baseName(b)), likelyCoverName(baseName(a))))
                 )
-                .flatMap(Supplier::get)
-                .map(coverEntry -> readArchiveEntryBytes(path, coverEntry))
-                .filter(Objects::nonNull)
-                .filter(this::canDecode)
-                .findFirst()
-                .orElse(null);
+                .distinct()
+                .toList();
+
+        boolean sawUnreadableEntry = false;
+        boolean sawUndecodableEntry = false;
+        for (String entry : candidates) {
+            byte[] bytes = readArchiveEntryBytes(path, entry);
+            if (bytes == null) {
+                sawUnreadableEntry = true;
+                continue;
+            }
+            if (canDecode(bytes)) {
+                return bytes;
+            }
+            // Not fatal on its own: a comic can lead with a broken page and still have good ones,
+            // which is the whole reason this loop keeps going rather than taking the first entry.
+            sawUndecodableEntry = true;
+        }
+
+        if (imageEntries.isEmpty()) {
+            // Archive opened and listed, and there is not one page image in it. Proven absence.
+            return null;
+        }
+        throw new CoverExtractionException(
+                "Comic archive %s holds %d image entr%s but none could be turned into a cover (unreadable=%s, undecodable=%s)"
+                        .formatted(path.getFileName(), imageEntries.size(), imageEntries.size() == 1 ? "y" : "ies",
+                                sawUnreadableEntry, sawUndecodableEntry));
     }
 
     private boolean canDecode(byte[] bytes) {
@@ -508,10 +546,8 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         }
     }
 
-    private Stream<String> extractCoverEntryNameFromComicInfo(Path cbxPath) {
+    private Stream<String> coverEntryNamesFromComicInfo(Path cbxPath, List<String> entryNames) {
         Set<String> possibleCoverImages = new LinkedHashSet<>();
-
-        List<String> entryNames = getComicImageEntryNames(cbxPath).toList();
 
         try (InputStream is = findComicInfoEntryInputStream(cbxPath)) {
             if (is == null) {
@@ -561,19 +597,22 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         return possibleCoverImages.stream();
     }
 
-    private Stream<String> extractCoverEntryNameFallback(Path cbxPath) {
-        return getComicImageEntryNames(cbxPath)
-                .sorted((a, b) -> Boolean.compare(likelyCoverName(baseName(b)), likelyCoverName(baseName(a))));
-    }
-
-    private Stream<String> getComicImageEntryNames(Path cbxPath) {
+    /**
+     * The archive's page images, in natural order.
+     * <p>
+     * This is the read that decides whether a "no cover" answer is available at all, so it must not
+     * swallow: it used to return an empty stream when the archive could not be opened, which made an
+     * unopenable archive indistinguishable from one containing no images. An empty list from here
+     * now means one thing only - the archive opened and has no page images.
+     */
+    private List<String> listComicImageEntries(Path cbxPath) {
         try {
             return archiveService.streamEntryNames(cbxPath)
                     .filter(this::isImageEntry)
-                    .sorted(this::naturalCompare);
+                    .sorted(this::naturalCompare)
+                    .toList();
         } catch (Exception e) {
-            log.warn("Failed to extract cover image from archive {}", cbxPath.getFileName(), e);
-            return Stream.empty();
+            throw new CoverExtractionException("Failed to list entries of comic archive: " + cbxPath.getFileName(), e);
         }
     }
 

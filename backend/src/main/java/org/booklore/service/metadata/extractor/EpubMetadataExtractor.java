@@ -99,6 +99,19 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                 }
             }));
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Two readers run in sequence and they are not equal partners. epub4j is tried first for its
+     * cover detection, and its failure is deliberately swallowed: it is an optimisation, and the
+     * container scan below is the fallback that exists precisely for the EPUBs it cannot handle.
+     * The container scan is the authority. If it opens the archive, finds the OPF and walks it
+     * through to the end without finding a cover, that is a proven absence and returns {@code null};
+     * if it throws - the file is missing, the zip is corrupt, the OPF will not parse - then nothing
+     * read this EPUB and we are in no position to say it has no cover, so it leaves as a
+     * {@link CoverExtractionException}. Both used to return the same bare {@code null}, which is why
+     * regenerating the cover of a corrupt EPUB told the user it had "no embedded cover image".
+     */
     @Override
     public byte[] extractCover(File epubFile) {
         // Primary: use epub4j's CoverDetector with native lazy loading
@@ -117,6 +130,8 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                 }
             }
         } catch (Exception e) {
+            // Not a verdict: epub4j is the fast path, and the container scan below is the fallback
+            // that exists for exactly the files it chokes on. Only that scan gets to conclude.
             log.debug("epub4j cover detection failed for {}: {}", epubFile.getName(), e.getMessage());
         }
 
@@ -174,9 +189,10 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                 }
             }
         } catch (Exception e) {
-            log.debug("Container cover search failed for {}: {}", epubFile.getName(), e.getMessage());
+            throw new CoverExtractionException("Failed to extract cover from EPUB: " + epubFile.getName(), e);
         }
 
+        // The container opened, the OPF parsed and every route through it came up empty: proven.
         return null;
     }
 

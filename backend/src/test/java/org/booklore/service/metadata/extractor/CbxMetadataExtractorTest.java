@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -1029,13 +1030,45 @@ class CbxMetadataExtractorTest {
             assertThat(cover).isEqualTo(expected);
         }
 
+        /**
+         * An archive that will not open is not an archive without pages. It used to be reported as
+         * exactly that: the failure to list entries was swallowed into an empty stream, which then
+         * flowed through the pipeline and came out as the same {@code null} as an empty CBZ.
+         */
         @Test
-        void returnsPlaceholderForCorruptFile() throws IOException {
+        void corruptArchiveThrowsRatherThanReportingNoCover() throws IOException {
             Path path = mockRaisesException();
 
-            byte[] cover = extractor.extractCover(path);
+            assertThatThrownBy(() -> extractor.extractCover(path))
+                    .isInstanceOf(CoverExtractionException.class);
+        }
 
-            assertThat(cover).isNull();
+        /**
+         * The other side of the same distinction: an archive that opens and holds no page images at
+         * all really does have no cover, and must still say so definitively.
+         */
+        @Test
+        void archiveWithNoImagesStillReportsNoCover() throws IOException {
+            Path path = mockArchiveContents(Map.of("readme.txt", "no images here".getBytes()));
+
+            assertThat(extractor.extractCover(path)).isNull();
+        }
+
+        /**
+         * Pages that are present but undecodable are not an absence of pages. The comic plainly has
+         * a cover; we just cannot turn it into one. Saying "no cover" here would be a lie, and
+         * {@code canDecode} silently filtering them away is how it got told.
+         */
+        @Test
+        void archiveWhoseImagesAllFailToDecodeThrowsRatherThanReportingNoCover() throws IOException {
+            Path path = mockArchiveContents(Map.of(
+                    "page001.jpg", "not actually a jpeg".getBytes(),
+                    "page002.jpg", "nor is this".getBytes()
+            ));
+
+            assertThatThrownBy(() -> extractor.extractCover(path))
+                    .isInstanceOf(CoverExtractionException.class)
+                    .hasMessageContaining("2 image entries");
         }
     }
 
@@ -1187,12 +1220,11 @@ class CbxMetadataExtractorTest {
         }
 
         @Test
-        void returnsPlaceholderCoverForNonArchiveFile() throws IOException {
+        void nonArchiveFileThrowsFromExtractCoverRatherThanReportingNoCover() throws IOException {
             Path path = mockRaisesException();
 
-            byte[] cover = extractor.extractCover(path);
-
-            assertThat(cover).isNull();
+            assertThatThrownBy(() -> extractor.extractCover(path))
+                    .isInstanceOf(CoverExtractionException.class);
         }
     }
 }

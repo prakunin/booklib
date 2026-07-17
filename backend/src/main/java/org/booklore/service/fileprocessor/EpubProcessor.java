@@ -1,12 +1,15 @@
 package org.booklore.service.fileprocessor;
 
 import org.booklore.mapper.BookMapper;
+import org.booklore.model.CoverExtraction;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.settings.LibraryFile;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.CoverProbeOutcome;
+import org.booklore.model.enums.CoverSaveOutcome;
 import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.book.BookCreatorService;
@@ -19,9 +22,6 @@ import org.booklore.util.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
@@ -70,34 +70,46 @@ public class EpubProcessor extends AbstractFileProcessor implements BookFileProc
         return generateCover(bookEntity, bookEntity.getPrimaryBookFile());
     }
 
+    /**
+     * Reads the cover and writes it, for callers that just want the file on disk and are entitled to
+     * overwrite whatever is there. Built on {@link #extractCover} so there is only one way to read a
+     * cover out of an EPUB - the read and the write are separate steps, and this is both in a row.
+     */
     @Override
     public boolean generateCover(BookEntity bookEntity, BookFileEntity bookFile) {
-        try {
-            File epubFile = FileUtils.getBookFullPath(bookEntity, bookFile).toFile();
-            byte[] coverData = epubMetadataExtractor.extractCover(epubFile);
-
-            if (coverData == null) {
-                log.warn("No cover image found in EPUB '{}'", bookFile.getFileName());
-                return false;
-            }
-
-            boolean saved;
-            try (ByteArrayInputStream bais = new ByteArrayInputStream(coverData)) {
-                BufferedImage originalImage = ImageIO.read(bais);
-                if (originalImage == null) {
-                    log.warn("Cover image found but could not be decoded (possibly SVG or unsupported format) in EPUB '{}'", bookFile.getFileName());
-                    return false;
-                }
-                saved = fileService.saveCoverImages(originalImage, bookEntity.getId());
-                originalImage.flush();
-            }
-
-            return saved;
-
-        } catch (Exception e) {
-            log.error("Error generating cover for EPUB '{}': {}", bookFile.getFileName(), e.getMessage(), e);
+        CoverExtraction extraction = extractCover(bookEntity, bookFile);
+        if (extraction.outcome() != CoverProbeOutcome.COVER_FOUND) {
             return false;
         }
+        return fileService.saveCoverImageFromBytes(bookEntity.getId(), extraction.data()) == CoverSaveOutcome.SAVED;
+    }
+
+    /**
+     * Pure read: opens the EPUB, pulls the cover bytes out, writes nothing and touches no state.
+     * <p>
+     * The clean miss is genuinely provable here - epub4j reports an EPUB with no cover as a null
+     * rather than by failing - so this is one of the processors entitled to return
+     * {@code NO_COVER_FOUND}. It is also the common real case: an EPUB with no cover is what most
+     * users hitting this path actually have, and the outcome is what earns them a definitive
+     * message instead of a hedged one.
+     */
+    @Override
+    public CoverExtraction extractCover(BookEntity bookEntity, BookFileEntity bookFile) {
+        byte[] coverData;
+        try {
+            File epubFile = FileUtils.getBookFullPath(bookEntity, bookFile).toFile();
+            coverData = epubMetadataExtractor.extractCover(epubFile);
+        } catch (Exception e) {
+            // A missing, unreadable or malformed EPUB means we could not look, not that there is
+            // nothing to find - it must not be reported the same way as a clean miss.
+            log.error("Error extracting cover from EPUB '{}': {}", bookFile.getFileName(), e.getMessage(), e);
+            return CoverExtraction.readFailed();
+        }
+        if (coverData == null || coverData.length == 0) {
+            log.warn("No cover image found in EPUB '{}'", bookFile.getFileName());
+            return CoverExtraction.noCoverFound();
+        }
+        return CoverExtraction.found(coverData);
     }
 
     @Override

@@ -22,6 +22,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EpubMetadataExtractorTest {
 
@@ -1359,21 +1360,30 @@ class EpubMetadataExtractorTest {
     @Nested
     class EdgeCases {
 
+        /**
+         * A missing EPUB is not an EPUB without a cover. Returning {@code null} for both is what
+         * made {@code regenerateCover} tell users a file it could not even open had "no embedded
+         * cover image found in the file".
+         */
         @Test
-        void nonExistentFileReturnsNull() {
+        void nonExistentFileThrowsFromExtractCoverRatherThanReportingNoCover() {
             File nonExistent = new File(tempDir.toFile(), "nonexistent.epub");
             assertThat(extractor.extractMetadata(nonExistent)).isNull();
-            assertThat(extractor.extractCover(nonExistent)).isNull();
+            assertThatThrownBy(() -> extractor.extractCover(nonExistent))
+                    .isInstanceOf(CoverExtractionException.class)
+                    .hasMessageContaining("nonexistent.epub");
         }
 
         @Test
-        void corruptZipReturnsNull() throws IOException {
+        void corruptZipThrowsFromExtractCoverRatherThanReportingNoCover() throws IOException {
             File corrupt = tempDir.resolve("corrupt.epub").toFile();
             try (FileOutputStream fos = new FileOutputStream(corrupt)) {
                 fos.write(new byte[]{0x00, 0x01, 0x02, 0x03});
             }
             assertThat(extractor.extractMetadata(corrupt)).isNull();
-            assertThat(extractor.extractCover(corrupt)).isNull();
+            assertThatThrownBy(() -> extractor.extractCover(corrupt))
+                    .isInstanceOf(CoverExtractionException.class)
+                    .hasMessageContaining("corrupt.epub");
         }
 
         @Test

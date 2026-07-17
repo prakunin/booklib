@@ -24,11 +24,14 @@ import org.jaudiotagger.audio.AudioFileIO;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -673,16 +676,28 @@ class AudiobookMetadataExtractorTest {
             }
         }
 
+        /**
+         * A file jaudiotagger cannot read at all is not a file without artwork. Driven with a real
+         * unreadable file rather than a stubbed static: the point of the whole change is that the
+         * real collaborator throws, and stubbing one that throws proves nothing about whether it
+         * does.
+         */
         @Test
-        void exceptionReturnsNull() {
-            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
-                File file = new File(tempDir.toFile(), "corrupt.mp3");
-                mocked.when(() -> AudioFileIO.read(file)).thenThrow(new RuntimeException("bad file"));
+        void unreadableAudioFileThrowsRatherThanReportingNoCover() throws IOException {
+            File file = new File(tempDir.toFile(), "corrupt.mp3");
+            Files.write(file.toPath(), new byte[]{0x00, 0x01, 0x02, 0x03});
 
-                byte[] cover = extractor.extractCover(file);
+            assertThatThrownBy(() -> extractor.extractCover(file))
+                    .isInstanceOf(CoverExtractionException.class)
+                    .hasMessageContaining("corrupt.mp3");
+        }
 
-                assertThat(cover).isNull();
-            }
+        @Test
+        void missingAudioFileThrowsRatherThanReportingNoCover() {
+            File missing = new File(tempDir.toFile(), "gone.mp3");
+
+            assertThatThrownBy(() -> extractor.extractCover(missing))
+                    .isInstanceOf(CoverExtractionException.class);
         }
     }
 

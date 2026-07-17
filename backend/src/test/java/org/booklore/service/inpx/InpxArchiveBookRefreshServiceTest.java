@@ -94,4 +94,35 @@ class InpxArchiveBookRefreshServiceTest {
         verify(bookRepository).save(managedBook);
         verify(bookCoverService).regenerateCover(42L);
     }
+
+    @Test
+    void clearsThePreviouslyProbedMarkerSoAGainedCoverIsPickedUp() {
+        // A prior lazy probe may have recorded "no cover" before the archive was replaced with one
+        // that does have a cover. The rescan must not let that stale answer survive.
+        BookFileEntity archivedFile = BookFileEntity.builder()
+                .sourceArchive("books.zip")
+                .sourceArchiveEntry("book.fb2")
+                .build();
+        BookEntity detachedBook = BookEntity.builder()
+                .id(42L)
+                .coverProbedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"))
+                .bookFiles(List.of(archivedFile))
+                .build();
+        BookEntity managedBook = BookEntity.builder()
+                .id(42L)
+                .coverProbedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"))
+                .bookFiles(List.of(archivedFile))
+                .build();
+
+        when(bookRepository.findByIdForInpxArchiveRefresh(42L))
+                .thenReturn(Optional.of(detachedBook), Optional.of(managedBook));
+        when(archivedBookContentService.resolveRevalidated(archivedFile)).thenReturn(Path.of("book.fb2"));
+        when(fb2MetadataExtractor.extractMetadata(Path.of("book.fb2").toFile())).thenReturn(null);
+        when(bookRepository.findById(42L)).thenReturn(Optional.of(managedBook));
+
+        service.refresh(42L);
+
+        assertThat(managedBook.getCoverProbedAt()).isNull();
+        verify(bookRepository).save(managedBook);
+    }
 }

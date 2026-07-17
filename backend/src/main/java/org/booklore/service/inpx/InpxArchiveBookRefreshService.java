@@ -70,6 +70,9 @@ public class InpxArchiveBookRefreshService {
                             .build());
                 }
                 managedBook.setScannedOn(Instant.now());
+                // A rescan may be repairing a replaced archive that now has a cover it didn't have
+                // before, so a prior "no cover" probe result must not survive it.
+                managedBook.setCoverProbedAt(null);
                 bookRepository.save(managedBook);
             });
         } catch (RuntimeException e) {

@@ -1,6 +1,7 @@
 package org.booklore.service.fileprocessor;
 
 import org.booklore.mapper.BookMapper;
+import org.booklore.model.CoverExtraction;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.ComicMetadata;
 import org.booklore.model.dto.settings.LibraryFile;
@@ -9,6 +10,8 @@ import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.ComicMetadataEntity;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.CoverProbeOutcome;
+import org.booklore.model.enums.CoverSaveOutcome;
 import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.book.BookCreatorService;
@@ -22,8 +25,6 @@ import org.booklore.util.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.*;
@@ -76,52 +77,51 @@ public class CbxProcessor extends AbstractFileProcessor implements BookFileProce
         return generateCover(bookEntity, bookEntity.getPrimaryBookFile());
     }
 
+    /**
+     * Reads the cover and writes it, for callers that just want the file on disk and are entitled to
+     * overwrite whatever is there. Built on {@link #extractCover} so there is only one way to read a
+     * cover out of a comic archive - the read and the write are separate steps, and this is both in
+     * a row.
+     */
     @Override
     public boolean generateCover(BookEntity bookEntity, BookFileEntity bookFile) {
-        Path bookPath = FileUtils.getBookFullPath(bookEntity, bookFile);
-
-        try {
-            Optional<BufferedImage> imageOptional = extractImagesFromArchive(bookPath);
-            if (imageOptional.isPresent()) {
-                BufferedImage image = imageOptional.get();
-                try {
-                    boolean saved = fileService.saveCoverImages(image, bookEntity.getId());
-                    if (saved) {
-                        return true;
-                    } else {
-                        log.warn("Could not save image extracted from CBZ as cover for '{}'", bookFile.getFileName());
-                    }
-                } finally {
-                    image.flush(); // Release resources after processing
-                }
-            } else {
-                log.warn("Could not find cover image in '{}' archive", bookFile.getFileName());
-            }
-        } catch (Exception e) {
-            log.error("Error generating cover for '{}': {}", bookFile.getFileName(), e.getMessage());
+        CoverExtraction extraction = extractCover(bookEntity, bookFile);
+        if (extraction.outcome() != CoverProbeOutcome.COVER_FOUND) {
+            return false;
         }
-        return false;
+        return fileService.saveCoverImageFromBytes(bookEntity.getId(), extraction.data()) == CoverSaveOutcome.SAVED;
+    }
+
+    /**
+     * Pure read: opens the comic archive, pulls the first page's bytes out, writes nothing and
+     * touches no state.
+     * <p>
+     * The clean miss is provable: the extractor returns a null for an archive it read but that holds
+     * no image entry. This used to be indistinguishable here - the whole read sat under one
+     * {@code catch} that turned an unopenable or corrupt archive into the same "could not find cover
+     * image" as an archive with no pages in it.
+     */
+    @Override
+    public CoverExtraction extractCover(BookEntity bookEntity, BookFileEntity bookFile) {
+        byte[] coverBytes;
+        try {
+            Path bookPath = FileUtils.getBookFullPath(bookEntity, bookFile);
+            coverBytes = cbxMetadataExtractor.extractCover(bookPath);
+        } catch (Exception e) {
+            // Could not open or walk the archive - not proof it holds no pages.
+            log.error("Error extracting cover from '{}': {}", bookFile.getFileName(), e.getMessage(), e);
+            return CoverExtraction.readFailed();
+        }
+        if (coverBytes == null || coverBytes.length == 0) {
+            log.warn("Could not find cover image in '{}' archive", bookFile.getFileName());
+            return CoverExtraction.noCoverFound();
+        }
+        return CoverExtraction.found(coverBytes);
     }
 
     @Override
     public List<BookFileType> getSupportedTypes() {
         return List.of(BookFileType.CBX);
-    }
-
-    private Optional<BufferedImage> extractImagesFromArchive(Path path) {
-        try{
-            byte[] coverBytes = cbxMetadataExtractor.extractCover(path);
-
-            if (coverBytes == null) {
-                return Optional.empty();
-            }
-
-            return Optional.ofNullable(FileService.readImage(new ByteArrayInputStream(coverBytes)));
-        } catch (Exception e) {
-            log.warn("Error reading archive cover {}: {}", path.getFileName(), e.getMessage());
-        }
-
-        return Optional.empty();
     }
 
     private void extractAndSetMetadata(BookEntity bookEntity) {

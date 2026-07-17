@@ -36,16 +36,25 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
     protected abstract String getFormatName();
 
     @Override
+    /**
+     * {@inheritDoc}
+     * <p>
+     * A file whose PalmDB or MOBI header will not read is a file we failed to open, not a file
+     * without a cover: both used to return the same {@code null} as a book that simply has no cover
+     * record, so a truncated {@code .mobi} was indistinguishable from a coverless one.
+     */
     public byte[] extractCover(File file) {
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
             PalmDB palmDB = readPalmDB(raf);
             if (palmDB == null) {
-                return null;
+                throw new CoverExtractionException(
+                        "Unreadable PalmDB header in " + getFormatName() + ": " + file.getName());
             }
 
             MobiHeader mobiHeader = readMobiHeader(raf, palmDB);
             if (mobiHeader == null) {
-                return null;
+                throw new CoverExtractionException(
+                        "Unreadable " + getFormatName() + " header in: " + file.getName());
             }
 
             // Try to get cover from EXTH
@@ -66,10 +75,13 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
                 return extractImageFromRecord(raf, palmDB.records.get(mobiHeader.firstImageIndex));
             }
 
+            // Headers read, no cover record and no first image: read through, genuinely none.
             return null;
+        } catch (CoverExtractionException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("Failed to extract cover from {}: {}", getFormatName(), file.getName(), e);
-            return null;
+            throw new CoverExtractionException(
+                    "Failed to extract cover from " + getFormatName() + ": " + file.getName(), e);
         }
     }
 

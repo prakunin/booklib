@@ -3,12 +3,14 @@ package org.booklore.service.metadata;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.exception.ApiError;
+import org.booklore.model.CoverExtraction;
 import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.CoverProbeOutcome;
 import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.websocket.LogNotification;
 import org.booklore.model.websocket.Topic;
@@ -258,18 +260,78 @@ public class BookCoverService {
         }
 
         BookFileProcessor processor = processorRegistry.getProcessorOrThrow(ebookFile.getBookType());
-        boolean success = processor.generateCover(bookEntity, ebookFile);
-        if (!success) {
-            throw ApiError.FAILED_TO_REGENERATE_COVER.createException("no embedded cover image found in the file");
+        CoverExtraction extraction = processor.extractCover(bookEntity, ebookFile);
+        switch (extraction.outcome()) {
+            // Only a processor that actually read the source through to the end can say this, so it
+            // is the one case that may be reported to the user as a fact about their file. Every
+            // format that has an embedded cover to be missing can now prove it, so the commonest
+            // real case - an EPUB with no cover - gets this message rather than the hedged one.
+            case NO_COVER_FOUND -> throw ApiError.FAILED_TO_REGENERATE_COVER.createException("no embedded cover image found in the file");
+            // Either the source could not be read, or the processor cannot tell that apart from a
+            // clean miss (a PDF's cover is a render of page one, so it has no absence to prove).
+            // Neither reading is grounds for telling the user their file has no cover, and neither
+            // is grounds for promising a retry would help, so the wording names both possibilities
+            // instead of picking one.
+            case READ_FAILED -> throw ApiError.FAILED_TO_REGENERATE_COVER.createException(
+                    "could not read a cover image from the file - it may have none, or the file may be unreadable or temporarily unavailable");
+            // Regeneration is an explicit request to overwrite this book's cover, so unlike the lazy
+            // path there is nothing to claim first - just write. The two ways that write can fail are
+            // different facts and get different messages: an image this server cannot decode is a
+            // property of the user's file that no retry will change, whereas a write failure says
+            // nothing about the file at all.
+            case COVER_FOUND -> {
+                switch (fileService.saveCoverImageFromBytes(bookId, extraction.data())) {
+                    case SAVED -> {
+                    }
+                    case UNDECODABLE -> throw ApiError.FAILED_TO_REGENERATE_COVER.createException(
+                            "the file's cover image cannot be turned into a picture (for example an SVG, or an unsupported format)");
+                    case SAVE_FAILED -> throw ApiError.FAILED_TO_REGENERATE_COVER.createException(
+                            "the cover image was found but could not be saved - please try again");
+                }
+            }
         }
         updateBookCoverMetadata(bookEntity);
         bookRepository.save(bookEntity);
     }
 
+    /**
+     * Lazily generates a missing cover for an INPX book, probing the archive at most once.
+     * <p>
+     * The {@code coverProbedAt} guard is the durable record of a probe that actually completed. A
+     * probe completes in two ways, and both must mark: the archive was read and genuinely had no
+     * cover ({@link CoverProbeOutcome#NO_COVER_FOUND}), or it had one this server can never decode
+     * ({@link org.booklore.model.enums.CoverSaveOutcome#UNDECODABLE} - an SVG cover, typically).
+     * Both are permanent facts about the file: re-opening the ZIP will read the same bytes and reach
+     * the same answer. Only a transient failure - an IO error, a corrupt or temporarily unavailable
+     * archive, a cover that decoded but could not be written - leaves the marker unset so the book
+     * remains eligible for a later retry.
+     * <p>
+     * The initial guard-clause read below is <em>not</em> itself a concurrency guarantee: it runs
+     * outside any row lock, so two concurrent calls for the same book can both pass it and both go
+     * on to read the archive. What makes the persisted outcome safe is that this service is
+     * class-level {@code @Transactional} and every write below goes through an atomic conditional
+     * update ({@link BookRepository#markCoverProbedIfStillMissing} / {@link
+     * BookRepository#markCoverFoundIfStillMissing}) whose UPDATE takes an exclusive row lock held
+     * until commit. Two probes therefore serialise completely at that point: the second blocks,
+     * then re-evaluates its guard against the first's committed state and finds its answer already
+     * obsolete, so it writes nothing and - crucially - never reaches its own file write. Probe
+     * against probe there is no window at all.
+     * <p>
+     * The window that does remain is against a concurrent cover <em>upload</em>, which writes its
+     * image to disk before its own UPDATE and so is not serialised by that lock. Extraction is a
+     * pure read ({@link BookFileProcessor#extractCover}) and the image is written only after the
+     * cover has been claimed, which is what bounds it: the guarded updates protect the database
+     * column but not the file on disk, so writing before claiming - as this path used to - meant a
+     * probe that lost the race had nonetheless already overwritten the winner's cover image, leaving
+     * one owner's hash in the database and another's bytes on disk. Claiming first narrows that to
+     * the gap between winning the claim and finishing the write (milliseconds) rather than the whole
+     * archive read (seconds, over a NAS); it does not eliminate it.
+     */
     public boolean tryGenerateMissingInpxCover(long bookId) {
         BookEntity bookEntity = bookRepository.findByIdWithBookFiles(bookId).orElse(null);
         if (bookEntity == null
                 || bookEntity.getBookCoverHash() != null
+                || bookEntity.getCoverProbedAt() != null
                 || bookEntity.getLibrary() == null
                 || bookEntity.getLibrary().getSourceType() != LibrarySourceType.INPX
                 || isCoverLocked(bookEntity)) {
@@ -282,13 +344,73 @@ public class BookCoverService {
         }
 
         BookFileProcessor processor = processorRegistry.getProcessorOrThrow(ebookFile.getBookType());
-        if (!processor.generateCover(bookEntity, ebookFile)) {
-            return false;
-        }
+        CoverExtraction extraction = processor.extractCover(bookEntity, ebookFile);
+        return switch (extraction.outcome()) {
+            case COVER_FOUND -> {
+                String coverHash = BookCoverUtils.generateCoverHash();
+                // Claim first, write second. The guarded UPDATE protects the database column, not
+                // the file on disk, so the write must not happen until the claim has been won -
+                // otherwise a losing writer has already overwritten a cover it does not own.
+                int updated = bookRepository.markCoverFoundIfStillMissing(bookEntity.getId(), coverHash);
+                if (updated == 0) {
+                    yield true;
+                }
+                yield switch (fileService.saveCoverImageFromBytes(bookEntity.getId(), extraction.data())) {
+                    case SAVED -> {
+                        Instant now = Instant.now();
+                        bookEntity.setBookCoverHash(coverHash);
+                        bookEntity.setMetadataUpdatedAt(now);
+                        bookEntity.getMetadata().setCoverUpdatedOn(now);
+                        bookRepository.save(bookEntity);
+                        yield true;
+                    }
+                    // The archive really does hold a cover, but not one this server can ever turn
+                    // into an image - an SVG, typically. Re-opening the ZIP would extract the same
+                    // bytes and fail identically, so this is a completed probe and must mark, or the
+                    // book stays eligible and every scan re-reads the archive forever: exactly the
+                    // defect this whole marker exists to prevent.
+                    //
+                    // Order matters. The claim set bookCoverHash, and markCoverProbedIfStillMissing
+                    // requires it to be NULL, so the release has to land first or the marker write
+                    // silently does nothing and the infinite re-read comes back.
+                    case UNDECODABLE -> {
+                        log.warn("Book {} has a cover in its archive that cannot be decoded; marking it probed so the archive is not re-read", bookId);
+                        bookRepository.clearCoverHashIfStillClaimed(bookEntity.getId(), coverHash);
+                        markProbed(bookEntity);
+                        yield false;
+                    }
+                    // Nothing is wrong with the file - only with this attempt to save it. Release
+                    // the claim and set no marker, so the book is retried rather than written off
+                    // for a full disk. Releasing also stops it advertising a hash with no image
+                    // behind it; the guard makes sure only our own claim is released.
+                    case SAVE_FAILED -> {
+                        log.warn("Failed to write lazily extracted cover for book {}; releasing the claim so it can be retried", bookId);
+                        bookRepository.clearCoverHashIfStillClaimed(bookEntity.getId(), coverHash);
+                        yield false;
+                    }
+                };
+            }
+            // Whether this call won the race or lost it to a concurrent write, this call itself
+            // found no cover - nothing to notify either way.
+            case NO_COVER_FOUND -> {
+                markProbed(bookEntity);
+                yield false;
+            }
+            case READ_FAILED -> false;
+        };
+    }
 
-        updateBookCoverMetadata(bookEntity);
-        bookRepository.save(bookEntity);
-        return true;
+    /**
+     * Durably records that a probe completed and this book will never yield a cover from its
+     * archive. The atomic guard refuses if the book's cover state has moved on since this probe
+     * read it - a concurrent refresh that regenerated a cover, say - so an obsolete verdict is
+     * dropped rather than reinstated. Only a won write is mirrored onto the entity.
+     */
+    private void markProbed(BookEntity bookEntity) {
+        Instant probedAt = Instant.now();
+        if (bookRepository.markCoverProbedIfStillMissing(bookEntity.getId(), probedAt) > 0) {
+            bookEntity.setCoverProbedAt(probedAt);
+        }
     }
 
     /**
@@ -652,6 +774,11 @@ public class BookCoverService {
                 });
     }
 
+    /**
+     * Stamps a fresh cover hash on the book. Any "no cover" probe marker is dropped as part of the
+     * stamp - see {@link BookEntity#setBookCoverHash(String)}, which owns that invariant so that no
+     * caller here or elsewhere can set a hash and forget the marker.
+     */
     private void updateBookCoverMetadata(BookEntity bookEntity) {
         Instant now = Instant.now();
         bookEntity.setMetadataUpdatedAt(now);
