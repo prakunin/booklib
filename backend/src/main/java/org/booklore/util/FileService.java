@@ -5,6 +5,7 @@ import org.booklore.exception.ApiError;
 import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.CoverCroppingSettings;
 import org.booklore.model.entity.BookMetadataEntity;
+import org.booklore.model.enums.CoverSaveOutcome;
 import org.booklore.service.appsettings.AppSettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -517,37 +518,46 @@ public class FileService {
     }
 
     /**
-     * Decodes {@code imageData} and writes it as the book's cover and thumbnail, reporting whether
-     * the images actually landed on disk.
+     * Decodes {@code imageData} and writes it as the book's cover and thumbnail.
      * <p>
      * This is the one place that turns extracted cover bytes into cover files, so callers holding
-     * bytes from {@code BookFileProcessor#extractCover} - the processor itself and
+     * bytes from {@code BookFileProcessor#extractCover} - the processors themselves and
      * {@code BookCoverService} alike - do not each need their own copy of the decode-and-save
-     * dance, and neither has to know what an image format is.
+     * dance, and none has to know what an image format is.
      * <p>
-     * Returns {@code false} rather than throwing when the bytes cannot be decoded or the files
-     * cannot be written: both are ordinary outcomes for a cover pulled out of an arbitrary book
-     * file, and callers here need to react to them, not be interrupted by them.
+     * Returns a {@link CoverSaveOutcome} rather than throwing: both failure modes are ordinary
+     * outcomes for a cover pulled out of an arbitrary book file, and callers need to react to them,
+     * not be interrupted by them. It reports which of the two happened rather than a bare boolean
+     * because they are not the same kind of fact, and a caller that persists a permanent marker
+     * needs to tell them apart - see {@link CoverSaveOutcome}. Decoding is therefore guarded
+     * separately from writing: a failure in the first is a fact about the bytes, a failure in the
+     * second is a fact about this attempt, and one {@code catch} around both cannot say which.
      */
-    public boolean saveCoverImageFromBytes(long bookId, byte[] imageData) {
-        if (imageData == null || imageData.length == 0) {
-            return false;
-        }
-        BufferedImage originalImage = null;
+    public CoverSaveOutcome saveCoverImageFromBytes(long bookId, byte[] imageData) {
+        BufferedImage originalImage;
         try {
             originalImage = readImage(imageData);
-            if (originalImage == null) {
-                log.warn("Cover image for book {} could not be decoded (possibly SVG or an unsupported format)", bookId);
-                return false;
-            }
-            return saveCoverImages(originalImage, bookId);
         } catch (Exception e) {
-            log.error("Failed to save cover image for book {}: {}", bookId, e.getMessage(), e);
-            return false;
+            // readImage throws (it does not return null) for empty input, for bytes no ImageIO
+            // reader claims - an SVG cover is the common one - and for dimensions that look like a
+            // decompression bomb. All three are properties of these bytes: the next probe re-reads
+            // the same archive entry and fails identically, so retrying forever is pointless.
+            log.warn("Cover image for book {} could not be decoded (possibly SVG or an unsupported format): {}", bookId, e.getMessage());
+            return CoverSaveOutcome.UNDECODABLE;
+        }
+        if (originalImage == null) {
+            // Defensive: readImage's contract is throw-or-return-an-image, but treating a null as
+            // "these bytes are not an image" keeps this in step with that contract if it ever slips.
+            log.warn("Cover image for book {} decoded to nothing (possibly SVG or an unsupported format)", bookId);
+            return CoverSaveOutcome.UNDECODABLE;
+        }
+        try {
+            return saveCoverImages(originalImage, bookId) ? CoverSaveOutcome.SAVED : CoverSaveOutcome.WRITE_FAILED;
+        } catch (Exception e) {
+            log.error("Failed to write cover image for book {}: {}", bookId, e.getMessage(), e);
+            return CoverSaveOutcome.WRITE_FAILED;
         } finally {
-            if (originalImage != null) {
-                originalImage.flush();
-            }
+            originalImage.flush();
         }
     }
 

@@ -3,6 +3,7 @@ package org.booklore.service.fileprocessor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.exception.ApiError;
 import org.booklore.mapper.BookMapper;
+import org.booklore.model.CoverExtraction;
 import org.booklore.model.dto.AudiobookMetadata;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.settings.LibraryFile;
@@ -86,6 +87,41 @@ public class AudiobookProcessor extends AbstractFileProcessor implements BookFil
             return false;
         }
         return generateCoverFromFile(bookEntity, audiobookFile);
+    }
+
+    /**
+     * Pure read: pulls the embedded cover bytes out of the audio file, writing nothing and touching
+     * no state.
+     * <p>
+     * "The cover" here is the <em>audiobook</em> cover - the same thing this processor's
+     * {@code generateCover} produces, and it is written to the audiobook cover files (square-cropped)
+     * rather than the book cover files. Neither caller of {@code extractCover} reaches this today:
+     * both {@code BookCoverService#regenerateCover} and {@code #tryGenerateMissingInpxCover} pick
+     * their file with {@code findEbookFile}, which excludes audiobooks. It is implemented properly
+     * anyway rather than left to throw, because the read genuinely is separable here and a stub
+     * would be a landmine for the first caller that does reach it.
+     */
+    @Override
+    public CoverExtraction extractCover(BookEntity bookEntity, BookFileEntity bookFile) {
+        File audioFile = getAudioFileForBookFile(bookEntity, bookFile);
+        if (audioFile == null || !audioFile.exists()) {
+            // Could not resolve or reach the audio file: we did not look, so this is not proof the
+            // file has no cover.
+            log.warn("Audio file not resolvable for audiobook '{}' (bookId: {})", bookFile.getFileName(), bookEntity.getId());
+            return CoverExtraction.readFailed();
+        }
+        byte[] coverData;
+        try {
+            coverData = audiobookMetadataExtractor.extractCover(audioFile);
+        } catch (Exception e) {
+            log.error("Error extracting cover from audiobook '{}': {}", bookFile.getFileName(), e.getMessage(), e);
+            return CoverExtraction.readFailed();
+        }
+        if (coverData == null || coverData.length == 0) {
+            log.warn("No embedded cover image found in audiobook file '{}'", audioFile.getAbsolutePath());
+            return CoverExtraction.noCoverFound();
+        }
+        return CoverExtraction.found(coverData);
     }
 
     public boolean generateCover(BookEntity bookEntity, boolean isFolderBased) {

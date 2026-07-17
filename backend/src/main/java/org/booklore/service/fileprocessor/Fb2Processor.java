@@ -9,6 +9,7 @@ import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.CoverProbeOutcome;
+import org.booklore.model.enums.CoverSaveOutcome;
 import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.book.BookCreatorService;
@@ -81,10 +82,10 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
     @Override
     public boolean generateCover(BookEntity bookEntity, BookFileEntity bookFile) {
         CoverExtraction extraction = extractCover(bookEntity, bookFile);
-        if (extraction.outcome() != CoverProbeOutcome.COVER_FOUND || !extraction.hasData()) {
+        if (extraction.outcome() != CoverProbeOutcome.COVER_FOUND) {
             return false;
         }
-        return fileService.saveCoverImageFromBytes(bookEntity.getId(), extraction.data());
+        return fileService.saveCoverImageFromBytes(bookEntity.getId(), extraction.data()) == CoverSaveOutcome.SAVED;
     }
 
     /**

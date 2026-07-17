@@ -1,8 +1,10 @@
 package org.booklore.service.fileprocessor;
 
 import org.booklore.mapper.BookMapper;
+import org.booklore.model.CoverExtraction;
 import org.booklore.model.dto.settings.LibraryFile;
 import org.booklore.model.entity.BookEntity;
+import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
 import org.booklore.model.enums.BookFileType;
@@ -212,6 +214,15 @@ class AbstractFileProcessorTest {
         @Override
         public boolean generateCover(BookEntity bookEntity) {
             return false;
+        }
+
+        @Override
+        public CoverExtraction extractCover(BookEntity bookEntity, BookFileEntity bookFile) {
+            // This fixture exists to exercise AbstractFileProcessor's folder-image fallbacks, not
+            // cover extraction. READ_FAILED is the only honest answer for a processor that cannot
+            // read: it claims nothing about the file, so nothing can be persisted as permanent on
+            // the strength of it.
+            return CoverExtraction.readFailed();
         }
 
         @Override

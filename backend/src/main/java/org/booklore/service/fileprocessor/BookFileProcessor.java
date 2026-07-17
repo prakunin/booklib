@@ -31,26 +31,25 @@ public interface BookFileProcessor {
      * completed read that found nothing ({@link CoverProbeOutcome#NO_COVER_FOUND}) from a failure
      * to read the source at all ({@link CoverProbeOutcome#READ_FAILED}).
      * <p>
-     * An override must have <strong>no side effects</strong>: it must not write the cover to disk
-     * and must not mutate {@code bookEntity}. That is what lets a caller sequence the write however
-     * it needs to - notably {@code BookCoverService#tryGenerateMissingInpxCover}, which claims the
-     * book's cover in the database before writing anything, so that losing the claim costs only
-     * discarded bytes rather than an overwritten file.
+     * An implementation must have <strong>no side effects</strong>: it must not write the cover to
+     * disk and must not mutate {@code bookEntity}. That is what lets a caller sequence the write
+     * however it needs to - notably {@code BookCoverService#tryGenerateMissingInpxCover}, which
+     * claims the book's cover in the database before writing anything, so that losing the claim
+     * costs only discarded bytes rather than an overwritten file. {@code generateCover} is then this
+     * read followed by a write, not a second way to read.
      * <p>
-     * The default cannot honour that contract, because a processor that has not overridden this has
-     * only {@link #generateCover(BookEntity, BookFileEntity)} - which writes the image itself and
-     * reports a bare boolean. So the default delegates and reports {@link
-     * CoverExtraction#writtenInPlace()}: a cover, but already on disk and with no bytes to return.
-     * Callers that need claim-before-write must refuse such a result rather than write after the
-     * fact.
+     * This is deliberately abstract rather than defaulted. It used to default to delegating to
+     * {@code generateCover} and reporting a cover that was already on disk, which meant a processor
+     * that had not been taught to read without writing silently inherited a value the lazy path had
+     * to detect and refuse at runtime - after that path's whole reason to exist had already been
+     * violated. Forcing every processor to answer for itself turns that landmine into a compile
+     * error: a new format cannot be added without deciding what its three outcomes are.
      * <p>
-     * Crucially the default never reports {@code NO_COVER_FOUND}. {@code generateCover} returns
-     * {@code false} for read failures, parse failures and write failures alike, so collapsing that
-     * into a clean miss would let any archived format - present or future - persist a transient
-     * failure as a permanent "no cover". Only override this to return {@code NO_COVER_FOUND} once a
-     * processor can actually prove the source has none (see {@link Fb2Processor}).
+     * The three outcomes are not interchangeable. {@code NO_COVER_FOUND} is a permanent fact about
+     * the file and callers may persist it as one, so only return it having actually read the source
+     * through to the end and found nothing; anything ambiguous - an IO error, a parse failure, a
+     * format whose reader cannot distinguish the two - is {@code READ_FAILED}. Reporting a failure
+     * as a clean miss lets a caller record a transient problem as a permanent verdict.
      */
-    default CoverExtraction extractCover(BookEntity bookEntity, BookFileEntity bookFile) {
-        return generateCover(bookEntity, bookFile) ? CoverExtraction.writtenInPlace() : CoverExtraction.readFailed();
-    }
+    CoverExtraction extractCover(BookEntity bookEntity, BookFileEntity bookFile);
 }

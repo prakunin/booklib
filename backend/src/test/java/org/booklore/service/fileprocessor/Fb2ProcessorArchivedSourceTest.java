@@ -5,6 +5,7 @@ import org.booklore.model.CoverExtraction;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.CoverProbeOutcome;
+import org.booklore.model.enums.CoverSaveOutcome;
 import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.book.BookCreatorService;
@@ -208,7 +209,7 @@ class Fb2ProcessorArchivedSourceTest {
             byte[] png = encodePng();
             when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(png);
-            when(fileService.saveCoverImageFromBytes(42L, png)).thenReturn(true);
+            when(fileService.saveCoverImageFromBytes(42L, png)).thenReturn(CoverSaveOutcome.SAVED);
 
             boolean generated = processor.generateCover(book, bookFile);
 
@@ -225,7 +226,26 @@ class Fb2ProcessorArchivedSourceTest {
             byte[] png = encodePng();
             when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(png);
-            when(fileService.saveCoverImageFromBytes(42L, png)).thenReturn(false);
+            when(fileService.saveCoverImageFromBytes(42L, png)).thenReturn(CoverSaveOutcome.WRITE_FAILED);
+
+            assertThat(processor.generateCover(book, bookFile)).isFalse();
+        }
+
+        /**
+         * generateCover is an unconditional overwrite: it has no marker to set and no claim to
+         * release, so an undecodable cover is simply a failure to produce one. The permanent-vs-
+         * transient distinction it discards here is the lazy probe's business, not its own.
+         */
+        @Test
+        void generateCoverReportsFailureWhenTheCoverCannotBeDecoded() throws IOException {
+            Fb2Processor processor = buildProcessor();
+            BookEntity book = BookEntity.builder().id(42L).build();
+            BookFileEntity bookFile = buildArchivedFile(book);
+            Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
+            byte[] svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"/>".getBytes();
+            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(svg);
+            when(fileService.saveCoverImageFromBytes(42L, svg)).thenReturn(CoverSaveOutcome.UNDECODABLE);
 
             assertThat(processor.generateCover(book, bookFile)).isFalse();
         }

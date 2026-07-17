@@ -4,6 +4,7 @@ import org.booklore.config.AppProperties;
 import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.CoverCroppingSettings;
 import org.booklore.model.entity.BookMetadataEntity;
+import org.booklore.model.enums.CoverSaveOutcome;
 import org.booklore.service.appsettings.AppSettingService;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -576,6 +578,102 @@ class FileServiceTest {
         @BeforeEach
         void setup() {
             lenient().when(appProperties.getPathConfig()).thenReturn(tempDir.toString());
+        }
+
+        /**
+         * The decode-versus-write distinction, against real bytes and a real directory.
+         * <p>
+         * These two failures used to be one {@code false}. That is what let the lazy INPX probe
+         * re-open the same ZIP forever for a book whose cover is an SVG: the archive read fine, the
+         * decode could never succeed, and the caller - unable to tell that from a full disk - had to
+         * assume a retry might help. Nothing here may collapse them back.
+         */
+        @Nested
+        @DisplayName("saveCoverImageFromBytes")
+        class SaveCoverImageFromBytesTests {
+
+            @Test
+            void savesDecodableBytesAsCoverAndThumbnail() throws IOException {
+                byte[] png = encodePng(createTestImage(500, 700));
+
+                CoverSaveOutcome outcome = fileService.saveCoverImageFromBytes(1L, png);
+
+                assertAll(
+                        () -> assertEquals(CoverSaveOutcome.SAVED, outcome),
+                        () -> assertTrue(Files.exists(Path.of(fileService.getCoverFile(1L)))),
+                        () -> assertTrue(Files.exists(Path.of(fileService.getThumbnailFile(1L))))
+                );
+            }
+
+            /**
+             * The exact case from the field: an FB2 whose embedded cover is an SVG. ImageIO has no
+             * reader for it, so it can never become a cover on this server - a permanent property of
+             * the file, not of this attempt.
+             */
+            @Test
+            void reportsUndecodableForAnSvgCover() {
+                byte[] svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"/>"
+                        .getBytes(StandardCharsets.UTF_8);
+
+                CoverSaveOutcome outcome = fileService.saveCoverImageFromBytes(2L, svg);
+
+                assertEquals(CoverSaveOutcome.UNDECODABLE, outcome);
+            }
+
+            @Test
+            void reportsUndecodableForBytesThatAreNotAnImageAtAll() {
+                CoverSaveOutcome outcome = fileService.saveCoverImageFromBytes(3L, new byte[]{1, 2, 3, 4});
+
+                assertEquals(CoverSaveOutcome.UNDECODABLE, outcome);
+            }
+
+            @Test
+            void reportsUndecodableForEmptyBytes() {
+                assertAll(
+                        () -> assertEquals(CoverSaveOutcome.UNDECODABLE, fileService.saveCoverImageFromBytes(4L, new byte[0])),
+                        () -> assertEquals(CoverSaveOutcome.UNDECODABLE, fileService.saveCoverImageFromBytes(4L, null))
+                );
+            }
+
+            /**
+             * Decodable bytes that cannot be written must report the write failure, not the decode
+             * one - the caller retries the first and gives up permanently on the second. The images
+             * folder is made un-creatable by putting a regular file where it needs to be.
+             */
+            @Test
+            void reportsWriteFailedWhenTheImagesFolderCannotBeCreated() throws IOException {
+                long bookId = 5L;
+                Path imagesFolder = Path.of(fileService.getImagesFolder(bookId));
+                Files.createDirectories(imagesFolder.getParent());
+                Files.writeString(imagesFolder, "not a directory");
+                byte[] png = encodePng(createTestImage(100, 140));
+
+                CoverSaveOutcome outcome = fileService.saveCoverImageFromBytes(bookId, png);
+
+                assertEquals(CoverSaveOutcome.WRITE_FAILED, outcome);
+            }
+
+            /**
+             * Undecodable bytes must be reported as such even when writing would also have failed -
+             * the decode is what actually happened, and the write never got a chance to.
+             */
+            @Test
+            void reportsUndecodableRatherThanWriteFailedWhenBothWouldFail() throws IOException {
+                long bookId = 6L;
+                Path imagesFolder = Path.of(fileService.getImagesFolder(bookId));
+                Files.createDirectories(imagesFolder.getParent());
+                Files.writeString(imagesFolder, "not a directory");
+
+                CoverSaveOutcome outcome = fileService.saveCoverImageFromBytes(bookId, "<svg/>".getBytes(StandardCharsets.UTF_8));
+
+                assertEquals(CoverSaveOutcome.UNDECODABLE, outcome);
+            }
+
+            private byte[] encodePng(BufferedImage image) throws IOException {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                ImageIO.write(image, "png", out);
+                return out.toByteArray();
+            }
         }
 
         @Nested

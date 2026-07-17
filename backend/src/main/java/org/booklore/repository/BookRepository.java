@@ -279,31 +279,48 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     int markCoverProbedIfStillMissing(@Param("bookId") Long bookId, @Param("probedAt") Instant probedAt);
 
     /**
-     * Atomically records a freshly found cover, but only if the book does not already have one.
-     * Guards against two concurrent probes of the same archived book (or a probe racing an explicit
-     * regeneration) both persisting - and both notifying about - the same cover. Returns the number
-     * of rows changed (0 or 1); a caller that gets 0 lost the race, but the postcondition it wanted
-     * (the book has a cover) already holds.
+     * Atomically claims the book's cover, but only if it does not already have one. Guards against
+     * two concurrent probes of the same archived book (or a probe racing an explicit regeneration)
+     * both persisting - and both notifying about - the same cover. Returns the number of rows
+     * changed (0 or 1); a caller that gets 0 lost the race, but the postcondition it wanted (the
+     * book has a cover) already holds.
+     * <p>
+     * {@code coverProbedAt} is cleared because stamping a hash and dropping the "this file has no
+     * cover" marker are one operation - a book with a cover contradicts the marker. This is the
+     * database-side twin of {@link org.booklore.model.entity.BookEntity#setBookCoverHash}.
+     * <p>
+     * This deliberately writes <em>only</em> the two cover columns and does not touch
+     * {@code metadataUpdatedAt}, even though a book that gains a cover has had its metadata change.
+     * The reason is that a claim is not a commitment: {@link #clearCoverHashIfStillClaimed} can
+     * revert it, and it can only revert what this statement wrote. Stamping {@code metadataUpdatedAt}
+     * here made the pair asymmetric - the release put the hash back but left the timestamp bumped,
+     * so every failed probe permanently looked like a metadata change to
+     * {@code KoboSnapshotBookRepository#findChangedBooks} and re-pushed the book to every paired
+     * Kobo device, on every scan, forever. The successful path stamps {@code metadataUpdatedAt} on
+     * the entity and saves it, which is the right place: by then there is something to commit to.
      */
     @Modifying
     @Query("""
             UPDATE BookEntity b SET
                 b.bookCoverHash = :coverHash,
-                b.coverProbedAt = NULL,
-                b.metadataUpdatedAt = :now
+                b.coverProbedAt = NULL
             WHERE b.id = :bookId AND b.bookCoverHash IS NULL
             """)
-    int markCoverFoundIfStillMissing(@Param("bookId") Long bookId, @Param("coverHash") String coverHash, @Param("now") Instant now);
+    int markCoverFoundIfStillMissing(@Param("bookId") Long bookId, @Param("coverHash") String coverHash);
 
     /**
      * Releases a cover claim taken by {@link #markCoverFoundIfStillMissing} when the image could not
-     * actually be written, putting the book back in the has-no-cover-and-no-marker state that makes
-     * it eligible for a later retry.
+     * actually be written, putting the book back in the no-cover state that makes it eligible for a
+     * later retry. Reverts exactly the column the claim set, so a claim followed by a release is a
+     * no-op.
      * <p>
-     * Guarded on the claimed hash rather than clearing unconditionally: between the failed write and
-     * this revert, another writer may have given the book a real cover of its own, and blanking that
-     * hash would strand an image that exists on disk with nothing to serve it by. Only the claim
-     * this caller still owns is released. Returns the number of rows changed (0 or 1).
+     * The guard on the claimed hash is defence in depth, not a defence against a concurrent writer.
+     * {@code BookCoverService} is class-level {@code @Transactional}, so the claim's UPDATE holds an
+     * exclusive lock on the row until the transaction commits: no other transaction can give this
+     * book a cover between the claim and this revert - it would block on the claim. What the guard
+     * actually buys is that this statement cannot do damage if that stops being true (if the claim
+     * ever moves to its own transaction) or if a caller passes a hash it never owned. Returns the
+     * number of rows changed (0 or 1).
      */
     @Modifying
     @Query("""

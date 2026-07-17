@@ -7,6 +7,7 @@ import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.CoverExtraction;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.CoverSaveOutcome;
 import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.projection.BookCoverUpdateProjection;
@@ -68,6 +69,12 @@ class BookCoverServiceTest {
 
     @InjectMocks
     private BookCoverService service;
+
+    /**
+     * Stand-in for cover bytes a processor extracted. Their content never matters: every test here
+     * mocks FileService, so what they decode to is that mock's business, not this suite's.
+     */
+    private static final byte[] COVER_BYTES = new byte[]{1, 2, 3};
 
     @BeforeEach
     void setUp() {
@@ -208,8 +215,6 @@ class BookCoverServiceTest {
                     .build();
         }
 
-        private static final byte[] COVER_BYTES = new byte[]{1, 2, 3};
-
         @Test
         void generatesOnlyMissingArchivedCover() {
             BookFileEntity bookFile = buildArchivedFb2File();
@@ -217,16 +222,17 @@ class BookCoverServiceTest {
             when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
-            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any(), any())).thenReturn(1);
-            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(true);
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.SAVED);
 
             boolean generated = service.tryGenerateMissingInpxCover(42L);
 
             assertThat(generated).isTrue();
             assertThat(book.getBookCoverHash()).isNotBlank();
             assertThat(book.getMetadata().getCoverUpdatedOn()).isNotNull();
+            assertThat(book.getMetadataUpdatedAt()).isNotNull();
             assertThat(book.getCoverProbedAt()).isNull();
-            verify(bookRepository).markCoverFoundIfStillMissing(eq(42L), any(), any());
+            verify(bookRepository).markCoverFoundIfStillMissing(eq(42L), any());
             verify(bookRepository).save(book);
         }
 
@@ -241,13 +247,13 @@ class BookCoverServiceTest {
             when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
-            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any(), any())).thenReturn(1);
-            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(true);
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.SAVED);
 
             service.tryGenerateMissingInpxCover(42L);
 
             InOrder inOrder = inOrder(bookRepository, fileService);
-            inOrder.verify(bookRepository).markCoverFoundIfStillMissing(eq(42L), any(), any());
+            inOrder.verify(bookRepository).markCoverFoundIfStillMissing(eq(42L), any());
             inOrder.verify(fileService).saveCoverImageFromBytes(42L, COVER_BYTES);
         }
 
@@ -265,7 +271,7 @@ class BookCoverServiceTest {
             when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
-            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any(), any())).thenReturn(0);
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(0);
 
             boolean generated = service.tryGenerateMissingInpxCover(42L);
 
@@ -281,6 +287,9 @@ class BookCoverServiceTest {
          * cover hash with nothing behind it, and - because the claim also clears coverProbedAt -
          * permanently eligible yet permanently broken. Releasing the claim puts it back where it
          * started: no cover, no marker, retryable.
+         * <p>
+         * A write failure says nothing about the file, so unlike an undecodable cover it must
+         * <em>not</em> mark: a full disk today is no reason to write the book off forever.
          */
         @Test
         void failedWriteAfterAWonClaimReleasesTheClaimSoTheBookStaysEligible() {
@@ -289,40 +298,145 @@ class BookCoverServiceTest {
             when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
-            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any(), any())).thenReturn(1);
-            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(false);
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.WRITE_FAILED);
 
             boolean generated = service.tryGenerateMissingInpxCover(42L);
 
             assertThat(generated).isFalse();
             ArgumentCaptor<String> claimedHash = ArgumentCaptor.forClass(String.class);
-            verify(bookRepository).markCoverFoundIfStillMissing(eq(42L), claimedHash.capture(), any());
+            verify(bookRepository).markCoverFoundIfStillMissing(eq(42L), claimedHash.capture());
             // Guarded on the hash this call claimed, so a concurrent writer's cover is never cleared.
             verify(bookRepository).clearCoverHashIfStillClaimed(42L, claimedHash.getValue());
             assertThat(book.getBookCoverHash()).isNull();
             assertThat(book.getCoverProbedAt()).isNull();
+            verify(bookRepository, never()).markCoverProbedIfStillMissing(anyLong(), any());
             verify(bookRepository, never()).save(any());
         }
 
         /**
-         * A processor that falls back to the write-in-place default has already written the image by
-         * the time it answers, so claim-before-write is impossible and this path cannot promise it
-         * won't clobber someone else's cover. It must decline rather than claim after the fact.
+         * The regression test for the infinite re-read. An archived FB2 whose cover is an SVG
+         * extracts fine and decodes never: the read succeeds, so NO_COVER_FOUND is never reached,
+         * and the write "fails", so the claim is released - leaving the book with no cover and no
+         * marker, i.e. eligible again. Every scan then re-opened the same ZIP, forever, which is
+         * precisely what coverProbedAt exists to stop.
+         * <p>
+         * An undecodable cover is a permanent fact about the file, so it completes the probe and
+         * must mark.
          */
         @Test
-        void refusesToClaimWhenTheProcessorCannotExtractWithoutWriting() {
+        void undecodableCoverMarksTheBookProbedSoTheArchiveIsNeverReReadAgain() {
             BookFileEntity bookFile = buildArchivedFb2File();
             BookEntity book = buildArchivedInpxBook(bookFile);
             when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
-            when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.writtenInPlace());
+            when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.UNDECODABLE);
+            when(bookRepository.markCoverProbedIfStillMissing(eq(42L), any())).thenReturn(1);
 
             boolean generated = service.tryGenerateMissingInpxCover(42L);
 
             assertThat(generated).isFalse();
-            verify(bookRepository, never()).markCoverFoundIfStillMissing(anyLong(), any(), any());
-            verify(bookRepository, never()).markCoverProbedIfStillMissing(anyLong(), any());
+            // The marker is the whole point: without it the guard clause lets the next scan straight
+            // back into the archive.
+            assertThat(book.getCoverProbedAt()).isNotNull();
+            assertThat(book.getBookCoverHash()).isNull();
+            verify(bookRepository).markCoverProbedIfStillMissing(eq(42L), any());
+        }
+
+        /**
+         * markCoverProbedIfStillMissing requires bookCoverHash IS NULL, and the claim just set it.
+         * Release first or the marker write matches no rows, does nothing, and the re-read defect
+         * returns with every test above still green.
+         */
+        @Test
+        void undecodableCoverReleasesTheClaimBeforeMarkingSoTheMarkerCanLand() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.UNDECODABLE);
+            when(bookRepository.markCoverProbedIfStillMissing(eq(42L), any())).thenReturn(1);
+
+            service.tryGenerateMissingInpxCover(42L);
+
+            ArgumentCaptor<String> claimedHash = ArgumentCaptor.forClass(String.class);
+            verify(bookRepository).markCoverFoundIfStillMissing(eq(42L), claimedHash.capture());
+            InOrder inOrder = inOrder(bookRepository);
+            inOrder.verify(bookRepository).clearCoverHashIfStillClaimed(42L, claimedHash.getValue());
+            inOrder.verify(bookRepository).markCoverProbedIfStillMissing(eq(42L), any());
+        }
+
+        /**
+         * The Kobo half of the same defect. A probe that produces no cover must leave the book
+         * looking untouched to {@code KoboSnapshotBookRepository#findChangedBooks}; stamping
+         * metadataUpdatedAt on a book whose metadata did not change re-pushes it to every paired
+         * device. The claim's own bump lives in the SQL - see {@code BookRepositoryDataJpaTest} -
+         * and this pins the entity side: nothing stamps it unless a cover actually landed.
+         */
+        @Test
+        void undecodableCoverLeavesMetadataUpdatedAtUntouched() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.UNDECODABLE);
+            when(bookRepository.markCoverProbedIfStillMissing(eq(42L), any())).thenReturn(1);
+
+            service.tryGenerateMissingInpxCover(42L);
+
+            assertThat(book.getMetadataUpdatedAt()).isNull();
+            assertThat(book.getMetadata().getCoverUpdatedOn()).isNull();
             verify(bookRepository, never()).save(any());
+        }
+
+        /**
+         * The marker is what makes the book ineligible, so the second call must not reach the
+         * archive at all. This is the end-to-end statement of the fix: probe an SVG-covered book
+         * twice, and the processor is asked exactly once.
+         */
+        @Test
+        void aSecondProbeOfAnUndecodableCoverDoesNotOpenTheArchiveAgain() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.UNDECODABLE);
+            when(bookRepository.markCoverProbedIfStillMissing(eq(42L), any())).thenReturn(1);
+
+            service.tryGenerateMissingInpxCover(42L);
+            // The marker the first call persisted is now on the book the second call loads.
+            service.tryGenerateMissingInpxCover(42L);
+
+            verify(processor, times(1)).extractCover(book, bookFile);
+            verify(fileService, times(1)).saveCoverImageFromBytes(anyLong(), any());
+        }
+
+        /**
+         * The counterpart: a transient write failure leaves no marker, so the book really is probed
+         * again. Without this, "does not re-read" could be satisfied by marking indiscriminately.
+         */
+        @Test
+        void aSecondProbeAfterAWriteFailureDoesOpenTheArchiveAgain() {
+            BookFileEntity bookFile = buildArchivedFb2File();
+            BookEntity book = buildArchivedInpxBook(bookFile);
+            when(bookRepository.findByIdWithBookFiles(42L)).thenReturn(Optional.of(book));
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.extractCover(book, bookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(bookRepository.markCoverFoundIfStillMissing(eq(42L), any())).thenReturn(1);
+            when(fileService.saveCoverImageFromBytes(42L, COVER_BYTES)).thenReturn(CoverSaveOutcome.WRITE_FAILED);
+
+            service.tryGenerateMissingInpxCover(42L);
+            service.tryGenerateMissingInpxCover(42L);
+
+            verify(processor, times(2)).extractCover(book, bookFile);
         }
 
         @Test
@@ -405,7 +519,7 @@ class BookCoverServiceTest {
             assertThat(book.getBookCoverHash()).isNull();
             verify(bookRepository, never()).save(any());
             verify(bookRepository, never()).markCoverProbedIfStillMissing(anyLong(), any());
-            verify(bookRepository, never()).markCoverFoundIfStillMissing(anyLong(), any(), any());
+            verify(bookRepository, never()).markCoverFoundIfStillMissing(anyLong(), any());
         }
 
         /**
@@ -663,11 +777,35 @@ class BookCoverServiceTest {
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.found(new byte[]{1, 2, 3}));
-            when(fileService.saveCoverImageFromBytes(eq(1L), any())).thenReturn(false);
+            when(fileService.saveCoverImageFromBytes(eq(1L), any())).thenReturn(CoverSaveOutcome.WRITE_FAILED);
 
             assertThatThrownBy(() -> service.regenerateCover(1L))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("could not be saved");
+            verify(bookRepository, never()).save(any());
+        }
+
+        /**
+         * An undecodable cover is a fact about the user's file - their cover is an SVG - and no
+         * retry will change it. Telling them the save failed sends them looking at their disk; both
+         * used to produce that same message because the save reported a bare boolean.
+         */
+        @Test
+        void undecodableCoverImageReportsTheFormatNotASaveFailure() {
+            BookFileEntity ebookFile = fb2File();
+            BookEntity book = buildBookWithEbookFile(ebookFile);
+            when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(book));
+
+            BookFileProcessor processor = mock(BookFileProcessor.class);
+            when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
+            when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.found(new byte[]{1, 2, 3}));
+            when(fileService.saveCoverImageFromBytes(eq(1L), any())).thenReturn(CoverSaveOutcome.UNDECODABLE);
+
+            assertThatThrownBy(() -> service.regenerateCover(1L))
+                    .isInstanceOf(APIException.class)
+                    .hasMessageContaining("cannot be read")
+                    .hasMessageContaining("SVG")
+                    .hasMessageNotContaining("could not be saved");
             verify(bookRepository, never()).save(any());
         }
 
@@ -685,7 +823,7 @@ class BookCoverServiceTest {
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
             when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.found(coverBytes));
-            when(fileService.saveCoverImageFromBytes(1L, coverBytes)).thenReturn(true);
+            when(fileService.saveCoverImageFromBytes(1L, coverBytes)).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
 
@@ -706,7 +844,8 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.EPUB)).thenReturn(processor);
-            when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.writtenInPlace());
+            when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(fileService.saveCoverImageFromBytes(1L, COVER_BYTES)).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
 
@@ -735,7 +874,8 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.EPUB)).thenReturn(processor);
-            when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.writtenInPlace());
+            when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(fileService.saveCoverImageFromBytes(1L, COVER_BYTES)).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
 
@@ -758,7 +898,8 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.FB2)).thenReturn(processor);
-            when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.writtenInPlace());
+            when(processor.extractCover(book, ebookFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(fileService.saveCoverImageFromBytes(1L, COVER_BYTES)).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
 
@@ -831,7 +972,8 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.EPUB)).thenReturn(processor);
-            when(processor.extractCover(eq(book), any())).thenReturn(CoverExtraction.writtenInPlace());
+            when(processor.extractCover(eq(book), any())).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(fileService.saveCoverImageFromBytes(eq(1L), any())).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
 
@@ -856,7 +998,8 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.PDF)).thenReturn(processor);
-            when(processor.extractCover(eq(book), any())).thenReturn(CoverExtraction.writtenInPlace());
+            when(processor.extractCover(eq(book), any())).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(fileService.saveCoverImageFromBytes(eq(1L), any())).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
 
@@ -1467,7 +1610,8 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.EPUB)).thenReturn(processor);
-            when(processor.extractCover(eq(book), eq(epubFile))).thenReturn(CoverExtraction.writtenInPlace());
+            when(processor.extractCover(eq(book), eq(epubFile))).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(fileService.saveCoverImageFromBytes(anyLong(), any())).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
 
@@ -1486,7 +1630,8 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.PDF)).thenReturn(processor);
-            when(processor.extractCover(eq(book), eq(pdfFile))).thenReturn(CoverExtraction.writtenInPlace());
+            when(processor.extractCover(eq(book), eq(pdfFile))).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(fileService.saveCoverImageFromBytes(anyLong(), any())).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
 
@@ -1504,7 +1649,8 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.EPUB)).thenReturn(processor);
-            when(processor.extractCover(eq(book), eq(epubFile))).thenReturn(CoverExtraction.writtenInPlace());
+            when(processor.extractCover(eq(book), eq(epubFile))).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(fileService.saveCoverImageFromBytes(anyLong(), any())).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
 
