@@ -91,11 +91,25 @@ public class StorageInfoService {
         }
     }
 
+    /**
+     * An empty {@link PathProbe} result means the underlying syscall did not answer within its time
+     * budget (e.g. a hung network mount), not that the path was checked and found missing — so it
+     * classifies as {@link PathStatus#UNKNOWN}, never silently falls through to {@link
+     * PathStatus#MISSING}.
+     */
     private PathStatus classify(Path path) {
-        if (!pathProbe.isDirectory(path)) {
+        Optional<Boolean> isDirectory = pathProbe.isDirectory(path);
+        if (isDirectory.isEmpty()) {
+            return PathStatus.UNKNOWN;
+        }
+        if (!isDirectory.get()) {
             return PathStatus.MISSING;
         }
-        return pathProbe.isReadable(path) ? PathStatus.OK : PathStatus.UNREADABLE;
+        Optional<Boolean> isReadable = pathProbe.isReadable(path);
+        if (isReadable.isEmpty()) {
+            return PathStatus.UNKNOWN;
+        }
+        return isReadable.get() ? PathStatus.OK : PathStatus.UNREADABLE;
     }
 
     /**

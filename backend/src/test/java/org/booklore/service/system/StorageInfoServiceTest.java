@@ -16,9 +16,12 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import java.io.IOException;
 import java.nio.file.FileStore;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -185,11 +188,11 @@ class StorageInfoServiceTest {
             when(libraryPathRepository.findAllPaths()).thenReturn(List.of(
                     "/books/present", "/books/gone", "/books/locked"));
 
-            when(pathProbe.isDirectory(Path.of("/books/present"))).thenReturn(true);
-            when(pathProbe.isReadable(Path.of("/books/present"))).thenReturn(true);
-            when(pathProbe.isDirectory(Path.of("/books/gone"))).thenReturn(false);
-            when(pathProbe.isDirectory(Path.of("/books/locked"))).thenReturn(true);
-            when(pathProbe.isReadable(Path.of("/books/locked"))).thenReturn(false);
+            when(pathProbe.isDirectory(Path.of("/books/present"))).thenReturn(Optional.of(true));
+            when(pathProbe.isReadable(Path.of("/books/present"))).thenReturn(Optional.of(true));
+            when(pathProbe.isDirectory(Path.of("/books/gone"))).thenReturn(Optional.of(false));
+            when(pathProbe.isDirectory(Path.of("/books/locked"))).thenReturn(Optional.of(true));
+            when(pathProbe.isReadable(Path.of("/books/locked"))).thenReturn(Optional.of(false));
 
             var paths = service.libraryPaths(service.configuredLibraryPaths());
 
@@ -197,6 +200,48 @@ class StorageInfoServiceTest {
                     org.assertj.core.groups.Tuple.tuple("/books/present", PathStatus.OK),
                     org.assertj.core.groups.Tuple.tuple("/books/gone", PathStatus.MISSING),
                     org.assertj.core.groups.Tuple.tuple("/books/locked", PathStatus.UNREADABLE));
+        }
+
+        @Test
+        void classifiesAnUndeterminedDirectoryProbeAsUnknownRatherThanMissing() {
+            when(libraryPathRepository.findAllPaths()).thenReturn(List.of("/books/hung"));
+
+            when(pathProbe.isDirectory(Path.of("/books/hung"))).thenReturn(Optional.empty());
+
+            var paths = service.libraryPaths(service.configuredLibraryPaths());
+
+            assertThat(paths).extracting("path", "status").containsExactly(
+                    org.assertj.core.groups.Tuple.tuple("/books/hung", PathStatus.UNKNOWN));
+            // A directory probe that could not be determined must not even attempt isReadable.
+            verify(pathProbe, never()).isReadable(any());
+        }
+
+        @Test
+        void classifiesAnUndeterminedReadableProbeAsUnknownRatherThanUnreadable() {
+            when(libraryPathRepository.findAllPaths()).thenReturn(List.of("/books/hung"));
+
+            when(pathProbe.isDirectory(Path.of("/books/hung"))).thenReturn(Optional.of(true));
+            when(pathProbe.isReadable(Path.of("/books/hung"))).thenReturn(Optional.empty());
+
+            var paths = service.libraryPaths(service.configuredLibraryPaths());
+
+            assertThat(paths).extracting("path", "status").containsExactly(
+                    org.assertj.core.groups.Tuple.tuple("/books/hung", PathStatus.UNKNOWN));
+        }
+
+        @Test
+        void anUndeterminedPathDoesNotAffectTheClassificationOfOtherPaths() {
+            when(libraryPathRepository.findAllPaths()).thenReturn(List.of("/books/hung", "/books/present"));
+
+            when(pathProbe.isDirectory(Path.of("/books/hung"))).thenReturn(Optional.empty());
+            when(pathProbe.isDirectory(Path.of("/books/present"))).thenReturn(Optional.of(true));
+            when(pathProbe.isReadable(Path.of("/books/present"))).thenReturn(Optional.of(true));
+
+            var paths = service.libraryPaths(service.configuredLibraryPaths());
+
+            assertThat(paths).extracting("path", "status").containsExactly(
+                    org.assertj.core.groups.Tuple.tuple("/books/hung", PathStatus.UNKNOWN),
+                    org.assertj.core.groups.Tuple.tuple("/books/present", PathStatus.OK));
         }
 
         @Test
@@ -213,9 +258,9 @@ class StorageInfoServiceTest {
             // but proven independently for libraryPaths(List): one bad path must degrade only itself.
             List<String> pathsWithABadRow = Arrays.asList("/books/present", null, "/books/gone");
             when(libraryPathRepository.findAllPaths()).thenReturn(pathsWithABadRow);
-            when(pathProbe.isDirectory(Path.of("/books/present"))).thenReturn(true);
-            when(pathProbe.isReadable(Path.of("/books/present"))).thenReturn(true);
-            when(pathProbe.isDirectory(Path.of("/books/gone"))).thenReturn(false);
+            when(pathProbe.isDirectory(Path.of("/books/present"))).thenReturn(Optional.of(true));
+            when(pathProbe.isReadable(Path.of("/books/present"))).thenReturn(Optional.of(true));
+            when(pathProbe.isDirectory(Path.of("/books/gone"))).thenReturn(Optional.of(false));
 
             var paths = service.libraryPaths(service.configuredLibraryPaths());
 
@@ -226,8 +271,8 @@ class StorageInfoServiceTest {
 
         @Test
         void usesThePreFetchedPathListWithoutQueryingTheRepositoryAgain() {
-            when(pathProbe.isDirectory(any())).thenReturn(true);
-            when(pathProbe.isReadable(any())).thenReturn(true);
+            when(pathProbe.isDirectory(any())).thenReturn(Optional.of(true));
+            when(pathProbe.isReadable(any())).thenReturn(Optional.of(true));
 
             service.libraryPaths(List.of("/books/shared-fetch"));
 
@@ -255,8 +300,8 @@ class StorageInfoServiceTest {
             // it into both libraryPaths(List) and filesystems(List), instead of each of the two
             // no-arg methods independently querying the repository.
             when(libraryPathRepository.findAllPaths()).thenReturn(List.of("/books/one"));
-            when(pathProbe.isDirectory(any())).thenReturn(true);
-            when(pathProbe.isReadable(any())).thenReturn(true);
+            when(pathProbe.isDirectory(any())).thenReturn(Optional.of(true));
+            when(pathProbe.isReadable(any())).thenReturn(Optional.of(true));
             when(pathProbe.fileStore(any())).thenReturn(Optional.empty());
 
             List<String> configuredPaths = service.configuredLibraryPaths();
@@ -264,6 +309,65 @@ class StorageInfoServiceTest {
             service.filesystems(configuredPaths);
 
             verify(libraryPathRepository, org.mockito.Mockito.times(1)).findAllPaths();
+        }
+    }
+
+    @Nested
+    class BoundedProbeIntegration {
+
+        /**
+         * A real {@link PathProbe} wired to a real, short-budget {@link TimeoutGuard} — proof that
+         * this is not just a value-mapping unit test, but exercises the actual bounding mechanism
+         * {@link NioPathProbe} uses in production. One path genuinely never finishes (a
+         * {@link CountDownLatch} that never opens, run inside the same guard {@link NioPathProbe}
+         * would use for a hung {@code Files.isDirectory} syscall); the other resolves immediately.
+         */
+        private static final class HangingOnOnePathProbe implements PathProbe {
+            private final TimeoutGuard guard;
+
+            private HangingOnOnePathProbe(TimeoutGuard guard) {
+                this.guard = guard;
+            }
+
+            @Override
+            public Optional<Boolean> isDirectory(Path path) {
+                if (path.toString().contains("hung")) {
+                    return guard.run("hung isDirectory(" + path + ")", () -> {
+                        new CountDownLatch(1).await();
+                        return true;
+                    });
+                }
+                return Optional.of(true);
+            }
+
+            @Override
+            public Optional<Boolean> isReadable(Path path) {
+                return Optional.of(true);
+            }
+
+            @Override
+            public Optional<FileStore> fileStore(Path path) {
+                return Optional.empty();
+            }
+        }
+
+        @Test
+        void aPathThatNeverRespondsIsUnknownWithinTheBudgetAndTheOtherPathStillClassifies() {
+            TimeoutGuard shortGuard = new TimeoutGuard(1);
+            StorageInfoService boundedService =
+                    new StorageInfoService(new HangingOnOnePathProbe(shortGuard), libraryPathRepository, appProperties);
+            when(libraryPathRepository.findAllPaths()).thenReturn(List.of("/books/hung", "/books/present"));
+
+            Instant start = Instant.now();
+            var paths = boundedService.libraryPaths(boundedService.configuredLibraryPaths());
+            Duration elapsed = Duration.between(start, Instant.now());
+
+            // One path's 1s budget, not the CountDownLatch waiting forever — proves the request
+            // actually returns rather than merely that the eventual value is correct.
+            assertThat(elapsed).isLessThan(Duration.ofSeconds(3));
+            assertThat(paths).extracting("path", "status").containsExactly(
+                    org.assertj.core.groups.Tuple.tuple("/books/hung", PathStatus.UNKNOWN),
+                    org.assertj.core.groups.Tuple.tuple("/books/present", PathStatus.OK));
         }
     }
 }

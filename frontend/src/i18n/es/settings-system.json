@@ -47,7 +47,8 @@
         "total": "total",
         "libraryPaths": "Rutas de bibliotecas",
         "noLibraryPaths": "No hay rutas de bibliotecas configuradas.",
-        "libraryPathsUnavailable": "No se pudieron determinar las rutas de la biblioteca; la base de datos no está disponible."
+        "libraryPathsUnavailable": "No se pudieron determinar las rutas de la biblioteca; la base de datos no está disponible.",
+        "pathStatusUnknownNote": "Algunas rutas no se pudieron comprobar a tiempo (por ejemplo, una unidad de red bloqueada) y se muestran como Desconocido en lugar de darse por perdidas."
     },
     "tools": {
         "title": "Herramientas",

@@ -47,7 +47,8 @@
         "total": "ukupno",
         "libraryPaths": "Putanje knjižnica",
         "noLibraryPaths": "Nisu konfigurirane putanje knjižnica.",
-        "libraryPathsUnavailable": "Nije moguće utvrditi putanje knjižnica; baza podataka nije dostupna."
+        "libraryPathsUnavailable": "Nije moguće utvrditi putanje knjižnica; baza podataka nije dostupna.",
+        "pathStatusUnknownNote": "Neke putanje nije bilo moguće provjeriti na vrijeme (npr. zaglavljeni mrežni disk) pa su prikazane kao Nepoznato umjesto da se smatraju nedostajućima."
     },
     "tools": {
         "title": "Alati",

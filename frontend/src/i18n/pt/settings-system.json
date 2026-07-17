@@ -47,7 +47,8 @@
         "total": "total",
         "libraryPaths": "Caminhos das bibliotecas",
         "noLibraryPaths": "Nenhum caminho de biblioteca configurado.",
-        "libraryPathsUnavailable": "Não foi possível determinar os caminhos da biblioteca; o banco de dados está inacessível."
+        "libraryPathsUnavailable": "Não foi possível determinar os caminhos da biblioteca; o banco de dados está inacessível.",
+        "pathStatusUnknownNote": "Alguns caminhos não puderam ser verificados a tempo (por exemplo, uma unidade de rede travada) e são exibidos como Desconhecido em vez de considerados ausentes."
     },
     "tools": {
         "title": "Ferramentas",

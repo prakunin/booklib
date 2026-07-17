@@ -47,7 +47,8 @@
     "total": "celkem",
     "libraryPaths": "Cesty knihoven",
     "noLibraryPaths": "Nejsou nakonfigurovány žádné cesty knihoven.",
-    "libraryPathsUnavailable": "Nepodařilo se zjistit cesty knihoven; databáze je nedostupná."
+    "libraryPathsUnavailable": "Nepodařilo se zjistit cesty knihoven; databáze je nedostupná.",
+    "pathStatusUnknownNote": "Některé cesty se nepodařilo ověřit včas (například zaseknutá síťová jednotka) a jsou označeny jako Neznámé, místo aby byly považovány za chybějící."
   },
   "tools": {
     "title": "Nástroje",

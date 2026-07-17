@@ -87,12 +87,13 @@ describe('SystemInfoComponent', () => {
     expect(text).toContain(translate('storage.noFilesystems'));
   });
 
-  it('renders MISSING, UNREADABLE, and OK library path statuses', async () => {
+  it('renders MISSING, UNREADABLE, UNKNOWN, and OK library path statuses', async () => {
     const {fixture} = await renderSnapshot({
       ...BASE_SNAPSHOT,
       libraryPaths: [
         {path: '/books/missing', status: 'MISSING'},
         {path: '/books/unreadable', status: 'UNREADABLE'},
+        {path: '/books/hung', status: 'UNKNOWN'},
         {path: '/books/ok', status: 'OK'},
       ],
     });
@@ -100,10 +101,33 @@ describe('SystemInfoComponent', () => {
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('MISSING');
     expect(text).toContain('UNREADABLE');
+    expect(text).toContain('UNKNOWN');
     expect(text).toContain('OK');
     expect(text).toContain('/books/missing');
     expect(text).toContain('/books/unreadable');
+    expect(text).toContain('/books/hung');
     expect(text).toContain('/books/ok');
+  });
+
+  it('shows an explanatory note when a library path is UNKNOWN', async () => {
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      libraryPaths: [
+        {path: '/books/hung', status: 'UNKNOWN'},
+        {path: '/books/ok', status: 'OK'},
+      ],
+    });
+
+    expect(fixture.nativeElement.textContent).toContain(translate('storage.pathStatusUnknownNote'));
+  });
+
+  it('does not show the UNKNOWN-path note when every path resolved', async () => {
+    const {fixture, translate} = await renderSnapshot({
+      ...BASE_SNAPSHOT,
+      libraryPaths: [{path: '/books/ok', status: 'OK'}],
+    });
+
+    expect(fixture.nativeElement.textContent).not.toContain(translate('storage.pathStatusUnknownNote'));
   });
 
   it('formats heap usage in the gigabyte range instead of falling back to bytes', async () => {

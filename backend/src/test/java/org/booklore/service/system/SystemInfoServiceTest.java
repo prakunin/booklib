@@ -16,7 +16,10 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,7 +54,10 @@ class SystemInfoServiceTest {
         lenient().when(dataSource.getConnection()).thenReturn(defaultConnection);
         lenient().when(defaultConnection.getMetaData()).thenReturn(defaultMetaData);
 
-        service = new SystemInfoService(versionService, dataSource, storageInfoService, toolVersionService);
+        // The production default budget (5s) is used here: every test in this class besides
+        // DatabaseBlockTimeout resolves its mocks promptly, so this adds negligible overhead while
+        // exercising the exact TimeoutGuard wiring production uses.
+        service = new SystemInfoService(versionService, dataSource, storageInfoService, toolVersionService, new TimeoutGuard());
     }
 
     @Nested
@@ -161,6 +167,70 @@ class SystemInfoServiceTest {
 
             assertThat(info.getDatabase().getStatus()).isEqualTo("DOWN");
             assertThat(info.getApplication().getVersion()).isEqualTo("v1.2.3");
+        }
+    }
+
+    /**
+     * Unlike {@link DatabaseBlock}, these wire a real, short-budget {@link TimeoutGuard} instead of
+     * the class-level {@link #service} (whose 5s production budget would make a genuinely hanging
+     * mock slow to assert against). {@code dataSource.getConnection()} here truly never returns —
+     * proof this is bounding wall-clock time, not just mapping an already-thrown exception to DOWN.
+     */
+    @Nested
+    class DatabaseBlockTimeout {
+
+        @Test
+        void reportsDownWithinTheBudgetWhenConnectionAcquisitionNeverReturns() throws Exception {
+            TimeoutGuard shortGuard = new TimeoutGuard(1);
+            SystemInfoService boundedService =
+                    new SystemInfoService(versionService, dataSource, storageInfoService, toolVersionService, shortGuard);
+            when(dataSource.getConnection()).thenAnswer(invocation -> {
+                new CountDownLatch(1).await();
+                return mock(Connection.class);
+            });
+            when(versionService.getAppVersion()).thenReturn("v1.2.3");
+
+            Instant start = Instant.now();
+            var info = boundedService.getSystemInfo();
+            Duration elapsed = Duration.between(start, Instant.now());
+
+            assertThat(info.getDatabase().getStatus()).isEqualTo("DOWN");
+            // Bounded by the 1s guard, not the CountDownLatch that never opens.
+            assertThat(elapsed).isLessThan(Duration.ofSeconds(3));
+            // The whole point of the tab: the rest still renders when the DB call hangs.
+            assertThat(info.getApplication().getVersion()).isEqualTo("v1.2.3");
+            assertThat(info.getRuntime().getAvailableProcessors()).isPositive();
+        }
+
+        @Test
+        void aSlowConfiguredLibraryPathsCallDoesNotEatTheDatabaseBlocksBudget() throws Exception {
+            TimeoutGuard shortGuard = new TimeoutGuard(1);
+            SystemInfoService boundedService =
+                    new SystemInfoService(versionService, dataSource, storageInfoService, toolVersionService, shortGuard);
+            // Slower than the 1s guard, but finite: this must still time out at ~1s on its own
+            // budget rather than consuming (or being consumed by) the database block's budget.
+            when(storageInfoService.configuredLibraryPaths()).thenAnswer(invocation -> {
+                Thread.sleep(1500);
+                return List.of();
+            });
+            Connection connection = mock(Connection.class);
+            DatabaseMetaData metaData = mock(DatabaseMetaData.class);
+            when(dataSource.getConnection()).thenReturn(connection);
+            when(connection.getMetaData()).thenReturn(metaData);
+            when(metaData.getDatabaseProductName()).thenReturn("MariaDB");
+            when(metaData.getDatabaseProductVersion()).thenReturn("12.3.2-MariaDB-ubu2404");
+
+            Instant start = Instant.now();
+            var info = boundedService.getSystemInfo();
+            Duration elapsed = Duration.between(start, Instant.now());
+
+            // If the two blocks shared one deadline, the database call would start with (close to)
+            // no budget left and report DOWN. It does not: its own, independent 1s budget applies.
+            assertThat(info.getDatabase().getStatus()).isEqualTo("UP");
+            assertThat(info.getDatabase().getVendor()).isEqualTo("MariaDB");
+            // ~1s (configuredLibraryPaths' own timeout) plus a fast database call — comfortably
+            // under 2x the guard, which is what a shared/consumed budget would look like instead.
+            assertThat(elapsed).isLessThan(Duration.ofMillis(2500));
         }
     }
 

@@ -47,7 +47,8 @@
         "total": "totaal",
         "libraryPaths": "Bibliotheekpaden",
         "noLibraryPaths": "Er zijn geen bibliotheekpaden geconfigureerd.",
-        "libraryPathsUnavailable": "Kan bibliotheekpaden niet bepalen; de database is onbereikbaar."
+        "libraryPathsUnavailable": "Kan bibliotheekpaden niet bepalen; de database is onbereikbaar.",
+        "pathStatusUnknownNote": "Sommige paden konden niet op tijd worden gecontroleerd (bijvoorbeeld een vastgelopen netwerkkoppeling) en worden weergegeven als Onbekend in plaats van als ontbrekend beschouwd."
     },
     "tools": {
         "title": "Hulpmiddelen",

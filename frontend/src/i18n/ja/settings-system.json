@@ -47,7 +47,8 @@
         "total": "合計",
         "libraryPaths": "ライブラリパス",
         "noLibraryPaths": "ライブラリパスは設定されていません。",
-        "libraryPathsUnavailable": "ライブラリパスを特定できませんでした。データベースに到達できません。"
+        "libraryPathsUnavailable": "ライブラリパスを特定できませんでした。データベースに到達できません。",
+        "pathStatusUnknownNote": "一部のパスは時間内に確認できませんでした（例: ハングしたネットワークマウント）。存在しないと見なす代わりに「不明」として表示されます。"
     },
     "tools": {
         "title": "ツール",

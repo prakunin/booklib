@@ -47,7 +47,8 @@
     "total": "total",
     "libraryPaths": "Library Paths",
     "noLibraryPaths": "No library paths are configured.",
-    "libraryPathsUnavailable": "Could not determine library paths; the database is unreachable."
+    "libraryPathsUnavailable": "Could not determine library paths; the database is unreachable.",
+    "pathStatusUnknownNote": "Some paths could not be checked in time (for example, a hung network mount) and are marked Unknown rather than assumed missing."
   },
   "tools": {
     "title": "Tools",

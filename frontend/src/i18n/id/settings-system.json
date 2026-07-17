@@ -47,7 +47,8 @@
         "total": "total",
         "libraryPaths": "Jalur pustaka",
         "noLibraryPaths": "Tidak ada jalur pustaka yang dikonfigurasi.",
-        "libraryPathsUnavailable": "Tidak dapat menentukan jalur pustaka; basis data tidak dapat dijangkau."
+        "libraryPathsUnavailable": "Tidak dapat menentukan jalur pustaka; basis data tidak dapat dijangkau.",
+        "pathStatusUnknownNote": "Beberapa jalur tidak dapat diperiksa tepat waktu (misalnya mount jaringan yang macet) dan ditampilkan sebagai Tidak diketahui, bukan dianggap hilang."
     },
     "tools": {
         "title": "Alat",

@@ -47,7 +47,8 @@
         "total": "i alt",
         "libraryPaths": "Biblioteksstier",
         "noLibraryPaths": "Der er ikke konfigureret nogen biblioteksstier.",
-        "libraryPathsUnavailable": "Kunne ikke bestemme biblioteksstier; databasen er utilgængelig."
+        "libraryPathsUnavailable": "Kunne ikke bestemme biblioteksstier; databasen er utilgængelig.",
+        "pathStatusUnknownNote": "Nogle stier kunne ikke kontrolleres i tide (f.eks. en hængende netværksdrevet enhed) og vises som Ukendt i stedet for at blive antaget som manglende."
     },
     "tools": {
         "title": "Værktøjer",

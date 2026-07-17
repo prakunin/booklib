@@ -47,7 +47,8 @@
         "total": "totalt",
         "libraryPaths": "Biblioteksökvägar",
         "noLibraryPaths": "Inga biblioteksökvägar är konfigurerade.",
-        "libraryPathsUnavailable": "Det gick inte att fastställa bibliotekssökvägar; databasen är inte nåbar."
+        "libraryPathsUnavailable": "Det gick inte att fastställa bibliotekssökvägar; databasen är inte nåbar.",
+        "pathStatusUnknownNote": "Vissa sökvägar kunde inte kontrolleras i tid (till exempel en hängande nätverksenhet) och visas som Okänd i stället för att antas saknas."
     },
     "tools": {
         "title": "Verktyg",
