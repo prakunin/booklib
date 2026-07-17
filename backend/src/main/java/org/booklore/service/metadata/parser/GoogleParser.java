@@ -66,9 +66,11 @@ public class GoogleParser implements BookParser {
 
     @Override
     public List<BookMetadata> fetchMetadata(Book book, FetchMetadataRequest fetchMetadataRequest) {
+        String bookLanguage = book.getMetadata() != null ? book.getMetadata().getLanguage() : null;
+
         // 1. Try ISBN Search
         if (fetchMetadataRequest.getIsbn() != null && !fetchMetadataRequest.getIsbn().isBlank()) {
-            List<BookMetadata> isbnResults = getMetadataListByIsbn(ParserUtils.cleanIsbn(fetchMetadataRequest.getIsbn()));
+            List<BookMetadata> isbnResults = getMetadataListByIsbn(ParserUtils.cleanIsbn(fetchMetadataRequest.getIsbn()), bookLanguage);
             if (!isbnResults.isEmpty()) {
                 return isbnResults;
             }
@@ -85,7 +87,7 @@ public class GoogleParser implements BookParser {
         if (title != null && !title.isBlank() && author != null && !author.isBlank()) {
             String term = buildSearchTerm(title, author);
             log.info("Google Books: Searching with Title + Author: {}", term);
-            results = getMetadataListByTerm(term);
+            results = getMetadataListByTerm(term, bookLanguage);
         }
 
         // 3. Try Title Only Search (if Title+Author failed or wasn't attempted)
@@ -100,7 +102,7 @@ public class GoogleParser implements BookParser {
             }
 
             if (term != null) {
-                results = getMetadataListByTerm(term);
+                results = getMetadataListByTerm(term, bookLanguage);
             }
         }
 
@@ -118,29 +120,25 @@ public class GoogleParser implements BookParser {
         return searchTerm;
     }
 
-    private List<BookMetadata> getMetadataListByIsbn(String isbn) {
+    private List<BookMetadata> getMetadataListByIsbn(String isbn, String bookLanguage) {
         // Try ISBN-13 format first, then ISBN-10
         String cleanIsbn = isbn.replace("-", "");
-        List<BookMetadata> results = fetchFromApi("isbn:" + cleanIsbn, true);
-        
+        List<BookMetadata> results = fetchFromApi("isbn:" + cleanIsbn, true, bookLanguage);
+
         if (results.isEmpty() && cleanIsbn.length() == 13) {
             // If ISBN-13 failed, try searching without the prefix for broader results
             log.info("ISBN-13 search returned no results, trying general search with ISBN");
-            results = fetchFromApi(cleanIsbn, true);
+            results = fetchFromApi(cleanIsbn, true, bookLanguage);
         }
-        
+
         return results;
     }
 
-    public List<BookMetadata> getMetadataListByTerm(String term) {
-        return fetchFromApi(term);
+    public List<BookMetadata> getMetadataListByTerm(String term, String bookLanguage) {
+        return fetchFromApi(term, false, bookLanguage);
     }
 
-    private List<BookMetadata> fetchFromApi(String query) {
-        return fetchFromApi(query, false);
-    }
-
-    private List<BookMetadata> fetchFromApi(String query, boolean isIsbnSearch) {
+    private List<BookMetadata> fetchFromApi(String query, boolean isIsbnSearch, String bookLanguage) {
         try {
             waitForRateLimit();
 
@@ -151,7 +149,7 @@ public class GoogleParser implements BookParser {
             UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(getApiUrl())
                     .queryParam("q", query)
                     .queryParam("maxResults", maxResults);
-            
+
             URI uri = uriBuilder.build().toUri();
 
             log.info("Google Books API URL: {}", uri);
@@ -163,7 +161,7 @@ public class GoogleParser implements BookParser {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            return handleApiResponse(response, query, isIsbnSearch);
+            return handleApiResponse(response, new RankingContext(query, isIsbnSearch, bookLanguage));
         } catch (IOException e) {
             log.error("IO error while fetching metadata from Google Books API: {}", e.getMessage());
             return List.of();
@@ -174,13 +172,13 @@ public class GoogleParser implements BookParser {
         }
     }
 
-    private List<BookMetadata> handleApiResponse(HttpResponse<String> response, String query, boolean isIsbnSearch) throws IOException {
+    private List<BookMetadata> handleApiResponse(HttpResponse<String> response, RankingContext rankingContext) throws IOException {
         int statusCode = response.statusCode();
 
         if (statusCode == 200) {
             List<BookMetadata> results = parseGoogleBooksApiResponse(response.body());
             List<BookMetadata> filtered = filterIrrelevantResults(results);
-            return rank(filtered, query, isIsbnSearch);
+            return rank(filtered, rankingContext);
         }
         
         if (statusCode == 429) {
@@ -605,26 +603,30 @@ public class GoogleParser implements BookParser {
     }
 
     /**
-     * Sort results by metadata completeness.
-     * Items with more populated fields come first.
+     * The inputs that drive result ranking: the query that produced the results, whether it was an
+     * ISBN search, and the language already recorded on the book being matched (if any). Passed as a
+     * single immutable value rather than threaded as separate positional parameters through
+     * {@code fetchFromApi} / {@code handleApiResponse} / {@code rank}.
      */
+    record RankingContext(String query, boolean isIsbnSearch, String bookLanguage) {}
+
     /**
      * Orders results by how well each one answers the query that produced it, strongest signal
-     * first: an exact ISBN match, then a language matching the query's own script, then how
-     * complete the record is.
+     * first: an exact ISBN match, then the book's own recorded language, then how complete the
+     * record is.
      * <p>
      * This only ever reorders — nothing is dropped. {@code langRestrict} (configured through the
      * Google provider's language setting) already filters, and a filter makes a mis-tagged edition
      * vanish outright; an empty result list is worse than an unsorted one. That is why the language
      * signal is a boost and lives here.
      */
-    static List<BookMetadata> rank(List<BookMetadata> results, String query, boolean isIsbnSearch) {
+    static List<BookMetadata> rank(List<BookMetadata> results, RankingContext context) {
         if (results == null || results.isEmpty()) {
             return List.of();
         }
 
-        String wantedIsbn = isIsbnSearch ? normaliseIsbn(query) : null;
-        String wantedLanguage = queryLanguage(query);
+        String wantedIsbn = context.isIsbnSearch() ? ParserUtils.cleanIsbn(context.query()) : null;
+        String wantedLanguage = LanguageNormalizer.normalize(context.bookLanguage());
 
         return results.stream()
                 .sorted(Comparator
@@ -638,8 +640,8 @@ public class GoogleParser implements BookParser {
         if (wantedIsbn == null || wantedIsbn.isBlank()) {
             return false;
         }
-        return wantedIsbn.equals(normaliseIsbn(metadata.getIsbn13()))
-                || wantedIsbn.equals(normaliseIsbn(metadata.getIsbn10()));
+        return wantedIsbn.equals(ParserUtils.cleanIsbn(metadata.getIsbn13()))
+                || wantedIsbn.equals(ParserUtils.cleanIsbn(metadata.getIsbn10()));
     }
 
     private static boolean matchesLanguage(BookMetadata metadata, String wantedLanguage) {
@@ -647,23 +649,6 @@ public class GoogleParser implements BookParser {
             return false;
         }
         return wantedLanguage.equals(LanguageNormalizer.normalize(metadata.getLanguage()));
-    }
-
-    /**
-     * The language the query itself is written in, or null when it carries no signal. Only Cyrillic
-     * is inferred: a Latin-script query must rank exactly as it did before this existed.
-     */
-    private static String queryLanguage(String query) {
-        if (query == null) {
-            return null;
-        }
-        boolean hasCyrillic = query.codePoints()
-                .anyMatch(cp -> Character.UnicodeScript.of(cp) == Character.UnicodeScript.CYRILLIC);
-        return hasCyrillic ? LanguageNormalizer.normalize("ru") : null;
-    }
-
-    private static String normaliseIsbn(String isbn) {
-        return isbn == null ? null : isbn.replaceAll("[\\s-]", "");
     }
 
     private static int countPopulatedFields(BookMetadata metadata) {
