@@ -36,6 +36,49 @@
   ],
   "dataGroups": [
     {
+      "name": "book-media-covers",
+      "urls": [
+        "/api/v1/media/book/*/thumbnail",
+        "/api/v1/media/book/*/cover",
+        "/api/v1/media/book/*/audiobook-thumbnail",
+        "/api/v1/media/book/*/audiobook-cover"
+      ],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 1000,
+        "maxAge": "365d"
+      }
+    },
+    {
+      "name": "book-content",
+      "urls": [
+        "/api/v1/books/*/content"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 100,
+        "maxAge": "30d",
+        "timeout": "10s"
+      }
+    },
+    {
+      "name": "book-downloads",
+      "urls": [
+        "/api/v1/books/*/download",
+        "/api/v1/books/*/download-all",
+        "/api/v1/books/*/files/*/download"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 100,
+        "maxAge": "30d",
+        "timeout": "10s"
+      },
+      "cacheQueryOptions": {
+        "ignoreSearch": true
+      }
+    },
+    {
       "name": "api-passthrough",
       "urls": ["/api/**"],
       "cacheConfig": {
