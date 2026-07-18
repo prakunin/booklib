@@ -2,7 +2,6 @@ package org.booklore.util;
 
 import org.booklore.config.AppProperties;
 import org.booklore.exception.ApiError;
-import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.CoverCroppingSettings;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.service.appsettings.AppSettingService;
@@ -47,6 +46,7 @@ public class FileService {
     private final RestTemplate restTemplate;
     private final AppSettingService appSettingService;
     private final RestTemplate noRedirectRestTemplate;
+    private final CoverUploadValidator coverUploadValidator;
 
     private static final int MAX_REDIRECTS = 5;
 
@@ -67,8 +67,6 @@ public class FileService {
     private static final String AUTHOR_THUMBNAIL_FILENAME     = "thumbnail.jpg";
     private static final String AUDIOBOOK_THUMBNAIL_FILENAME  = "audiobook-thumbnail.jpg";
     private static final String AUDIOBOOK_COVER_FILENAME      = "audiobook-cover.jpg";
-    private static final String JPEG_MIME_TYPE                = "image/jpeg";
-    private static final String PNG_MIME_TYPE                 = "image/png";
     private static final long   MAX_FILE_SIZE_BYTES           = 5L * 1024 * 1024;
     // 20 MP covers legitimate book covers and author photos with a comfortable safety margin.
     private static final long   MAX_IMAGE_PIXELS              = 20_000_000L;
@@ -185,38 +183,6 @@ public class FileService {
     // ========================================
     // VALIDATION
     // ========================================
-
-    private long getMaxFileUploadSizeMb() {
-        AppSettings appSettings = this.appSettingService.getAppSettings();
-
-        Integer maxFileUploadSizeMb = appSettings.getMaxFileUploadSizeInMb();
-
-        if (maxFileUploadSizeMb == null) {
-            log.warn("Max File Upload Size is unset, cannot continue");
-            throw ApiError.INTERNAL_SERVER_ERROR.createException("Max File Upload Size is Unset");
-        }
-
-        return maxFileUploadSizeMb.longValue();
-    }
-
-    private void validateCoverFile(MultipartFile file) {
-        if (file.isEmpty()) {
-            throw new IllegalArgumentException("Uploaded file is empty");
-        }
-        String contentType = file.getContentType();
-        if (contentType == null) {
-            throw new IllegalArgumentException("Content type is required");
-        }
-        String lowerType = contentType.toLowerCase();
-        if (!lowerType.startsWith(JPEG_MIME_TYPE) && !lowerType.startsWith(PNG_MIME_TYPE)) {
-            throw new IllegalArgumentException("Only JPEG and PNG files are allowed");
-        }
-        long maxSizeMb = getMaxFileUploadSizeMb();
-        long maxFileSize = maxSizeMb * 1024 * 1024;
-        if (file.getSize() > maxFileSize) {
-            throw ApiError.FILE_TOO_LARGE.createException(maxSizeMb);
-        }
-    }
 
     // ========================================
     // IMAGE OPERATIONS
@@ -447,7 +413,7 @@ public class FileService {
 
     public void createThumbnailFromFile(long bookId, MultipartFile file) {
         try {
-            validateCoverFile(file);
+            coverUploadValidator.validate(file);
             BufferedImage originalImage;
             try (InputStream inputStream = file.getInputStream()) {
                 originalImage = readImage(inputStream);
@@ -622,7 +588,7 @@ public class FileService {
 
     public void createAudiobookThumbnailFromFile(long bookId, MultipartFile file) {
         try {
-            validateCoverFile(file);
+            coverUploadValidator.validate(file);
             BufferedImage originalImage;
             try (InputStream inputStream = file.getInputStream()) {
                 originalImage = readImage(inputStream);

@@ -3,7 +3,6 @@ package org.booklore.service.metadata;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.exception.ApiError;
-import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
@@ -22,8 +21,8 @@ import org.booklore.service.fileprocessor.BookFileProcessorRegistry;
 import org.booklore.service.metadata.writer.MetadataWriter;
 import org.booklore.service.metadata.writer.MetadataWriterFactory;
 import org.booklore.util.BookCoverUtils;
+import org.booklore.util.CoverUploadValidator;
 import org.booklore.util.FileService;
-import org.booklore.util.MimeDetector;
 import org.booklore.config.AppProperties;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.enums.PermissionType;
@@ -32,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -60,6 +58,7 @@ public class BookCoverService {
     private final Executor taskExecutor;
     private final TransactionTemplate transactionTemplate;
     private final AuthenticationService authenticationService;
+    private final CoverUploadValidator coverUploadValidator;
 
     private void sendNotification(String username, Topic topic, Object message) {
         if (username != null) {
@@ -229,7 +228,7 @@ public class BookCoverService {
      * Bulk update cover images from a file for multiple books.
      */
     public void updateCoverFromFileForBooks(Set<Long> bookIds, MultipartFile file) {
-        validateCoverFile(file);
+        coverUploadValidator.validate(file);
         byte[] coverImageBytes = extractBytesFromMultipartFile(file);
         List<BookCoverInfo> unlockedBooks = getUnlockedBookCoverInfos(bookIds);
         String username = getCurrentUsername();
@@ -504,39 +503,6 @@ public class BookCoverService {
     // =========================
     // SECTION: INTERNAL HELPERS
     // =========================
-
-    private long getMaxFileUploadSizeMb() {
-        AppSettings appSettings = this.appSettingService.getAppSettings();
-
-        Integer maxFileUploadSizeMb = appSettings.getMaxFileUploadSizeInMb();
-
-        if (maxFileUploadSizeMb == null) {
-            log.warn("Max File Upload Size is unset, cannot continue");
-            throw ApiError.INTERNAL_SERVER_ERROR.createException("Max File Upload Size is Unset");
-        }
-
-        return maxFileUploadSizeMb.longValue();
-    }
-
-    private void validateCoverFile(MultipartFile file) {
-        if (file.isEmpty()) {
-            throw ApiError.INVALID_INPUT.createException("Uploaded file is empty");
-        }
-        long maxSizeMb = getMaxFileUploadSizeMb();
-        long maxFileSize = maxSizeMb * 1024 * 1024;
-        if (file.getSize() > maxFileSize) {
-            throw ApiError.FILE_TOO_LARGE.createException(maxSizeMb);
-        }
-        // Detect MIME from content byte never trust the client-supplied Content-Type header
-        try (var inputStream = file.getInputStream()) {
-            String detectedMime = MimeDetector.detect(inputStream);
-            if (!"image/jpeg".equals(detectedMime) && !"image/png".equals(detectedMime)) {
-                throw ApiError.INVALID_INPUT.createException("Only JPEG and PNG files are allowed (detected: " + detectedMime + ")");
-            }
-        } catch (IOException e) {
-            throw ApiError.INVALID_INPUT.createException("Failed to read uploaded file for MIME detection");
-        }
-    }
 
     private byte[] extractBytesFromMultipartFile(MultipartFile file) {
         try {

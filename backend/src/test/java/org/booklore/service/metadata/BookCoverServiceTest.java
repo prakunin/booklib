@@ -2,6 +2,7 @@ package org.booklore.service.metadata;
 
 import org.booklore.config.AppProperties;
 import org.booklore.exception.APIException;
+import org.booklore.exception.ApiError;
 import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.*;
@@ -16,6 +17,7 @@ import org.booklore.service.fileprocessor.BookFileProcessorRegistry;
 import org.booklore.service.metadata.writer.MetadataWriter;
 import org.booklore.service.metadata.writer.MetadataWriterFactory;
 import org.booklore.service.file.FileFingerprint;
+import org.booklore.util.CoverUploadValidator;
 import org.booklore.util.FileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -42,7 +44,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import java.io.IOException;
 
 @ExtendWith(MockitoExtension.class)
 class BookCoverServiceTest {
@@ -59,6 +60,7 @@ class BookCoverServiceTest {
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private Executor taskExecutor;
     @Mock private AuthenticationService authenticationService;
+    @Mock private CoverUploadValidator coverUploadValidator;
     @Mock private AppSettings appSettings;
 
     @InjectMocks
@@ -399,9 +401,6 @@ class BookCoverServiceTest {
 
         @Test
         void filtersOutLockedBooksForBulkOperations() {
-            when(appSettingService.getAppSettings()).thenReturn(appSettings);
-            when(appSettings.getMaxFileUploadSizeInMb()).thenReturn(5);
-
             BookEntity unlocked = buildBook(1L, false);
             BookEntity locked = buildBook(2L, true);
 
@@ -409,15 +408,13 @@ class BookCoverServiceTest {
                     .thenReturn(List.of(unlocked, locked));
 
             MultipartFile file = mock(MultipartFile.class);
-            when(file.isEmpty()).thenReturn(false);
-            when(file.getSize()).thenReturn(1024L);
             try {
-                when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0})); // JPEG
                 when(file.getBytes()).thenReturn(new byte[]{1, 2, 3});
             } catch (Exception _) {}
 
             service.updateCoverFromFileForBooks(Set.of(1L, 2L), file);
 
+            verify(coverUploadValidator).validate(file);
             verify(bookQueryService).findAllWithMetadataByIds(Set.of(1L, 2L));
         }
     }
@@ -428,7 +425,8 @@ class BookCoverServiceTest {
         @Test
         void rejectsEmptyFile() {
             MultipartFile file = mock(MultipartFile.class);
-            when(file.isEmpty()).thenReturn(true);
+            doThrow(ApiError.INVALID_INPUT.createException("Uploaded file is empty"))
+                    .when(coverUploadValidator).validate(file);
 
             assertThatThrownBy(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
                     .isInstanceOf(APIException.class)
@@ -436,14 +434,10 @@ class BookCoverServiceTest {
         }
 
         @Test
-        void rejectsNonImageContentType() throws Exception {
-            when(appSettingService.getAppSettings()).thenReturn(appSettings);
-            when(appSettings.getMaxFileUploadSizeInMb()).thenReturn(5);
-
+        void rejectsNonImageContentType() {
             MultipartFile file = mock(MultipartFile.class);
-            when(file.isEmpty()).thenReturn(false);
-            when(file.getSize()).thenReturn(1024L);
-            when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{1, 2, 3}));
+            doThrow(ApiError.INVALID_INPUT.createException("Only JPEG and PNG files are allowed (detected: application/octet-stream)"))
+                    .when(coverUploadValidator).validate(file);
 
             assertThatThrownBy(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
                     .isInstanceOf(APIException.class)
@@ -452,12 +446,9 @@ class BookCoverServiceTest {
 
         @Test
         void rejectsFileLargerThanLimit() {
-            when(appSettingService.getAppSettings()).thenReturn(appSettings);
-            when(appSettings.getMaxFileUploadSizeInMb()).thenReturn(5);
-
             MultipartFile file = mock(MultipartFile.class);
-            when(file.isEmpty()).thenReturn(false);
-            when(file.getSize()).thenReturn(6L * 1024 * 1024);
+            doThrow(ApiError.FILE_TOO_LARGE.createException(5L))
+                    .when(coverUploadValidator).validate(file);
 
             assertThatThrownBy(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
                     .isInstanceOf(APIException.class)
@@ -466,49 +457,37 @@ class BookCoverServiceTest {
 
         @Test
         void acceptsJpegFile() {
-            when(appSettingService.getAppSettings()).thenReturn(appSettings);
-            when(appSettings.getMaxFileUploadSizeInMb()).thenReturn(5);
-
             MultipartFile file = mock(MultipartFile.class);
-            when(file.isEmpty()).thenReturn(false);
-            when(file.getSize()).thenReturn(1024L);
             try {
-                when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0}));
                 when(file.getBytes()).thenReturn(new byte[]{1, 2, 3});
             } catch (Exception _) {}
 
             when(bookQueryService.findAllWithMetadataByIds(any())).thenReturn(List.of());
 
             service.updateCoverFromFileForBooks(Set.of(1L), file);
+
+            verify(coverUploadValidator).validate(file);
         }
 
         @Test
         void acceptsPngFile() {
-            when(appSettingService.getAppSettings()).thenReturn(appSettings);
-            when(appSettings.getMaxFileUploadSizeInMb()).thenReturn(5);
-
             MultipartFile file = mock(MultipartFile.class);
-            when(file.isEmpty()).thenReturn(false);
-            when(file.getSize()).thenReturn(1024L);
             try {
-                when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}));
                 when(file.getBytes()).thenReturn(new byte[]{1, 2, 3});
             } catch (Exception _) {}
 
             when(bookQueryService.findAllWithMetadataByIds(any())).thenReturn(List.of());
 
             service.updateCoverFromFileForBooks(Set.of(1L), file);
+
+            verify(coverUploadValidator).validate(file);
         }
 
         @Test
-        void rejectsIOExceptionOnRead() throws Exception {
-            when(appSettingService.getAppSettings()).thenReturn(appSettings);
-            when(appSettings.getMaxFileUploadSizeInMb()).thenReturn(5);
-
+        void rejectsIOExceptionOnRead() {
             MultipartFile file = mock(MultipartFile.class);
-            when(file.isEmpty()).thenReturn(false);
-            when(file.getSize()).thenReturn(1024L);
-            when(file.getInputStream()).thenThrow(new IOException("Test error"));
+            doThrow(ApiError.INVALID_INPUT.createException("Failed to read uploaded file for MIME detection"))
+                    .when(coverUploadValidator).validate(file);
 
             assertThatThrownBy(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
                     .isInstanceOf(APIException.class)
@@ -733,9 +712,6 @@ class BookCoverServiceTest {
 
         @Test
         void processesOnlyUnlockedBooks() throws Exception {
-            when(appSettingService.getAppSettings()).thenReturn(appSettings);
-            when(appSettings.getMaxFileUploadSizeInMb()).thenReturn(5);
-
             BookEntity unlocked = buildBook(1L, false);
             BookEntity locked = buildBook(2L, true);
 
@@ -743,9 +719,6 @@ class BookCoverServiceTest {
                     .thenReturn(List.of(unlocked, locked));
 
             MultipartFile file = mock(MultipartFile.class);
-            when(file.isEmpty()).thenReturn(false);
-            when(file.getSize()).thenReturn(1024L);
-            when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}));
             when(file.getBytes()).thenReturn(new byte[]{1, 2, 3});
 
             doAnswer(inv -> {
@@ -755,6 +728,7 @@ class BookCoverServiceTest {
 
             service.updateCoverFromFileForBooks(Set.of(1L, 2L), file);
 
+            verify(coverUploadValidator).validate(file);
             verify(taskExecutor).execute(any(Runnable.class));
         }
     }
@@ -909,14 +883,10 @@ class BookCoverServiceTest {
             }).when(taskExecutor).execute(any(Runnable.class));
             
             MultipartFile file = mock(MultipartFile.class);
-            when(file.isEmpty()).thenReturn(false);
-            when(file.getSize()).thenReturn(1024L);
-            when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}));
-            when(appSettingService.getAppSettings()).thenReturn(appSettings);
-            when(appSettings.getMaxFileUploadSizeInMb()).thenReturn(10);
             
             service.updateCoverFromFileForBooks(Set.of(1L), file);
             
+            verify(coverUploadValidator).validate(file);
             verify(bookQueryService).findAllWithMetadataByIds(any());
             // Should not proceed to transaction if filtered out
             verify(transactionTemplate, never()).execute(any());
