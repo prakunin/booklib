@@ -4,6 +4,7 @@ import org.booklore.exception.ApiError;
 import org.booklore.model.MetadataUpdateContext;
 import org.booklore.model.MetadataUpdateWrapper;
 import org.booklore.model.dto.BookMetadata;
+import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.websocket.TaskProgressPayload;
@@ -21,14 +22,18 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.TaskType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.nio.file.Path;
 import java.util.List;
 
 @Slf4j
 @Service
 public class LibraryRescanHelper {
+
+    private static final int RESCAN_BATCH_SIZE = 250;
 
     private final LibraryRepository libraryRepository;
     private final MetadataExtractorFactory metadataExtractorFactory;
@@ -37,8 +42,9 @@ public class LibraryRescanHelper {
     private final TaskCancellationManager cancellationManager;
     private final BookRepository bookRepository;
     private final AudiobookProcessor audiobookProcessor;
+    private final TransactionTemplate transactionTemplate;
 
-    public LibraryRescanHelper(LibraryRepository libraryRepository, MetadataExtractorFactory metadataExtractorFactory, @Lazy BookMetadataUpdater bookMetadataUpdater, NotificationService notificationService, TaskCancellationManager cancellationManager, BookRepository bookRepository, AudiobookProcessor audiobookProcessor) {
+    public LibraryRescanHelper(LibraryRepository libraryRepository, MetadataExtractorFactory metadataExtractorFactory, @Lazy BookMetadataUpdater bookMetadataUpdater, NotificationService notificationService, TaskCancellationManager cancellationManager, BookRepository bookRepository, AudiobookProcessor audiobookProcessor, TransactionTemplate transactionTemplate) {
         this.libraryRepository = libraryRepository;
         this.metadataExtractorFactory = metadataExtractorFactory;
         this.bookMetadataUpdater = bookMetadataUpdater;
@@ -46,85 +52,120 @@ public class LibraryRescanHelper {
         this.cancellationManager = cancellationManager;
         this.bookRepository = bookRepository;
         this.audiobookProcessor = audiobookProcessor;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    @Transactional
     public void handleRescanOptions(RescanLibraryContext context, String taskId) {
 
         LibraryEntity library = libraryRepository.findById(context.getLibraryId()).orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(context.getLibraryId()));
+        long libraryId = library.getId();
+        String libraryName = library.getName();
 
-        List<BookEntity> bookEntities = bookRepository.findAllWithMetadataByLibraryId(library.getId());
-
-        log.info("Found {} book(s) to process in library id={}", bookEntities.size(), library.getId());
-
-        int totalBooks = bookEntities.size();
+        long totalBooksLong = bookRepository.countByLibraryIdNonDeleted(libraryId);
+        int totalBooks = Math.toIntExact(Math.min(totalBooksLong, Integer.MAX_VALUE));
         int processedBooks = 0;
 
-        sendTaskProgressNotification(taskId, 0, String.format("Starting rescan for library: %s", library.getName()), TaskStatus.IN_PROGRESS);
+        log.info("Found {} book(s) to process in library id={}", totalBooksLong, libraryId);
 
-        for (BookEntity bookEntity : bookEntities) {
-            if (bookEntity == null || (bookEntity.getDeleted() != null && bookEntity.getDeleted())) {
-                continue;
-            }
+        sendTaskProgressNotification(taskId, 0, String.format("Starting rescan for library: %s", libraryName), TaskStatus.IN_PROGRESS);
 
-            // Skip fileless books (e.g., physical books) - they have no file to extract metadata from
-            if (!bookEntity.hasFiles()) {
-                processedBooks++;
-                continue;
-            }
-
-            if (taskId != null && cancellationManager.isTaskCancelled(taskId)) {
-                log.info("Library rescan for library {} was cancelled", library.getId());
-                sendTaskProgressNotification(taskId, (processedBooks * 100) / totalBooks,
-                        String.format("Rescan cancelled for library: %s (%d/%d books processed)", library.getName(), processedBooks, totalBooks),
-                        TaskStatus.CANCELLED);
+        long afterId = 0L;
+        while (true) {
+            List<Long> bookIds = bookRepository.findBookIdsByLibraryIdAfterId(libraryId, afterId, PageRequest.of(0, RESCAN_BATCH_SIZE));
+            if (bookIds.isEmpty()) {
                 break;
             }
 
-            log.info("Processing book: library={}, bookId={}, fileName={}", library.getName(), bookEntity.getId(), bookEntity.getPrimaryBookFile().getFileName());
-
-            int progressPercentage = totalBooks > 0 ? (processedBooks * 100) / totalBooks : 0;
-
-            sendTaskProgressNotification(taskId, progressPercentage,
-                    String.format("Processing: %s (Library: %s)", bookEntity.getPrimaryBookFile().getFileName(), library.getName()),
-                    TaskStatus.IN_PROGRESS);
-
-            try {
-                BookMetadata bookMetadata = metadataExtractorFactory.extractMetadata(bookEntity.getPrimaryBookFile().getBookType(), bookEntity.getFullFilePath().toFile());
-                if (bookMetadata == null) {
-                    log.warn("No metadata extracted for book id={} path={}", bookEntity.getId(), bookEntity.getFullFilePath());
+            for (Long bookId : bookIds) {
+                if (bookId == null) {
                     continue;
                 }
-                MetadataUpdateContext metadataUpdateContext = MetadataUpdateContext.builder()
-                        .bookEntity(bookEntity)
-                        .metadataUpdateWrapper(
-                                MetadataUpdateWrapper.builder()
-                                        .metadata(bookMetadata)
-                                        .build()
-                        )
-                        .replaceMode(context.getOptions().getMetadataReplaceMode())
-                        .updateThumbnail(false)
-                        .mergeCategories(false)
-                        .mergeMoods(true)
-                        .mergeTags(true)
-                        .build();
-                bookMetadataUpdater.setBookMetadata(metadataUpdateContext);
+                afterId = Math.max(afterId, bookId);
 
-                if (bookEntity.getPrimaryBookFile().getBookType() == BookFileType.AUDIOBOOK && bookMetadata.getAudiobookMetadata() != null) {
-                    audiobookProcessor.setAudiobookTechnicalMetadata(bookEntity, bookMetadata);
+                if (taskId != null && cancellationManager.isTaskCancelled(taskId)) {
+                    log.info("Library rescan for library {} was cancelled", libraryId);
+                    sendTaskProgressNotification(taskId, progressPercentage(processedBooks, totalBooks),
+                            String.format("Rescan cancelled for library: %s (%d/%d books processed)", libraryName, processedBooks, totalBooks),
+                            TaskStatus.CANCELLED);
+                    return;
                 }
-            } catch (Exception e) {
-                log.error("Failed to update metadata for book id={} path={}: {}", bookEntity.getId(), bookEntity.getFullFilePath(), e.getMessage(), e);
-            } finally {
-                processedBooks++;
+
+                BookEntity bookEntity = findBookForRescan(bookId, libraryId);
+                if (bookEntity == null) {
+                    continue;
+                }
+
+                // Skip fileless books (e.g., physical books) - they have no file to extract metadata from
+                if (!bookEntity.hasFiles()) {
+                    processedBooks++;
+                    continue;
+                }
+
+                BookFileEntity primaryFile = bookEntity.getPrimaryBookFile();
+                Path fullFilePath = bookEntity.getFullFilePath();
+                if (primaryFile == null || fullFilePath == null) {
+                    processedBooks++;
+                    continue;
+                }
+
+                log.info("Processing book: library={}, bookId={}, fileName={}", libraryName, bookId, primaryFile.getFileName());
+
+                sendTaskProgressNotification(taskId, progressPercentage(processedBooks, totalBooks),
+                        String.format("Processing: %s (Library: %s)", primaryFile.getFileName(), libraryName),
+                        TaskStatus.IN_PROGRESS);
+
+                try {
+                    BookFileType bookType = primaryFile.getBookType();
+                    BookMetadata bookMetadata = metadataExtractorFactory.extractMetadata(bookType, fullFilePath.toFile());
+                    if (bookMetadata == null) {
+                        log.warn("No metadata extracted for book id={} path={}", bookId, fullFilePath);
+                        continue;
+                    }
+                    updateBookMetadataInTransaction(context, libraryId, bookId, bookMetadata);
+                } catch (Exception e) {
+                    log.error("Failed to update metadata for book id={} path={}: {}", bookId, fullFilePath, e.getMessage(), e);
+                } finally {
+                    processedBooks++;
+                }
             }
         }
 
-        if (taskId == null || !cancellationManager.isTaskCancelled(taskId)) {
-            sendTaskProgressNotification(taskId, 100,
-                    String.format("Rescan completed for library: %s (%d books processed)", library.getName(), processedBooks),
-                    TaskStatus.COMPLETED);
-        }
+        sendTaskProgressNotification(taskId, 100,
+                String.format("Rescan completed for library: %s (%d books processed)", libraryName, processedBooks),
+                TaskStatus.COMPLETED);
+    }
+
+    private BookEntity findBookForRescan(Long bookId, Long libraryId) {
+        return transactionTemplate.execute(status -> bookRepository.findByIdForLibraryRescan(bookId, libraryId).orElse(null));
+    }
+
+    private void updateBookMetadataInTransaction(RescanLibraryContext context, Long libraryId, Long bookId, BookMetadata bookMetadata) {
+        transactionTemplate.executeWithoutResult(status -> {
+            BookEntity bookEntity = bookRepository.findByIdForLibraryRescan(bookId, libraryId)
+                    .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
+            MetadataUpdateContext metadataUpdateContext = MetadataUpdateContext.builder()
+                    .bookEntity(bookEntity)
+                    .metadataUpdateWrapper(
+                            MetadataUpdateWrapper.builder()
+                                    .metadata(bookMetadata)
+                                    .build()
+                    )
+                    .replaceMode(context.getOptions().getMetadataReplaceMode())
+                    .updateThumbnail(false)
+                    .mergeCategories(false)
+                    .mergeMoods(true)
+                    .mergeTags(true)
+                    .build();
+            bookMetadataUpdater.setBookMetadata(metadataUpdateContext);
+
+            if (bookEntity.getPrimaryBookFile().getBookType() == BookFileType.AUDIOBOOK && bookMetadata.getAudiobookMetadata() != null) {
+                audiobookProcessor.setAudiobookTechnicalMetadata(bookEntity, bookMetadata);
+            }
+        });
+    }
+
+    private int progressPercentage(int processedBooks, int totalBooks) {
+        return totalBooks > 0 ? (processedBooks * 100) / totalBooks : 0;
     }
 
     private void sendTaskProgressNotification(String taskId, int progress, String message, TaskStatus taskStatus) {

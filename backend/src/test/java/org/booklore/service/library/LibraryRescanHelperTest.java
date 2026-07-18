@@ -30,11 +30,16 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -49,6 +54,7 @@ class LibraryRescanHelperTest {
     @Mock private TaskCancellationManager cancellationManager;
     @Mock private BookRepository bookRepository;
     @Mock private AudiobookProcessor audiobookProcessor;
+    @Mock private TransactionTemplate transactionTemplate;
     @InjectMocks private LibraryRescanHelper libraryRescanHelper;
 
     @Captor private ArgumentCaptor<TaskProgressPayload> payloadCaptor;
@@ -60,6 +66,16 @@ class LibraryRescanHelperTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+        lenient().doAnswer(invocation -> {
+            Consumer<TransactionStatus> action = invocation.getArgument(0);
+            action.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+
         library = new LibraryEntity();
         library.setId(1L);
         library.setName("Test Library");
@@ -100,7 +116,7 @@ class LibraryRescanHelperTest {
         metadata2.setTitle("Book 2");
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(book1, book2));
+        givenRescanBooks(book1, book2);
         when(metadataExtractorFactory.extractMetadata(eq(BookFileType.EPUB), any(File.class))).thenReturn(metadata1);
         when(metadataExtractorFactory.extractMetadata(eq(BookFileType.PDF), any(File.class))).thenReturn(metadata2);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
@@ -123,7 +139,7 @@ class LibraryRescanHelperTest {
         metadata.setTitle("Book 1");
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(book1, book2));
+        givenRescanBooks(book1, book2);
         when(metadataExtractorFactory.extractMetadata(any(BookFileType.class), any(File.class))).thenReturn(metadata);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
 
@@ -142,7 +158,7 @@ class LibraryRescanHelperTest {
 
         BookMetadata metadata = new BookMetadata();
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(books);
+        givenRescanBooks(books);
         when(metadataExtractorFactory.extractMetadata(any(BookFileType.class), any(File.class))).thenReturn(metadata);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
 
@@ -160,7 +176,7 @@ class LibraryRescanHelperTest {
         BookMetadata metadata2 = new BookMetadata();
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(book1, book2));
+        givenRescanBooks(book1, book2);
         when(metadataExtractorFactory.extractMetadata(eq(BookFileType.EPUB), any(File.class))).thenReturn(null);
         when(metadataExtractorFactory.extractMetadata(eq(BookFileType.PDF), any(File.class))).thenReturn(metadata2);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
@@ -180,7 +196,7 @@ class LibraryRescanHelperTest {
         BookMetadata metadata2 = new BookMetadata();
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(book1, book2));
+        givenRescanBooks(book1, book2);
         when(metadataExtractorFactory.extractMetadata(any(BookFileType.class), any(File.class)))
                 .thenReturn(metadata1, metadata2);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
@@ -199,7 +215,7 @@ class LibraryRescanHelperTest {
         BookEntity book2 = createBookEntity(2L, "book2.pdf", BookFileType.PDF);
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(book1, book2));
+        givenRescanBooks(book1, book2);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false, true);
 
         libraryRescanHelper.handleRescanOptions(rescanContext, taskId);
@@ -217,7 +233,7 @@ class LibraryRescanHelperTest {
 
         BookMetadata metadata = new BookMetadata();
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(book1));
+        givenRescanBooks(book1);
         when(metadataExtractorFactory.extractMetadata(any(BookFileType.class), any(File.class))).thenReturn(metadata);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
 
@@ -238,8 +254,7 @@ class LibraryRescanHelperTest {
     @Test
     void handleRescanOptions_shouldHandleEmptyLibrary() {
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(new ArrayList<>());
-        when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
+        givenRescanBooks(List.of());
 
         libraryRescanHelper.handleRescanOptions(rescanContext, taskId);
 
@@ -259,7 +274,7 @@ class LibraryRescanHelperTest {
         metadata.setTitle("Test Book");
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(book));
+        givenRescanBooks(book);
         when(metadataExtractorFactory.extractMetadata(any(BookFileType.class), any(File.class))).thenReturn(metadata);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
 
@@ -281,7 +296,7 @@ class LibraryRescanHelperTest {
 
         BookMetadata metadata = new BookMetadata();
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(book));
+        givenRescanBooks(book);
         when(metadataExtractorFactory.extractMetadata(any(BookFileType.class), any(File.class))).thenReturn(metadata);
 
         libraryRescanHelper.handleRescanOptions(rescanContext, null);
@@ -299,7 +314,7 @@ class LibraryRescanHelperTest {
 
         BookMetadata metadata = new BookMetadata();
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(book));
+        givenRescanBooks(book);
         when(metadataExtractorFactory.extractMetadata(any(BookFileType.class), any(File.class))).thenReturn(metadata);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
         doThrow(new RuntimeException("Notification failed"))
@@ -327,7 +342,7 @@ class LibraryRescanHelperTest {
         metadata.setAudiobookMetadata(audiobookMeta);
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(audiobookEntity));
+        givenRescanBooks(audiobookEntity);
         when(metadataExtractorFactory.extractMetadata(eq(BookFileType.AUDIOBOOK), any(File.class))).thenReturn(metadata);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
 
@@ -345,7 +360,7 @@ class LibraryRescanHelperTest {
         metadata.setTitle("Epub Book");
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(epubBook));
+        givenRescanBooks(epubBook);
         when(metadataExtractorFactory.extractMetadata(eq(BookFileType.EPUB), any(File.class))).thenReturn(metadata);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
 
@@ -364,7 +379,7 @@ class LibraryRescanHelperTest {
         metadata.setAudiobookMetadata(null);
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
-        when(bookRepository.findAllWithMetadataByLibraryId(1L)).thenReturn(List.of(audiobookEntity));
+        givenRescanBooks(audiobookEntity);
         when(metadataExtractorFactory.extractMetadata(eq(BookFileType.AUDIOBOOK), any(File.class))).thenReturn(metadata);
         when(cancellationManager.isTaskCancelled(taskId)).thenReturn(false);
 
@@ -372,6 +387,25 @@ class LibraryRescanHelperTest {
 
         verify(bookMetadataUpdater).setBookMetadata(any(MetadataUpdateContext.class));
         verify(audiobookProcessor, never()).setAudiobookTechnicalMetadata(any(), any());
+    }
+
+    private void givenRescanBooks(BookEntity... books) {
+        givenRescanBooks(List.of(books));
+    }
+
+    private void givenRescanBooks(List<BookEntity> books) {
+        List<BookEntity> activeBooks = books.stream()
+                .filter(Objects::nonNull)
+                .filter(book -> !Boolean.TRUE.equals(book.getDeleted()))
+                .toList();
+        List<Long> bookIds = activeBooks.stream().map(BookEntity::getId).toList();
+        lenient().when(bookRepository.countByLibraryIdNonDeleted(1L)).thenReturn((long) activeBooks.size());
+        lenient().when(bookRepository.findBookIdsByLibraryIdAfterId(eq(1L), eq(0L), any())).thenReturn(bookIds);
+        if (!bookIds.isEmpty()) {
+            lenient().when(bookRepository.findBookIdsByLibraryIdAfterId(eq(1L), eq(bookIds.getLast()), any())).thenReturn(List.of());
+        }
+        activeBooks.forEach(book ->
+                lenient().when(bookRepository.findByIdForLibraryRescan(book.getId(), 1L)).thenReturn(Optional.of(book)));
     }
 
     private BookEntity createBookEntity(Long id, String fileName, BookFileType bookType) {
