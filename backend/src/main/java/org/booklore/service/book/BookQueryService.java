@@ -16,7 +16,9 @@ import org.booklore.util.BookUtils;
 import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,18 +32,23 @@ import java.time.Instant;
 @Transactional(readOnly = true)
 public class BookQueryService {
 
+    static final int MAX_LEGACY_FULL_CATALOG_BOOKS = 10_000;
+    private static final Pageable LEGACY_FULL_CATALOG_PAGE = PageRequest.of(
+            0, MAX_LEGACY_FULL_CATALOG_BOOKS, Sort.by("id").ascending());
+
     private final BookRepository bookRepository;
     private final BookMapperV2 bookMapperV2;
     private final ContentRestrictionService contentRestrictionService;
     private final UserContentRestrictionRepository restrictionRepository;
 
     public List<Book> getAllBooks(boolean includeDescription, boolean stripForListView) {
-        List<BookEntity> books = bookRepository.findAllWithMetadata();
+        List<BookEntity> books = bookRepository.findAllWithMetadataPage(LEGACY_FULL_CATALOG_PAGE).getContent();
         return mapBooksToDto(books, includeDescription, null, stripForListView);
     }
 
     public List<Book> getAllBooksByLibraryIds(Set<Long> libraryIds, boolean includeDescription, boolean StripForListView, Long userId) {
-        List<BookEntity> books = bookRepository.findAllWithMetadataByLibraryIds(libraryIds);
+        List<BookEntity> books = bookRepository.findAllWithMetadataByLibraryIdsPage(libraryIds, LEGACY_FULL_CATALOG_PAGE)
+                .getContent();
         books = contentRestrictionService.applyRestrictions(books, userId);
         return mapBooksToDto(books, includeDescription, userId, StripForListView);
     }
