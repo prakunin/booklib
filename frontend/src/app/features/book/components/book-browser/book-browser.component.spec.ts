@@ -33,7 +33,6 @@ import {BookBrowserComponent, EntityType} from './book-browser.component';
 import {SortService} from '../../service/sort.service';
 import {TranslocoService} from '@jsverse/transloco';
 import {LayoutService} from '../../../../shared/layout/layout.service';
-import {type VirtualGridMetrics} from '../../../../shared/util/virtual-grid.util';
 
 function makeBook(id: number, libraryId: number, title: string, addedOn: string): Book {
   return {
@@ -478,23 +477,6 @@ describe('BookBrowserComponent', () => {
 
     expect(component.showBooksLoadingPlaceholder()).toBe(false);
     expect(component.virtualRowCount()).toBe(30);
-  });
-
-  it('sizes grid loading placeholders to fill the viewport', () => {
-    const {component} = createHarness({books: [], isBooksLoading: true});
-    const loadingGrid = component as unknown as {
-      minimumLoadingGridItemCount(metrics: VirtualGridMetrics): number;
-    };
-
-    component.currentViewMode.set(VIEW_MODES.GRID);
-
-    expect(loadingGrid.minimumLoadingGridItemCount({
-      viewportWidth: 960,
-      viewportHeight: 900,
-      columns: 6,
-      itemHeight: 200,
-      gap: 20,
-    })).toBe(36);
   });
 
   it('uses the known total book count while more pages are available', () => {

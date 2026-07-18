@@ -51,16 +51,16 @@ import {AppSettingsService} from '../../../../shared/service/app-settings.servic
 import {MultiSortPopoverComponent} from './sorting/multi-sort-popover/multi-sort-popover.component';
 import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
 
-import {createVirtualGrid, type VirtualGridMetrics} from '../../../../shared/util/virtual-grid.util';
+import {createVirtualGrid} from '../../../../shared/util/virtual-grid.util';
 import {GridDensityButtonsComponent, type GridDensityDirection} from '../../../../shared/components/grid-density-buttons/grid-density-buttons.component';
 import {LayoutService} from '../../../../shared/layout/layout.service';
 import {createGridDensity} from '../../../../shared/util/grid-density.util';
 import {AppBooksApiService} from '../../service/app-books-api.service';
 import {toAppBookFilters, toAppBookSort} from '../../service/app-book-query-adapter';
 import {EntityType} from './book-browser-entity-type';
+import {BookBrowserGridLayoutService, INITIAL_LOADING_GRID_ITEM_COUNT} from './book-browser-grid-layout.service';
 export {EntityType} from './book-browser-entity-type';
 
-const INITIAL_LOADING_ROW_COUNT = 24;
 const DEFAULT_MOBILE_GRID_COLUMNS = 3;
 const MIN_MOBILE_GRID_COLUMNS = 2;
 const MAX_MOBILE_GRID_COLUMNS = 4;
@@ -107,6 +107,7 @@ export class BookBrowserComponent implements AfterViewInit {
   private localStorageService = inject(LocalStorageService);
   private scrollService = inject(RouteScrollPositionService);
   private layoutService = inject(LayoutService);
+  private gridLayoutService = inject(BookBrowserGridLayoutService);
   private readonly t = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -218,22 +219,10 @@ export class BookBrowserComponent implements AfterViewInit {
   readonly isBooksLoading = this.appBooksApi.isLoading;
   readonly booksError = this.appBooksApi.error;
 
-  private readonly GRID_GAP = 21;
-  private readonly CARD_ASPECT_RATIO = 7 / 5;
-  private readonly MOBILE_TITLE_BAR_HEIGHT = 32;
-  private readonly DESKTOP_CARD_BASE_WIDTH = 135;
-  private readonly DESKTOP_CARD_BASE_HEIGHT = 220;
-  private readonly DESKTOP_MIN_SCALE = 0.5;
-  private readonly DESKTOP_MAX_SCALE = 1.5;
-  private readonly AUDIOBOOK_TITLE_BAR_HEIGHT = 31;
   private readonly scrollElement = viewChild<ElementRef<HTMLElement>>('scrollElement');
   private readonly initialScrollOffset = () => this.scrollService.getPosition(this.scrollService.keyFor(this.activatedRoute, 'grid')) ?? 0;
   readonly isMobile = computed(() => !this.layoutService.isDesktop());
-  private readonly desktopBaseCardWidth = computed(() =>
-    this.isAudiobookOnlyLibrary()
-      ? this.DESKTOP_CARD_BASE_WIDTH * 1.1
-      : this.DESKTOP_CARD_BASE_WIDTH
-  );
+  private readonly desktopBaseCardWidth = computed(() => this.gridLayoutService.desktopBaseWidth(this.isAudiobookOnlyLibrary()));
   private readonly gridDensity = createGridDensity(this.localStorageService, {
     useFixedColumns: this.isMobile,
     screenWidth: this.screenWidth,
@@ -242,16 +231,18 @@ export class BookBrowserComponent implements AfterViewInit {
     minColumns: MIN_MOBILE_GRID_COLUMNS,
     maxColumns: MAX_MOBILE_GRID_COLUMNS,
     scale: this.coverScalePreferenceService.scaleFactor,
-    minScale: this.DESKTOP_MIN_SCALE,
-    maxScale: this.DESKTOP_MAX_SCALE,
-    gap: this.GRID_GAP,
+    minScale: this.gridLayoutService.desktopMinScale,
+    maxScale: this.gridLayoutService.desktopMaxScale,
+    gap: this.gridLayoutService.gridGap,
     baseWidth: this.desktopBaseCardWidth,
     setScale: scale => this.coverScalePreferenceService.setScale(scale),
   });
   private readonly minCardWidth = computed(() =>
-    this.isMobile()
-      ? 1
-      : Math.round(this.desktopBaseCardWidth() * this.coverScalePreferenceService.scaleFactor())
+    this.gridLayoutService.minCardWidth(
+      this.isMobile(),
+      this.isAudiobookOnlyLibrary(),
+      this.coverScalePreferenceService.scaleFactor()
+    )
   );
   readonly virtualRowCount = computed(() => this.bookCountIncludingUnloadedPages(this.books().length));
   readonly loadedBookCount = computed(() => this.books().length);
@@ -262,13 +253,19 @@ export class BookBrowserComponent implements AfterViewInit {
     gap: this.gridDensity.gap,
     columns: this.gridDensity.columns,
     count: this.virtualRowCount,
-    minimumCount: metrics => this.minimumLoadingGridItemCount(metrics),
+    minimumCount: metrics => this.gridLayoutService.minimumLoadingItemCount(
+      metrics,
+      this.showBooksLoadingPlaceholder(),
+      this.currentViewMode()
+    ),
     initialOffset: this.initialScrollOffset,
     fillItemWidth: true,
     deferViewportUpdates: this.layoutService.sidebarTransitioning,
-    estimateItemHeight: itemWidth => this.isMobile()
-      ? this.mobileCardSizeForWidth(itemWidth).height
-      : this.cardSizeForWidth(itemWidth).height,
+    estimateItemHeight: itemWidth => this.gridLayoutService.estimateItemHeight(
+      itemWidth,
+      this.isMobile(),
+      this.isAudiobookOnlyLibrary()
+    ),
   });
   readonly bookQueryToken = computed(() => ({
     entity: this.entityInfo(),
@@ -454,25 +451,6 @@ export class BookBrowserComponent implements AfterViewInit {
   readonly gridDensitySmallerDisabled = this.gridDensity.smallerDisabled;
   readonly gridDensityLargerDisabled = this.gridDensity.largerDisabled;
 
-  private cardSizeForWidth(width: number): { width: number; height: number } {
-    const cardWidth = Math.round(width);
-    if (this.isAudiobookOnlyLibrary()) {
-      return {width: cardWidth, height: cardWidth + this.AUDIOBOOK_TITLE_BAR_HEIGHT};
-    }
-    return {
-      width: cardWidth,
-      height: Math.round(cardWidth * (this.DESKTOP_CARD_BASE_HEIGHT / this.DESKTOP_CARD_BASE_WIDTH)),
-    };
-  }
-
-  private mobileCardSizeForWidth(width: number): { width: number; height: number } {
-    const cardWidth = Math.round(width);
-    const coverHeight = this.isAudiobookOnlyLibrary()
-      ? cardWidth
-      : Math.floor(cardWidth * this.CARD_ASPECT_RATIO);
-    return {width: cardWidth, height: coverHeight + this.MOBILE_TITLE_BAR_HEIGHT};
-  }
-
   readonly showBooksLoadingPlaceholder = computed(() =>
     !this.booksError() && (!this.hasRenderedBooks() || (this.isBooksLoading() && this.books().length === 0))
   );
@@ -483,7 +461,7 @@ export class BookBrowserComponent implements AfterViewInit {
 
   private bookCountIncludingUnloadedPages(renderedBookCount: number): number {
     if (this.showBooksLoadingPlaceholder()) {
-      return INITIAL_LOADING_ROW_COUNT;
+      return INITIAL_LOADING_GRID_ITEM_COUNT;
     }
     // Once maxPages evicts earlier pages the loaded window sits at a global offset, so the virtual
     // count must reach the window's global end (firstLoadedBookIndex + renderedBookCount) even if a
@@ -493,18 +471,6 @@ export class BookBrowserComponent implements AfterViewInit {
       this.firstLoadedBookIndex() + renderedBookCount,
       this.appBooksApi.totalElements()
     );
-  }
-
-  private minimumLoadingGridItemCount({viewportHeight, columns, itemHeight, gap}: VirtualGridMetrics): number {
-    if (!this.showBooksLoadingPlaceholder() || this.currentViewMode() !== VIEW_MODES.GRID) {
-      return 0;
-    }
-    if (viewportHeight <= 0 || itemHeight <= 0) {
-      return INITIAL_LOADING_ROW_COUNT;
-    }
-
-    const visibleRows = Math.ceil((viewportHeight + gap) / (itemHeight + gap));
-    return Math.max(INITIAL_LOADING_ROW_COUNT, (visibleRows + 1) * columns);
   }
 
   readonly viewIcon = computed(() =>
