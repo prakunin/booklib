@@ -68,7 +68,6 @@ class InpxLibraryScannerTest {
     }
 
     private void givenIndexOf(int records) {
-        when(inpxParser.count("/books/index.inpx")).thenReturn((long) records);
         doAnswer(invocation -> {
             Consumer<InpxBookDto> consumer = invocation.getArgument(1);
             for (int i = 0; i < records; i++) {
@@ -102,6 +101,7 @@ class InpxLibraryScannerTest {
         assertThat(result.processed()).isEqualTo(1200);
         assertThat(result.added()).isEqualTo(1200);
         assertThat(result.cancelled()).isFalse();
+        verify(inpxParser, never()).count(any());
     }
 
     @Test
@@ -122,8 +122,8 @@ class InpxLibraryScannerTest {
         assertThat(events).allSatisfy(event -> {
             assertThat(event.libraryId()).isEqualTo(LIBRARY_ID);
             assertThat(event.libraryName()).isEqualTo("Flibusta");
-            assertThat(event.total()).isEqualTo(600);
         });
+        assertThat(events).extracting(InpxScanProgress::total).containsExactly(500L, 600L, 600L);
         assertThat(events.get(0).processed()).isEqualTo(500);
         assertThat(events.get(0).status()).isEqualTo(InpxScanStatus.RUNNING);
         assertThat(events.get(2).processed()).isEqualTo(600);
@@ -157,7 +157,7 @@ class InpxLibraryScannerTest {
     @Test
     void doesNothingWhenTheIndexIsEmpty() {
         givenLibrary();
-        when(inpxParser.count("/books/index.inpx")).thenReturn(0L);
+        givenIndexOf(0);
 
         InpxLibraryScanner.ScanResult result = scanner.scan(LIBRARY_ID);
 
@@ -220,14 +220,13 @@ class InpxLibraryScannerTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("boom");
 
-        // Previously the FAILED event was built from counters declared inside the try,
-        // so a failure after the first batch committed would still report total=0,
-        // processed=0 - contradicting the 500 books already in the database.
+        // The single-pass scanner no longer reads the full index once just to count it, so a
+        // mid-stream failure reports the high-water total reached before the failed write.
         ArgumentCaptor<InpxScanProgress> captor = ArgumentCaptor.forClass(InpxScanProgress.class);
         verify(notificationService, times(2)).sendMessage(eq(Topic.LIBRARY_SCAN_PROGRESS), captor.capture());
         InpxScanProgress failedEvent = captor.getAllValues().getLast();
         assertThat(failedEvent.status()).isEqualTo(InpxScanStatus.FAILED);
-        assertThat(failedEvent.total()).isEqualTo(1200);
+        assertThat(failedEvent.total()).isEqualTo(1000);
         assertThat(failedEvent.processed()).isEqualTo(500);
         assertThat(failedEvent.added()).isEqualTo(500);
         assertThat(failedEvent.skipped()).isZero();

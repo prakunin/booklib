@@ -54,8 +54,6 @@ public class InpxLibraryScanner {
             libraryNameHolder[0] = library.getName();
             long libraryPathId = libraryPath.getId();
 
-            counters.total = inpxParser.count(inpxPath);
-
             InpxScanCaches caches = new InpxScanCaches();
             List<InpxBookDto> batch = new ArrayList<>(BATCH_SIZE);
             boolean[] cancelled = {false};
@@ -74,6 +72,7 @@ public class InpxLibraryScanner {
                         cancelled[0] = true;
                         return;
                     }
+                    counters.total = Math.max(counters.total, counters.processed + batch.size());
                     flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
                     publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
                 }
@@ -83,11 +82,13 @@ public class InpxLibraryScanner {
             // count with the freshly committed database count, so archives already covered
             // by the INPX file are not needlessly parsed a second time.
             if (!cancelled[0] && !batch.isEmpty()) {
+                counters.total = Math.max(counters.total, counters.processed + batch.size());
                 flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
                 publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
             }
 
             if (!cancelled[0]) {
+                counters.total = Math.max(counters.total, counters.processed);
                 InpxArchiveScanner.Discovery discovery = archiveScanner.discover(
                         libraryId, library.getInpxArchivePath());
                 counters.total += discovery.totalEntries();
@@ -102,12 +103,14 @@ public class InpxLibraryScanner {
                             cancelled[0] = true;
                             return;
                         }
+                        counters.total = Math.max(counters.total, counters.processed + batch.size());
                         flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
                         publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
                     }
                 }, () -> cancelled[0]);
 
                 if (!cancelled[0] && !batch.isEmpty()) {
+                    counters.total = Math.max(counters.total, counters.processed + batch.size());
                     flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
                     publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
                 }
