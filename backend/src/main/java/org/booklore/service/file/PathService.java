@@ -1,6 +1,8 @@
 package org.booklore.service.file;
 
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
+import org.booklore.config.AppProperties;
 import org.booklore.exception.ApiError;
 import org.booklore.model.dto.inpx.InpxIndexOption;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import java.util.stream.Stream;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class PathService {
 
     private static final Set<String> BLOCKED_PATHS = Set.of(
@@ -26,6 +29,8 @@ public class PathService {
     );
 
     private static final String INPX_EXTENSION = ".inpx";
+
+    private final AppProperties appProperties;
 
     public List<String> getFoldersAtPath(String path) {
         Path directory = resolveDirectory(path);
@@ -86,11 +91,28 @@ public class PathService {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Access to this directory is not allowed");
         }
 
+        if (!isAllowedConfiguredRoot(directory)) {
+            log.warn("Blocked path browsing attempt outside configured roots: {}", normalized);
+            throw ApiError.GENERIC_BAD_REQUEST.createException("Access to this directory is not allowed");
+        }
+
         if (!Files.exists(directory) || !Files.isDirectory(directory)) {
             log.warn("Invalid path or not a directory: {}", path);
             return null;
         }
         return directory;
+    }
+
+    private boolean isAllowedConfiguredRoot(Path directory) {
+        return configuredRoots().stream().anyMatch(root -> directory.equals(root) || directory.startsWith(root));
+    }
+
+    private List<Path> configuredRoots() {
+        return Stream.of(appProperties.getPathConfig(), appProperties.getBookdropFolder())
+                .filter(value -> value != null && !value.isBlank())
+                .map(value -> Paths.get(value.trim()).toAbsolutePath().normalize())
+                .distinct()
+                .toList();
     }
 
     private InpxIndexOption toIndexOption(Path file) {

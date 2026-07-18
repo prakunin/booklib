@@ -362,6 +362,9 @@ public class FileService {
             if (e instanceof IOException ioException) {
                 throw ioException;
             }
+            if (e instanceof SecurityException securityException) {
+                throw securityException;
+            }
             throw new IOException("Failed to download image from " + imageUrl + ": " + e.getMessage(), e);
         }
     }
@@ -406,6 +409,7 @@ public class FileService {
                     throw new IOException("Redirection response without Location header");
                 }
                 URI redirectUri = uri.resolve(location);
+                NetworkAddressValidator.validateExternalHttpUrl(redirectUri.toString());
 
                 // When a CDN redirects to a raw IP (e.g. CloudFront -> 3.168.64.124),
                 // the Host header would become the bare IP, which the CDN rejects with

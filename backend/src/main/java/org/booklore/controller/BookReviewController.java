@@ -1,6 +1,7 @@
 package org.booklore.controller;
 
 import org.booklore.model.dto.BookReview;
+import org.booklore.config.security.annotation.CheckBookAccess;
 import org.booklore.service.book.BookReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,6 +30,7 @@ public class BookReviewController {
         @ApiResponse(responseCode = "204", description = "No reviews found")
     })
     @GetMapping("/book/{bookId}")
+    @CheckBookAccess(bookIdParam = "bookId")
     public ResponseEntity<List<BookReview>> listByBook(
             @Parameter(description = "ID of the book") @PathVariable @Positive(message = "Book ID must be positive") Long bookId) {
         List<BookReview> reviews = bookReviewService.getByBookId(bookId);

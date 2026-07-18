@@ -89,6 +89,16 @@ class OidcTokenValidatorTest {
         }
     }
 
+    private void invokeValidateAccessTokenHash(JWTClaimsSet claims, String accessToken, String idTokenStr) throws Exception {
+        Method method = OidcTokenValidator.class.getDeclaredMethod("validateAccessTokenHash", JWTClaimsSet.class, String.class, String.class);
+        method.setAccessible(true);
+        try {
+            method.invoke(validator, claims, accessToken, idTokenStr);
+        } catch (InvocationTargetException e) {
+            throw (Exception) e.getCause();
+        }
+    }
+
     private String invokeMapAlgToHashAlgorithm(String alg) throws Exception {
         Method method = OidcTokenValidator.class.getDeclaredMethod("mapAlgToHashAlgorithm", String.class);
         method.setAccessible(true);
@@ -322,6 +332,19 @@ class OidcTokenValidatorTest {
         assertThatThrownBy(() -> invokeValidateNonce(claims, "expected-nonce"))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("nonce mismatch");
+    }
+
+    // ── validateAccessTokenHash ──
+
+    @Test
+    void validateAccessTokenHash_presentHashWithInvalidIdToken_throws() {
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .claim("at_hash", "expected")
+                .build();
+
+        assertThatThrownBy(() -> invokeValidateAccessTokenHash(claims, "access-token", "not-a-jwt"))
+                .isInstanceOf(APIException.class)
+                .hasMessageContaining("at_hash");
     }
 
     // ── mapAlgToHashAlgorithm ──
