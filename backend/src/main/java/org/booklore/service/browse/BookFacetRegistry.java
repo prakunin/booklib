@@ -1,6 +1,6 @@
 package org.booklore.service.browse;
 
-import org.booklore.app.specification.AppBookSpecification;
+import org.booklore.service.browse.BookSpecifications;
 import org.booklore.browse.FacetLogic;
 import org.booklore.exception.ApiError;
 import org.booklore.model.entity.BookEntity;
@@ -41,33 +41,33 @@ public class BookFacetRegistry {
     public Specification<BookEntity> toSpecification(String facetName, List<String> values, FacetLogic logic, Long userId) {
         String mode = mode(logic);
         return switch (facetName) {
-            case "author" -> AppBookSpecification.withAuthors(values, mode);
-            case "series" -> AppBookSpecification.inSeriesMulti(values, mode);
-            case "genre" -> AppBookSpecification.withCategories(values, mode);
-            case "tag" -> AppBookSpecification.withTags(values, mode);
-            case "mood" -> AppBookSpecification.withMoods(values, mode);
-            case "language" -> AppBookSpecification.withLanguages(values, mode);
-            case "publisher" -> AppBookSpecification.withPublishers(values, mode);
-            case "library" -> AppBookSpecification.inLibraries(values, mode);
+            case "author" -> BookSpecifications.withAuthors(values, mode);
+            case "series" -> BookSpecifications.inSeriesMulti(values, mode);
+            case "genre" -> BookSpecifications.withCategories(values, mode);
+            case "tag" -> BookSpecifications.withTags(values, mode);
+            case "mood" -> BookSpecifications.withMoods(values, mode);
+            case "language" -> BookSpecifications.withLanguages(values, mode);
+            case "publisher" -> BookSpecifications.withPublishers(values, mode);
+            case "library" -> BookSpecifications.inLibraries(values, mode);
             case "shelf" -> shelves(values, logic, userId);
-            case "file_type" -> AppBookSpecification.withFileTypes(values, mode);
-            case "read_status" -> AppBookSpecification.withReadStatuses(values, userId, mode);
-            case "personal_rating" -> AppBookSpecification.withPersonalRatings(values, userId, mode);
-            case "amazon_rating" -> AppBookSpecification.withAmazonRatings(values, mode);
-            case "goodreads_rating" -> AppBookSpecification.withGoodreadsRatings(values, mode);
-            case "hardcover_rating" -> AppBookSpecification.withHardcoverRatings(values, mode);
-            case "ranobedb_rating" -> AppBookSpecification.withRanobedbRatings(values, mode);
-            case "age_rating" -> AppBookSpecification.withAgeRatings(values, mode);
-            case "content_rating" -> AppBookSpecification.withContentRatings(values, mode);
-            case "match_score" -> AppBookSpecification.withMatchScores(values, mode);
-            case "published_year" -> AppBookSpecification.withPublishedYears(values, mode);
-            case "file_size" -> AppBookSpecification.withFileSizes(values, mode);
-            case "page_count" -> AppBookSpecification.withPageCounts(values, mode);
-            case "shelf_status" -> AppBookSpecification.withShelfStatus(values, mode);
-            case "comic_character" -> AppBookSpecification.withComicCharacters(values, mode);
-            case "comic_team" -> AppBookSpecification.withComicTeams(values, mode);
-            case "comic_location" -> AppBookSpecification.withComicLocations(values, mode);
-            case "comic_creator" -> AppBookSpecification.withComicCreators(values, mode);
+            case "file_type" -> BookSpecifications.withFileTypes(values, mode);
+            case "read_status" -> BookSpecifications.withReadStatuses(values, userId, mode);
+            case "personal_rating" -> BookSpecifications.withPersonalRatings(values, userId, mode);
+            case "amazon_rating" -> BookSpecifications.withAmazonRatings(values, mode);
+            case "goodreads_rating" -> BookSpecifications.withGoodreadsRatings(values, mode);
+            case "hardcover_rating" -> BookSpecifications.withHardcoverRatings(values, mode);
+            case "ranobedb_rating" -> BookSpecifications.withRanobedbRatings(values, mode);
+            case "age_rating" -> BookSpecifications.withAgeRatings(values, mode);
+            case "content_rating" -> BookSpecifications.withContentRatings(values, mode);
+            case "match_score" -> BookSpecifications.withMatchScores(values, mode);
+            case "published_year" -> BookSpecifications.withPublishedYears(values, mode);
+            case "file_size" -> BookSpecifications.withFileSizes(values, mode);
+            case "page_count" -> BookSpecifications.withPageCounts(values, mode);
+            case "shelf_status" -> BookSpecifications.withShelfStatus(values, mode);
+            case "comic_character" -> BookSpecifications.withComicCharacters(values, mode);
+            case "comic_team" -> BookSpecifications.withComicTeams(values, mode);
+            case "comic_location" -> BookSpecifications.withComicLocations(values, mode);
+            case "comic_creator" -> BookSpecifications.withComicCreators(values, mode);
             default -> throw ApiError.INVALID_FACET.createException("Unknown facet: " + facetName);
         };
     }
@@ -87,7 +87,7 @@ public class BookFacetRegistry {
         }
         if (!regularIds.isEmpty()) {
             String inMode = logic == FacetLogic.AND ? "and" : "or";
-            specs.add(AppBookSpecification.inShelves(regularIds, inMode));
+            specs.add(BookSpecifications.inShelves(regularIds, inMode));
         }
         if (specs.isEmpty()) {
             return (root, query, cb) -> cb.conjunction();

@@ -77,7 +77,7 @@ public class BookBrowseService {
 
         List<SortTerm> sortTerms = SortParser.parse(sortString, sortRegistry.registry().keys());
         Specification<BookEntity> filter = filterSpecifications.base(query, facets, facetLogic, userId, isAdmin, BookFilterSpecifications.libraryIds(user), null);
-        Specification<BookEntity> spec = withSort(filter, sortTerms, userId);
+        Specification<BookEntity> spec = BookSortSpecifications.withSort(filter, sortRegistry, sortTerms, userId);
 
         Pageable pageRequest = PageRequest.of((int) (offset / limit), limit);
         Page<Book> page = bookQueryService.findBooksPaged(spec, pageRequest, userId);
@@ -99,15 +99,6 @@ public class BookBrowseService {
         List<Link> links = linksBuilder.build(new LinksBuilder.Context(
                 PAGE_PATH, "", offset, limit, page.getTotalElements(), baseState));
         return BrowsePage.of(page.getContent(), offset, limit, page.getTotalElements(), cursorCodec.encode(baseState), links);
-    }
-
-    private Specification<BookEntity> withSort(Specification<BookEntity> filter, List<SortTerm> sortTerms, Long userId) {
-        return (root, query, cb) -> {
-            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
-                query.orderBy(sortRegistry.registry().toOrders(sortTerms, root, query, cb, userId));
-            }
-            return filter.toPredicate(root, query, cb);
-        };
     }
 
     private void enrich(List<Book> books, Long userId) {

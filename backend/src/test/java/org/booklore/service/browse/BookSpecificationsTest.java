@@ -1,4 +1,4 @@
-package org.booklore.app.specification;
+package org.booklore.service.browse;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class AppBookSpecificationTest {
+class BookSpecificationsTest {
 
     @Test
     void emptyAccessibleLibrarySetMatchesNothing() {
@@ -23,7 +23,7 @@ class AppBookSpecificationTest {
         Predicate disjunction = mock(Predicate.class);
         when(cb.disjunction()).thenReturn(disjunction);
 
-        Predicate result = AppBookSpecification.inLibraries(Collections.emptySet())
+        Predicate result = BookSpecifications.inLibraries(Collections.emptySet())
                 .toPredicate(root, query, cb);
 
         assertThat(result).isSameAs(disjunction);
@@ -37,7 +37,7 @@ class AppBookSpecificationTest {
         Predicate conjunction = mock(Predicate.class);
         when(cb.conjunction()).thenReturn(conjunction);
 
-        Predicate result = AppBookSpecification.inLibraries(null)
+        Predicate result = BookSpecifications.inLibraries(null)
                 .toPredicate(root, query, cb);
 
         assertThat(result).isSameAs(conjunction);
