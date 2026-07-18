@@ -16,7 +16,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -47,6 +49,7 @@ public class ChapterCacheService {
         ReentrantLock lock = cacheLocks.get(cacheKey, _ -> new ReentrantLock());
         lock.lock();
         try {
+            cleanupStaleCacheDirs(cacheKey);
             Path cacheDir = getCacheDir(cacheKey);
             if (!Files.exists(cacheDir)) {
                 Files.createDirectories(cacheDir);
@@ -75,6 +78,24 @@ public class ChapterCacheService {
 
     Cache<String, ReentrantLock> cacheLocks() {
         return cacheLocks;
+    }
+
+    void cleanupStaleCacheDirs(String currentCacheKey) {
+        Path currentCacheDir = getCacheDir(currentCacheKey);
+        Path cacheRoot = currentCacheDir.getParent();
+        if (cacheRoot == null || !Files.isDirectory(cacheRoot)) {
+            return;
+        }
+
+        String cacheKeyPrefix = cacheKeyPrefix(currentCacheKey);
+        try (Stream<Path> dirs = Files.list(cacheRoot)) {
+            dirs.filter(Files::isDirectory)
+                    .filter(dir -> !dir.equals(currentCacheDir))
+                    .filter(dir -> dir.getFileName().toString().startsWith(cacheKeyPrefix))
+                    .forEach(this::deleteRecursively);
+        } catch (IOException e) {
+            log.debug("Failed to clean stale chapter cache dirs for key {}: {}", currentCacheKey, e.getMessage());
+        }
     }
 
     public Path getCachedPage(String cacheKey, int pageNumber) {
@@ -117,6 +138,25 @@ public class ChapterCacheService {
             throw ApiError.INVALID_INPUT.createException("Invalid cache key: " + cacheKey);
         }
         return Paths.get(appProperties.getPathConfig(), "cache", "chapters", cacheKey);
+    }
+
+    private String cacheKeyPrefix(String cacheKey) {
+        int lastSeparator = cacheKey.lastIndexOf('_');
+        return lastSeparator >= 0 ? cacheKey.substring(0, lastSeparator + 1) : cacheKey + "_";
+    }
+
+    private void deleteRecursively(Path dir) {
+        try (Stream<Path> paths = Files.walk(dir)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    log.debug("Failed to delete stale chapter cache path {}: {}", path, e.getMessage());
+                }
+            });
+        } catch (IOException e) {
+            log.debug("Failed to walk stale chapter cache dir {}: {}", dir, e.getMessage());
+        }
     }
 
     private boolean isCacheStale(Path cacheDir, Path sourcePath, int expectedPages) throws IOException {

@@ -4,6 +4,7 @@ import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.enums.PermissionType;
 import org.booklore.model.websocket.Topic;
+import org.booklore.service.event.BookCatalogChangedEvent;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -12,6 +13,7 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,8 +29,10 @@ public class NotificationService {
     private final SimpMessagingTemplate messagingTemplate;
     private final AuthenticationService authenticationService;
     private final EntityManager entityManager;
+    private final ApplicationEventPublisher eventPublisher;
 
     public void sendMessage(Topic topic, Object message) {
+        publishCatalogChangedEvent(topic);
         try {
             var user = authenticationService.getAuthenticatedUser();
             if (user == null) {
@@ -43,6 +47,7 @@ public class NotificationService {
     }
 
     public void sendMessageToUser(String username, Topic topic, Object message) {
+        publishCatalogChangedEvent(topic);
         try {
             messagingTemplate.convertAndSendToUser(username, topic.getPath(), message);
         } catch (Exception e) {
@@ -53,6 +58,7 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public void sendMessageToPermissions(Topic topic, Object message, Set<PermissionType> permissionTypes) {
         if (permissionTypes == null || permissionTypes.isEmpty()) return;
+        publishCatalogChangedEvent(topic);
 
         try {
             List<String> usernames = findUsernamesWithPermissions(permissionTypes);
@@ -76,5 +82,15 @@ public class NotificationService {
 
         query.select(user.get("username")).where(cb.or(predicates));
         return entityManager.createQuery(query).getResultList();
+    }
+
+    private void publishCatalogChangedEvent(Topic topic) {
+        if (topic == Topic.BOOK_ADD
+                || topic == Topic.BOOK_UPDATE
+                || topic == Topic.BOOKS_REMOVE
+                || topic == Topic.BOOK_METADATA_UPDATE
+                || topic == Topic.BOOK_METADATA_BATCH_UPDATE) {
+            eventPublisher.publishEvent(new BookCatalogChangedEvent(topic));
+        }
     }
 }
