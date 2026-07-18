@@ -260,12 +260,17 @@ class KomgaServiceTest {
         List<BookEntity> seriesABooks = List.of(seriesBooks.get(0), seriesBooks.get(1));
         List<BookEntity> seriesBBooks = List.of(seriesBooks.get(2), seriesBooks.get(3));
         
-        when(bookRepository.findBooksBySeriesNameGroupedByLibraryId("Series A", 1L, "Unknown Series"))
-                .thenReturn(seriesABooks);
-        when(bookRepository.findBooksBySeriesNameGroupedByLibraryId("Series B", 1L, "Unknown Series"))
-                .thenReturn(seriesBBooks);
+        List<BookEntity> pageBooks = new ArrayList<>();
+        pageBooks.addAll(seriesABooks);
+        pageBooks.addAll(seriesBBooks);
+
+        when(bookRepository.findBooksBySeriesNamesGroupedByLibraryId(
+                eq(List.of("Series A", "Series B")), eq(1L), eq("Unknown Series"), eq(false)))
+                .thenReturn(pageBooks);
         
         when(komgaMapper.getUnknownSeriesName()).thenReturn("Unknown Series");
+        seriesABooks.forEach(book -> when(komgaMapper.getBookSeriesName(book)).thenReturn("Series A"));
+        seriesBBooks.forEach(book -> when(komgaMapper.getBookSeriesName(book)).thenReturn("Series B"));
         when(komgaMapper.toKomgaSeriesDto(eq("Series A"), anyLong(), any()))
                 .thenReturn(KomgaSeriesDto.builder().id("1-series-a").name("Series A").booksCount(2).build());
         when(komgaMapper.toKomgaSeriesDto(eq("Series B"), anyLong(), any()))
@@ -286,6 +291,7 @@ class KomgaServiceTest {
         // Verify that only books for Series A and B were loaded (optimization check)
         verify(bookRepository, never()).findAllWithMetadataByLibraryId(anyLong());
         verify(bookRepository, never()).findAllWithMetadata();
+        verify(bookRepository, never()).findBooksBySeriesNameGroupedByLibraryId(anyString(), anyLong(), anyString());
     }
 
     @Test

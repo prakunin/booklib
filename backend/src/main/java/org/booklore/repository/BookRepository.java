@@ -594,6 +594,94 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     List<BookEntity> findBooksBySeriesNameUngrouped(
             @Param("seriesName") String seriesName);
 
+    @EntityGraph(attributePaths = {"metadata", "metadata.comicMetadata", "library", "libraryPath", "bookFiles"})
+    @Query("""
+            SELECT b FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE b.library.id = :libraryId
+              AND (
+                  m.seriesName IN :seriesNames
+                  OR (:includeUnknown = true AND m.seriesName IS NULL)
+              )
+              AND (b.deleted IS NULL OR b.deleted = false)
+            ORDER BY COALESCE(m.seriesName, :unknownSeriesName), COALESCE(m.seriesNumber, 0), b.id
+            """)
+    List<BookEntity> findBooksBySeriesNamesGroupedByLibraryId(
+            @Param("seriesNames") Collection<String> seriesNames,
+            @Param("libraryId") Long libraryId,
+            @Param("unknownSeriesName") String unknownSeriesName,
+            @Param("includeUnknown") boolean includeUnknown);
+
+    @EntityGraph(attributePaths = {"metadata", "metadata.comicMetadata", "library", "libraryPath", "bookFiles"})
+    @Query("""
+            SELECT b FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE (
+                m.seriesName IN :seriesNames
+                OR (:includeUnknown = true AND m.seriesName IS NULL)
+            )
+            AND (b.deleted IS NULL OR b.deleted = false)
+            ORDER BY COALESCE(m.seriesName, :unknownSeriesName), COALESCE(m.seriesNumber, 0), b.id
+            """)
+    List<BookEntity> findBooksBySeriesNamesGrouped(
+            @Param("seriesNames") Collection<String> seriesNames,
+            @Param("unknownSeriesName") String unknownSeriesName,
+            @Param("includeUnknown") boolean includeUnknown);
+
+    @EntityGraph(attributePaths = {"metadata", "metadata.comicMetadata", "library", "libraryPath", "bookFiles"})
+    @Query("""
+            SELECT b FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE b.library.id = :libraryId
+              AND (
+                  m.seriesName IN :seriesNames
+                  OR (m.seriesName IS NULL AND m.title IN :seriesNames)
+                  OR EXISTS (
+                      SELECT 1 FROM BookFileEntity bf
+                      WHERE bf.book = b
+                        AND bf.fileName IN :seriesNames
+                        AND bf.isBookFormat = true
+                        AND bf.id = (
+                            SELECT MIN(bf2.id) FROM BookFileEntity bf2
+                            WHERE bf2.book = b AND bf2.isBookFormat = true
+                        )
+                        AND m.seriesName IS NULL
+                        AND m.title IS NULL
+                  )
+              )
+              AND (b.deleted IS NULL OR b.deleted = false)
+            ORDER BY COALESCE(m.seriesName, m.title), COALESCE(m.seriesNumber, 0), b.id
+            """)
+    List<BookEntity> findBooksBySeriesNamesUngroupedByLibraryId(
+            @Param("seriesNames") Collection<String> seriesNames,
+            @Param("libraryId") Long libraryId);
+
+    @EntityGraph(attributePaths = {"metadata", "metadata.comicMetadata", "library", "libraryPath", "bookFiles"})
+    @Query("""
+            SELECT b FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE (
+                m.seriesName IN :seriesNames
+                OR (m.seriesName IS NULL AND m.title IN :seriesNames)
+                OR EXISTS (
+                    SELECT 1 FROM BookFileEntity bf
+                    WHERE bf.book = b
+                      AND bf.fileName IN :seriesNames
+                      AND bf.isBookFormat = true
+                      AND bf.id = (
+                          SELECT MIN(bf2.id) FROM BookFileEntity bf2
+                          WHERE bf2.book = b AND bf2.isBookFormat = true
+                      )
+                      AND m.seriesName IS NULL
+                      AND m.title IS NULL
+                )
+            )
+            AND (b.deleted IS NULL OR b.deleted = false)
+            ORDER BY COALESCE(m.seriesName, m.title), COALESCE(m.seriesNumber, 0), b.id
+            """)
+    List<BookEntity> findBooksBySeriesNamesUngrouped(
+            @Param("seriesNames") Collection<String> seriesNames);
+
     @Query("""
             SELECT DISTINCT
                 CASE

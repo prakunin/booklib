@@ -385,6 +385,37 @@ class BookRepositoryDataJpaTest {
                     .containsExactly("Standalone Book");
         }
 
+        @Test
+        void batchLoadsGroupedSeriesBooksForCurrentPageNames() {
+            LibraryEntity library = persistLibrary();
+            persistBook(library, "Series A", "A1", 1F);
+            persistBook(library, "Series A", "A2", 2F);
+            persistBook(library, "Series B", "B1", 1F);
+            persistBook(library, "Series C", "C1", 1F);
+            flushAndClear();
+
+            List<BookEntity> books = bookRepository.findBooksBySeriesNamesGroupedByLibraryId(
+                    List.of("Series A", "Series B"), library.getId(), "Unknown Series", false);
+
+            assertThat(books).extracting(book -> book.getMetadata().getTitle())
+                    .containsExactly("A1", "A2", "B1");
+        }
+
+        @Test
+        void batchLoadsUngroupedTitleFallbackSeriesBooksForCurrentPageNames() {
+            LibraryEntity library = persistLibrary();
+            persistBook(library, null, "Standalone A", null);
+            persistBook(library, null, "Standalone B", null);
+            persistBook(library, "Series C", "C1", 1F);
+            flushAndClear();
+
+            List<BookEntity> books = bookRepository.findBooksBySeriesNamesUngroupedByLibraryId(
+                    List.of("Standalone A", "Standalone B"), library.getId());
+
+            assertThat(books).extracting(book -> book.getMetadata().getTitle())
+                    .containsExactly("Standalone A", "Standalone B");
+        }
+
         private LibraryEntity persistLibrary() {
             LibraryEntity library = LibraryEntity.builder()
                     .name("Komga Library")
