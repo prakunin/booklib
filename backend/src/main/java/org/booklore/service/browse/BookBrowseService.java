@@ -1,15 +1,10 @@
 package org.booklore.service.browse;
 
 import lombok.RequiredArgsConstructor;
-import org.booklore.browse.BrowsePage;
-import org.booklore.browse.CursorCodec;
-import org.booklore.browse.CursorState;
 import org.booklore.browse.FacetLogic;
-import org.booklore.browse.Link;
-import org.booklore.browse.LinksBuilder;
-import org.booklore.browse.ParamsHash;
 import org.booklore.browse.SortParser;
 import org.booklore.browse.SortTerm;
+import org.booklore.app.dto.AppPageResponse;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.exception.ApiError;
 import org.booklore.model.dto.Book;
@@ -36,7 +31,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class BookBrowseService {
 
-    private static final String PAGE_PATH = "/api/v1/books/page";
     private static final int MAX_PAGE_SIZE = 100;
 
     private final AuthenticationService authenticationService;
@@ -44,61 +38,30 @@ public class BookBrowseService {
     private final ReadingProgressService readingProgressService;
     private final BookFilterSpecifications filterSpecifications;
     private final BookSortRegistry sortRegistry;
-    private final CursorCodec cursorCodec;
-    private final LinksBuilder linksBuilder;
 
-    public BrowsePage<Book> browse(String sort, List<String> facet, String facetLogicParam, String query, String cursor, Pageable pageable) {
+    public AppPageResponse<Book> browse(String sort, List<String> facet, String facetLogicParam, String query, Pageable pageable) {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
         Long userId = user.getId();
         boolean isAdmin = user.getPermissions().isAdmin();
 
         Map<String, List<String>> facets = BookFilterSpecifications.parseFacets(facet);
         FacetLogic facetLogic = FacetLogic.from(facetLogicParam);
-        String paramsHash = ParamsHash.compute(query, facets, facetLogic);
 
-        long offset;
-        int limit;
-        String sortString;
-        if (cursor != null) {
-            CursorState state = cursorCodec.decode(cursor);
-            cursorCodec.verifyParamsMatch(state, paramsHash);
-            offset = state.offset();
-            limit = state.limit();
-            sortString = state.sort();
-        } else {
-            offset = pageable.getOffset();
-            limit = pageable.getPageSize();
-            sortString = sort;
-        }
+        int limit = pageable.getPageSize();
         if (limit <= 0) {
             throw ApiError.INVALID_INPUT.createException("Page size must be positive.");
         }
         limit = Math.min(limit, MAX_PAGE_SIZE);
 
-        List<SortTerm> sortTerms = SortParser.parse(sortString, sortRegistry.registry().keys());
+        List<SortTerm> sortTerms = SortParser.parse(sort, sortRegistry.registry().keys());
         Specification<BookEntity> filter = filterSpecifications.base(query, facets, facetLogic, userId, isAdmin, BookFilterSpecifications.libraryIds(user), null);
         Specification<BookEntity> spec = BookSortSpecifications.withSort(filter, sortRegistry, sortTerms, userId);
 
-        Pageable pageRequest = PageRequest.of((int) (offset / limit), limit);
+        Pageable pageRequest = PageRequest.of(pageable.getPageNumber(), limit);
         Page<Book> page = bookQueryService.findBooksPaged(spec, pageRequest, userId);
         enrich(page.getContent(), userId);
 
-        CursorState baseState = new CursorState(offset, limit, sortString, paramsHash);
-        String currentCursor = cursorCodec.encode(baseState);
-        List<Link> links = linksBuilder.build(new LinksBuilder.Context(
-                PAGE_PATH, BrowseParams.preserved(facet, facetLogicParam, query), offset, limit, page.getTotalElements(), baseState));
-
-        return BrowsePage.of(page.getContent(), offset, limit, page.getTotalElements(), currentCursor, links);
-    }
-
-    public BrowsePage<Book> wrapLegacy(Page<Book> page, Pageable pageable) {
-        long offset = pageable.getOffset();
-        int limit = pageable.getPageSize();
-        String paramsHash = ParamsHash.compute(null, Map.of(), FacetLogic.AND);
-        CursorState baseState = new CursorState(offset, limit, null, paramsHash);
-        List<Link> links = linksBuilder.build(new LinksBuilder.Context(
-                PAGE_PATH, "", offset, limit, page.getTotalElements(), baseState));
-        return BrowsePage.of(page.getContent(), offset, limit, page.getTotalElements(), cursorCodec.encode(baseState), links);
+        return AppPageResponse.fromPage(page);
     }
 
     private void enrich(List<Book> books, Long userId) {

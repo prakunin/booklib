@@ -298,11 +298,12 @@ describe('BookService', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/ebook-reader/book/43'], {queryParams: {streaming: false}});
   });
 
-  it('removes a shelf from the cached books query without disturbing other shelf assignments', async () => {
+  it('invalidates book list caches when removing a shelf from books', async () => {
     setup();
 
     const targetShelf = buildShelf(10, {name: 'Favorites'});
     const untouchedShelf = buildShelf(11, {name: 'Archive'});
+    const invalidateSpy = vi.spyOn(queryClientHarness.queryClient, 'invalidateQueries').mockResolvedValue(undefined);
     const initialBooks = [
       buildBook(1, {shelves: [targetShelf, untouchedShelf]}),
       buildBook(2, {shelves: [targetShelf]}),
@@ -316,14 +317,9 @@ describe('BookService', () => {
     service.removeBooksFromShelf(10);
     await flushBooksQuery();
 
-    expect(queryClientHarness.queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([
-      buildBook(1, {shelves: [untouchedShelf]}),
-      buildBook(2, {shelves: []}),
-    ]);
-    expect(service.books()).toEqual([
-      buildBook(1, {shelves: [untouchedShelf]}),
-      buildBook(2, {shelves: []}),
-    ]);
+    expect(queryClientHarness.queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual(initialBooks);
+    expect(invalidateSpy).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
+    expect(invalidateSpy).toHaveBeenCalledWith({queryKey: ['app-books']});
   });
 
   it('does not fabricate the books query cache when removing a shelf before it is cached', () => {

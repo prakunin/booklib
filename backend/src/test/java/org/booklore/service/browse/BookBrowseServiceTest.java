@@ -3,8 +3,7 @@ package org.booklore.service.browse;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.booklore.BookloreApplication;
-import org.booklore.browse.BrowsePage;
-import org.booklore.browse.Link;
+import org.booklore.app.dto.AppPageResponse;
 import org.booklore.exception.APIException;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.dto.Book;
@@ -138,27 +137,23 @@ class BookBrowseServiceTest {
         });
     }
 
-    private BrowsePage<Book> browse(String sort, List<String> facet, String query, String cursor, int page, int size) {
-        return browseService.browse(sort, facet, null, query, cursor, PageRequest.of(page, size));
-    }
-
-    private String nextCursor(BrowsePage<Book> page) {
-        Link next = page.links().stream().filter(l -> l.rel().contains("next")).findFirst().orElseThrow();
-        return next.href().substring(next.href().indexOf("cursor=") + "cursor=".length());
+    private AppPageResponse<Book> browse(String sort, List<String> facet, String query, int page, int size) {
+        return browseService.browse(sort, facet, null, query, PageRequest.of(page, size));
     }
 
     @Test
-    void returnsPageWithTotalsAndCursorAndLinks() {
+    void returnsOffsetPageWithTotals() {
         book("Alpha", List.of());
         book("Bravo", List.of());
         em.flush();
 
-        BrowsePage<Book> result = browse(null, null, null, null, 0, 20);
+        AppPageResponse<Book> result = browse(null, null, null, 0, 20);
 
-        assertThat(result.content()).hasSize(2);
-        assertThat(result.page().totalElements()).isEqualTo(2);
-        assertThat(result.page().cursor()).isNotBlank();
-        assertThat(result.links().stream().anyMatch(l -> l.rel().contains("self"))).isTrue();
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getPage()).isZero();
+        assertThat(result.getSize()).isEqualTo(20);
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.isHasNext()).isFalse();
     }
 
     @Test
@@ -166,8 +161,8 @@ class BookBrowseServiceTest {
         Long b = book("Bravo", List.of()).getId();
         Long a = book("Alpha", List.of()).getId();
         em.flush();
-        assertThat(browse("title", null, null, null, 0, 20).content().stream().map(Book::getId)).containsExactly(a, b);
-        assertThat(browse("-title", null, null, null, 0, 20).content().stream().map(Book::getId)).containsExactly(b, a);
+        assertThat(browse("title", null, null, 0, 20).getContent().stream().map(Book::getId)).containsExactly(a, b);
+        assertThat(browse("-title", null, null, 0, 20).getContent().stream().map(Book::getId)).containsExactly(b, a);
     }
 
     @Test
@@ -175,9 +170,9 @@ class BookBrowseServiceTest {
         Long horror = book("H", List.of("Horror")).getId();
         book("R", List.of("Romance"));
         em.flush();
-        BrowsePage<Book> result = browse(null, List.of("genre:Horror"), null, null, 0, 20);
-        assertThat(result.content().stream().map(Book::getId)).containsExactly(horror);
-        assertThat(result.page().totalElements()).isEqualTo(1);
+        AppPageResponse<Book> result = browse(null, List.of("genre:Horror"), null, 0, 20);
+        assertThat(result.getContent().stream().map(Book::getId)).containsExactly(horror);
+        assertThat(result.getTotalElements()).isEqualTo(1);
     }
 
     @Test
@@ -185,60 +180,37 @@ class BookBrowseServiceTest {
         Long hobbit = book("The Hobbit", List.of()).getId();
         book("Dune", List.of());
         em.flush();
-        assertThat(browse(null, null, "hobbit", null, 0, 20).content().stream().map(Book::getId)).containsExactly(hobbit);
+        assertThat(browse(null, null, "hobbit", 0, 20).getContent().stream().map(Book::getId)).containsExactly(hobbit);
     }
 
     @Test
-    void cursorWalkIsConsistent() {
+    void offsetPagesWalkConsistently() {
         for (int i = 0; i < 5; i++) {
             book(String.format("Book%02d", i), List.of());
         }
         em.flush();
 
-        BrowsePage<Book> page0 = browse("title", null, null, null, 0, 2);
-        assertThat(page0.content()).hasSize(2);
-        assertThat(page0.page().totalElements()).isEqualTo(5);
+        AppPageResponse<Book> page0 = browse("title", null, null, 0, 2);
+        assertThat(page0.getContent()).hasSize(2);
+        assertThat(page0.getTotalElements()).isEqualTo(5);
+        assertThat(page0.isHasNext()).isTrue();
 
-        BrowsePage<Book> page1 = browse("title", null, null, nextCursor(page0), 0, 2);
-        assertThat(page1.content()).hasSize(2);
-        assertThat(page1.content().stream().map(Book::getId))
-                .doesNotContainAnyElementsOf(page0.content().stream().map(Book::getId).toList());
-    }
-
-    @Test
-    void cursorWithConflictingFacetsIsRejected() {
-        book("Alpha", List.of("Horror"));
-        em.flush();
-        String cursor = browse(null, null, null, null, 0, 20).page().cursor();
-        assertThatThrownBy(() -> browse(null, List.of("genre:Horror"), null, cursor, 0, 20))
-                .isInstanceOfSatisfying(APIException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
-                .hasMessageContaining("does not match");
+        AppPageResponse<Book> page1 = browse("title", null, null, 1, 2);
+        assertThat(page1.getContent()).hasSize(2);
+        assertThat(page1.getContent().stream().map(Book::getId))
+                .doesNotContainAnyElementsOf(page0.getContent().stream().map(Book::getId).toList());
     }
 
     @Test
     void deferredSortKeyIsRejected() {
         book("Alpha", List.of());
         em.flush();
-        assertThatThrownBy(() -> browse("random", null, null, null, 0, 20))
+        assertThatThrownBy(() -> browse("random", null, null, 0, 20))
                 .isInstanceOfSatisfying(APIException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
                 .hasMessageContaining("Unknown sort key");
-        assertThatThrownBy(() -> browse("fileSizeKb", null, null, null, 0, 20))
+        assertThatThrownBy(() -> browse("fileSizeKb", null, null, 0, 20))
                 .isInstanceOfSatisfying(APIException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
                 .hasMessageContaining("Unknown sort key");
-    }
-
-    @Test
-    void wrapLegacyAddsCursorAndLinksToExistingPage() {
-        Book book = Book.builder().id(1L).build();
-        org.springframework.data.domain.Page<Book> page =
-                new org.springframework.data.domain.PageImpl<>(List.of(book), PageRequest.of(0, 20), 1);
-
-        BrowsePage<Book> wrapped = browseService.wrapLegacy(page, PageRequest.of(0, 20));
-
-        assertThat(wrapped.content()).hasSize(1);
-        assertThat(wrapped.page().totalElements()).isEqualTo(1);
-        assertThat(wrapped.page().cursor()).isNotBlank();
-        assertThat(wrapped.links().stream().anyMatch(l -> l.rel().contains("self"))).isTrue();
     }
 
     @Test
@@ -256,8 +228,8 @@ class BookBrowseServiceTest {
         em.persist(md);
         em.flush();
 
-        BrowsePage<Book> result = browse(null, null, null, null, 0, 20);
-        assertThat(result.content()).hasSize(1);
-        assertThat(result.content().get(0).getId()).isNotEqualTo(outside.getId());
+        AppPageResponse<Book> result = browse(null, null, null, 0, 20);
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).getId()).isNotEqualTo(outside.getId());
     }
 }

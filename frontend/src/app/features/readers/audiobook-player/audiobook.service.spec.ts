@@ -89,7 +89,11 @@ describe('AudiobookService', () => {
     request.flush(null);
 
     expect(completed).toBe(true);
-    expect(queryClient.setQueryData).toHaveBeenCalledWith(['books'], expect.any(Function));
+    expect(queryClient.setQueryData).not.toHaveBeenCalledWith(['books'], expect.any(Function));
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['books'], exact: true});
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({queryKey: ['app-books'], predicate: expect.any(Function)})
+    );
   });
 
   it('includes both audiobookProgress and fileProgress in the payload when a book file id is present', () => {
@@ -115,6 +119,10 @@ describe('AudiobookService', () => {
     });
     request.flush(null);
 
-    expect(queryClient.setQueryData).toHaveBeenCalledWith(['books'], expect.any(Function));
+    expect(queryClient.setQueryData).not.toHaveBeenCalledWith(['books'], expect.any(Function));
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['books'], exact: true});
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({queryKey: ['app-books'], predicate: expect.any(Function)})
+    );
   });
 });

@@ -5,7 +5,7 @@ import {QueryClient} from '@tanstack/angular-query-experimental';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ResetProgressTypes} from '../../../shared/constants/reset-progress-type';
-import {Book, ReadStatus} from '../model/book.model';
+import {ReadStatus} from '../model/book.model';
 import {BOOKS_QUERY_KEY} from './book-query-keys';
 import {BookPatchService} from './book-patch.service';
 
@@ -57,12 +57,12 @@ describe('BookPatchService', () => {
     });
     request.flush(null);
 
-    expect(queryClient.setQueryData).toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.setQueryData).not.toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['books', 'detail', 11]});
   });
 
-  it('patches the read status the server derived from a saved progress', () => {
-    const setQueryData = queryClient.setQueryData as unknown as ReturnType<typeof vi.fn>;
+  it('reconciles app list views when the server derives read status from saved progress', () => {
     service.savePdfProgress(11, 23, 100).subscribe();
 
     const request = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books/progress'));
@@ -74,15 +74,10 @@ describe('BookPatchService', () => {
       dateFinished: '2026-02-01T00:00:00Z'
     });
 
-    const updater = setQueryData.mock.calls.find(call => call[0] === BOOKS_QUERY_KEY)![1] as
-      (books: Book[]) => Book[];
-    const patched = updater([{id: 11, libraryId: 1, libraryName: 'L', metadata: {bookId: 11, title: 'B'}}]);
-
-    expect(patched[0]).toMatchObject({
-      readStatus: ReadStatus.READ,
-      dateFinished: '2026-02-01T00:00:00Z',
-      pdfProgress: {page: 23, percentage: 100}
-    });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({queryKey: ['app-books'], predicate: expect.any(Function)})
+    );
   });
 
   it('deduplicates identical EPUB progress updates before posting', () => {
@@ -107,7 +102,8 @@ describe('BookPatchService', () => {
     request.flush(null);
 
     httpTestingController.expectNone(req => req.url.endsWith('/api/v1/books/progress'));
-    expect(queryClient.setQueryData).toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.setQueryData).not.toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['books', 'detail', 7]});
   });
 
@@ -124,7 +120,8 @@ describe('BookPatchService', () => {
       {bookId: 2, readStatus: ReadStatus.READING, readStatusModifiedTime: '2026-03-02T00:00:00Z', dateFinished: '2026-03-03'},
     ]);
 
-    expect(queryClient.setQueryData).toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.setQueryData).not.toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     // The list is never blanket-invalidated; a read-status change reconciles via a predicate.
     expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({queryKey: ['app-books']});
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
@@ -147,7 +144,8 @@ describe('BookPatchService', () => {
     });
     request.flush(null);
 
-    expect(queryClient.setQueryData).toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.setQueryData).not.toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['books', 'detail', 5]});
   });
 
@@ -166,7 +164,8 @@ describe('BookPatchService', () => {
       {bookId: 2, readStatus: ReadStatus.READ, readStatusModifiedTime: '2026-03-05T00:00:00Z', dateFinished: '2026-03-05'},
     ]);
 
-    expect(queryClient.setQueryData).toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.setQueryData).not.toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     // The list is never blanket-invalidated; a read-status change reconciles via a predicate.
     expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({queryKey: ['app-books']});
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
@@ -184,7 +183,8 @@ describe('BookPatchService', () => {
 
     service.updateLastReadTime(3);
 
-    expect(queryClient.setQueryData).toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.setQueryData).not.toHaveBeenCalledWith(BOOKS_QUERY_KEY, expect.any(Function));
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     httpTestingController.expectNone(req => req.url.includes('/api/v1/books'));
 
     vi.useRealTimers();

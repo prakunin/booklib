@@ -48,10 +48,14 @@ export function invalidateAppBooksQueries(queryClient: QueryClient): void {
   invalidateAppDerivedQueries(queryClient);
 }
 
+export function invalidateLegacyBooksQuery(queryClient: QueryClient): void {
+  void queryClient.invalidateQueries({queryKey: BOOKS_QUERY_KEY, exact: true});
+}
+
 // --- Full invalidation (refetches from server) ---
 
 export function invalidateBooksQuery(queryClient: QueryClient): void {
-  void queryClient.invalidateQueries({queryKey: BOOKS_QUERY_KEY, exact: true});
+  invalidateLegacyBooksQuery(queryClient);
   invalidateAppBooksQueries(queryClient);
 }
 
@@ -79,64 +83,42 @@ export function removeBooksFromCache(queryClient: QueryClient, bookIds: Iterable
     return;
   }
 
-  queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    current?.filter(book => !removedIds.has(book.id)) ?? current
-  );
+  removeAppBooksFromCache(queryClient, removedIds);
   removeBookQueries(queryClient, removedIds);
+  invalidateLegacyBooksQuery(queryClient);
   invalidateAppBooksQueries(queryClient);
 }
 
 // --- Surgical patches (updates cache directly, no list refetch) ---
 
-// Surgical add for the legacy flat ['books'] list. Only patches when that list is already
-// cached: a socket add must not fabricate a partial legacy catalog (the paginated app-books
-// cache is the source of truth), and fabricating it would rebuild an ever-growing array on
-// every event during a bulk import (O(N^2)). The paginated app-books invalidation is coalesced
-// by the caller (see BookSocketService.handleNewlyCreatedBook), so it is not triggered here.
 export function addBookToCache(queryClient: QueryClient, book: Book): void {
-  queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current => {
-    if (!current) return current;
-    const exists = current.some(b => b.id === book.id);
-    return exists ? current.map(b => b.id === book.id ? book : b) : [...current, book];
-  });
+  void book;
+  invalidateLegacyBooksQuery(queryClient);
 }
 
 export function patchBooksInCache(queryClient: QueryClient, updatedBooks: Book[]): void {
-  const updatedMap = new Map(updatedBooks.map(book => [book.id, book]));
-  queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    current?.map(book => updatedMap.get(book.id) ?? book) ?? current
-  );
+  patchAppBooksFromBooksInCache(queryClient, updatedBooks);
+  invalidateLegacyBooksQuery(queryClient);
   invalidateBookDetailQueries(queryClient, updatedBooks.map(b => b.id));
   invalidateAppBooksQueries(queryClient);
 }
 
 export function patchBookMetadataInCache(queryClient: QueryClient, bookId: number, metadata: BookMetadata): void {
-  queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    current?.map(book =>
-      book.id === bookId ? {...book, metadata} : book
-    ) ?? current
-  );
+  patchAppBooksSummaryFieldsInCache(queryClient, [{bookId, patch: metadataToSummaryPatch(metadata)}]);
+  invalidateLegacyBooksQuery(queryClient);
   invalidateBookDetailQueries(queryClient, [bookId]);
   invalidateAppBooksQueries(queryClient);
 }
 
 export function patchBookInCacheWith(queryClient: QueryClient, bookId: number, updater: (book: Book) => Book): void {
-  queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    current?.map(book => book.id === bookId ? updater(book) : book) ?? current
-  );
+  void updater;
+  invalidateLegacyBooksQuery(queryClient);
   invalidateBookDetailQueries(queryClient, [bookId]);
   invalidateAppBooksQueries(queryClient);
 }
 
 export function patchBookFieldsInCache(queryClient: QueryClient, updates: {bookId: number; fields: Partial<Book>}[]): void {
-  const updateMap = new Map(updates.map(u => [u.bookId, u.fields]));
-  // Do not create the legacy full-books cache when only the paginated app-books cache exists.
-  queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    current?.map(book => {
-      const fields = updateMap.get(book.id);
-      return fields ? {...book, ...fields} : book;
-    }) ?? current
-  );
+  invalidateLegacyBooksQuery(queryClient);
   // Patch the visible rows in place for instant feedback (no multi-page refetch)...
   patchAppBooksFieldsInCache(queryClient, updates);
   invalidateBookDetailQueries(queryClient, updates.map(u => u.bookId));
@@ -220,10 +202,26 @@ function bookFieldsToSummaryPatch(fields: Partial<Book>): Partial<AppBookSummary
 
 export function patchAppBooksFieldsInCache(queryClient: QueryClient, updates: {bookId: number; fields: Partial<Book>}[]): void {
   if (updates.length === 0) return;
+  patchAppBooksSummaryFieldsInCache(
+    queryClient,
+    updates.map(u => ({bookId: u.bookId, patch: bookFieldsToSummaryPatch(u.fields)}))
+  );
+}
+
+function patchAppBooksFromBooksInCache(queryClient: QueryClient, books: Book[]): void {
+  patchAppBooksSummaryFieldsInCache(
+    queryClient,
+    books.map(book => ({bookId: book.id, patch: bookToSummaryPatch(book)}))
+  );
+}
+
+function patchAppBooksSummaryFieldsInCache(
+  queryClient: QueryClient,
+  updates: {bookId: number; patch: Partial<AppBookSummary>}[]
+): void {
   const patchMap = new Map<number, Partial<AppBookSummary>>();
-  for (const u of updates) {
-    const patch = bookFieldsToSummaryPatch(u.fields);
-    if (Object.keys(patch).length > 0) patchMap.set(u.bookId, patch);
+  for (const update of updates) {
+    if (Object.keys(update.patch).length > 0) patchMap.set(update.bookId, update.patch);
   }
   // Nothing summary-visible changed (e.g. a dateFinished-only update) — skip the rewrite.
   if (patchMap.size === 0) return;
@@ -241,6 +239,32 @@ export function patchAppBooksFieldsInCache(queryClient: QueryClient, updates: {b
             return patch ? {...summary, ...patch} : summary;
           }),
         })),
+      };
+    }
+  );
+}
+
+function removeAppBooksFromCache(queryClient: QueryClient, bookIds: Set<number>): void {
+  queryClient.setQueriesData<InfiniteData<AppPageResponse<AppBookSummary>>>(
+    {queryKey: APP_BOOKS_QUERY_PREFIX},
+    current => {
+      if (!current) return current;
+      return {
+        ...current,
+        pages: current.pages.map(page => {
+          const nextContent = page.content.filter(summary => !bookIds.has(summary.id));
+          const removedCount = page.content.length - nextContent.length;
+          if (removedCount === 0) return page;
+          const totalElements = Math.max(0, page.totalElements - removedCount);
+          const totalPages = page.size > 0 ? Math.ceil(totalElements / page.size) : 0;
+          return {
+            ...page,
+            content: nextContent,
+            totalElements,
+            totalPages,
+            hasNext: page.page < totalPages - 1,
+          };
+        }),
       };
     }
   );
@@ -277,21 +301,6 @@ export function patchAppBooksCoverInCache(
 }
 
 export function patchAppBooksMetadataLockInCache(queryClient: QueryClient, bookId: number, allMetadataLocked: boolean): void {
-  // Do not create the legacy full-books cache when only the paginated app-books cache exists.
-  queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    current?.map(book =>
-      book.id === bookId
-        ? {
-          ...book,
-          metadata: {
-            ...(book.metadata ?? {bookId}),
-            allMetadataLocked,
-          },
-        }
-        : book
-    ) ?? current
-  );
-
   queryClient.setQueriesData<InfiniteData<AppPageResponse<AppBookSummary>>>(
     {queryKey: APP_BOOKS_QUERY_PREFIX},
     current => {
@@ -308,4 +317,63 @@ export function patchAppBooksMetadataLockInCache(queryClient: QueryClient, bookI
       };
     }
   );
+  invalidateLegacyBooksQuery(queryClient);
+}
+
+function metadataToSummaryPatch(metadata: BookMetadata): Partial<AppBookSummary> {
+  return {
+    title: metadata.title ?? '',
+    authors: metadata.authors ?? [],
+    publisher: metadata.publisher ?? null,
+    seriesName: metadata.seriesName ?? null,
+    seriesNumber: metadata.seriesNumber ?? null,
+    categories: metadata.categories ?? null,
+    tags: metadata.tags ?? null,
+    moods: metadata.moods ?? null,
+    language: metadata.language ?? null,
+    narrator: metadata.narrator ?? metadata.audiobookMetadata?.narrator ?? null,
+    isbn13: metadata.isbn13 ?? null,
+    isbn10: metadata.isbn10 ?? null,
+    coverUpdatedOn: metadata.coverUpdatedOn ?? null,
+    audiobookCoverUpdatedOn: metadata.audiobookCoverUpdatedOn ?? null,
+    publishedDate: metadata.publishedDate ?? null,
+    pageCount: metadata.pageCount ?? null,
+    ageRating: metadata.ageRating ?? null,
+    contentRating: metadata.contentRating ?? null,
+    amazonRating: metadata.amazonRating ?? null,
+    amazonReviewCount: metadata.amazonReviewCount ?? null,
+    goodreadsRating: metadata.goodreadsRating ?? null,
+    goodreadsReviewCount: metadata.goodreadsReviewCount ?? null,
+    hardcoverRating: metadata.hardcoverRating ?? null,
+    hardcoverReviewCount: metadata.hardcoverReviewCount ?? null,
+    ranobedbRating: metadata.ranobedbRating ?? null,
+    lubimyczytacRating: metadata.lubimyczytacRating ?? null,
+    audibleRating: metadata.audibleRating ?? null,
+    audibleReviewCount: metadata.audibleReviewCount ?? null,
+    allMetadataLocked: metadata.allMetadataLocked ?? null,
+  };
+}
+
+function bookToSummaryPatch(book: Book): Partial<AppBookSummary> {
+  const patch: Partial<AppBookSummary> = {};
+  if (book.libraryId != null) patch.libraryId = book.libraryId;
+  if (book.addedOn !== undefined) patch.addedOn = book.addedOn ?? null;
+  if (book.lastReadTime !== undefined) patch.lastReadTime = book.lastReadTime ?? null;
+  if (book.readStatus !== undefined) patch.readStatus = book.readStatus ?? null;
+  if (book.personalRating !== undefined) patch.personalRating = book.personalRating ?? null;
+  if (book.metadataMatchScore !== undefined) patch.metadataMatchScore = book.metadataMatchScore ?? null;
+  if (book.fileSizeKb !== undefined) patch.fileSizeKb = book.fileSizeKb ?? null;
+  if (book.isPhysical !== undefined) patch.isPhysical = book.isPhysical ?? null;
+  if (book.primaryFile !== undefined) {
+    patch.primaryFileId = book.primaryFile?.id ?? null;
+    patch.primaryFileType = book.primaryFile?.bookType ?? null;
+    patch.primaryFileName = book.primaryFile?.fileName ?? null;
+  }
+  for (const key of PROGRESS_KEYS) {
+    if (key in book) {
+      const progress = book[key] as {percentage?: number} | undefined;
+      patch.readProgress = progress?.percentage ?? null;
+    }
+  }
+  return book.metadata ? {...patch, ...metadataToSummaryPatch(book.metadata)} : patch;
 }

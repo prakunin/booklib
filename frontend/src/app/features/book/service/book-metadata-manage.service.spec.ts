@@ -62,7 +62,7 @@ describe('BookMetadataManageService', () => {
     vi.restoreAllMocks();
   });
 
-  it('updates metadata with merge params and patches the cached metadata', () => {
+  it('updates metadata with merge params and invalidates cached lists', () => {
     const original = makeBook(7, {title: 'Old Title'});
     const wrapper: MetadataUpdateWrapper = {
       metadata: {bookId: 7, title: 'Updated Title'},
@@ -81,10 +81,12 @@ describe('BookMetadataManageService', () => {
     expect(request.request.body).toEqual(wrapper);
     request.flush({bookId: 7, title: 'Updated Title'});
 
-    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)?.[0].metadata?.title).toBe('Updated Title');
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)?.[0].metadata?.title).toBe('Old Title');
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['app-books']});
   });
 
-  it('toggles cached metadata lock fields for successful bulk lock updates', () => {
+  it('invalidates cached lists for successful bulk lock updates', () => {
     queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [
       makeBook(1, {titleLocked: false, authorsLocked: false}),
     ]);
@@ -100,9 +102,11 @@ describe('BookMetadataManageService', () => {
     request.flush(null);
 
     expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)?.[0].metadata).toMatchObject({
-      titleLocked: true,
-      authorsLocked: true,
+      titleLocked: false,
+      authorsLocked: false,
     });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['app-books']});
   });
 
   it('shows an error toast when toggleFieldLocks fails', () => {

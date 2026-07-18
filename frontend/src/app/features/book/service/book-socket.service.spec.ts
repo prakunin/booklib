@@ -43,14 +43,16 @@ describe('BookSocketService', () => {
     vi.restoreAllMocks();
   });
 
-  it('adds newly created books into the list cache when it exists', () => {
+  it('invalidates the legacy list when newly created books arrive', () => {
     const existing = makeBook(1);
     const created = makeBook(2);
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [existing]);
 
     service.handleNewlyCreatedBook(created);
 
-    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([existing, created]);
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([existing]);
+    expect(invalidateSpy).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
   });
 
   const appBooksInvalidationCount = (invalidateSpy: {mock: {calls: unknown[][]}}) =>
@@ -123,14 +125,16 @@ describe('BookSocketService', () => {
     expect(queryClient.getQueryData(bookRecommendationsQueryKey(1, 20))).toBeUndefined();
   });
 
-  it('patches updated books directly into the list cache', () => {
+  it('invalidates the legacy list when updated books arrive', () => {
     const original = makeBook(7, {libraryName: 'Original'});
     const updated = makeBook(7, {libraryName: 'Updated'});
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [original]);
 
     service.handleBookUpdate(updated);
 
-    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([updated]);
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([original]);
+    expect(invalidateSpy).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
   });
 
   it('patches multiple cover timestamps and invalidates their detail queries', () => {
@@ -146,16 +150,8 @@ describe('BookSocketService', () => {
 
     service.handleMultipleBookCoverPatches([{id: 3, coverUpdatedOn: '2026-03-26T12:34:00Z'}]);
 
-    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([
-      {
-        ...first,
-        metadata: {
-          ...first.metadata,
-          coverUpdatedOn: '2026-03-26T12:34:00Z',
-        },
-      },
-      second,
-    ]);
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([first, second]);
+    expect(invalidateSpy).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(invalidateSpy).toHaveBeenCalledWith({queryKey: ['books', 'detail', 3]});
   });
 
