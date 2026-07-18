@@ -1,16 +1,14 @@
 package org.booklore.service.metadata.extractor;
 
 import org.booklore.model.dto.BookMetadata;
-import org.booklore.util.SecureXmlUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
-import javax.xml.parsers.DocumentBuilder;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -46,54 +44,106 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
      */
     @Override
     public byte[] extractCover(File file) {
-        try (InputStream inputStream = getInputStream(file)) {
-            DocumentBuilder builder = SecureXmlUtils.createSecureDocumentBuilder(true);
-            Document doc = builder.parse(inputStream);
-
-            // Look for cover image in binary elements
-            NodeList binaries = doc.getElementsByTagNameNS(FB2_NAMESPACE, "binary");
-            for (int i = 0; i < binaries.getLength(); i++) {
-                Element binary = (Element) binaries.item(i);
-                String id = binary.getAttribute("id");
-
-                if (id != null && id.toLowerCase().contains("cover")) {
-                    String contentType = binary.getAttribute("content-type");
-                    if (contentType != null && contentType.startsWith("image/")) {
-                        String base64Data = binary.getTextContent().trim();
-                        return Base64.getMimeDecoder().decode(base64Data);
-                    }
-                }
+        try {
+            CoverCandidate candidate = findCoverCandidate(file);
+            if (candidate == null) {
+                // Parsed all the way through and found no cover binary: a genuine, permanent miss.
+                return null;
             }
+            return decodeCoverBinary(file, candidate.binaryId());
+        } catch (CoverExtractionException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new CoverExtractionException("Failed to extract cover from FB2: " + file.getName(), e);
+        }
+    }
 
-            // If no cover found by name, try to find the first referenced image in title-info
-            Element titleInfo = getFirstElementByTagNameNS(doc, FB2_NAMESPACE, "title-info");
-            if (titleInfo != null) {
-                NodeList coverPages = titleInfo.getElementsByTagNameNS(FB2_NAMESPACE, "coverpage");
-                if (coverPages.getLength() > 0) {
-                    Element coverPage = (Element) coverPages.item(0);
-                    NodeList images = coverPage.getElementsByTagNameNS(FB2_NAMESPACE, "image");
-                    if (images.getLength() > 0) {
-                        Element image = (Element) images.item(0);
-                        String href = image.getAttributeNS("http://www.w3.org/1999/xlink", "href");
-                        if (href != null && href.startsWith("#")) {
-                            String imageId = href.substring(1);
-                            // Find the binary with this ID
-                            for (int i = 0; i < binaries.getLength(); i++) {
-                                Element binary = (Element) binaries.item(i);
-                                if (imageId.equals(binary.getAttribute("id"))) {
-                                    String base64Data = binary.getTextContent().trim();
-                                    return Base64.getMimeDecoder().decode(base64Data);
-                                }
+    private CoverCandidate findCoverCandidate(File file) throws Exception {
+        try (InputStream inputStream = getInputStream(file)) {
+            XMLStreamReader reader = createXmlStreamReader(inputStream);
+            String coverBinaryId = null;
+            String referencedImageId = null;
+            int titleInfoDepth = 0;
+            int coverpageDepth = 0;
+            try {
+                while (reader.hasNext()) {
+                    int event = reader.next();
+                    if (event == XMLStreamConstants.START_ELEMENT) {
+                        if (titleInfoDepth > 0) {
+                            titleInfoDepth++;
+                        }
+                        if (coverpageDepth > 0) {
+                            coverpageDepth++;
+                        }
+
+                        String localName = reader.getLocalName();
+                        if ("title-info".equals(localName)) {
+                            titleInfoDepth = 1;
+                        } else if (titleInfoDepth > 0 && "coverpage".equals(localName)) {
+                            coverpageDepth = 1;
+                        } else if (coverpageDepth > 0 && "image".equals(localName) && referencedImageId == null) {
+                            String href = getHrefAttribute(reader);
+                            if (href != null && href.startsWith("#")) {
+                                referencedImageId = href.substring(1);
                             }
+                        } else if ("binary".equals(localName) && coverBinaryId == null) {
+                            String id = reader.getAttributeValue(null, "id");
+                            String contentType = reader.getAttributeValue(null, "content-type");
+                            if (StringUtils.containsIgnoreCase(id, "cover")
+                                    && StringUtils.startsWithIgnoreCase(contentType, "image/")) {
+                                coverBinaryId = id;
+                            }
+                        }
+                    } else if (event == XMLStreamConstants.END_ELEMENT) {
+                        if (coverpageDepth > 0) {
+                            coverpageDepth--;
+                        }
+                        if (titleInfoDepth > 0) {
+                            titleInfoDepth--;
                         }
                     }
                 }
+            } finally {
+                reader.close();
             }
 
-            // Parsed all the way through and found no cover binary: a genuine, permanent miss.
+            String binaryId = StringUtils.defaultIfBlank(coverBinaryId, referencedImageId);
+            return StringUtils.isBlank(binaryId) ? null : new CoverCandidate(binaryId);
+        }
+    }
+
+    private byte[] decodeCoverBinary(File file, String binaryId) throws Exception {
+        try (InputStream inputStream = getInputStream(file)) {
+            XMLStreamReader reader = createXmlStreamReader(inputStream);
+            StringBuilder base64 = null;
+            int targetDepth = 0;
+            try {
+                while (reader.hasNext()) {
+                    int event = reader.next();
+                    if (event == XMLStreamConstants.START_ELEMENT) {
+                        if (base64 != null) {
+                            targetDepth++;
+                        } else if ("binary".equals(reader.getLocalName())
+                                && binaryId.equals(reader.getAttributeValue(null, "id"))) {
+                            base64 = new StringBuilder();
+                            targetDepth = 1;
+                        }
+                    } else if ((event == XMLStreamConstants.CHARACTERS
+                            || event == XMLStreamConstants.CDATA
+                            || event == XMLStreamConstants.SPACE)
+                            && base64 != null) {
+                        base64.append(reader.getText());
+                    } else if (event == XMLStreamConstants.END_ELEMENT && base64 != null) {
+                        if (targetDepth == 1 && "binary".equals(reader.getLocalName())) {
+                            return Base64.getMimeDecoder().decode(base64.toString().trim());
+                        }
+                        targetDepth--;
+                    }
+                }
+            } finally {
+                reader.close();
+            }
             return null;
-        } catch (Exception e) {
-            throw new CoverExtractionException("Failed to extract cover from FB2: " + file.getName(), e);
         }
     }
 
@@ -114,26 +164,21 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
      */
     public BookMetadata extractMetadata(InputStream inputStream, String sourceName) {
         try {
-            DocumentBuilder builder = SecureXmlUtils.createSecureDocumentBuilder(true);
-            Document doc = builder.parse(inputStream);
-
             BookMetadata.BookMetadataBuilder metadataBuilder = BookMetadata.builder();
             List<String> authors = new ArrayList<>();
             Set<String> categories = new HashSet<>();
 
-            Element titleInfo = getFirstElementByTagNameNS(doc, FB2_NAMESPACE, "title-info");
-            if (titleInfo != null) {
-                extractTitleInfo(titleInfo, metadataBuilder, authors, categories);
-            }
-
-            Element publishInfo = getFirstElementByTagNameNS(doc, FB2_NAMESPACE, "publish-info");
-            if (publishInfo != null) {
-                extractPublishInfo(publishInfo, metadataBuilder);
-            }
-
-            Element documentInfo = getFirstElementByTagNameNS(doc, FB2_NAMESPACE, "document-info");
-            if (documentInfo != null) {
-                extractDocumentInfo(documentInfo, metadataBuilder);
+            XMLStreamReader reader = createXmlStreamReader(inputStream);
+            try {
+                while (reader.hasNext()) {
+                    int event = reader.next();
+                    if (event == XMLStreamConstants.START_ELEMENT && "description".equals(reader.getLocalName())) {
+                        extractDescription(reader, metadataBuilder, authors, categories);
+                        break;
+                    }
+                }
+            } finally {
+                reader.close();
             }
 
             metadataBuilder.authors(authors);
@@ -145,189 +190,270 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         }
     }
 
-    private void extractTitleInfo(Element titleInfo, BookMetadata.BookMetadataBuilder builder,
-                                   List<String> authors, Set<String> categories) {
-        // Extract genres (categories)
-        NodeList genres = titleInfo.getElementsByTagNameNS(FB2_NAMESPACE, "genre");
-        for (int i = 0; i < genres.getLength(); i++) {
-            String genre = genres.item(i).getTextContent().trim();
-            if (StringUtils.isNotBlank(genre)) {
-                categories.add(genre);
-            }
-        }
-
-        // Extract authors
-        NodeList authorNodes = titleInfo.getElementsByTagNameNS(FB2_NAMESPACE, "author");
-        for (int i = 0; i < authorNodes.getLength(); i++) {
-            Element author = (Element) authorNodes.item(i);
-            String authorName = extractPersonName(author);
-            if (StringUtils.isNotBlank(authorName)) {
-                authors.add(authorName);
-            }
-        }
-
-        // Extract book title
-        Element bookTitle = getFirstElementByTagNameNS(titleInfo, FB2_NAMESPACE, "book-title");
-        if (bookTitle != null) {
-            builder.title(bookTitle.getTextContent().trim());
-        }
-
-        // Extract annotation (description)
-        Element annotation = getFirstElementByTagNameNS(titleInfo, FB2_NAMESPACE, "annotation");
-        if (annotation != null) {
-            String description = extractTextFromElement(annotation);
-            if (StringUtils.isNotBlank(description)) {
-                builder.description(description);
-            }
-        }
-
-        // Extract keywords (additional categories/tags)
-        Element keywords = getFirstElementByTagNameNS(titleInfo, FB2_NAMESPACE, "keywords");
-        if (keywords != null) {
-            String keywordsText = keywords.getTextContent().trim();
-            if (StringUtils.isNotBlank(keywordsText)) {
-                for (String keyword : KEYWORD_SEPARATOR_PATTERN.split(keywordsText)) {
-                    String trimmed = keyword.trim();
-                    if (StringUtils.isNotBlank(trimmed)) {
-                        categories.add(trimmed);
+    private void extractDescription(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder,
+                                    List<String> authors, Set<String> categories) throws XMLStreamException {
+        while (reader.hasNext()) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) {
+                switch (reader.getLocalName()) {
+                    case "title-info" -> extractTitleInfo(reader, builder, authors, categories);
+                    case "publish-info" -> extractPublishInfo(reader, builder);
+                    case "document-info" -> extractDocumentInfo(reader);
+                    default -> {
                     }
                 }
-            }
-        }
-
-        // Extract date
-        Element date = getFirstElementByTagNameNS(titleInfo, FB2_NAMESPACE, "date");
-        if (date != null) {
-            String dateValue = date.getAttribute("value");
-            if (StringUtils.isBlank(dateValue)) {
-                dateValue = date.getTextContent().trim();
-            }
-            LocalDate publishedDate = parseDate(dateValue);
-            if (publishedDate != null) {
-                builder.publishedDate(publishedDate);
-            }
-        }
-
-        // Extract language
-        Element lang = getFirstElementByTagNameNS(titleInfo, FB2_NAMESPACE, "lang");
-        if (lang != null) {
-            builder.language(lang.getTextContent().trim());
-        }
-
-        // Extract sequence (series information)
-        Element sequence = getFirstElementByTagNameNS(titleInfo, FB2_NAMESPACE, "sequence");
-        if (sequence != null) {
-            String seriesName = sequence.getAttribute("name");
-            if (StringUtils.isNotBlank(seriesName)) {
-                builder.seriesName(seriesName.trim());
-            }
-            String seriesNumber = sequence.getAttribute("number");
-            if (StringUtils.isNotBlank(seriesNumber)) {
-                try {
-                    builder.seriesNumber(Float.parseFloat(seriesNumber));
-                } catch (NumberFormatException e) {
-                    log.debug("Failed to parse series number: {}", seriesNumber);
-                }
+            } else if (event == XMLStreamConstants.END_ELEMENT && "description".equals(reader.getLocalName())) {
+                return;
             }
         }
     }
 
-    private void extractPublishInfo(Element publishInfo, BookMetadata.BookMetadataBuilder builder) {
-        // Extract publisher
-        Element publisher = getFirstElementByTagNameNS(publishInfo, FB2_NAMESPACE, "publisher");
-        if (publisher != null) {
-            builder.publisher(publisher.getTextContent().trim());
-        }
-
-        // Extract publication year
-        Element year = getFirstElementByTagNameNS(publishInfo, FB2_NAMESPACE, "year");
-        if (year != null) {
-            String yearText = year.getTextContent().trim();
-            Matcher matcher = YEAR_PATTERN.matcher(yearText);
-            if (matcher.find()) {
-                try {
-                    int yearValue = Integer.parseInt(matcher.group());
-                    builder.publishedDate(LocalDate.of(yearValue, 1, 1));
-                } catch (NumberFormatException e) {
-                    log.debug("Failed to parse year: {}", yearText);
+    private void extractTitleInfo(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder,
+                                  List<String> authors, Set<String> categories) throws XMLStreamException {
+        while (reader.hasNext()) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) {
+                switch (reader.getLocalName()) {
+                    case "genre" -> addCategory(categories, readElementText(reader));
+                    case "author" -> addAuthor(authors, extractPersonName(reader));
+                    case "book-title" -> builder.title(readElementText(reader));
+                    case "annotation" -> {
+                        String description = readElementText(reader);
+                        if (StringUtils.isNotBlank(description)) {
+                            builder.description(description);
+                        }
+                    }
+                    case "keywords" -> addKeywords(categories, readElementText(reader));
+                    case "date" -> {
+                        String dateValue = reader.getAttributeValue(null, "value");
+                        if (StringUtils.isBlank(dateValue)) {
+                            dateValue = readElementText(reader);
+                        } else {
+                            skipElement(reader);
+                        }
+                        LocalDate publishedDate = parseDate(dateValue);
+                        if (publishedDate != null) {
+                            builder.publishedDate(publishedDate);
+                        }
+                    }
+                    case "lang" -> builder.language(readElementText(reader));
+                    case "sequence" -> {
+                        extractSequence(reader, builder);
+                        skipElement(reader);
+                    }
+                    default -> {
+                    }
                 }
-            }
-        }
-
-        // Extract ISBN
-        Element isbn = getFirstElementByTagNameNS(publishInfo, FB2_NAMESPACE, "isbn");
-        if (isbn != null) {
-            String isbnText = ISBN_CLEANER_PATTERN.matcher(isbn.getTextContent().trim()).replaceAll("");
-            if (isbnText.length() == 13) {
-                builder.isbn13(isbnText);
-            } else if (isbnText.length() == 10) {
-                builder.isbn10(isbnText);
-            } else if (ISBN_PATTERN.matcher(isbnText).find()) {
-                // Extract the first valid ISBN pattern found
-                Matcher matcher = ISBN_PATTERN.matcher(isbnText);
-                if (matcher.find()) {
-                    builder.isbn10(matcher.group());
-                }
+            } else if (event == XMLStreamConstants.END_ELEMENT && "title-info".equals(reader.getLocalName())) {
+                return;
             }
         }
     }
 
-    private void extractDocumentInfo(Element documentInfo, BookMetadata.BookMetadataBuilder builder) {
-        // Extract document ID (can be used as an identifier)
-        Element id = getFirstElementByTagNameNS(documentInfo, FB2_NAMESPACE, "id");
-        if (id != null) {
-            // Could potentially map this to a custom identifier field if needed
-            log.debug("FB2 document ID: {}", id.getTextContent().trim());
+    private void extractPublishInfo(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder)
+            throws XMLStreamException {
+        while (reader.hasNext()) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) {
+                switch (reader.getLocalName()) {
+                    case "publisher" -> builder.publisher(readElementText(reader));
+                    case "year" -> extractPublicationYear(reader, builder);
+                    case "isbn" -> extractIsbn(reader, builder);
+                    default -> {
+                    }
+                }
+            } else if (event == XMLStreamConstants.END_ELEMENT && "publish-info".equals(reader.getLocalName())) {
+                return;
+            }
         }
     }
 
-    private String extractPersonName(Element personElement) {
-        Element firstName = getFirstElementByTagNameNS(personElement, FB2_NAMESPACE, "first-name");
-        Element middleName = getFirstElementByTagNameNS(personElement, FB2_NAMESPACE, "middle-name");
-        Element lastName = getFirstElementByTagNameNS(personElement, FB2_NAMESPACE, "last-name");
-        Element nickname = getFirstElementByTagNameNS(personElement, FB2_NAMESPACE, "nickname");
+    private void extractDocumentInfo(XMLStreamReader reader) throws XMLStreamException {
+        while (reader.hasNext()) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT && "id".equals(reader.getLocalName())) {
+                log.debug("FB2 document ID: {}", readElementText(reader));
+            } else if (event == XMLStreamConstants.END_ELEMENT && "document-info".equals(reader.getLocalName())) {
+                return;
+            }
+        }
+    }
+
+    private void addCategory(Set<String> categories, String category) {
+        if (StringUtils.isNotBlank(category)) {
+            categories.add(category.trim());
+        }
+    }
+
+    private void addKeywords(Set<String> categories, String keywordsText) {
+        if (StringUtils.isBlank(keywordsText)) {
+            return;
+        }
+        for (String keyword : KEYWORD_SEPARATOR_PATTERN.split(keywordsText)) {
+            addCategory(categories, keyword);
+        }
+    }
+
+    private void addAuthor(List<String> authors, String authorName) {
+        if (StringUtils.isNotBlank(authorName)) {
+            authors.add(authorName);
+        }
+    }
+
+    private String extractPersonName(XMLStreamReader reader) throws XMLStreamException {
+        String firstName = null;
+        String middleName = null;
+        String lastName = null;
+        String nickname = null;
+
+        while (reader.hasNext()) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) {
+                switch (reader.getLocalName()) {
+                    case "first-name" -> firstName = readElementText(reader);
+                    case "middle-name" -> middleName = readElementText(reader);
+                    case "last-name" -> lastName = readElementText(reader);
+                    case "nickname" -> nickname = readElementText(reader);
+                    default -> {
+                    }
+                }
+            } else if (event == XMLStreamConstants.END_ELEMENT && "author".equals(reader.getLocalName())) {
+                break;
+            }
+        }
 
         StringBuilder name = new StringBuilder(64);
 
-        if (firstName != null) {
-            name.append(firstName.getTextContent().trim());
+        if (StringUtils.isNotBlank(firstName)) {
+            name.append(firstName.trim());
         }
-        if (middleName != null) {
+        if (StringUtils.isNotBlank(middleName)) {
             if (!name.isEmpty()) name.append(" ");
-            name.append(middleName.getTextContent().trim());
+            name.append(middleName.trim());
         }
-        if (lastName != null) {
+        if (StringUtils.isNotBlank(lastName)) {
             if (!name.isEmpty()) name.append(" ");
-            name.append(lastName.getTextContent().trim());
+            name.append(lastName.trim());
         }
 
-        // If no name parts found, try nickname
-        if (name.isEmpty() && nickname != null) {
-            name.append(nickname.getTextContent().trim());
+        if (name.isEmpty() && StringUtils.isNotBlank(nickname)) {
+            name.append(nickname.trim());
         }
 
         return name.toString();
     }
 
-    private String extractTextFromElement(Element element) {
-        StringBuilder text = new StringBuilder();
-        NodeList children = element.getChildNodes();
-
-        for (int i = 0; i < children.getLength(); i++) {
-            Node child = children.item(i);
-            if (child.getNodeType() == Node.TEXT_NODE) {
-                text.append(child.getTextContent().trim()).append(" ");
-            } else if (child.getNodeType() == Node.ELEMENT_NODE) {
-                Element childElement = (Element) child;
-                if ("p".equals(childElement.getLocalName())) {
-                    text.append(childElement.getTextContent().trim()).append("\n\n");
-                } else {
-                    text.append(extractTextFromElement(childElement));
-                }
+    private void extractSequence(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder) {
+        String seriesName = reader.getAttributeValue(null, "name");
+        if (StringUtils.isNotBlank(seriesName)) {
+            builder.seriesName(seriesName.trim());
+        }
+        String seriesNumber = reader.getAttributeValue(null, "number");
+        if (StringUtils.isNotBlank(seriesNumber)) {
+            try {
+                builder.seriesNumber(Float.parseFloat(seriesNumber));
+            } catch (NumberFormatException e) {
+                log.debug("Failed to parse series number: {}", seriesNumber);
             }
         }
+    }
 
-        return text.toString().trim();
+    private void extractPublicationYear(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder)
+            throws XMLStreamException {
+        String yearText = readElementText(reader);
+        Matcher matcher = YEAR_PATTERN.matcher(yearText);
+        if (matcher.find()) {
+            try {
+                int yearValue = Integer.parseInt(matcher.group());
+                builder.publishedDate(LocalDate.of(yearValue, 1, 1));
+            } catch (NumberFormatException e) {
+                log.debug("Failed to parse year: {}", yearText);
+            }
+        }
+    }
+
+    private void extractIsbn(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder)
+            throws XMLStreamException {
+        String isbnText = ISBN_CLEANER_PATTERN.matcher(readElementText(reader)).replaceAll("");
+        if (isbnText.length() == 13) {
+            builder.isbn13(isbnText);
+        } else if (isbnText.length() == 10) {
+            builder.isbn10(isbnText);
+        } else if (ISBN_PATTERN.matcher(isbnText).find()) {
+            Matcher matcher = ISBN_PATTERN.matcher(isbnText);
+            if (matcher.find()) {
+                builder.isbn10(matcher.group());
+            }
+        }
+    }
+
+    private String readElementText(XMLStreamReader reader) throws XMLStreamException {
+        StringBuilder text = new StringBuilder();
+        int depth = 0;
+        while (reader.hasNext()) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) {
+                depth++;
+            } else if (event == XMLStreamConstants.CHARACTERS
+                    || event == XMLStreamConstants.CDATA
+                    || event == XMLStreamConstants.SPACE) {
+                text.append(reader.getText());
+            } else if (event == XMLStreamConstants.END_ELEMENT) {
+                if (depth == 0) {
+                    return text.toString().trim();
+                }
+                depth--;
+            }
+        }
+        throw new XMLStreamException("Unexpected end of FB2 element");
+    }
+
+    private void skipElement(XMLStreamReader reader) throws XMLStreamException {
+        int depth = 0;
+        while (reader.hasNext()) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) {
+                depth++;
+            } else if (event == XMLStreamConstants.END_ELEMENT) {
+                if (depth == 0) {
+                    return;
+                }
+                depth--;
+            }
+        }
+    }
+
+    private String getHrefAttribute(XMLStreamReader reader) {
+        String href = reader.getAttributeValue("http://www.w3.org/1999/xlink", "href");
+        if (href != null) {
+            return href;
+        }
+        href = reader.getAttributeValue(null, "href");
+        if (href != null) {
+            return href;
+        }
+        for (int i = 0; i < reader.getAttributeCount(); i++) {
+            if ("href".equals(reader.getAttributeLocalName(i))) {
+                return reader.getAttributeValue(i);
+            }
+        }
+        return null;
+    }
+
+    private XMLStreamReader createXmlStreamReader(InputStream inputStream) throws XMLStreamException {
+        XMLInputFactory factory = XMLInputFactory.newFactory();
+        setXmlProperty(factory, XMLInputFactory.SUPPORT_DTD, false);
+        setXmlProperty(factory, "javax.xml.stream.isSupportingExternalEntities", false);
+        setXmlProperty(factory, XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
+        return factory.createXMLStreamReader(inputStream);
+    }
+
+    private void setXmlProperty(XMLInputFactory factory, String property, Object value) {
+        try {
+            factory.setProperty(property, value);
+        } catch (IllegalArgumentException e) {
+            log.debug("XMLInputFactory does not support property {}", property, e);
+        }
     }
 
     private LocalDate parseDate(String dateString) {
@@ -354,18 +480,6 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         return null;
     }
 
-    private Element getFirstElementByTagNameNS(Node parent, String namespace, String localName) {
-        NodeList nodes;
-        if (parent instanceof Document document) {
-            nodes = document.getElementsByTagNameNS(namespace, localName);
-        } else if (parent instanceof Element element) {
-            nodes = element.getElementsByTagNameNS(namespace, localName);
-        } else {
-            return null;
-        }
-        return nodes.getLength() > 0 ? (Element) nodes.item(0) : null;
-    }
-
     private InputStream getInputStream(File file) throws Exception {
         FileInputStream fis = new FileInputStream(file);
         if (file.getName().toLowerCase().endsWith(".gz")) {
@@ -377,5 +491,8 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
             }
         }
         return fis;
+    }
+
+    private record CoverCandidate(String binaryId) {
     }
 }
