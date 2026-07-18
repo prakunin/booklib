@@ -205,7 +205,7 @@ describe('ReaderEventService', () => {
     expect(emittedEvents).toContainEqual({type: 'load', detail: {doc}});
   });
 
-  it('continues scrolling across chapter boundaries in scrolled mode', () => {
+  it('does not hijack wheel scrolling at section boundaries in scrolled mode', () => {
     view.renderer = {
       getAttribute: name => name === 'flow' ? 'scrolled' : null,
       start: 900,
@@ -218,8 +218,8 @@ describe('ReaderEventService', () => {
     const forward = new WheelEvent('wheel', {deltaY: 120, bubbles: true, cancelable: true});
     doc.dispatchEvent(forward);
 
-    expect(next).toHaveBeenCalledOnce();
-    expect(forward.defaultPrevented).toBe(true);
+    expect(next).not.toHaveBeenCalled();
+    expect(forward.defaultPrevented).toBe(false);
 
     vi.advanceTimersByTime(300);
     view.renderer.start = 0;
@@ -227,8 +227,24 @@ describe('ReaderEventService', () => {
     const backward = new WheelEvent('wheel', {deltaY: -120, bubbles: true, cancelable: true});
     doc.dispatchEvent(backward);
 
-    expect(prev).toHaveBeenCalledOnce();
-    expect(backward.defaultPrevented).toBe(true);
+    expect(prev).not.toHaveBeenCalled();
+    expect(backward.defaultPrevented).toBe(false);
+  });
+
+  it('does not turn sections when wheel starts on the reader surface', () => {
+    view.renderer = {
+      getAttribute: name => name === 'flow' ? 'scrolled' : null,
+      start: 0,
+      end: 1100,
+      viewSize: 220,
+    };
+    view.dispatchEvent(new CustomEvent('relocate', {detail: {section: {current: 0, total: 3}}}));
+
+    const wheel = new WheelEvent('wheel', {deltaY: 180, bubbles: true, cancelable: true});
+    view.dispatchEvent(wheel);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(wheel.defaultPrevented).toBe(false);
   });
 
   it('does not change chapters while ordinary scrolling still has room', () => {
@@ -267,7 +283,7 @@ describe('ReaderEventService', () => {
     expect(prev).not.toHaveBeenCalled();
   });
 
-  it('continues to the next chapter with an upward swipe at the scroll boundary', () => {
+  it('does not turn sections with an upward swipe at the scroll boundary', () => {
     view.renderer = {
       getAttribute: name => name === 'flow' ? 'scrolled' : null,
       start: 900,
@@ -282,8 +298,8 @@ describe('ReaderEventService', () => {
     const swipeUp = createTouchEvent('touchend', [{clientX: 150, clientY: 100}]);
     privateService.handleTouchEnd(swipeUp, doc);
 
-    expect(next).toHaveBeenCalledOnce();
-    expect(swipeUp.defaultPrevented).toBe(true);
+    expect(next).not.toHaveBeenCalled();
+    expect(swipeUp.defaultPrevented).toBe(false);
   });
 
   it('navigates and emits keyboard events for reader shortcuts while ignoring editable targets', () => {
@@ -535,6 +551,53 @@ describe('ReaderEventService', () => {
       },
       popupPosition: {
         showBelow: true,
+      },
+    });
+  });
+
+  it('uses the selected document index when multiple scrolled sections are loaded', () => {
+    const secondDoc = document.implementation.createHTMLDocument('second-reader-doc');
+    const secondIframe = secondDoc.createElement('iframe');
+    Object.defineProperty(secondIframe, 'getBoundingClientRect', {
+      value: () => new DOMRect(220, 120, 500, 400),
+    });
+    Object.defineProperty(secondDoc, 'defaultView', {
+      value: {
+        frameElement: secondIframe,
+        getSelection: () => selectedSelection,
+      },
+      configurable: true,
+    });
+
+    const selectedRange: RangeLike = {
+      toString: () => 'Second chapter note',
+      getBoundingClientRect: () => new DOMRect(30, 25, 90, 22),
+      commonAncestorContainer: secondDoc.body,
+      startContainer: secondDoc.body,
+      endContainer: secondDoc.body,
+      intersectsNode: () => false,
+    };
+    const selectedSelection: TestSelection = {
+      isCollapsed: false,
+      rangeCount: 1,
+      getRangeAt: () => selectedRange,
+      anchorNode: secondDoc.body,
+      focusNode: secondDoc.body,
+    };
+
+    getContents.mockReturnValue([{index: 7, doc}, {index: 8, doc: secondDoc}]);
+    getCFI.mockReturnValue('epubcfi(/6/8!/4/2:0)');
+
+    privateService.handleSelectionEnd(secondDoc);
+    vi.advanceTimersByTime(10);
+
+    expect(getCFI).toHaveBeenLastCalledWith(8, selectedRange);
+    expect(emittedEvents.at(-1)).toMatchObject({
+      type: 'text-selected',
+      detail: {
+        text: 'Second chapter note',
+        cfi: 'epubcfi(/6/8!/4/2:0)',
+        index: 8,
       },
     });
   });

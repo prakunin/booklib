@@ -74,6 +74,38 @@
   src: url("../fonts/AcademyBook-Regular.otf") format("opentype");
 }
 
+@font-face {
+  font-family: "PT Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/PTSerif-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "PT Serif";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/PTSerif-Italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "PT Serif";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/PTSerif-Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "PT Serif";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/PTSerif-BoldItalic.woff2") format("woff2");
+}
+
 @theme static {
   --font-sans: var(--font-ui, "Inter", sans-serif);
 

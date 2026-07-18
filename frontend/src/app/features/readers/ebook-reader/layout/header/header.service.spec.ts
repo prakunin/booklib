@@ -27,6 +27,7 @@ describe('ReaderHeaderService', () => {
     })),
     toggleDarkMode: vi.fn(),
     updateFontSize: vi.fn(),
+    toggleJustify: vi.fn(),
     persistSettings: vi.fn(),
   };
 
@@ -49,6 +50,7 @@ describe('ReaderHeaderService', () => {
     readerState.state.mockClear();
     readerState.toggleDarkMode.mockReset();
     readerState.updateFontSize.mockReset();
+    readerState.toggleJustify.mockReset();
     sidebarService.open.mockReset();
     sidebarService.toggleBookmark.mockReset();
     leftSidebarService.open.mockReset();
@@ -122,13 +124,17 @@ describe('ReaderHeaderService', () => {
     expect(location.back).toHaveBeenCalledOnce();
   });
 
-  it('persists dark mode and font size updates through the reader state', () => {
+  it('persists dark mode, font size, and justification updates through the reader state', () => {
     service.toggleDarkMode();
     service.increaseFontSize();
+    service.decreaseFontSize();
+    service.toggleJustify();
 
     expect(readerState.toggleDarkMode).toHaveBeenCalledOnce();
     expect(readerState.updateFontSize).toHaveBeenCalledWith(1);
-    expect(readerState.persistSettings).toHaveBeenCalledTimes(2);
+    expect(readerState.updateFontSize).toHaveBeenCalledWith(-1);
+    expect(readerState.toggleJustify).toHaveBeenCalledOnce();
+    expect(readerState.persistSettings).toHaveBeenCalledTimes(4);
     expect(readerState.persistSettings).toHaveBeenCalledWith(12);
   });
 });

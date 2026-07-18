@@ -31,6 +31,19 @@
     z-index: 1;
   }
 
+  .reader-tools {
+    display: flex;
+    align-items: center;
+    margin-right: 6px;
+    padding-right: 6px;
+    border-right: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+
+    .icon-btn.active {
+      color: var(--color-primary-500, #f97316);
+      opacity: 1;
+    }
+  }
+
   .icon-btn {
     background: none;
     border: none;

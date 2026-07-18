@@ -51,6 +51,8 @@ export type ReaderIconName =
   | 'dots-horizontal'
   | 'zoom-in'
   | 'zoom-out'
+  | 'align-left'
+  | 'align-justify'
   | 'save';
 
 interface IconPath {
@@ -291,6 +293,18 @@ const ICONS: Record<ReaderIconName, IconPath[]> = {
     {d: 'M11 11m-8 0a8 8 0 1 0 16 0a8 8 0 1 0-16 0', type: 'path'},
     {d: 'M21 21l-4.35-4.35'},
     {d: 'M8 11h6'}
+  ],
+  'align-left': [
+    {d: 'M4,6 L20,6', type: 'line'},
+    {d: 'M4,10 L15,10', type: 'line'},
+    {d: 'M4,14 L20,14', type: 'line'},
+    {d: 'M4,18 L13,18', type: 'line'}
+  ],
+  'align-justify': [
+    {d: 'M4,6 L20,6', type: 'line'},
+    {d: 'M4,10 L20,10', type: 'line'},
+    {d: 'M4,14 L20,14', type: 'line'},
+    {d: 'M4,18 L20,18', type: 'line'}
   ],
   'save': [
     {d: 'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z'},

@@ -230,6 +230,8 @@ public class BookService {
                             .pageMargin(epubPref.getPageMargin())
                             .theme(epubPref.getTheme())
                             .flow(epubPref.getFlow())
+                            .backgroundSaturation(epubPref.getBackgroundSaturation())
+                            .backgroundTransparency(epubPref.getBackgroundTransparency())
                             .build()));
         } else if (bookType == BookFileType.PDF) {
             pdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())

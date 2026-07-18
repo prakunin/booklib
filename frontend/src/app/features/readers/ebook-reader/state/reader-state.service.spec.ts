@@ -87,6 +87,8 @@ describe('ReaderStateService', () => {
           isDark: false,
           flow: 'scrolled',
           theme: 'gray',
+          backgroundSaturation: 135,
+          backgroundTransparency: 25,
         }
       }
     }));
@@ -111,6 +113,8 @@ describe('ReaderStateService', () => {
     expect(service.state().flow).toBe('scrolled');
     expect(service.state().theme.name).toBe('gray');
     expect(service.state().theme.fg).toBe(grayTheme?.light.fg);
+    expect(service.state().backgroundSaturation).toBe(135);
+    expect(service.state().backgroundTransparency).toBe(25);
   });
 
   it('applies per-book settings and legacy custom font ids', async () => {
@@ -269,13 +273,15 @@ describe('ReaderStateService', () => {
     service.setFontFamily('12');
     service.toggleDarkMode();
     service.setFlow('scrolled');
+    service.setBackgroundSaturation(200);
+    service.setBackgroundTransparency(100);
 
     expect(service.state().lineHeight).toBe(0.8);
     expect(service.state().maxColumnCount).toBe(10);
     expect(service.state().gap).toBe(0.5);
     expect(service.state().justify).toBe(false);
     expect(service.state().hyphenate).toBe(false);
-    expect(service.state().fontSize).toBe(32);
+    expect(service.state().fontSize).toBe(36);
     expect(service.state().maxInlineSize).toBe(400);
     expect(service.state().maxBlockSize).toBe(2400);
     expect(service.state().pageMargin).toBe(0);
@@ -283,6 +289,41 @@ describe('ReaderStateService', () => {
     expect(service.state().fontFamily).toBe('custom:12');
     expect(service.state().isDark).toBe(false);
     expect(service.state().flow).toBe('scrolled');
+    expect(service.state().backgroundSaturation).toBe(150);
+    expect(service.state().backgroundTransparency).toBe(80);
+  });
+
+  it('normalizes legacy continuous flow to scrolled', async () => {
+    userService.getMyself.mockReturnValue(of({
+      id: 7,
+      userSettings: {
+        perBookSetting: {epub: 'Global'},
+        ebookReaderSetting: {flow: 'continuous'}
+      }
+    }));
+    bookService.getBookSetting.mockReturnValue(of({}));
+
+    await firstValueFrom(service.initializeState(11, 22));
+    service.persistSettings(11);
+
+    expect(service.state().flow).toBe('scrolled');
+    expect(userService.updateUserSetting).toHaveBeenCalledWith(7, 'ebookReaderSetting', expect.objectContaining({
+      flow: 'scrolled',
+    }));
+  });
+
+  it('clamps direct font size and page margin updates', () => {
+    service.setFontSize(100);
+    service.updatePageMargin(500);
+
+    expect(service.state().fontSize).toBe(40);
+    expect(service.state().pageMargin).toBe(160);
+
+    service.setFontSize(2);
+    service.updatePageMargin(-500);
+
+    expect(service.state().fontSize).toBe(10);
+    expect(service.state().pageMargin).toBe(0);
   });
 
   it('ignores unknown theme names', () => {

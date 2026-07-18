@@ -375,7 +375,8 @@ public class OpdsFeedService {
 
         appendPaginationLinks(feed, request, page, booksPage.getTotalPages(), size);
 
-        booksPage.getContent().forEach(book -> appendBookEntry(feed, book));
+        String downloadToken = authenticationService.generateDownloadToken(userId);
+        booksPage.getContent().forEach(book -> appendBookEntry(feed, book, downloadToken));
 
         feed.append("</feed>");
         return feed.toString();
@@ -408,7 +409,8 @@ public class OpdsFeedService {
 
         appendPaginationLinks(feed, request, page, booksPage.getTotalPages(), size);
 
-        booksPage.getContent().forEach(book -> appendBookEntry(feed, book));
+        String downloadToken = authenticationService.generateDownloadToken(userId);
+        booksPage.getContent().forEach(book -> appendBookEntry(feed, book, downloadToken));
 
         feed.append("</feed>");
         return feed.toString();
@@ -433,7 +435,8 @@ public class OpdsFeedService {
                   <link rel="search" type="application/opensearchdescription+xml" title="Search" href="/api/v1/opds/search.opds"/>
                 """.formatted(now(), books.size(), count));
 
-        books.forEach(book -> appendBookEntry(feed, book));
+        String downloadToken = authenticationService.generateDownloadToken(userId);
+        books.forEach(book -> appendBookEntry(feed, book, downloadToken));
 
         feed.append("</feed>");
         return feed.toString();
@@ -499,7 +502,7 @@ public class OpdsFeedService {
         return buildPaginationUrl(request, page, size);
     }
 
-    private void appendBookEntry(StringBuilder feed, Book book) {
+    private void appendBookEntry(StringBuilder feed, Book book, String downloadToken) {
         feed.append("""
                   <entry>
                     <title>%s</title>
@@ -518,7 +521,7 @@ public class OpdsFeedService {
         }
 
         appendMetadata(feed, book);
-        appendLinks(feed, book);
+        appendLinks(feed, book, downloadToken);
 
         feed.append("  </entry>\n");
     }
@@ -569,16 +572,16 @@ public class OpdsFeedService {
         return null;
     }
 
-    private void appendLinks(StringBuilder feed, Book book) {
+    private void appendLinks(StringBuilder feed, Book book, String downloadToken) {
         // Add acquisition link for primary file
         if (book.getPrimaryFile() != null) {
-            appendAcquisitionLink(feed, book.getId(), book.getPrimaryFile());
+            appendAcquisitionLink(feed, book.getId(), book.getPrimaryFile(), downloadToken);
         }
 
         // Add acquisition links for alternative formats
         if (book.getAlternativeFormats() != null) {
             for (BookFile altFormat : book.getAlternativeFormats()) {
-                appendAcquisitionLink(feed, book.getId(), altFormat);
+                appendAcquisitionLink(feed, book.getId(), altFormat, downloadToken);
             }
         }
 
@@ -592,14 +595,16 @@ public class OpdsFeedService {
         }
     }
 
-    private void appendAcquisitionLink(StringBuilder feed, Long bookId, BookFile bookFile) {
+    private void appendAcquisitionLink(StringBuilder feed, Long bookId, BookFile bookFile, String downloadToken) {
         if (bookFile == null || bookFile.getId() == null) return;
 
         String mimeType = fileMimeType(bookFile);
-        feed.append("    <link href=\"/api/v1/opds/")
-                .append(bookId)
-                .append("/download?fileId=")
-                .append(bookFile.getId())
+        String href = "/api/v1/opds/" + bookId + "/download?fileId=" + bookFile.getId();
+        if (downloadToken != null && !downloadToken.isEmpty()) {
+            href += "&token=" + downloadToken;
+        }
+        feed.append("    <link href=\"")
+                .append(escapeXml(href))
                 .append("\" rel=\"http://opds-spec.org/acquisition\" type=\"")
                 .append(mimeType)
                 .append("\"");

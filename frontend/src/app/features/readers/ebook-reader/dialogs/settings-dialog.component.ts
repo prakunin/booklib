@@ -1,7 +1,7 @@
 import {Component, EventEmitter, inject, Input, OnInit, Output, Renderer2} from '@angular/core';
 import {DecimalPipe, DOCUMENT} from '@angular/common';
 import {TranslocoDirective} from '@jsverse/transloco';
-import {ReaderStateService} from '../state/reader-state.service';
+import {ReaderFlow, ReaderStateService} from '../state/reader-state.service';
 import {ReaderViewManagerService} from '../core/view-manager.service';
 import {EpubCustomFontService} from '../features/fonts/custom-font.service';
 
@@ -115,6 +115,16 @@ export class ReaderSettingsDialogComponent implements OnInit {
     this.syncSettingsToBackend();
   }
 
+  setBackgroundSaturation(value: number) {
+    this.stateService.setBackgroundSaturation(value);
+    this.syncSettingsToBackend();
+  }
+
+  setBackgroundTransparency(value: number) {
+    this.stateService.setBackgroundTransparency(value);
+    this.syncSettingsToBackend();
+  }
+
   toggleJustify() {
     this.stateService.toggleJustify();
     this.syncSettingsToBackend();
@@ -145,6 +155,16 @@ export class ReaderSettingsDialogComponent implements OnInit {
     this.syncSettingsToBackend();
   }
 
+  increasePageMargin() {
+    this.stateService.updatePageMargin(8);
+    this.syncSettingsToBackend();
+  }
+
+  decreasePageMargin() {
+    this.stateService.updatePageMargin(-8);
+    this.syncSettingsToBackend();
+  }
+
   toggleFullWidth() {
     this.stateService.toggleFullWidth();
     this.syncSettingsToBackend();
@@ -160,9 +180,9 @@ export class ReaderSettingsDialogComponent implements OnInit {
     this.syncSettingsToBackend();
   }
 
-  setFlow(flow: 'paginated' | 'scrolled') {
+  setFlow(flow: ReaderFlow) {
     this.stateService.setFlow(flow);
-    this.viewManager.getRenderer()?.setAttribute?.('flow', flow);
+    this.viewManager.setFlow(flow);
     this.syncSettingsToBackend();
   }
 

@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, effect, HostListener, inject, OnInit, signal} from '@angular/core';
+import {AfterViewInit, ChangeDetectionStrategy, Component, computed, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, effect, ElementRef, HostListener, inject, OnInit, signal, ViewChild} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {forkJoin, from, Observable, of, throwError} from 'rxjs';
 import {catchError, map, switchMap, tap} from 'rxjs/operators';
@@ -78,11 +78,12 @@ interface PendingInitialChapterRestore {
   styleUrls: ['./ebook-reader.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class EbookReaderComponent implements OnInit {
+export class EbookReaderComponent implements AfterViewInit, OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private static readonly MAX_CHAPTER_PROGRESS_PERCENT = 99.9;
   private static readonly INITIAL_CHAPTER_RESTORE_RETRY_MS = 100;
   private static readonly INITIAL_CHAPTER_RESTORE_MAX_ATTEMPTS = 15;
+  private static readonly PINCH_PERCENT_HYSTERESIS = 0.65;
   private loaderService = inject(ReaderLoaderService);
   private styleService = inject(ReaderStyleService);
   private bookService = inject(BookService);
@@ -102,6 +103,8 @@ export class EbookReaderComponent implements OnInit {
   public viewManager = inject(ReaderViewManagerService);
   public stateService = inject(ReaderStateService);
 
+  @ViewChild('readerRoot', {static: true}) private readerRoot?: ElementRef<HTMLElement>;
+
   protected bookId!: number;
   protected altBookType?: string;
 
@@ -113,6 +116,19 @@ export class EbookReaderComponent implements OnInit {
   private pendingInitialChapterRestore: PendingInitialChapterRestore | null = null;
   private pendingInitialChapterRestoreTimeout?: ReturnType<typeof setTimeout>;
   private fontSizePersistTimeout?: ReturnType<typeof setTimeout>;
+  private sectionBoundaryRevealTimeout?: ReturnType<typeof setTimeout>;
+  private pinchStartDistance: number | null = null;
+  private pinchStartFontSize: number | null = null;
+  private pinchPreviewScale = 1;
+  private pinchStableZoomPercent: number | null = null;
+  private pinchOverlayTimeout?: ReturnType<typeof setTimeout>;
+  private touchListenerCleanups: (() => void)[] = [];
+  private pinchListenerTargets = new WeakSet<EventTarget>();
+  private readonly readerTouchStartListener: EventListener = event => this.onReaderTouchStart(event as TouchEvent);
+  private readonly readerTouchMoveListener: EventListener = event => this.onReaderTouchMove(event as TouchEvent);
+  private readonly readerTouchEndListener: EventListener = event => this.onReaderTouchEnd(event as TouchEvent);
+  private readonly readerTouchCancelListener: EventListener = event => this.onReaderTouchCancel(event as TouchEvent);
+  private readonly readerGesturePreventListener = (event: Event) => this.preventReaderGesture(event);
 
   isLoading = signal(true);
   showQuickSettings = signal(false);
@@ -120,6 +136,7 @@ export class EbookReaderComponent implements OnInit {
   showMetadata = signal(false);
   forceNavbarVisible = signal(false);
   headerVisible = signal(false);
+  private sectionBoundaryControlsVisible = signal(false);
   book = signal<Book | null>(null);
   sectionFractions = signal<number[]>([]);
   isFullscreen = signal(false);
@@ -127,8 +144,12 @@ export class EbookReaderComponent implements OnInit {
   immersiveMode = signal(false);
   private immersiveAutoHideTimer?: ReturnType<typeof setTimeout>;
   protected progressData = signal<RelocateProgressData | null>(null);
+  protected pinchZoomPercent = signal<number | null>(null);
+  protected pinchTransform = signal('none');
+  protected pinchTransformOrigin = signal('50% 50%');
 
   readonly readerState = this.stateService.state;
+  readonly readerBackground = computed(() => this.styleService.getAdjustedBackgroundColor(this.readerState()));
   readonly selectionState = this.selectionService.state;
   readonly noteDialogState = this.noteService.dialogState;
   readonly isCurrentCfiBookmarked = this.headerService.isCurrentCfiBookmarked;
@@ -152,6 +173,10 @@ export class EbookReaderComponent implements OnInit {
       if (this.relocateTimeout) clearTimeout(this.relocateTimeout);
       if (this.sectionFractionsTimeout) clearTimeout(this.sectionFractionsTimeout);
       if (this.pendingInitialChapterRestoreTimeout) clearTimeout(this.pendingInitialChapterRestoreTimeout);
+      if (this.pinchOverlayTimeout) clearTimeout(this.pinchOverlayTimeout);
+      if (this.sectionBoundaryRevealTimeout) clearTimeout(this.sectionBoundaryRevealTimeout);
+      this.touchListenerCleanups.forEach(cleanup => cleanup());
+      this.touchListenerCleanups = [];
 
       if (this._fileUrl) {
         URL.revokeObjectURL(this._fileUrl);
@@ -173,12 +198,14 @@ export class EbookReaderComponent implements OnInit {
     );
   }
 
+  ngAfterViewInit(): void {
+    this.bindReaderTouchListeners();
+  }
+
   ngOnInit() {
     this.visibilityManager = new ReaderHeaderFooterVisibilityManager(window.innerHeight);
     this.visibilityManager.onStateChange((state) => {
-      this.headerVisible.set(state.headerVisible);
-      this.headerService.setForceVisible(state.headerVisible);
-      this.forceNavbarVisible.set(state.footerVisible);
+      this.applyChromeVisibility(state.headerVisible, state.footerVisible);
     });
 
     this.sidebarService.showMetadata$
@@ -312,10 +339,14 @@ export class EbookReaderComponent implements OnInit {
         switch (event.type) {
           case 'load':
             this.applyStyles();
+            if (event.detail?.doc) {
+              this.bindReaderDocumentTouchListeners(event.detail.doc);
+            }
             this.sidebarService.updateChapters();
             this.updateSectionFractions();
             break;
           case 'relocate':
+            this.updateSectionBoundaryChrome(event.detail);
             if (this.handlePendingInitialChapterRestore(event.detail)) {
               break;
             }
@@ -488,6 +519,59 @@ export class EbookReaderComponent implements OnInit {
     this.updateBookmarkIndicator();
   }
 
+  private updateSectionBoundaryChrome(detail: RelocateProgressData): void {
+    if (this.readerState().flow === 'paginated') {
+      this.hideSectionBoundaryChrome();
+      return;
+    }
+
+    const sectionEndFraction = detail.sectionEndFraction ?? detail.sectionFraction;
+    if (typeof sectionEndFraction !== 'number') {
+      if (detail.reason !== 'resize') {
+        this.hideSectionBoundaryChrome();
+      }
+      return;
+    }
+
+    const nearSectionEnd = sectionEndFraction >= 0.96;
+    if (!nearSectionEnd) {
+      if (detail.reason !== 'resize') {
+        this.hideSectionBoundaryChrome();
+      }
+      return;
+    }
+
+    this.sectionBoundaryControlsVisible.set(true);
+    this.refreshChromeVisibility();
+    if (this.sectionBoundaryRevealTimeout) clearTimeout(this.sectionBoundaryRevealTimeout);
+    this.sectionBoundaryRevealTimeout = setTimeout(() => {
+      this.sectionBoundaryRevealTimeout = undefined;
+      this.hideSectionBoundaryChrome();
+    }, 4000);
+  }
+
+  private hideSectionBoundaryChrome(): void {
+    if (this.sectionBoundaryRevealTimeout) {
+      clearTimeout(this.sectionBoundaryRevealTimeout);
+      this.sectionBoundaryRevealTimeout = undefined;
+    }
+    if (!this.sectionBoundaryControlsVisible()) return;
+    this.sectionBoundaryControlsVisible.set(false);
+    this.refreshChromeVisibility();
+  }
+
+  private refreshChromeVisibility(): void {
+    const state = this.visibilityManager.getVisibilityState();
+    this.applyChromeVisibility(state.headerVisible, state.footerVisible);
+  }
+
+  private applyChromeVisibility(headerVisible: boolean, footerVisible: boolean): void {
+    const visible = this.sectionBoundaryControlsVisible();
+    this.headerVisible.set(headerVisible || visible);
+    this.headerService.setForceVisible(headerVisible || visible);
+    this.forceNavbarVisible.set(footerVisible || visible);
+  }
+
   private resolveChapterFraction(sectionIndex: number | undefined, chapterProgressPercent: number): number | null {
     if (sectionIndex === undefined) {
       return null;
@@ -528,11 +612,15 @@ export class EbookReaderComponent implements OnInit {
   }
 
   private applyStyles(): void {
+    const state = this.stateService.state();
+    this.viewManager.setFlow(state.flow);
     const renderer = this.viewManager.getRenderer();
     if (renderer) {
-      const state = this.stateService.state();
       this.styleService.applyStylesToRenderer(renderer, state);
-      if (state.flow) {
+      const rendererElement = renderer as unknown as HTMLElement;
+      const isSwitchingToContinuous = state.flow === 'scrolled'
+        && rendererElement.localName !== 'foliate-continuous-scroller';
+      if (state.flow && !isSwitchingToContinuous) {
         renderer.setAttribute?.('flow', state.flow);
       }
     }
@@ -571,11 +659,238 @@ export class EbookReaderComponent implements OnInit {
 
   private changeFontSize(delta: number): void {
     this.stateService.updateFontSize(delta);
+    this.scheduleFontSizePersist();
+  }
+
+  private bindReaderTouchListeners(): void {
+    const reader = this.readerRoot?.nativeElement;
+    if (!reader) {
+      return;
+    }
+
+    this.bindPinchListeners(reader);
+  }
+
+  private bindReaderDocumentTouchListeners(doc: Document): void {
+    this.bindPinchListeners(doc);
+    doc.documentElement?.style.setProperty('touch-action', 'none', 'important');
+    doc.body?.style.setProperty('touch-action', 'none', 'important');
+  }
+
+  private bindPinchListeners(target: EventTarget): void {
+    if (this.pinchListenerTargets.has(target)) {
+      return;
+    }
+    this.pinchListenerTargets.add(target);
+
+    const options: AddEventListenerOptions = {passive: false};
+    target.addEventListener('touchstart', this.readerTouchStartListener, options);
+    target.addEventListener('touchmove', this.readerTouchMoveListener, options);
+    target.addEventListener('touchend', this.readerTouchEndListener, options);
+    target.addEventListener('touchcancel', this.readerTouchCancelListener, options);
+    target.addEventListener('gesturestart', this.readerGesturePreventListener, options);
+    target.addEventListener('gesturechange', this.readerGesturePreventListener, options);
+    target.addEventListener('gestureend', this.readerGesturePreventListener, options);
+    this.touchListenerCleanups.push(
+      () => target.removeEventListener('touchstart', this.readerTouchStartListener, options),
+      () => target.removeEventListener('touchmove', this.readerTouchMoveListener, options),
+      () => target.removeEventListener('touchend', this.readerTouchEndListener, options),
+      () => target.removeEventListener('touchcancel', this.readerTouchCancelListener, options),
+      () => target.removeEventListener('gesturestart', this.readerGesturePreventListener, options),
+      () => target.removeEventListener('gesturechange', this.readerGesturePreventListener, options),
+      () => target.removeEventListener('gestureend', this.readerGesturePreventListener, options),
+    );
+  }
+
+  onReaderTouchStart(event: TouchEvent): void {
+    if (event.touches.length !== 2 || !this.canHandleReaderPinch(event)) {
+      this.resetPinchState();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    this.pinchStartDistance = this.getTouchDistance(event.touches);
+    this.pinchStartFontSize = this.readerState().fontSize;
+    this.pinchPreviewScale = 1;
+    this.pinchStableZoomPercent = 100;
+    this.updatePinchTransform(event, 1);
+    this.pinchZoomPercent.set(100);
+    if (this.pinchOverlayTimeout) clearTimeout(this.pinchOverlayTimeout);
+  }
+
+  onReaderTouchMove(event: TouchEvent): void {
+    if (event.touches.length !== 2 || this.pinchStartDistance === null || this.pinchStartFontSize === null) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    const distance = this.getTouchDistance(event.touches);
+    if (this.pinchStartDistance <= 0 || distance <= 0) {
+      return;
+    }
+
+    const scale = this.stabilizePinchScale(
+      this.clampPinchScale(distance / this.pinchStartDistance, this.pinchStartFontSize)
+    );
+    this.pinchPreviewScale = scale;
+    this.updatePinchTransform(event, scale);
+    this.pinchZoomPercent.set(Math.round(scale * 100));
+    if (this.pinchOverlayTimeout) clearTimeout(this.pinchOverlayTimeout);
+  }
+
+  onReaderTouchEnd(event: TouchEvent): void {
+    if (this.pinchStartDistance !== null) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.commitPinchFontSize();
+      this.schedulePinchOverlayDismiss();
+    }
+    this.resetPinchState();
+  }
+
+  onReaderTouchCancel(event: TouchEvent): void {
+    if (this.pinchStartDistance !== null) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    this.pinchZoomPercent.set(null);
+    this.resetPinchState();
+  }
+
+  private preventReaderGesture(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  private scheduleFontSizePersist(): void {
     if (this.fontSizePersistTimeout) clearTimeout(this.fontSizePersistTimeout);
     this.fontSizePersistTimeout = setTimeout(() => {
       this.stateService.persistSettings(this.bookId);
       this.fontSizePersistTimeout = undefined;
     }, 250);
+  }
+
+  private canHandleReaderPinch(event: TouchEvent): boolean {
+    if (this.showControls() || this.showQuickSettings() || this.showMetadata() || this.showShortcutsHelp()) {
+      return false;
+    }
+
+    if (this.noteDialogState().visible || this.selectionState().visible) {
+      return false;
+    }
+
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return true;
+    }
+
+    return !target.closest('button, input, select, textarea, a, [role="button"]');
+  }
+
+  private getTouchDistance(touches: TouchList): number {
+    const first = touches.item(0);
+    const second = touches.item(1);
+    if (!first || !second) {
+      return 0;
+    }
+
+    return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
+  }
+
+  private schedulePinchOverlayDismiss(): void {
+    if (this.pinchOverlayTimeout) clearTimeout(this.pinchOverlayTimeout);
+    this.pinchOverlayTimeout = setTimeout(() => {
+      this.pinchZoomPercent.set(null);
+      this.pinchOverlayTimeout = undefined;
+    }, 700);
+  }
+
+  private resetPinchState(): void {
+    this.pinchStartDistance = null;
+    this.pinchStartFontSize = null;
+    this.pinchPreviewScale = 1;
+    this.pinchStableZoomPercent = null;
+    this.pinchTransform.set('none');
+    this.pinchTransformOrigin.set('50% 50%');
+  }
+
+  private commitPinchFontSize(): void {
+    if (this.pinchStartFontSize === null) return;
+
+    const nextFontSize = Math.round(this.pinchStartFontSize * this.pinchPreviewScale);
+    if (nextFontSize === this.readerState().fontSize) return;
+
+    this.stateService.setFontSize(nextFontSize);
+    this.scheduleFontSizePersist();
+  }
+
+  private clampPinchScale(scale: number, startFontSize: number): number {
+    if (!Number.isFinite(scale) || scale <= 0) return 1;
+
+    const minScale = 10 / startFontSize;
+    const maxScale = 40 / startFontSize;
+    return Math.max(minScale, Math.min(maxScale, scale));
+  }
+
+  private stabilizePinchScale(scale: number): number {
+    const percent = scale * 100;
+    const current = this.pinchStableZoomPercent ?? Math.round(percent);
+    const rounded = Math.round(percent);
+
+    let stablePercent = current;
+    if (rounded > current && percent >= current + EbookReaderComponent.PINCH_PERCENT_HYSTERESIS) {
+      stablePercent = rounded;
+    } else if (rounded < current && percent <= current - EbookReaderComponent.PINCH_PERCENT_HYSTERESIS) {
+      stablePercent = rounded;
+    }
+
+    this.pinchStableZoomPercent = stablePercent;
+    return stablePercent / 100;
+  }
+
+  private updatePinchTransform(event: TouchEvent, scale: number): void {
+    const center = this.getTouchCenterInReader(event);
+    if (center) {
+      this.pinchTransformOrigin.set(`${Math.round(center.x)}px ${Math.round(center.y)}px`);
+    }
+    this.pinchTransform.set(`scale(${scale.toFixed(3)})`);
+  }
+
+  private getTouchCenterInReader(event: TouchEvent): { x: number; y: number } | null {
+    const first = event.touches.item(0);
+    const second = event.touches.item(1);
+    const container = document.getElementById('foliate-container');
+    if (!first || !second || !container) return null;
+
+    let x = (first.clientX + second.clientX) / 2;
+    let y = (first.clientY + second.clientY) / 2;
+    const eventDoc = this.getTouchEventDocument(event);
+    const iframe = eventDoc && eventDoc !== document
+      ? eventDoc.defaultView?.frameElement
+      : null;
+    if (iframe instanceof HTMLIFrameElement) {
+      const iframeRect = iframe.getBoundingClientRect();
+      x += iframeRect.left;
+      y += iframeRect.top;
+    }
+
+    const readerRect = container.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(readerRect.width, x - readerRect.left)),
+      y: Math.max(0, Math.min(readerRect.height, y - readerRect.top)),
+    };
+  }
+
+  private getTouchEventDocument(event: TouchEvent): Document | null {
+    if (event.target instanceof Node) {
+      return event.target.ownerDocument;
+    }
+    if (event.currentTarget instanceof Document) {
+      return event.currentTarget;
+    }
+    return null;
   }
 
   private persistPendingFontSize(): void {
@@ -633,6 +948,7 @@ export class EbookReaderComponent implements OnInit {
   @HostListener('window:resize')
   onWindowResize(): void {
     this.visibilityManager.updateWindowHeight(window.innerHeight);
+    this.applyStyles();
   }
 
   onHeaderTriggerZoneEnter(): void {

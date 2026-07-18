@@ -25,4 +25,6 @@ public class EbookViewerPreferences {
     private Integer pageMargin;
     private String theme;
     private String flow;
+    private Integer backgroundSaturation;
+    private Integer backgroundTransparency;
 }

@@ -132,6 +132,8 @@ class BookUpdateServiceTest {
                         .pageMargin(0)
                         .theme("dark")
                         .flow("paginated")
+                        .backgroundSaturation(130)
+                        .backgroundTransparency(30)
                         .build())
                 .build();
 
@@ -151,6 +153,8 @@ class BookUpdateServiceTest {
         assertEquals(0, epubPrefs.getPageMargin());
         assertEquals("dark", epubPrefs.getTheme());
         assertEquals("paginated", epubPrefs.getFlow());
+        assertEquals(130, epubPrefs.getBackgroundSaturation());
+        assertEquals(30, epubPrefs.getBackgroundTransparency());
 
         settings.getEbookSettings().setPageMargin(12);
         bookUpdateService.updateBookViewerSetting(bookId, settings);
@@ -160,6 +164,56 @@ class BookUpdateServiceTest {
         bookUpdateService.updateBookViewerSetting(bookId, settings);
 
         assertEquals(40, epubPrefs.getPageMargin());
+
+        settings.getEbookSettings().setBackgroundSaturation(200);
+        settings.getEbookSettings().setBackgroundTransparency(100);
+        bookUpdateService.updateBookViewerSetting(bookId, settings);
+
+        assertEquals(150, epubPrefs.getBackgroundSaturation());
+        assertEquals(80, epubPrefs.getBackgroundTransparency());
+    }
+
+    @Test
+    void updateBookViewerSetting_epub_shouldDefaultBackgroundTuningWhenValuesAreNull() {
+        long bookId = 1L;
+        BookEntity book = new BookEntity();
+        book.setId(bookId);
+        BookFileEntity primaryFile = new BookFileEntity();
+        primaryFile.setBook(book);
+        primaryFile.setBookType(BookFileType.EPUB);
+        book.setBookFiles(List.of(primaryFile));
+        BookLoreUser user = mock(BookLoreUser.class);
+        when(bookRepository.findByIdWithBookFiles(bookId)).thenReturn(Optional.of(book));
+        when(authenticationService.getAuthenticatedUser()).thenReturn(user);
+        when(user.getId()).thenReturn(2L);
+
+        EbookViewerPreferenceEntity epubPrefs = new EbookViewerPreferenceEntity();
+        when(ebookViewerPreferenceRepository.findByBookIdAndUserId(bookId, 2L)).thenReturn(Optional.of(epubPrefs));
+        BookViewerSettings settings = BookViewerSettings.builder()
+                .ebookSettings(EbookViewerPreferences.builder()
+                        .fontFamily("serif")
+                        .fontSize(18)
+                        .gap(0.1f)
+                        .hyphenate(true)
+                        .isDark(false)
+                        .justify(true)
+                        .lineHeight(1.7f)
+                        .maxBlockSize(800)
+                        .maxColumnCount(1)
+                        .maxInlineSize(1200)
+                        .pageMargin(12)
+                        .theme("default")
+                        .flow("scrolled")
+                        .backgroundSaturation(null)
+                        .backgroundTransparency(null)
+                        .build())
+                .build();
+
+        bookUpdateService.updateBookViewerSetting(bookId, settings);
+
+        verify(ebookViewerPreferenceRepository).save(epubPrefs);
+        assertEquals(100, epubPrefs.getBackgroundSaturation());
+        assertEquals(0, epubPrefs.getBackgroundTransparency());
     }
 
     @Test

@@ -155,9 +155,13 @@ public class BookUpdateService {
         prefs.setMaxColumnCount(epubSettings.getMaxColumnCount());
         prefs.setMaxInlineSize(epubSettings.getMaxInlineSize());
         Integer pageMargin = epubSettings.getPageMargin();
-        prefs.setPageMargin(pageMargin == null ? 40 : Math.max(0, Math.min(80, pageMargin)));
+        prefs.setPageMargin(pageMargin == null ? 40 : Math.max(0, Math.min(160, pageMargin)));
         prefs.setTheme(epubSettings.getTheme());
         prefs.setFlow(epubSettings.getFlow());
+        Integer backgroundSaturation = epubSettings.getBackgroundSaturation();
+        prefs.setBackgroundSaturation(backgroundSaturation == null ? 100 : Math.max(0, Math.min(150, backgroundSaturation)));
+        Integer backgroundTransparency = epubSettings.getBackgroundTransparency();
+        prefs.setBackgroundTransparency(backgroundTransparency == null ? 0 : Math.max(0, Math.min(80, backgroundTransparency)));
 
         ebookViewerPreferenceRepository.save(prefs);
     }

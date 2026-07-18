@@ -2,7 +2,7 @@ import {DOCUMENT} from '@angular/common';
 import {inject, Injectable} from '@angular/core';
 import {ReaderState} from '../state/reader-state.service';
 import {EpubCustomFontService} from '../features/fonts/custom-font.service';
-import {ACADEMY_BOOK_FONT} from '../state/built-in-fonts.constant';
+import {ACADEMY_BOOK_FONT, PT_SERIF_FONT} from '../state/built-in-fonts.constant';
 
 interface ReaderRenderer {
   setAttribute(name: string, value: string | number): void;
@@ -19,6 +19,11 @@ export class ReaderStyleService {
 
   generateCSS(state: ReaderState): string {
     const {lineHeight, justify, hyphenate, fontSize, theme, fontFamily} = state;
+    const adjustedBg = this.getAdjustedBackgroundColor(state);
+    const documentBg = (state.backgroundTransparency ?? 0) > 0 ? 'transparent' : adjustedBg;
+    const shouldOverrideLightBackground = (theme.bg || theme.light.bg) !== '#ffffff'
+      || (state.backgroundSaturation ?? 100) !== 100
+      || (state.backgroundTransparency ?? 0) !== 0;
     const userStylesheet = '';
     const overrideFont = false;
     const mediaActiveClass = 'media-active';
@@ -39,7 +44,7 @@ export class ReaderStyleService {
               src: url("${blobUrl}") format("truetype");
               font-weight: normal;
               font-style: normal;
-              font-display: swap;
+              font-display: block;
           }`;
         }
       } else if (fontFamily === ACADEMY_BOOK_FONT.family) {
@@ -50,9 +55,21 @@ export class ReaderStyleService {
               src: url("${fontUrl}") format("opentype");
               font-weight: normal;
               font-style: normal;
-              font-display: swap;
+              font-display: block;
               size-adjust: ${ACADEMY_BOOK_FONT.sizeAdjust};
           }`;
+      } else if (fontFamily === PT_SERIF_FONT.family) {
+        actualFontFamily = `"${PT_SERIF_FONT.family}", ${PT_SERIF_FONT.fallback}`;
+        fontFaceRule = PT_SERIF_FONT.faces.map(face => {
+          const fontUrl = new URL(face.assetPath, this.document.baseURI).href;
+          return `@font-face {
+              font-family: "${PT_SERIF_FONT.family}";
+              src: url("${fontUrl}") format("woff2");
+              font-weight: ${face.weight};
+              font-style: ${face.style};
+              font-display: block;
+          }`;
+        }).join('\n');
       } else {
         actualFontFamily = fontFamily;
       }
@@ -126,15 +143,15 @@ export class ReaderStyleService {
           tab-size: 2;
       }
       @media screen and (prefers-color-scheme: light) {
-          ${(theme.bg || theme.light.bg) !== '#ffffff' ? `
+          ${shouldOverrideLightBackground ? `
           html, body {
               color: ${theme.fg || theme.light.fg} !important;
-              background: none !important;
+              background: ${documentBg} !important;
           }
           body * {
               color: inherit !important;
               border-color: currentColor !important;
-              background-color: ${theme.bg || theme.light.bg} !important;
+              background-color: ${documentBg} !important;
           }
           a:any-link {
               color: ${theme.link || theme.light.link} !important;
@@ -146,19 +163,19 @@ export class ReaderStyleService {
           .${mediaActiveClass}, .${mediaActiveClass} * {
               color: ${theme.fg || theme.light.fg} !important;
               background: color-mix(in hsl, ${theme.fg || theme.light.fg}, #fff 50%) !important;
-              background: color-mix(in hsl, ${theme.fg || theme.light.fg}, ${theme.bg || theme.light.bg} 85%) !important;
+              background: color-mix(in hsl, ${theme.fg || theme.light.fg}, ${adjustedBg} 85%) !important;
           }` : ''}
       }
       @media screen and (prefers-color-scheme: dark) {
 
           html, body {
               color: ${theme.fg || theme.dark.fg} !important;
-              background: none !important;
+              background: ${documentBg} !important;
           }
           body * {
               color: inherit !important;
               border-color: currentColor !important;
-              background-color: ${theme.bg || theme.dark.bg} !important;
+              background-color: ${documentBg} !important;
           }
           a:any-link {
               color: ${theme.link || theme.dark.link} !important;
@@ -166,7 +183,7 @@ export class ReaderStyleService {
           .${mediaActiveClass}, .${mediaActiveClass} * {
               color: ${theme.fg || theme.dark.fg} !important;
               background: color-mix(in hsl, ${theme.fg || theme.dark.fg}, #000 50%) !important;
-              background: color-mix(in hsl, ${theme.fg || theme.dark.fg}, ${theme.bg || theme.dark.bg} 75%) !important;
+              background: color-mix(in hsl, ${theme.fg || theme.dark.fg}, ${adjustedBg} 75%) !important;
           }
       }
       p, li, blockquote, dd {
@@ -185,6 +202,89 @@ export class ReaderStyleService {
     `;
   }
 
+  getAdjustedBackgroundColor(state: ReaderState): string {
+    const baseColor = state.theme.bg || (state.isDark ? state.theme.dark.bg : state.theme.light.bg);
+    const rgb = this.hexToRgb(baseColor);
+    if (!rgb) return baseColor;
+
+    const saturation = Math.max(0, Math.min(150, state.backgroundSaturation ?? 100)) / 100;
+    const transparency = Math.max(0, Math.min(80, state.backgroundTransparency ?? 0)) / 100;
+    const [h, s, l] = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
+    const adjusted = this.hslToRgb(h, Math.max(0, Math.min(1, s * saturation)), l);
+    const alpha = Math.max(0.2, Math.min(1, 1 - transparency));
+
+    return `rgba(${adjusted.r}, ${adjusted.g}, ${adjusted.b}, ${Number(alpha.toFixed(2))})`;
+  }
+
+  private hexToRgb(color: string): { r: number; g: number; b: number } | null {
+    const hex = color.trim().replace(/^#/, '');
+    const normalized = hex.length === 3
+      ? hex.split('').map(char => char + char).join('')
+      : hex;
+    if (!/^[0-9a-f]{6}$/i.test(normalized)) return null;
+
+    return {
+      r: parseInt(normalized.slice(0, 2), 16),
+      g: parseInt(normalized.slice(2, 4), 16),
+      b: parseInt(normalized.slice(4, 6), 16),
+    };
+  }
+
+  private rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0;
+    let s = 0;
+    const l = (max + min) / 2;
+
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r:
+          h = (g - b) / d + (g < b ? 6 : 0);
+          break;
+        case g:
+          h = (b - r) / d + 2;
+          break;
+        default:
+          h = (r - g) / d + 4;
+          break;
+      }
+      h /= 6;
+    }
+
+    return [h, s, l];
+  }
+
+  private hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+    if (s === 0) {
+      const value = Math.round(l * 255);
+      return {r: value, g: value, b: value};
+    }
+
+    const hue2rgb = (p: number, q: number, t: number): number => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+
+    return {
+      r: Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+      g: Math.round(hue2rgb(p, q, h) * 255),
+      b: Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+    };
+  }
+
   private parseCustomFontId(fontFamily: string): number | null {
     if (fontFamily.startsWith('custom:')) {
       const id = parseInt(fontFamily.substring(7), 10);
@@ -201,17 +301,30 @@ export class ReaderStyleService {
     renderer.setAttribute('max-column-count', state.maxColumnCount);
     const isFullWidth = state.flow === 'paginated' && state.pageMargin === 0;
     renderer.setAttribute('gap', isFullWidth ? '0%' : `${state.gap * 100}%`);
-    renderer.setAttribute('max-inline-size', isFullWidth ? '10000px' : `${state.maxInlineSize}px`);
-    renderer.setAttribute('max-block-size', `${state.maxBlockSize}px`);
+    renderer.setAttribute('max-inline-size', this.getMaxInlineSize(state, isFullWidth));
+    if (state.flow === 'paginated') {
+      renderer.setAttribute('max-block-size', `${state.maxBlockSize}px`);
+    } else {
+      renderer.removeAttribute('max-block-size');
+    }
     if (typeof renderer.setStyles === 'function') {
       const css = this.generateCSS(state);
       renderer.setStyles(css);
     }
 
-    if (state.flow === 'paginated') {
-      renderer.setAttribute('margin', `${state.pageMargin}px`);
-    } else {
-      renderer.removeAttribute('margin');
+    renderer.setAttribute('margin', `${state.pageMargin}px`);
+  }
+
+  private getMaxInlineSize(state: ReaderState, isFullWidth: boolean): string {
+    if (isFullWidth) {
+      return '10000px';
     }
+
+    if (state.flow === 'scrolled' || state.flow === 'continuous') {
+      const viewportWidth = globalThis.innerWidth || this.document.documentElement.clientWidth || state.maxInlineSize;
+      return `${Math.max(320, viewportWidth - state.pageMargin * 2)}px`;
+    }
+
+    return `${state.maxInlineSize}px`;
   }
 }
