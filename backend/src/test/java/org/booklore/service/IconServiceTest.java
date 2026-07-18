@@ -4,6 +4,7 @@ import org.booklore.config.AppProperties;
 import org.booklore.exception.APIException;
 import org.booklore.model.dto.request.SvgIconCreateRequest;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.data.domain.Page;
 
 import java.io.IOException;
@@ -12,10 +13,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class IconServiceTest {
 
-    private static final String TEST_DIR = "test-icons";
     private static final String SVG_DIR = "svg";
     private static final String SVG_NAME = "testicon";
     private static final String SVG_DATA = "<svg><rect width=\"100\" height=\"100\"/></svg>";
@@ -26,41 +25,32 @@ class IconServiceTest {
     private IconService iconService;
     private Path iconsSvgPath;
 
-    @BeforeAll
+    @TempDir
+    private Path tempDir;
+
+    @BeforeEach
     void setup() throws IOException {
         AppProperties appProperties = new AppProperties() {
             @Override
             public String getPathConfig() {
-                return TEST_DIR;
+                return tempDir.toString();
             }
         };
         iconService = new IconService(appProperties);
-        iconsSvgPath = Paths.get(TEST_DIR, "icons", SVG_DIR);
+        iconsSvgPath = tempDir.resolve("icons").resolve(SVG_DIR);
         Files.createDirectories(iconsSvgPath);
     }
 
     @AfterEach
     void cleanup() throws IOException {
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(iconsSvgPath)) {
-            for (Path entry : stream) {
-                Files.deleteIfExists(entry);
-            }
-        }
-        iconService.getSvgCache().invalidateAll();
-    }
-
-    @AfterAll
-    void teardown() throws IOException {
         if (Files.exists(iconsSvgPath)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(iconsSvgPath)) {
                 for (Path entry : stream) {
                     Files.deleteIfExists(entry);
                 }
             }
-            Files.deleteIfExists(iconsSvgPath);
-            Files.deleteIfExists(iconsSvgPath.getParent());
-            Files.deleteIfExists(Paths.get(TEST_DIR));
         }
+        iconService.getSvgCache().invalidateAll();
     }
 
     @Test

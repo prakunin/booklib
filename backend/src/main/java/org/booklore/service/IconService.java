@@ -52,7 +52,7 @@ public class IconService {
         validateSvgData(request.getSvgData());
 
         String filename = normalizeFilename(request.getSvgName());
-        Path filePath = getIconsSvgPath().resolve(filename);
+        Path filePath = resolveIconPath(filename);
 
         if (Files.exists(filePath)) {
             log.warn("SVG icon already exists: {}", filename);
@@ -123,7 +123,7 @@ public class IconService {
     }
 
     private String loadAndCacheIcon(String filename, String originalName) {
-        Path filePath = getIconsSvgPath().resolve(filename);
+        Path filePath = resolveIconPath(filename);
 
         if (!Files.exists(filePath)) {
             log.warn("SVG icon not found: {}", filename);
@@ -142,7 +142,7 @@ public class IconService {
 
     public void deleteSvgIcon(String svgName) {
         String filename = normalizeFilename(svgName);
-        Path filePath = getIconsSvgPath().resolve(filename);
+        Path filePath = resolveIconPath(filename);
 
         try {
             if (!Files.exists(filePath)) {
@@ -202,6 +202,15 @@ public class IconService {
 
     private Path getIconsSvgPath() {
         return Paths.get(appProperties.getPathConfig(), ICONS_DIR, SVG_DIR);
+    }
+
+    private Path resolveIconPath(String filename) {
+        Path iconsPath = getIconsSvgPath().toAbsolutePath().normalize();
+        Path iconPath = iconsPath.resolve(filename).normalize();
+        if (!iconPath.startsWith(iconsPath)) {
+            throw ApiError.INVALID_INPUT.createException("Invalid icon filename");
+        }
+        return iconPath;
     }
 
     private void validateSvgData(String svgData) {

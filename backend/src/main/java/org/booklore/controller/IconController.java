@@ -11,17 +11,30 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.util.HexFormat;
 import java.util.Map;
+import java.util.TreeMap;
 
 @Tag(name = "Icons", description = "Endpoints for managing SVG icons")
 @AllArgsConstructor
 @RestController
 @RequestMapping("/api/v1/icons")
 public class IconController {
+
+    private static final CacheControl SVG_CACHE = CacheControl.maxAge(Duration.ofMinutes(10)).cachePrivate();
+    private static final MediaType SVG_MEDIA_TYPE = MediaType.valueOf("image/svg+xml");
 
     private final IconService iconService;
 
@@ -46,10 +59,21 @@ public class IconController {
     @Operation(summary = "Get SVG icon content", description = "Retrieve the SVG content of an icon by its name.")
     @ApiResponse(responseCode = "200", description = "SVG icon content retrieved successfully")
     @GetMapping("/{svgName}/content")
-    public ResponseEntity<String> getSvgIconContent(@Parameter(description = "SVG icon name") @PathVariable String svgName) {
+    public ResponseEntity<String> getSvgIconContent(
+            @Parameter(description = "SVG icon name") @PathVariable String svgName,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         String svgContent = iconService.getSvgIcon(svgName);
+        String etag = quotedSha256(svgContent);
+        if (matchesIfNoneMatch(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .cacheControl(SVG_CACHE)
+                    .eTag(etag)
+                    .build();
+        }
         return ResponseEntity.ok()
-                .header("Content-Type", "image/svg+xml")
+                .cacheControl(SVG_CACHE)
+                .eTag(etag)
+                .contentType(SVG_MEDIA_TYPE)
                 .body(svgContent);
     }
 
@@ -75,8 +99,67 @@ public class IconController {
     @Operation(summary = "Get all icon contents", description = "Retrieve all SVG icons as a map of icon names to their content.")
     @ApiResponse(responseCode = "200", description = "All icon contents retrieved successfully")
     @GetMapping("/all/content")
-    public ResponseEntity<Map<String, String>> getAllIconsContent() {
+    public ResponseEntity<Map<String, String>> getAllIconsContent(
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         Map<String, String> iconsMap = iconService.getAllIconsContent();
-        return ResponseEntity.ok(iconsMap);
+        String etag = quotedSha256(iconsMap);
+        if (matchesIfNoneMatch(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .cacheControl(SVG_CACHE)
+                    .eTag(etag)
+                    .build();
+        }
+        return ResponseEntity.ok()
+                .cacheControl(SVG_CACHE)
+                .eTag(etag)
+                .body(iconsMap);
+    }
+
+    private String quotedSha256(String content) {
+        MessageDigest digest = sha256Digest();
+        digest.update(content.getBytes(StandardCharsets.UTF_8));
+        return quote(digest.digest());
+    }
+
+    private String quotedSha256(Map<String, String> iconsMap) {
+        MessageDigest digest = sha256Digest();
+        new TreeMap<>(iconsMap).forEach((name, content) -> {
+            digest.update(name.getBytes(StandardCharsets.UTF_8));
+            digest.update((byte) 0);
+            digest.update(content.getBytes(StandardCharsets.UTF_8));
+            digest.update((byte) 0);
+        });
+        return quote(digest.digest());
+    }
+
+    private MessageDigest sha256Digest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 digest is not available", e);
+        }
+    }
+
+    private String quote(byte[] digest) {
+        return "\"" + HexFormat.of().formatHex(digest) + "\"";
+    }
+
+    private boolean matchesIfNoneMatch(String ifNoneMatch, String currentEtag) {
+        if (ifNoneMatch == null || ifNoneMatch.isBlank()) {
+            return false;
+        }
+        if ("*".equals(ifNoneMatch.trim())) {
+            return true;
+        }
+        for (String candidate : ifNoneMatch.split(",")) {
+            if (weakEtagValue(candidate.trim()).equals(weakEtagValue(currentEtag))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String weakEtagValue(String etag) {
+        return etag.startsWith("W/") ? etag.substring(2) : etag;
     }
 }
