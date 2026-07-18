@@ -240,4 +240,19 @@ class AuthenticationServiceTest {
         assertThat(response.getBody().getExpires()).isEqualTo(7200);
         assertThat(response.getBody().getIsDefaultPassword()).isFalse();
     }
+
+    @Test
+    void generateDownloadToken_usesShortLivedMediaToken() {
+        var user = BookLoreUserEntity.builder()
+                .id(6L)
+                .username("reader")
+                .build();
+        when(userRepository.findById(6L)).thenReturn(Optional.of(user));
+        when(jwtUtils.generateMediaToken(user)).thenReturn("media-token");
+
+        String token = authenticationService.generateDownloadToken(6L);
+
+        assertThat(token).isEqualTo("media-token");
+        verify(jwtUtils).generateMediaToken(user);
+    }
 }

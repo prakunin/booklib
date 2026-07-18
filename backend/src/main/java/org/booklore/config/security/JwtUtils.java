@@ -34,6 +34,10 @@ public class JwtUtils {
     private final JwtSecretService jwtSecretService;
     private static final int MIN_SECRET_BYTES = 32;
     private static final String JWT_ISSUER = "booklore";
+    private static final String TOKEN_TYPE_CLAIM = "tokenType";
+    private static final String TOKEN_TYPE_ACCESS = "access";
+    private static final String TOKEN_TYPE_REFRESH = "refresh";
+    private static final String TOKEN_TYPE_MEDIA = "media";
 
     private DefaultJWTClaimsVerifier<?> claimsVerifier;
 
@@ -41,6 +45,8 @@ public class JwtUtils {
     public static final long accessTokenExpirationMs = 1000L * 60 * 60 * 2;  // 2 hours
     @Getter
     public static final long refreshTokenExpirationMs = 1000L * 60 * 60 * 24 * 30; // 30 days
+    @Getter
+    public static final long mediaTokenExpirationMs = 1000L * 60 * 10; // 10 minutes
 
     @PostConstruct
     public void init() {
@@ -73,6 +79,11 @@ public class JwtUtils {
 
     public String generateToken(BookLoreUserEntity user, boolean isRefreshToken) {
         long expirationTime = isRefreshToken ? refreshTokenExpirationMs : accessTokenExpirationMs;
+        String tokenType = isRefreshToken ? TOKEN_TYPE_REFRESH : TOKEN_TYPE_ACCESS;
+        return generateToken(user, expirationTime, tokenType);
+    }
+
+    private String generateToken(BookLoreUserEntity user, long expirationTime, String tokenType) {
         Instant now = Instant.now();
 
         try {
@@ -83,6 +94,7 @@ public class JwtUtils {
                     .subject(user.getUsername())
                     .claim("userId", user.getId())
                     .claim("isDefaultPassword", user.isDefaultPassword())
+                    .claim(TOKEN_TYPE_CLAIM, tokenType)
                     .issueTime(Date.from(now))
                     .expirationTime(Date.from(now.plusMillis(expirationTime)))
                     .build();
@@ -106,6 +118,10 @@ public class JwtUtils {
 
     public String generateRefreshToken(BookLoreUserEntity user) {
         return generateToken(user, true);
+    }
+
+    public String generateMediaToken(BookLoreUserEntity user) {
+        return generateToken(user, mediaTokenExpirationMs, TOKEN_TYPE_MEDIA);
     }
 
     /**
@@ -143,6 +159,14 @@ public class JwtUtils {
         }
     }
 
+    public boolean validateAccessToken(String token) {
+        return validateTokenType(token, TOKEN_TYPE_ACCESS, true);
+    }
+
+    public boolean validateMediaToken(String token) {
+        return validateTokenType(token, TOKEN_TYPE_MEDIA, false);
+    }
+
     /**
      * Checks if claims are valid using the built-in Nimbus verifier (expiration, issuer, clock skew).
      * @throws BadJWTException if claims are invalid.
@@ -152,6 +176,22 @@ public class JwtUtils {
         Object userId = claims.getClaim("userId");
         if (!(userId instanceof Number)) {
             throw new BadJWTException("Invalid userId claim type");
+        }
+    }
+
+    private boolean validateTokenType(String token, String expectedTokenType, boolean allowLegacyAccessToken) {
+        try {
+            SignedJWT signedJWT = parseAndVerify(token);
+            JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
+            validateClaims(claims);
+            Object tokenType = claims.getClaim(TOKEN_TYPE_CLAIM);
+            if (tokenType == null && allowLegacyAccessToken) {
+                return true;
+            }
+            return expectedTokenType.equals(tokenType);
+        } catch (Exception e) {
+            log.debug("Invalid {} token: {}", expectedTokenType, e.getMessage());
+            return false;
         }
     }
 

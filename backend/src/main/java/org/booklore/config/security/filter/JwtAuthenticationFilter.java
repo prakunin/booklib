@@ -46,7 +46,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         try {
-            if (jwtUtils.validateToken(token)) {
+            if (jwtUtils.validateAccessToken(token)) {
                 authenticateUser(token, request);
             } else {
                 log.debug("Invalid token. Rejecting request.");
