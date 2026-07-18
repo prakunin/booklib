@@ -51,13 +51,6 @@ interface IframeClickMessage {
   target?: string;
 }
 
-interface ScrolledRenderer {
-  getAttribute(name: string): string | null;
-  start: number;
-  end: number;
-  viewSize: number;
-}
-
 interface EventServiceView extends HTMLElement {
   addAnnotation(annotation: { value: string }): void;
   renderer?: unknown;
@@ -83,8 +76,8 @@ export type ViewEvent =
   | { type: 'change-font-size'; delta: number };
 
 interface ViewCallbacks {
-  prev: () => void;
-  next: () => void;
+  prev: (distance?: number) => void;
+  next: (distance?: number) => void;
   getCFI: (index: number, range: Range) => string | null;
   getContents: () => { index: number; doc: Document }[] | null;
 }
@@ -292,7 +285,10 @@ export class ReaderEventService {
   private attachZoomWheelHandler(): void {
     if (!this.view) return;
     this.wheelHandler = (event: WheelEvent) => {
-      this.handleZoomWheel(event);
+      if (this.handleZoomWheel(event)) return;
+      if (this.tryNavigateAcrossScrolledBoundary(event.deltaY)) {
+        event.preventDefault();
+      }
     };
     this.view.addEventListener('wheel', this.wheelHandler, {passive: false});
   }
@@ -554,35 +550,8 @@ export class ReaderEventService {
   }
 
   private tryNavigateAcrossScrolledBoundary(scrollDelta: number): boolean {
-    if (this.isNavigating || scrollDelta === 0) return false;
-
-    const renderer = this.view?.renderer;
-    if (!this.isScrolledRenderer(renderer) || renderer.getAttribute('flow') !== 'scrolled') return false;
-
-    const boundaryTolerance = 2;
-    const atStart = renderer.start <= boundaryTolerance;
-    const atEnd = renderer.viewSize - renderer.end <= boundaryTolerance;
-    if ((scrollDelta < 0 && !atStart) || (scrollDelta > 0 && !atEnd)) return false;
-    if (scrollDelta < 0 && this.currentSectionIndex === 0) return false;
-    if (scrollDelta > 0 && this.currentSectionIndex !== null && this.sectionCount !== null
-      && this.currentSectionIndex >= this.sectionCount - 1) return false;
-
-    this.isNavigating = true;
-    if (scrollDelta < 0) {
-      this.viewCallbacks?.prev();
-    } else {
-      this.viewCallbacks?.next();
-    }
-    setTimeout(() => this.isNavigating = false, 300);
-    return true;
-  }
-
-  private isScrolledRenderer(value: unknown): value is ScrolledRenderer {
-    if (!value || typeof value !== 'object') return false;
-    return 'getAttribute' in value && typeof value.getAttribute === 'function'
-      && 'start' in value && typeof value.start === 'number'
-      && 'end' in value && typeof value.end === 'number'
-      && 'viewSize' in value && typeof value.viewSize === 'number';
+    void scrollDelta;
+    return false;
   }
 
   private handleSelectionEnd(doc: Document): void {
@@ -599,7 +568,8 @@ export class ReaderEventService {
       const contents = this.viewCallbacks?.getContents();
       if (!contents || contents.length === 0) return;
 
-      const {index} = contents[0];
+      const content = contents.find(item => item.doc === doc) ?? contents[0];
+      const {index} = content;
       const cfi = this.viewCallbacks?.getCFI(index, range);
 
       if (cfi) {

@@ -336,7 +336,9 @@ export interface EbookViewerSetting {
   pageMargin?: number;
   fontFamily: string | null;
   isDark: boolean;
-  flow: 'paginated' | 'scrolled';
+  flow: 'paginated' | 'scrolled' | 'continuous';
+  backgroundSaturation?: number;
+  backgroundTransparency?: number;
 }
 
 export interface CbxViewerSetting {

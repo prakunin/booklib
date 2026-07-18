@@ -36,10 +36,13 @@ interface ProgressTime {
 }
 
 export interface RelocateProgressData {
+  reason?: string;
   cfi?: string | null;
   pageItem?: ProgressNavigationItem;
   tocItem?: ProgressNavigationItem;
   fraction?: number;
+  sectionFraction?: number;
+  sectionEndFraction?: number;
   section?: ProgressSection;
   time?: ProgressTime;
 }

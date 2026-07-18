@@ -20,6 +20,7 @@ export class ReaderHeaderComponent {
   readonly isFullscreen = this.headerService.isFullscreen;
   readonly bookTitle = this.headerService.bookTitle;
   readonly theme = this.headerService.theme;
+  readonly justify = this.headerService.justify;
   @Output() hoverChange = new EventEmitter<boolean>();
   overflowOpen = false;
 
@@ -49,6 +50,18 @@ export class ReaderHeaderComponent {
 
   onShowHelp(): void {
     this.headerService.showShortcutsHelp();
+  }
+
+  onDecreaseFontSize(): void {
+    this.headerService.decreaseFontSize();
+  }
+
+  onIncreaseFontSize(): void {
+    this.headerService.increaseFontSize();
+  }
+
+  onToggleJustify(): void {
+    this.headerService.toggleJustify();
   }
 
   onClose(): void {

@@ -63,4 +63,12 @@ public class EbookViewerPreferenceEntity {
 
     @Column(name = "flow", nullable = false)
     private String flow;
+
+    @Column(name = "background_saturation", nullable = false)
+    @Builder.Default
+    private Integer backgroundSaturation = 100;
+
+    @Column(name = "background_transparency", nullable = false)
+    @Builder.Default
+    private Integer backgroundTransparency = 0;
 }

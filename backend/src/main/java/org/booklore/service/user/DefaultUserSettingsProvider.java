@@ -92,6 +92,8 @@ public class DefaultUserSettingsProvider {
                 .pageMargin(40)
                 .theme("gray")
                 .flow("paginated")
+                .backgroundSaturation(100)
+                .backgroundTransparency(0)
                 .build();
     }
 

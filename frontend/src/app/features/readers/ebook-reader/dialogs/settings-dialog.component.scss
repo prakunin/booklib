@@ -457,7 +457,8 @@
   gap: 8px;
 }
 
-.gap-control {
+.gap-control,
+.range-control {
   flex: 1;
   max-width: 200px;
   min-width: 160px;
@@ -469,6 +470,16 @@
 
   .value {
     min-width: 38px;
+  }
+}
+
+.tone-control {
+  gap: 18px;
+
+  > span {
+    color: var(--color-white);
+    font-size: 14px;
+    font-weight: 500;
   }
 }
 

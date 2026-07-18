@@ -60,6 +60,39 @@
             }
           </div>
 
+          <div class="section-header">{{ t('backgroundTuning') }}</div>
+          <div class="control tone-control">
+            <span>{{ t('backgroundSaturation') }}</span>
+            <div class="control-right range-control">
+              <input
+                #backgroundSaturationInput
+                type="range"
+                min="0"
+                max="150"
+                step="5"
+                [value]="state.backgroundSaturation"
+                (input)="setBackgroundSaturation(backgroundSaturationInput.valueAsNumber)"
+              />
+              <span class="value">{{ state.backgroundSaturation }}%</span>
+            </div>
+          </div>
+
+          <div class="control tone-control">
+            <span>{{ t('backgroundTransparency') }}</span>
+            <div class="control-right range-control">
+              <input
+                #backgroundTransparencyInput
+                type="range"
+                min="0"
+                max="80"
+                step="5"
+                [value]="state.backgroundTransparency"
+                (input)="setBackgroundTransparency(backgroundTransparencyInput.valueAsNumber)"
+              />
+              <span class="value">{{ state.backgroundTransparency }}%</span>
+            </div>
+          </div>
+
           <div class="section-header">{{ t('annotationHighlighter') }}</div>
           <div class="annotation-colors">
             @for (color of annotationColors; track color.name) {
@@ -142,7 +175,7 @@
                     type="radio"
                     name="flow"
                     value="scrolled"
-                    [checked]="state.flow === 'scrolled'"
+                    [checked]="state.flow === 'scrolled' || state.flow === 'continuous'"
                     (change)="setFlow('scrolled')"
                   />
                   {{ t('scrolled') }}
@@ -151,56 +184,56 @@
             </div>
           </div>
 
-          <div class="control">
-            <span>{{ t('maxColumns') }}</span>
-            <div class="control-right">
-              <div class="stepper">
-                <button (click)="decreaseMaxColumnCount()">&#8722;</button>
-                <span>{{ state.maxColumnCount }}</span>
-                <button (click)="increaseMaxColumnCount()">+</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="control">
-            <span>{{ t('columnGap') }}</span>
-            <div class="control-right gap-control">
-              <input
-                #gapInput
-                type="range"
-                min="0"
-                max="0.5"
-                step="0.01"
-                [value]="state.gap"
-                (input)="setGap(gapInput.valueAsNumber)"
-              />
-              <span class="value">{{ (state.gap * 100) | number : '1.0-0' }}%</span>
-            </div>
-          </div>
-
-          <div class="control">
-            <span>{{ t('maxWidth') }}</span>
-            <div class="control-right">
-              <div class="stepper">
-                <button (click)="decreaseMaxInlineSize()">&#8722;</button>
-                <span>{{ state.maxInlineSize }}</span>
-                <button (click)="increaseMaxInlineSize()">+</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="control">
-            <span>{{ t('maxHeight') }}</span>
-            <div class="control-right">
-              <div class="stepper">
-                <button (click)="decreaseMaxBlockSize()">&#8722;</button>
-                <span>{{ state.maxBlockSize }}</span>
-                <button (click)="increaseMaxBlockSize()">+</button>
-              </div>
-            </div>
-          </div>
-
           @if (state.flow === 'paginated') {
+            <div class="control">
+              <span>{{ t('maxColumns') }}</span>
+              <div class="control-right">
+                <div class="stepper">
+                  <button (click)="decreaseMaxColumnCount()">&#8722;</button>
+                  <span>{{ state.maxColumnCount }}</span>
+                  <button (click)="increaseMaxColumnCount()">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="control">
+              <span>{{ t('columnGap') }}</span>
+              <div class="control-right gap-control">
+                <input
+                  #gapInput
+                  type="range"
+                  min="0"
+                  max="0.5"
+                  step="0.01"
+                  [value]="state.gap"
+                  (input)="setGap(gapInput.valueAsNumber)"
+                />
+                <span class="value">{{ (state.gap * 100) | number : '1.0-0' }}%</span>
+              </div>
+            </div>
+
+            <div class="control">
+              <span>{{ t('maxWidth') }}</span>
+              <div class="control-right">
+                <div class="stepper">
+                  <button (click)="decreaseMaxInlineSize()">&#8722;</button>
+                  <span>{{ state.maxInlineSize }}</span>
+                  <button (click)="increaseMaxInlineSize()">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="control">
+              <span>{{ t('maxHeight') }}</span>
+              <div class="control-right">
+                <div class="stepper">
+                  <button (click)="decreaseMaxBlockSize()">&#8722;</button>
+                  <span>{{ state.maxBlockSize }}</span>
+                  <button (click)="increaseMaxBlockSize()">+</button>
+                </div>
+              </div>
+            </div>
+
             <div class="toggle-control">
               <span>{{ t('fullWidth') }}</span>
               <button
@@ -212,6 +245,17 @@
                 (click)="toggleFullWidth()">
                 <span class="slider"></span>
               </button>
+            </div>
+          } @else {
+            <div class="control">
+              <span>{{ t('sidePadding') }}</span>
+              <div class="control-right">
+                <div class="stepper">
+                  <button (click)="decreasePageMargin()">&#8722;</button>
+                  <span>{{ state.pageMargin }}</span>
+                  <button (click)="increasePageMargin()">+</button>
+                </div>
+              </div>
             </div>
           }
 

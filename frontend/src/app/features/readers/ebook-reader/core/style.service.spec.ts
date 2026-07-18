@@ -52,6 +52,8 @@ describe('ReaderStyleService', () => {
       fontFamily: 'custom:7',
       isDark: true,
       flow: 'paginated',
+      backgroundSaturation: 100,
+      backgroundTransparency: 0,
     });
 
     expect(epubCustomFontService.getCustomFontById).toHaveBeenCalledWith(7);
@@ -78,6 +80,8 @@ describe('ReaderStyleService', () => {
       fontFamily: 'serif',
       isDark: false,
       flow: 'scrolled',
+      backgroundSaturation: 100,
+      backgroundTransparency: 0,
     });
 
     expect(epubCustomFontService.getCustomFontById).not.toHaveBeenCalled();
@@ -102,6 +106,8 @@ describe('ReaderStyleService', () => {
       fontFamily: 'Academy Book',
       isDark: true,
       flow: 'paginated',
+      backgroundSaturation: 100,
+      backgroundTransparency: 0,
     });
 
     expect(css).toContain('@font-face');
@@ -111,7 +117,27 @@ describe('ReaderStyleService', () => {
     expect(css).toContain('font-family: "Academy Book", serif !important;');
   });
 
-  it('applies renderer attributes and paginated margins only when a renderer exists', () => {
+  it('adjusts reader background saturation and transparency', () => {
+    expect(service.getAdjustedBackgroundColor({
+      lineHeight: 1.5,
+      justify: true,
+      hyphenate: true,
+      maxColumnCount: 2,
+      gap: 0.05,
+      fontSize: 16,
+      theme: {...themes[8], fg: themes[8].light.fg, bg: themes[8].light.bg, link: themes[8].light.link},
+      maxInlineSize: 720,
+      maxBlockSize: 1440,
+      pageMargin: 40,
+      fontFamily: null,
+      isDark: false,
+      flow: 'continuous',
+      backgroundSaturation: 0,
+      backgroundTransparency: 40,
+    })).toBe('rgba(225, 225, 225, 0.6)');
+  });
+
+  it('applies renderer attributes and reader margins only when a renderer exists', () => {
     const renderer = {
       setAttribute: vi.fn(),
       removeAttribute: vi.fn(),
@@ -132,6 +158,8 @@ describe('ReaderStyleService', () => {
       fontFamily: null,
       isDark: true,
       flow: 'paginated',
+      backgroundSaturation: 100,
+      backgroundTransparency: 0,
     });
 
     expect(renderer.setAttribute).toHaveBeenCalledWith('max-column-count', 3);
@@ -155,9 +183,13 @@ describe('ReaderStyleService', () => {
       fontFamily: null,
       isDark: true,
       flow: 'scrolled',
+      backgroundSaturation: 100,
+      backgroundTransparency: 0,
     });
 
-    expect(renderer.removeAttribute).toHaveBeenCalledWith('margin');
+    expect(renderer.setAttribute).toHaveBeenCalledWith('max-inline-size', `${Math.max(320, globalThis.innerWidth - 80)}px`);
+    expect(renderer.removeAttribute).toHaveBeenCalledWith('max-block-size');
+    expect(renderer.setAttribute).toHaveBeenCalledWith('margin', '40px');
     expect(() => service.applyStylesToRenderer(null, {
       lineHeight: 1.5,
       justify: true,
@@ -172,6 +204,8 @@ describe('ReaderStyleService', () => {
       fontFamily: null,
       isDark: true,
       flow: 'scrolled',
+      backgroundSaturation: 100,
+      backgroundTransparency: 0,
     })).not.toThrow();
   });
 
@@ -196,6 +230,8 @@ describe('ReaderStyleService', () => {
       fontFamily: null,
       isDark: true,
       flow: 'paginated',
+      backgroundSaturation: 100,
+      backgroundTransparency: 0,
     });
 
     expect(renderer.setAttribute).toHaveBeenCalledWith('gap', '0%');

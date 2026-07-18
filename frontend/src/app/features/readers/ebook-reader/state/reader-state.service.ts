@@ -6,7 +6,9 @@ import {BookService} from '../../../book/service/book.service';
 import {EbookViewerSetting} from '../../../book/model/book.model';
 import {PerBookSetting, UserService} from '../../../settings/user-management/user.service';
 import {EpubCustomFontService} from '../features/fonts/custom-font.service';
-import {ACADEMY_BOOK_FONT} from './built-in-fonts.constant';
+import {ACADEMY_BOOK_FONT, PT_SERIF_FONT} from './built-in-fonts.constant';
+
+export type ReaderFlow = 'paginated' | 'scrolled' | 'continuous';
 
 export interface ReaderState {
   lineHeight: number;
@@ -21,7 +23,9 @@ export interface ReaderState {
   pageMargin: number;
   fontFamily: string | null;
   isDark: boolean;
-  flow: 'paginated' | 'scrolled';
+  flow: ReaderFlow;
+  backgroundSaturation: number;
+  backgroundTransparency: number;
 }
 
 interface LegacyViewerSetting {
@@ -39,6 +43,7 @@ export class ReaderStateService {
   private readonly BASE_FONTS = [
     {name: 'Publisher\'s', value: null},
     {name: ACADEMY_BOOK_FONT.name, value: ACADEMY_BOOK_FONT.family},
+    {name: PT_SERIF_FONT.name, value: PT_SERIF_FONT.family},
     {name: 'Serif', value: 'serif'},
     {name: 'Sans-Serif', value: 'sans-serif'},
     {name: 'Monospace', value: 'monospace'},
@@ -64,6 +69,8 @@ export class ReaderStateService {
     fontFamily: null,
     isDark: true,
     flow: 'paginated',
+    backgroundSaturation: 100,
+    backgroundTransparency: 0,
   };
 
   private readonly _state = signal<ReaderState>(this.defaultState);
@@ -115,7 +122,7 @@ export class ReaderStateService {
         const individualSetting = bookSetting?.ebookSettings;
         const settings = settingScope === 'Global' ? globalSettings : (individualSetting || globalSettings);
         const newState: Partial<ReaderState> = {};
-        if (settings.fontSize != null) newState.fontSize = settings.fontSize;
+        if (settings.fontSize != null) newState.fontSize = this.clampFontSize(settings.fontSize);
         if (settings.lineHeight != null) newState.lineHeight = settings.lineHeight;
 
         if (settings.fontFamily != null) {
@@ -142,9 +149,15 @@ export class ReaderStateService {
         if (settings.maxColumnCount != null) newState.maxColumnCount = settings.maxColumnCount;
         if (settings.maxInlineSize != null) newState.maxInlineSize = settings.maxInlineSize;
         if (settings.maxBlockSize != null) newState.maxBlockSize = settings.maxBlockSize;
-        if (settings.pageMargin != null) newState.pageMargin = Math.max(0, Math.min(80, settings.pageMargin));
+        if (settings.pageMargin != null) newState.pageMargin = this.clampPageMargin(settings.pageMargin);
         if (settings.isDark != null) newState.isDark = settings.isDark;
-        if (settings.flow) newState.flow = settings.flow;
+        if (settings.flow) newState.flow = this.normalizeFlow(settings.flow);
+        if (settings.backgroundSaturation != null) {
+          newState.backgroundSaturation = this.clampBackgroundSaturation(settings.backgroundSaturation);
+        }
+        if (settings.backgroundTransparency != null) {
+          newState.backgroundTransparency = this.clampBackgroundTransparency(settings.backgroundTransparency);
+        }
         if (settings.theme) {
           const theme = this.themes.find(t => t.name === settings.theme);
           if (theme) {
@@ -191,8 +204,11 @@ export class ReaderStateService {
   }
 
   updateFontSize(delta: number): void {
-    const newFontSize = Math.max(10, Math.min(32, this._state().fontSize + delta));
-    this.updateState({fontSize: newFontSize});
+    this.setFontSize(this._state().fontSize + delta);
+  }
+
+  setFontSize(fontSize: number): void {
+    this.updateState({fontSize: this.clampFontSize(fontSize)});
   }
 
   setTheme(theme: Theme): void {
@@ -219,8 +235,20 @@ export class ReaderStateService {
     this.updateState({maxBlockSize: newValue});
   }
 
+  updatePageMargin(delta: number): void {
+    this.updateState({pageMargin: this.clampPageMargin(this._state().pageMargin + delta)});
+  }
+
   toggleFullWidth(): void {
     this.updateState({pageMargin: this._state().pageMargin === 0 ? 40 : 0});
+  }
+
+  setBackgroundSaturation(value: number): void {
+    this.updateState({backgroundSaturation: this.clampBackgroundSaturation(value)});
+  }
+
+  setBackgroundTransparency(value: number): void {
+    this.updateState({backgroundTransparency: this.clampBackgroundTransparency(value)});
   }
 
   toggleDarkMode() {
@@ -250,8 +278,29 @@ export class ReaderStateService {
     }
   }
 
-  setFlow(flow: 'paginated' | 'scrolled'): void {
-    this.updateState({flow});
+  setFlow(flow: ReaderFlow): void {
+    this.updateState({flow: this.normalizeFlow(flow)});
+  }
+
+  private normalizeFlow(flow: ReaderFlow | string): ReaderFlow {
+    if (flow === 'continuous' || flow === 'scrolled') return 'scrolled';
+    return 'paginated';
+  }
+
+  private clampFontSize(value: number): number {
+    return Math.max(10, Math.min(40, Math.round(value)));
+  }
+
+  private clampPageMargin(value: number): number {
+    return Math.max(0, Math.min(160, Math.round(value)));
+  }
+
+  private clampBackgroundSaturation(value: number): number {
+    return Math.max(0, Math.min(150, Math.round(value)));
+  }
+
+  private clampBackgroundTransparency(value: number): number {
+    return Math.max(0, Math.min(80, Math.round(value)));
   }
 
   persistSettings(bookId: number): void {
@@ -295,7 +344,9 @@ export class ReaderStateService {
       pageMargin: state.pageMargin,
       fontFamily: state.fontFamily,
       isDark: state.isDark,
-      flow: state.flow,
+      flow: this.normalizeFlow(state.flow),
+      backgroundSaturation: state.backgroundSaturation,
+      backgroundTransparency: state.backgroundTransparency,
     };
   }
 

@@ -1,7 +1,8 @@
 <div
+  #readerRoot
   class="reader"
   [class.immersive]="immersiveMode()"
-  [style.background-color]="readerState().theme.bg ?? ''">
+  [style.background-color]="readerBackground()">
 
   <div class="header-trigger-zone"
        [class.inactive]="headerVisible() || immersiveMode()"
@@ -31,24 +32,31 @@
       </div>
     }
     <div id="foliate-container" tabindex="0"></div>
-    <button
-      type="button"
-      class="chapter-navigation chapter-navigation-previous"
-      [disabled]="!canGoToPreviousChapter()"
-      [attr.aria-label]="'readerEbook.reader.previousChapter' | transloco"
-      [title]="'readerEbook.reader.previousChapter' | transloco"
-      (click)="goToPreviousChapter()">
-      <span aria-hidden="true">&#10094;</span>
-    </button>
-    <button
-      type="button"
-      class="chapter-navigation chapter-navigation-next"
-      [disabled]="!canGoToNextChapter()"
-      [attr.aria-label]="'readerEbook.reader.nextChapter' | transloco"
-      [title]="'readerEbook.reader.nextChapter' | transloco"
-      (click)="goToNextChapter()">
-      <span aria-hidden="true">&#10095;</span>
-    </button>
+    @if (pinchFontSize()) {
+      <div class="pinch-font-size-overlay">
+        {{ pinchFontSize() }} px
+      </div>
+    }
+    @if (readerState().flow === 'paginated') {
+      <button
+        type="button"
+        class="chapter-navigation chapter-navigation-previous"
+        [disabled]="!canGoToPreviousChapter()"
+        [attr.aria-label]="'readerEbook.reader.previousChapter' | transloco"
+        [title]="'readerEbook.reader.previousChapter' | transloco"
+        (click)="goToPreviousChapter()">
+        <span aria-hidden="true">&#10094;</span>
+      </button>
+      <button
+        type="button"
+        class="chapter-navigation chapter-navigation-next"
+        [disabled]="!canGoToNextChapter()"
+        [attr.aria-label]="'readerEbook.reader.nextChapter' | transloco"
+        [title]="'readerEbook.reader.nextChapter' | transloco"
+        (click)="goToNextChapter()">
+        <span aria-hidden="true">&#10095;</span>
+      </button>
+    }
   </div>
 
   <app-reader-navbar

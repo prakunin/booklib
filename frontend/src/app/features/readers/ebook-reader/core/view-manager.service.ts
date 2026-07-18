@@ -5,6 +5,7 @@ import {ReaderAnnotationService, Annotation} from '../features/annotations/annot
 import {ReaderEventService, ViewEvent, TextSelection} from './event.service';
 import {PageInfo, ThemeInfo, PageDecorator} from '../shared/header-footer.util';
 import {EpubStreamingService, EpubBookInfo} from './epub-streaming.service';
+import {ReaderFlow} from '../state/reader-state.service';
 
 export type {ViewEvent, TextSelection} from './event.service';
 export type {PageInfo, ThemeInfo} from '../shared/header-footer.util';
@@ -79,8 +80,8 @@ interface FoliateViewElement extends HTMLElement {
   open(target: File | object): Promise<void>;
   goTo(target: string | number): Promise<void>;
   goToFraction(fraction: number): Promise<void>;
-  prev(): void;
-  next(): void;
+  prev(distance?: number): void;
+  next(distance?: number): void;
   getCFI(index: number, range: Range): string | null;
   deselect(): void;
   addAnnotation(annotation: { value: string }): void;
@@ -214,16 +215,20 @@ export class ReaderViewManagerService {
     );
   }
 
-  prev(): void {
-    this.view?.prev();
+  prev(distance?: number): void {
+    this.view?.prev(distance);
   }
 
-  next(): void {
-    this.view?.next();
+  next(distance?: number): void {
+    this.view?.next(distance);
   }
 
   getRenderer(): FoliateRenderer | null {
     return this.view?.renderer ?? null;
+  }
+
+  setFlow(flow: ReaderFlow): void {
+    this.view?.setAttribute('flow', flow);
   }
 
   getSelection(): TextSelection | null {
@@ -233,20 +238,23 @@ export class ReaderViewManagerService {
     const contents = renderer.getContents();
     if (!contents || contents.length === 0) return null;
 
-    const {index, doc} = contents[0];
-    if (!doc) return null;
+    for (const {index, doc} of contents) {
+      if (!doc) continue;
 
-    const selection = doc.defaultView?.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+      const selection = doc.defaultView?.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) continue;
 
-    const range = selection.getRangeAt(0);
-    const text = range.toString().trim();
-    if (!text) return null;
+      const range = selection.getRangeAt(0);
+      const text = range.toString().trim();
+      if (!text) continue;
 
-    const cfi = this.view?.getCFI(index, range);
-    if (!cfi) return null;
+      const cfi = this.view?.getCFI(index, range);
+      if (!cfi) continue;
 
-    return {text, cfi, range, index};
+      return {text, cfi, range, index};
+    }
+
+    return null;
   }
 
   clearSelection(): void {

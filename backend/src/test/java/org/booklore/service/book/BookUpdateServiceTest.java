@@ -132,6 +132,8 @@ class BookUpdateServiceTest {
                         .pageMargin(0)
                         .theme("dark")
                         .flow("paginated")
+                        .backgroundSaturation(130)
+                        .backgroundTransparency(30)
                         .build())
                 .build();
 
@@ -151,6 +153,8 @@ class BookUpdateServiceTest {
         assertEquals(0, epubPrefs.getPageMargin());
         assertEquals("dark", epubPrefs.getTheme());
         assertEquals("paginated", epubPrefs.getFlow());
+        assertEquals(130, epubPrefs.getBackgroundSaturation());
+        assertEquals(30, epubPrefs.getBackgroundTransparency());
 
         settings.getEbookSettings().setPageMargin(12);
         bookUpdateService.updateBookViewerSetting(bookId, settings);
@@ -160,6 +164,13 @@ class BookUpdateServiceTest {
         bookUpdateService.updateBookViewerSetting(bookId, settings);
 
         assertEquals(40, epubPrefs.getPageMargin());
+
+        settings.getEbookSettings().setBackgroundSaturation(200);
+        settings.getEbookSettings().setBackgroundTransparency(100);
+        bookUpdateService.updateBookViewerSetting(bookId, settings);
+
+        assertEquals(150, epubPrefs.getBackgroundSaturation());
+        assertEquals(80, epubPrefs.getBackgroundTransparency());
     }
 
     @Test

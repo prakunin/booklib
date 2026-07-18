@@ -257,6 +257,7 @@ const languageInfo = lang => {
 }
 
 export class View extends HTMLElement {
+  static observedAttributes = ['flow']
   #root = this.attachShadow({mode: 'closed'})
   #sectionProgress
   #tocProgress
@@ -267,6 +268,7 @@ export class View extends HTMLElement {
   isFixedLayout = false
   lastLocation
   history = new History()
+  #rendererMode
 
   constructor() {
     super()
@@ -274,6 +276,73 @@ export class View extends HTMLElement {
       const resolved = this.resolveNavigation(detail.state)
       this.renderer.goTo(resolved)
     })
+  }
+
+  attributeChangedCallback(name, oldValue, value) {
+    if (name !== 'flow' || oldValue === value || !this.renderer) return
+    const mode = this.#getRendererMode()
+    if (this.book && !this.isFixedLayout && mode !== this.#rendererMode) {
+      this.#installRenderer({restoreLocation: true}).catch(e => console.error(e))
+    } else {
+      this.renderer.setAttribute('flow', value)
+    }
+  }
+
+  #getRendererMode() {
+    if (this.isFixedLayout) return 'fixed'
+    const flow = this.getAttribute('flow')
+    return flow === 'scrolled' || flow === 'continuous' ? 'continuous' : 'paginator'
+  }
+
+  async #createRenderer() {
+    const mode = this.#getRendererMode()
+    if (mode === 'fixed') {
+      await import('./fixed-layout.js')
+      return document.createElement('foliate-fxl')
+    }
+    if (mode === 'continuous') {
+      await import('./continuous-scroller.js')
+      return document.createElement('foliate-continuous-scroller')
+    }
+    await import('./paginator.js')
+    return document.createElement('foliate-paginator')
+  }
+
+  #copyRendererAttributes(from, to) {
+    const names = [
+      'flow', 'gap', 'margin',
+      'max-inline-size', 'max-block-size', 'max-column-count',
+      'animated',
+    ]
+    for (const name of names) {
+      const value = name === 'flow'
+        ? this.getAttribute(name) ?? from?.getAttribute?.(name)
+        : from?.getAttribute?.(name) ?? this.getAttribute(name)
+      if (value != null) to.setAttribute(name, value)
+    }
+  }
+
+  #wireRenderer(renderer) {
+    renderer.setAttribute('exportparts', 'head,foot,filter')
+    renderer.addEventListener('load', e => this.#onLoad(e.detail))
+    renderer.addEventListener('relocate', e => this.#onRelocate(e.detail))
+    renderer.addEventListener('create-overlayer', e =>
+      e.detail.attach(this.#createOverlayer(e.detail)))
+  }
+
+  async #installRenderer({restoreLocation = false} = {}) {
+    const oldRenderer = this.renderer
+    const target = restoreLocation ? this.lastLocation?.cfi : null
+    const renderer = await this.#createRenderer()
+    this.#copyRendererAttributes(oldRenderer, renderer)
+    this.#wireRenderer(renderer)
+    this.#rendererMode = this.#getRendererMode()
+    oldRenderer?.destroy?.()
+    oldRenderer?.remove?.()
+    this.renderer = renderer
+    this.#root.append(renderer)
+    await Promise.resolve(renderer.open(this.book))
+    if (target) await renderer.goTo(this.resolveNavigation(target))
   }
 
   async open(book) {
@@ -299,20 +368,7 @@ export class View extends HTMLElement {
     }
 
     this.isFixedLayout = this.book.rendition?.layout === 'pre-paginated'
-    if (this.isFixedLayout) {
-      await import('./fixed-layout.js')
-      this.renderer = document.createElement('foliate-fxl')
-    } else {
-      await import('./paginator.js')
-      this.renderer = document.createElement('foliate-paginator')
-    }
-    this.renderer.setAttribute('exportparts', 'head,foot,filter')
-    this.renderer.addEventListener('load', e => this.#onLoad(e.detail))
-    this.renderer.addEventListener('relocate', e => this.#onRelocate(e.detail))
-    this.renderer.addEventListener('create-overlayer', e =>
-      e.detail.attach(this.#createOverlayer(e.detail)))
-    this.renderer.open(book)
-    this.#root.append(this.renderer)
+    await this.#installRenderer()
 
     if (book.sections.some(section => section.mediaOverlay)) {
       const activeClass = book.media.activeClass
@@ -378,12 +434,12 @@ export class View extends HTMLElement {
     return this.dispatchEvent(new CustomEvent(name, {detail, cancelable}))
   }
 
-  #onRelocate({reason, range, index, fraction, size}) {
+  #onRelocate({reason, range, index, fraction, size, sectionEndFraction}) {
     const progress = this.#sectionProgress?.getProgress(index, fraction, size) ?? {}
     const tocItem = this.#tocProgress?.getProgress(index, range)
     const pageItem = this.#pageProgress?.getProgress(index, range)
     const cfi = this.getCFI(index, range)
-    this.lastLocation = {...progress, tocItem, pageItem, cfi, range}
+    this.lastLocation = {...progress, tocItem, pageItem, cfi, range, reason, sectionFraction: fraction, sectionEndFraction}
     if (reason === 'snap' || reason === 'page' || reason === 'scroll')
       this.history.replaceState(cfi)
     this.#emit('relocate', this.lastLocation)

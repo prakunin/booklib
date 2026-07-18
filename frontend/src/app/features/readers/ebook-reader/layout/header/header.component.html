@@ -14,6 +14,17 @@
   </div>
   <span class="chapter-title">{{ bookTitle() }}</span>
   <div class="header-right">
+    <div class="reader-tools desktop-only">
+      <button class="icon-btn" (click)="onDecreaseFontSize()" [title]="t('decreaseFontSize')">
+        <app-reader-icon name="minus" [size]="18"></app-reader-icon>
+      </button>
+      <button class="icon-btn" (click)="onIncreaseFontSize()" [title]="t('increaseFontSize')">
+        <app-reader-icon name="plus" [size]="18"></app-reader-icon>
+      </button>
+      <button class="icon-btn" [class.active]="justify()" (click)="onToggleJustify()" [title]="justify() ? t('disableJustify') : t('enableJustify')">
+        <app-reader-icon [name]="justify() ? 'align-justify' : 'align-left'" [size]="18"></app-reader-icon>
+      </button>
+    </div>
     <button class="icon-btn desktop-only" (click)="onOpenNotes()" [title]="t('notes')">
       <app-reader-icon name="note"></app-reader-icon>
     </button>

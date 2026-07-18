@@ -186,7 +186,9 @@ export interface EbookReaderSetting {
   pageMargin?: number;
   fontFamily: string;
   isDark: boolean;
-  flow: 'paginated' | 'scrolled';
+  flow: 'paginated' | 'scrolled' | 'continuous';
+  backgroundSaturation?: number;
+  backgroundTransparency?: number;
 }
 
 export interface EpubReaderSetting {

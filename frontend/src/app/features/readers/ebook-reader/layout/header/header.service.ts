@@ -33,6 +33,7 @@ export class ReaderHeaderService {
   toggleFullscreen$ = this._toggleFullscreen.asObservable();
   showShortcutsHelp$ = this._showShortcutsHelp.asObservable();
   readonly theme = computed(() => this.stateService.state().theme);
+  readonly justify = computed(() => this.stateService.state().justify);
 
   initialize(bookId: number, title: string): void {
     this.bookId = bookId;
@@ -90,6 +91,16 @@ export class ReaderHeaderService {
 
   increaseFontSize(): void {
     this.stateService.updateFontSize(1);
+    this.syncSettingsToBackend();
+  }
+
+  decreaseFontSize(): void {
+    this.stateService.updateFontSize(-1);
+    this.syncSettingsToBackend();
+  }
+
+  toggleJustify(): void {
+    this.stateService.toggleJustify();
     this.syncSettingsToBackend();
   }
 

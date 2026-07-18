@@ -33,6 +33,7 @@ export class EpubReaderPreferencesComponent {
 
   private static readonly baseFonts: FontPreferenceItem[] = [
     {name: 'Book Default', displayName: 'Default', key: null},
+    {name: 'PT Serif', displayName: 'PT Serif', key: 'PT Serif'},
     {name: 'Serif', displayName: 'Serif', key: 'serif'},
     {name: 'Sans Serif', displayName: 'Sans Serif', key: 'sans-serif'},
     {name: 'Roboto', displayName: 'Roboto', key: 'roboto'},
@@ -183,7 +184,7 @@ export class EpubReaderPreferencesComponent {
   }
 
   get flow(): 'paginated' | 'scrolled' {
-    return this.userSettings().ebookReaderSetting.flow;
+    return this.userSettings().ebookReaderSetting.flow === 'paginated' ? 'paginated' : 'scrolled';
   }
 
   set flow(value: 'paginated' | 'scrolled') {

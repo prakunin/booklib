@@ -192,6 +192,10 @@
     &.font-button {
       font-size: var(--app-text-base);
 
+      &[data-font="PT Serif"] .option-text {
+        font-family: "PT Serif", serif;
+      }
+
       &[data-font="serif"] .option-text {
         font-family: Georgia, 'Times New Roman', serif;
       }
