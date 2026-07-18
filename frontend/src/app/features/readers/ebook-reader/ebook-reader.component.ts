@@ -35,6 +35,7 @@ import {TranslocoPipe} from '@jsverse/transloco';
 import {RelocateProgressData} from './state/progress.service';
 import {WakeLockService} from '../../../shared/service/wake-lock.service';
 import {ViewEvent} from './core/view-manager.service';
+import {ReaderFullscreenService} from '../shared/reader-fullscreen.service';
 
 interface PendingInitialChapterRestore {
   href: string;
@@ -97,6 +98,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   private noteService = inject(ReaderNoteService);
   private wakeLockService = inject(WakeLockService);
   private messageService = inject(MessageService);
+  private fullscreenService = inject(ReaderFullscreenService);
 
   public sidebarService = inject(ReaderSidebarService);
   public leftSidebarService = inject(ReaderLeftSidebarService);
@@ -628,12 +630,12 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
 
   @HostListener('document:fullscreenchange')
   onFullscreenChange(): void {
-    this.isFullscreen.set(!!document.fullscreenElement);
+    this.isFullscreen.set(this.fullscreenService.isFullscreen());
     this.headerService.setFullscreen(this.isFullscreen());
   }
 
   toggleFullscreen(): void {
-    if (document.fullscreenElement) {
+    if (this.fullscreenService.isFullscreen()) {
       this.exitFullscreen();
     } else {
       this.enterFullscreen();
@@ -641,11 +643,11 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   }
 
   private enterFullscreen(): void {
-    document.documentElement.requestFullscreen?.();
+    this.fullscreenService.enter();
   }
 
   private exitFullscreen(): void {
-    document.exitFullscreen?.();
+    this.fullscreenService.exit();
   }
 
   onProgressChange(fraction: number): void {
