@@ -1,5 +1,7 @@
 package org.booklore.service.audit;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,8 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -22,20 +23,23 @@ public class GeoIpService {
 
     private static final String GEO_API_URL = "http://ip-api.com/json/%s?fields=countryCode";
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
+    static final long CACHE_MAX_SIZE = 10_000;
+    static final Duration CACHE_TTL = Duration.ofHours(24);
+    private static final Pattern IP_LITERAL = Pattern.compile("[0-9A-Fa-f:.%]+");
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private final Map<String, String> cache = new ConcurrentHashMap<>();
+    private final Cache<String, String> cache = Caffeine.newBuilder()
+            .maximumSize(CACHE_MAX_SIZE)
+            .expireAfterWrite(CACHE_TTL)
+            .build();
 
     public String resolveCountryCode(String ip) {
-        if (ip == null || ip.isBlank() || isPrivateOrLocal(ip)) {
+        String cacheKey = normalizePublicIp(ip);
+        if (cacheKey == null) {
             return null;
         }
-        String result = cache.get(ip);
-        if (result == null) {
-            result = fetchCountryCode(ip);
-            cache.put(ip, result);
-        }
+        String result = cache.get(cacheKey, this::fetchCountryCode);
         return result.isEmpty() ? null : result;
     }
 
@@ -63,12 +67,26 @@ public class GeoIpService {
         return "";
     }
 
-    private boolean isPrivateOrLocal(String ip) {
-        try {
-            InetAddress addr = InetAddress.getByName(ip);
-            return addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress();
-        } catch (Exception e) {
-            return true;
+    private String normalizePublicIp(String ip) {
+        if (ip == null || ip.isBlank()) {
+            return null;
         }
+        String candidate = ip.trim();
+        if (!IP_LITERAL.matcher(candidate).matches()) {
+            return null;
+        }
+        try {
+            InetAddress addr = InetAddress.getByName(candidate);
+            if (addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress()) {
+                return null;
+            }
+            return addr.getHostAddress();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    Cache<String, String> cache() {
+        return cache;
     }
 }
