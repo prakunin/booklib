@@ -1,7 +1,5 @@
 package org.booklore.service.library;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.exception.ApiError;
@@ -22,16 +20,11 @@ import org.booklore.service.file.FileFingerprint;
 import org.booklore.task.options.RescanLibraryContext;
 import org.booklore.util.FileUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -51,12 +44,9 @@ public class LibraryProcessingService {
     private final LibraryFileHelper libraryFileHelper;
     private final BookGroupingService bookGroupingService;
     private final BookCoverGenerator bookCoverGenerator;
+    private final BookFileAutoAttacher bookFileAutoAttacher;
     private final InpxLibraryScanner inpxLibraryScanner;
-    @PersistenceContext
-    private final EntityManager entityManager;
-    private final PlatformTransactionManager transactionManager;
 
-    @Transactional
     public void processLibrary(long libraryId) {
         LibraryEntity libraryEntity = libraryRepository.findByIdWithPaths(libraryId).orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
         notificationService.sendMessage(Topic.LOG, LogNotification.info("Started processing library: " + libraryEntity.getName()));
@@ -83,7 +73,6 @@ public class LibraryProcessingService {
         }
     }
 
-    @Transactional
     public void rescanLibrary(RescanLibraryContext context) throws IOException {
         long libraryId = context.getLibraryId();
         LibraryEntity libraryEntity = libraryRepository.findByIdWithPaths(libraryId)
@@ -127,8 +116,8 @@ public class LibraryProcessingService {
         }
         bookRestorationService.restoreDeletedBooks(allLibraryFiles);
         bookDeletionService.purgeDisallowedFormats(libraryEntity);
-        entityManager.clear();
-        // Re-fetch fresh state after entity manager was cleared
+
+        // Re-fetch fresh state after bounded write services have committed their own transactions.
         libraryEntity = libraryRepository.findByIdWithPaths(libraryId)
                 .orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
         books = bookRepository.findAllByLibraryIdForRescan(libraryId);
@@ -166,48 +155,15 @@ public class LibraryProcessingService {
     }
 
     private void autoAttachFile(BookEntity book, LibraryFile file) {
-        // Check if file already exists to prevent duplicates during concurrent rescans
-        var existing = bookAdditionalFileRepository.findByLibraryPath_IdAndFileSubPathAndFileName(
-                file.getLibraryPathEntity().getId(), file.getFileSubPath(), file.getFileName());
-        if (existing.isPresent()) {
-            log.debug("Additional file already exists, skipping: {}", file.getFileName());
-            return;
-        }
-
-        // Set libraryPath if not set (fileless books like physical books don't have one)
-        if (book.getLibraryPath() == null) {
-            book.setLibraryPath(file.getLibraryPathEntity());
-        } else if (!book.getLibraryPath().getId().equals(file.getLibraryPathEntity().getId())) {
-            // Book already has a different libraryPath - cannot attach files from different paths
-            log.warn("Cannot attach file '{}' to book id={}: file is in libraryPath {} but book is in libraryPath {}",
-                    file.getFileName(), book.getId(), file.getLibraryPathEntity().getId(), book.getLibraryPath().getId());
-            return;
-        }
-
-        String hash = file.isFolderBased()
-                ? FileFingerprint.generateFolderHash(file.getFullPath())
-                : FileFingerprint.generateHash(file.getFullPath());
-        Long fileSizeKb = file.isFolderBased()
-                ? FileUtils.getFolderSizeInKb(file.getFullPath())
-                : FileUtils.getFileSizeInKb(file.getFullPath());
-        BookFileEntity additionalFile = BookFileEntity.builder()
-                .book(book)
-                .fileName(file.getFileName())
-                .fileSubPath(file.getFileSubPath())
-                .isBookFormat(true)
-                .bookType(file.getBookFileType())
-                .folderBased(file.isFolderBased())
-                .fileSizeKb(fileSizeKb)
-                .initialHash(hash)
-                .currentHash(hash)
-                .addedOn(Instant.now())
-                .build();
-
         try {
-            bookAdditionalFileRepository.save(additionalFile);
-            String primaryFileName = book.hasFiles() ? book.getPrimaryBookFile().getFileName() : "book#" + book.getId();
-            log.info("Auto-attached new format {} to existing book: {}", file.getFileName(), primaryFileName);
-            bookCoverGenerator.generateCoverFromAdditionalFile(book, file);
+            String hash = file.isFolderBased()
+                    ? FileFingerprint.generateFolderHash(file.getFullPath())
+                    : FileFingerprint.generateHash(file.getFullPath());
+            Long fileSizeKb = file.isFolderBased()
+                    ? FileUtils.getFolderSizeInKb(file.getFullPath())
+                    : FileUtils.getFileSizeInKb(file.getFullPath());
+            bookFileAutoAttacher.attach(book.getId(), file, hash, fileSizeKb)
+                    .ifPresent(attachedBook -> bookCoverGenerator.generateCoverFromAdditionalFile(attachedBook, file));
         } catch (Exception e) {
             log.error("Error auto-attaching file {}: {}", file.getFileName(), e.getMessage());
         }
@@ -221,21 +177,11 @@ public class LibraryProcessingService {
                     "Skipped " + action + " INPX library without an index: " + libraryEntity.getName()));
             return;
         }
-        // processLibrary(...)/rescanLibrary(...) are @Transactional, and are the only callers of
-        // this method. The scan itself can run for hours and loads what it needs itself
-        // (InpxLibraryScanner is deliberately non-transactional: InpxBatchWriter commits one
-        // batch at a time), so it must not hold the enclosing transaction - and its pooled
-        // connection and InnoDB read view - open for the whole ingest. Suspend the outer
-        // transaction for the duration of the scan and resume it once the scan returns.
-        runWithoutTransaction(() -> inpxLibraryScanner.scan(libraryEntity.getId()));
+        // InpxLibraryScanner is deliberately non-transactional; InpxBatchWriter commits one batch
+        // at a time. Keep the long archive scan outside service-level transactions.
+        inpxLibraryScanner.scan(libraryEntity.getId());
         notificationService.sendMessage(Topic.LIBRARY_SCAN_COMPLETE, libraryEntity.getId());
         notificationService.sendMessage(Topic.LOG, LogNotification.info(
                 "Finished " + action + " INPX library: " + libraryEntity.getName()));
-    }
-
-    private void runWithoutTransaction(Runnable action) {
-        TransactionTemplate template = new TransactionTemplate(transactionManager);
-        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
-        template.executeWithoutResult(status -> action.run());
     }
 }

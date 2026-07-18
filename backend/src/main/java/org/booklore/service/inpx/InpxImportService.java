@@ -14,7 +14,6 @@ import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.repository.LibraryRepository;
 import org.booklore.service.inpx.InpxSourceResolver.InpxSource;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,12 +44,11 @@ public class InpxImportService {
     private final LibraryAccessGuard libraryAccessGuard;
     private final InpxSourceResolver inpxSourceResolver;
 
-    @Transactional(readOnly = true)
     public InpxImportResult importBooks(long libraryId, InpxImportRequest request) {
         // Defence in depth: the controller's @CheckLibraryAccess covers the path variable, but the
         // destination is re-checked here so no future caller can reach this with an unowned library.
         libraryAccessGuard.requireAccess(libraryId);
-        LibraryEntity library = libraryRepository.findById(libraryId)
+        LibraryEntity library = libraryRepository.findByIdWithPaths(libraryId)
                 .orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
         if (library.getSourceType() == LibrarySourceType.INPX) {
             // An INPX library's rescan only reads its index and archives, so extracted loose files

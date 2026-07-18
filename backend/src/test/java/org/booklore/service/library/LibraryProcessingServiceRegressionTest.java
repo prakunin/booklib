@@ -1,6 +1,5 @@
 package org.booklore.service.library;
 
-import jakarta.persistence.EntityManager;
 import org.booklore.model.dto.settings.LibraryFile;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.LibraryEntity;
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.PlatformTransactionManager;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -55,9 +53,7 @@ class LibraryProcessingServiceRegressionTest {
     @Mock
     private InpxLibraryScanner inpxLibraryScanner;
     @Mock
-    private EntityManager entityManager;
-    @Mock
-    private PlatformTransactionManager transactionManager;
+    private BookFileAutoAttacher bookFileAutoAttacher;
 
     private LibraryProcessingService libraryProcessingService;
 
@@ -74,9 +70,8 @@ class LibraryProcessingServiceRegressionTest {
                 libraryFileHelper,
                 bookGroupingService,
                 bookCoverGenerator,
-                inpxLibraryScanner,
-                entityManager,
-                transactionManager
+                bookFileAutoAttacher,
+                inpxLibraryScanner
         );
     }
 
