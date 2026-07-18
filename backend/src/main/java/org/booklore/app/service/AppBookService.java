@@ -20,7 +20,6 @@ import org.booklore.service.browse.BookSpecifications;
 import org.booklore.model.dto.Book;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.Library;
-import org.booklore.model.dto.request.ReadProgressRequest;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.ComicCreatorRole;
 import org.booklore.model.enums.ContentRestrictionMode;
@@ -33,8 +32,6 @@ import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
 import org.booklore.repository.UserContentRestrictionRepository;
 import org.booklore.security.policy.ContentRestrictionSpecification;
-import org.booklore.service.annotation.InvalidateUserStats;
-import org.booklore.service.book.BookService;
 import org.booklore.service.browse.BookSortRegistry;
 import org.booklore.service.browse.BookSortSpecifications;
 import org.booklore.service.inpx.InpxCoverGenerationRequestedEvent;
@@ -50,7 +47,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
@@ -78,7 +74,7 @@ public class AppBookService {
     private final ShelfRepository shelfRepository;
     private final AuthenticationService authenticationService;
     private final AppBookMapper mobileBookMapper;
-    private final BookService bookService;
+    private final AppBookProgressService appBookProgressService;
     private final MagicShelfBookService magicShelfBookService;
     private final EntityManager entityManager;
     private final UserContentRestrictionRepository restrictionRepository;
@@ -98,7 +94,7 @@ public class AppBookService {
                           ShelfRepository shelfRepository,
                           AuthenticationService authenticationService,
                           AppBookMapper mobileBookMapper,
-                          BookService bookService,
+                          AppBookProgressService appBookProgressService,
                           MagicShelfBookService magicShelfBookService,
                           EntityManager entityManager,
                           UserContentRestrictionRepository restrictionRepository,
@@ -112,7 +108,7 @@ public class AppBookService {
         this.shelfRepository = shelfRepository;
         this.authenticationService = authenticationService;
         this.mobileBookMapper = mobileBookMapper;
-        this.bookService = bookService;
+        this.appBookProgressService = appBookProgressService;
         this.magicShelfBookService = magicShelfBookService;
         this.entityManager = entityManager;
         this.restrictionRepository = restrictionRepository;
@@ -398,30 +394,8 @@ public class AppBookService {
         return mobileBookMapper.toProgressResponse(progress, fileProgress);
     }
 
-    // The app path opens its own transaction around BookService.updateReadProgress, so this is the
-    // outermost boundary here and the one the invalidation must hang off to land after commit.
-    @InvalidateUserStats
-    @Transactional
     public void updateBookProgress(Long bookId, UpdateProgressRequest request) {
-        BookLoreUser user = authenticationService.getAuthenticatedUser();
-        Long userId = user.getId();
-        Set<Long> accessibleLibraryIds = getAccessibleLibraryIds(user);
-
-        BookEntity book = bookRepository.findByIdWithBookFiles(bookId)
-                .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
-
-        validateBookAccess(userId, accessibleLibraryIds, book);
-
-        ReadProgressRequest progressRequest = new ReadProgressRequest();
-        progressRequest.setBookId(bookId);
-        progressRequest.setFileProgress(request.getFileProgress());
-        progressRequest.setEpubProgress(request.getEpubProgress());
-        progressRequest.setPdfProgress(request.getPdfProgress());
-        progressRequest.setCbxProgress(request.getCbxProgress());
-        progressRequest.setAudiobookProgress(request.getAudiobookProgress());
-        progressRequest.setDateFinished(request.getDateFinished());
-
-        bookService.updateReadProgress(progressRequest);
+        appBookProgressService.updateBookProgress(bookId, request);
     }
 
     @Transactional(readOnly = true)
@@ -883,43 +857,12 @@ public class AppBookService {
                 .build();
     }
 
-
-    @InvalidateUserStats
-    @Transactional
     public void updateReadStatus(Long bookId, ReadStatus status) {
-        UserBookProgressEntity progress = validateAccessAndGetProgress(bookId);
-
-        progress.setReadStatus(status);
-        progress.setReadStatusModifiedTime(Instant.now());
-
-        if (status == ReadStatus.READ && progress.getDateFinished() == null) {
-            progress.setDateFinished(Instant.now());
-        }
-
-        userBookProgressRepository.save(progress);
+        appBookProgressService.updateReadStatus(bookId, status);
     }
 
-    @Transactional
     public void updatePersonalRating(Long bookId, Integer rating) {
-        UserBookProgressEntity progress = validateAccessAndGetProgress(bookId);
-
-        progress.setPersonalRating(rating);
-        userBookProgressRepository.save(progress);
-    }
-
-    private UserBookProgressEntity validateAccessAndGetProgress(Long bookId) {
-        BookLoreUser user = authenticationService.getAuthenticatedUser();
-        Long userId = user.getId();
-        Set<Long> accessibleLibraryIds = getAccessibleLibraryIds(user);
-
-        BookEntity book = bookRepository.findByIdWithBookFiles(bookId)
-                .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
-
-        validateBookAccess(userId, accessibleLibraryIds, book);
-
-        return userBookProgressRepository
-                .findByUserIdAndBookId(userId, bookId)
-                .orElseGet(() -> createNewProgress(userId, book));
+        appBookProgressService.updatePersonalRating(bookId, rating);
     }
 
     private void validateLibraryAccess(Set<Long> accessibleLibraryIds, Long libraryId) {
@@ -935,13 +878,6 @@ public class AppBookService {
                 userId, accessibleLibraryIds == null).and(sameBook))) {
             throw ApiError.FORBIDDEN.createException("Access denied to this book");
         }
-    }
-
-    private UserBookProgressEntity createNewProgress(Long userId, BookEntity book) {
-        return UserBookProgressEntity.builder()
-                .user(BookLoreUserEntity.builder().id(userId).build())
-                .book(book)
-                .build();
     }
 
     private Set<Long> getAccessibleLibraryIds(BookLoreUser user) {

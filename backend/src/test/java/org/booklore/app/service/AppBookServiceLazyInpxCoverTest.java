@@ -13,7 +13,6 @@ import org.booklore.repository.ShelfRepository;
 import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
 import org.booklore.repository.UserContentRestrictionRepository;
-import org.booklore.service.book.BookService;
 import org.booklore.service.browse.BookSortRegistry;
 import org.booklore.service.inpx.InpxCoverGenerationRequestedEvent;
 import org.booklore.service.opds.MagicShelfBookService;
@@ -43,7 +42,7 @@ class AppBookServiceLazyInpxCoverTest {
     @Mock private ShelfRepository shelfRepository;
     @Mock private AuthenticationService authenticationService;
     @Mock private AppBookMapper mobileBookMapper;
-    @Mock private BookService bookService;
+    @Mock private AppBookProgressService appBookProgressService;
     @Mock private MagicShelfBookService magicShelfBookService;
     @Mock private EntityManager entityManager;
     @Mock private UserContentRestrictionRepository restrictionRepository;
@@ -56,7 +55,7 @@ class AppBookServiceLazyInpxCoverTest {
     void setUp() {
         service = new AppBookService(
                 bookRepository, userBookProgressRepository, userBookFileProgressRepository,
-                shelfRepository, authenticationService, mobileBookMapper, bookService,
+                shelfRepository, authenticationService, mobileBookMapper, appBookProgressService,
                 magicShelfBookService, entityManager, restrictionRepository, bookSortRegistry,
                 eventPublisher, new CatalogSummaryCache(), new FilterOptionsCache());
     }
