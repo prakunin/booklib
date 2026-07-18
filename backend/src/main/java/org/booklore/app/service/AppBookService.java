@@ -1247,7 +1247,7 @@ public class AppBookService {
 
         requestMissingInpxCovers(books);
 
-        return AppPageResponse.of(summaries, pageNum, pageSize, bookPage.getTotalElements());
+        return AppPageResponse.fromPage(bookPage, summaries);
     }
 
     private void requestMissingInpxCovers(List<BookEntity> books) {

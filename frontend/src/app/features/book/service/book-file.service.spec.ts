@@ -147,9 +147,8 @@ describe('BookFileService', () => {
     );
   });
 
-  it('deletes an additional file, patches the cached lists, and shows a success toast', () => {
-    queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [
-      buildBook(7, {
+  it('deletes an additional file, invalidates cached lists, and shows a success toast', () => {
+    const cached = buildBook(7, {
         alternativeFormats: [buildAdditionalFile(70, {bookId: 7, fileName: 'alt.epub'})],
         supplementaryFiles: [
           buildAdditionalFile(71, {
@@ -158,8 +157,8 @@ describe('BookFileService', () => {
             additionalFileType: AdditionalFileType.SUPPLEMENTARY,
           }),
         ],
-      }),
-    ]);
+      });
+    queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [cached]);
 
     service.deleteAdditionalFile(7, 71).subscribe();
 
@@ -167,12 +166,8 @@ describe('BookFileService', () => {
     expect(request.request.method).toBe('DELETE');
     request.flush(null);
 
-    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([
-      buildBook(7, {
-        alternativeFormats: [buildAdditionalFile(70, {bookId: 7, fileName: 'alt.epub'})],
-        supplementaryFiles: [],
-      }),
-    ]);
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([cached]);
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(messageService.add).toHaveBeenCalledWith({
       severity: 'success',
       summary: 'book.bookService.toast.fileDeletedSummary',
@@ -199,12 +194,14 @@ describe('BookFileService', () => {
 
     expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([
       buildBook(9, {
-        primaryFile: buildAdditionalFile(91, {bookId: 9, fileName: 'alt-one.pdf', bookType: 'PDF'}),
+        primaryFile: buildAdditionalFile(90, {bookId: 9, fileName: 'main.epub'}),
         alternativeFormats: [
+          buildAdditionalFile(91, {bookId: 9, fileName: 'alt-one.pdf', bookType: 'PDF'}),
           buildAdditionalFile(92, {bookId: 9, fileName: 'alt-two.fb2', bookType: 'FB2'}),
         ],
       }),
     ]);
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(messageService.add).toHaveBeenCalledWith({
       severity: 'success',
       summary: 'book.bookService.toast.fileDeletedSummary',
@@ -269,11 +266,8 @@ describe('BookFileService', () => {
 
     request.flush(uploadedFile);
 
-    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([
-      buildBook(12, {
-        alternativeFormats: [uploadedFile],
-      }),
-    ]);
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([buildBook(12)]);
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(messageService.add).toHaveBeenCalledWith({
       severity: 'success',
       summary: 'book.bookService.toast.fileUploadedSummary',
@@ -307,7 +301,8 @@ describe('BookFileService', () => {
     expect(request.request.body).toEqual({copyMetadata: true});
     request.flush(response);
 
-    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([response.sourceBook, response.newBook]);
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([sourceBook, placeholderNewBook]);
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(messageService.add).toHaveBeenCalledWith({
       severity: 'success',
       summary: 'metadata.viewer.toast.detachFileSuccessSummary',
@@ -355,7 +350,8 @@ describe('BookFileService', () => {
       deletedSourceBookIds: [31, 32],
     });
 
-    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([updatedTargetBook]);
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([targetBook, sourceBook, secondSourceBook]);
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(queryClient.getQueryData(bookDetailQueryKey(31, false))).toBeUndefined();
     expect(queryClient.getQueryData(bookDetailQueryKey(32, false))).toBeUndefined();
     expect(messageService.add).toHaveBeenCalledWith({

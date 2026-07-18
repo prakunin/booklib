@@ -20,6 +20,7 @@ import {
 import {
   invalidateAppBooksQueries,
   invalidateBooksQuery,
+  invalidateLegacyBooksQuery,
   patchBooksInCache,
   removeBookQueries,
 } from './book-query-cache';
@@ -171,12 +172,8 @@ export class BookService {
   }
 
   removeBooksFromShelf(shelfId: number): void {
-    this.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-      current?.map(book => ({
-        ...book,
-        shelves: book.shelves?.filter(shelf => shelf.id !== shelfId),
-      })) ?? current
-    );
+    void shelfId;
+    invalidateLegacyBooksQuery(this.queryClient);
     invalidateAppBooksQueries(this.queryClient);
   }
 
