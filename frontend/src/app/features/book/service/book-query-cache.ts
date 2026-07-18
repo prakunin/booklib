@@ -55,7 +55,7 @@ export function removeBooksFromCache(queryClient: QueryClient, bookIds: Iterable
   }
 
   queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    (current ?? []).filter(book => !removedIds.has(book.id))
+    current?.filter(book => !removedIds.has(book.id)) ?? current
   );
   removeBookQueries(queryClient, removedIds);
   invalidateAppBooksQueries(queryClient);
@@ -79,7 +79,7 @@ export function addBookToCache(queryClient: QueryClient, book: Book): void {
 export function patchBooksInCache(queryClient: QueryClient, updatedBooks: Book[]): void {
   const updatedMap = new Map(updatedBooks.map(book => [book.id, book]));
   queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    (current ?? []).map(book => updatedMap.get(book.id) ?? book)
+    current?.map(book => updatedMap.get(book.id) ?? book) ?? current
   );
   invalidateBookDetailQueries(queryClient, updatedBooks.map(b => b.id));
   invalidateAppBooksQueries(queryClient);
@@ -87,9 +87,9 @@ export function patchBooksInCache(queryClient: QueryClient, updatedBooks: Book[]
 
 export function patchBookMetadataInCache(queryClient: QueryClient, bookId: number, metadata: BookMetadata): void {
   queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    (current ?? []).map(book =>
+    current?.map(book =>
       book.id === bookId ? {...book, metadata} : book
-    )
+    ) ?? current
   );
   invalidateBookDetailQueries(queryClient, [bookId]);
   invalidateAppBooksQueries(queryClient);
@@ -97,7 +97,7 @@ export function patchBookMetadataInCache(queryClient: QueryClient, bookId: numbe
 
 export function patchBookInCacheWith(queryClient: QueryClient, bookId: number, updater: (book: Book) => Book): void {
   queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-    (current ?? []).map(book => book.id === bookId ? updater(book) : book)
+    current?.map(book => book.id === bookId ? updater(book) : book) ?? current
   );
   invalidateBookDetailQueries(queryClient, [bookId]);
   invalidateAppBooksQueries(queryClient);

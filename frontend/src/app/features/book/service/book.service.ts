@@ -172,10 +172,10 @@ export class BookService {
 
   removeBooksFromShelf(shelfId: number): void {
     this.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-      (current ?? []).map(book => ({
+      current?.map(book => ({
         ...book,
         shelves: book.shelves?.filter(shelf => shelf.id !== shelfId),
-      }))
+      })) ?? current
     );
     invalidateAppBooksQueries(this.queryClient);
   }
