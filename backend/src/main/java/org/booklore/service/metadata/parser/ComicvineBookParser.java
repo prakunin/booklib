@@ -1,5 +1,7 @@
 package org.booklore.service.metadata.parser;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.dto.Book;
@@ -20,12 +22,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
@@ -63,7 +65,8 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
     private static final String PREFIX_ISSUE = RESOURCE_TYPE_ISSUE + "-";
     private static final String PREFIX_VOLUME = RESOURCE_TYPE_VOLUME + "-";
 
-    private static final long CACHE_EXPIRATION_MS = 600_000; // 10 minutes
+    static final Duration VOLUME_CACHE_TTL = Duration.ofMinutes(10);
+    static final int VOLUME_CACHE_MAX_ENTRIES = 500;
     private static final int MAX_VOLUMES_TO_CHECK = 3;
     private static final int SEARCH_LIMIT_DEFAULT = 25;
     private static final int FILTER_LIMIT_DEFAULT = 20;
@@ -78,21 +81,10 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
     private final AtomicLong rateLimitResetTime = new AtomicLong(0);
     private final AtomicLong lastRequestTime = new AtomicLong(0);
     private final AtomicLong apiCallCounter = new AtomicLong(0);
-    private final Map<String, CachedVolumes> volumeCache = new ConcurrentHashMap<>();
-
-    private static class CachedVolumes {
-        final List<Comic> volumes;
-        final long timestamp;
-
-        CachedVolumes(List<Comic> volumes) {
-            this.volumes = volumes;
-            this.timestamp = System.currentTimeMillis();
-        }
-
-        boolean isExpired() {
-            return System.currentTimeMillis() - timestamp > CACHE_EXPIRATION_MS;
-        }
-    }
+    private final Cache<String, List<Comic>> volumeCache = Caffeine.newBuilder()
+            .expireAfterWrite(VOLUME_CACHE_TTL)
+            .maximumSize(VOLUME_CACHE_MAX_ENTRIES)
+            .build();
 
     @Override
     public List<BookMetadata> fetchMetadata(Book book, FetchMetadataRequest fetchMetadataRequest) {
@@ -309,10 +301,10 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
 
     private List<Comic> searchVolumes(String seriesName) {
         String cacheKey = seriesName.toLowerCase();
-        CachedVolumes cached = volumeCache.get(cacheKey);
-        if (cached != null && !cached.isExpired()) {
+        List<Comic> cached = volumeCache.getIfPresent(cacheKey);
+        if (cached != null) {
             log.debug("Using cached volume search for '{}'", seriesName);
-            return cached.volumes;
+            return cached;
         }
 
         String apiToken = getApiToken();
@@ -339,7 +331,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         }
 
         if (!volumes.isEmpty()) {
-            volumeCache.put(cacheKey, new CachedVolumes(List.copyOf(volumes)));
+            volumeCache.put(cacheKey, List.copyOf(volumes));
         } else if (seriesName.contains(" - ")) {
             String alternativeName = seriesName.replace(" - ", ": ");
             log.debug("No results for '{}', trying alternative name '{}'", seriesName, alternativeName);
@@ -1020,6 +1012,10 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
             return null;
         }
         return apiToken;
+    }
+
+    Cache<String, List<Comic>> volumeCache() {
+        return volumeCache;
     }
 
     private record SeriesAndIssue(String series, String issue, Integer year, String issueType, String remainder) {}

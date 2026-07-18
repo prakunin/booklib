@@ -22,12 +22,14 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -101,7 +103,18 @@ public class ComicvineBookParserTest {
 
     @BeforeEach
     public void setup() throws Exception {
-        when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettings());
+        lenient().when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettings());
+    }
+
+    @Test
+    public void volumeSearchCacheHasMaximumSizeAndTtl() {
+        var eviction = comicvineBookParser.volumeCache().policy().eviction();
+        var expiration = comicvineBookParser.volumeCache().policy().expireAfterWrite();
+
+        assertThat(eviction).isPresent();
+        assertThat(eviction.orElseThrow().getMaximum()).isEqualTo(ComicvineBookParser.VOLUME_CACHE_MAX_ENTRIES);
+        assertThat(expiration).isPresent();
+        assertThat(expiration.orElseThrow().getExpiresAfter(TimeUnit.MINUTES)).isEqualTo(ComicvineBookParser.VOLUME_CACHE_TTL.toMinutes());
     }
 
     @Test
