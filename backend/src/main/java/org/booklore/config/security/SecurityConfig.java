@@ -78,7 +78,11 @@ public class SecurityConfig {
 
     @Bean
     @Order(1)
-    public SecurityFilterChain opdsBasicAuthSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) throws Exception {
+    public SecurityFilterChain opdsBasicAuthSecurityChain(
+            HttpSecurity http,
+            QueryParameterJwtFilter queryParameterJwtFilter,
+            OpdsBasicAuthRateLimitFilter opdsBasicAuthRateLimitFilter
+    ) throws Exception {
         List<String> unauthenticatedEndpoints = new ArrayList<>(Arrays.asList(COMMON_UNAUTHENTICATED_ENDPOINTS));
         http
                 .securityMatcher("/api/v1/opds/**", "/api/v2/opds/**")
@@ -92,6 +96,7 @@ public class SecurityConfig {
                 // download clients (that don't re-send Basic auth on the download GET) still work.
                 // Falls through to Basic auth when no valid token is present.
                 .addFilterBefore(queryParameterJwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(opdsBasicAuthRateLimitFilter, QueryParameterJwtFilter.class)
                 .httpBasic(basic -> basic
                         .realmName("Booklore OPDS")
                         .authenticationEntryPoint((request, response, authException) -> {

@@ -71,6 +71,35 @@ public class AuthRateLimitService {
         resetAttempts("refresh:" + ip);
     }
 
+    // --- Alternate authentication rate limiting ---
+
+    public void checkAlternateAuthRateLimit(String authPath, String ip) {
+        checkRateLimit(alternateIpKey(authPath, ip), AuditAction.LOGIN_RATE_LIMITED,
+                "Alternate auth rate limited for " + authPath + " IP: " + ip);
+    }
+
+    public void checkAlternateAuthRateLimitByCredential(String authPath, String credential) {
+        String normalizedCredential = normalizeCredential(credential);
+        checkRateLimit(alternateCredentialKey(authPath, normalizedCredential), AuditAction.LOGIN_RATE_LIMITED,
+                "Alternate auth rate limited for " + authPath + " credential");
+    }
+
+    public void recordFailedAlternateAuthAttempt(String authPath, String ip) {
+        recordFailedAttempt(alternateIpKey(authPath, ip));
+    }
+
+    public void recordFailedAlternateAuthAttemptByCredential(String authPath, String credential) {
+        recordFailedAttempt(alternateCredentialKey(authPath, normalizeCredential(credential)));
+    }
+
+    public void resetAlternateAuthAttempts(String authPath, String ip) {
+        resetAttempts(alternateIpKey(authPath, ip));
+    }
+
+    public void resetAlternateAuthAttemptsByCredential(String authPath, String credential) {
+        resetAttempts(alternateCredentialKey(authPath, normalizeCredential(credential)));
+    }
+
     // --- Shared internals ---
 
     private void checkRateLimit(String key, AuditAction action, String message) {
@@ -91,5 +120,17 @@ public class AuthRateLimitService {
 
     private String normalizeUsername(String username) {
         return username != null ? username.trim().toLowerCase() : "";
+    }
+
+    private String normalizeCredential(String credential) {
+        return credential != null ? credential.trim() : "";
+    }
+
+    private String alternateIpKey(String authPath, String ip) {
+        return "alternate:" + authPath + ":ip:" + ip;
+    }
+
+    private String alternateCredentialKey(String authPath, String normalizedCredential) {
+        return "alternate:" + authPath + ":credential:" + normalizedCredential;
     }
 }
