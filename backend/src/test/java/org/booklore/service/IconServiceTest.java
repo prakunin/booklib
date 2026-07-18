@@ -141,6 +141,8 @@ class IconServiceTest {
             req.setSvgData(SVG_DATA);
             iconService.saveSvgIcon(req);
         }
+        assertDoesNotThrow(() -> Files.writeString(iconsSvgPath.resolve("._icon0.svg"), "macOS metadata"));
+
         Page<String> page = iconService.getIconNames(0, 2);
         assertEquals(2, page.getContent().size());
         assertEquals(5, page.getTotalElements());

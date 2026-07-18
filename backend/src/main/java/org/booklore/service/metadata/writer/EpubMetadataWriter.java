@@ -7,6 +7,8 @@ import org.booklore.model.MetadataClearFlags;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
+import org.booklore.model.entity.MoodEntity;
+import org.booklore.model.entity.TagEntity;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.util.SecureXmlUtils;
@@ -48,6 +50,7 @@ import java.util.zip.ZipOutputStream;
 
 import org.grimmory.epub4j.archive.EpubContainer;
 import org.grimmory.epub4j.archive.EpubContainers;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.io.UncheckedIOException;
 
@@ -58,6 +61,27 @@ public class EpubMetadataWriter implements MetadataWriter {
 
     private static final String OPF_NS = "http://www.idpf.org/2007/opf";
     private static final Pattern CALIBRE_PREFIX_PATTERN = Pattern.compile("calibre:\\s*https?://[^\\s]+");
+    private static final List<BookloreMetadataField> BOOKLORE_METADATA_FIELDS = List.of(
+            new BookloreMetadataField("subtitle", metadata -> nonBlank(metadata.getSubtitle())),
+            new BookloreMetadataField("page_count", metadata -> positiveNumber(metadata.getPageCount())),
+            new BookloreMetadataField("series_total", metadata -> positiveNumber(metadata.getSeriesTotal())),
+            new BookloreMetadataField("amazon_rating", metadata -> positiveNumber(metadata.getAmazonRating())),
+            new BookloreMetadataField("amazon_review_count", metadata -> positiveNumber(metadata.getAmazonReviewCount())),
+            new BookloreMetadataField("goodreads_rating", metadata -> positiveNumber(metadata.getGoodreadsRating())),
+            new BookloreMetadataField("goodreads_review_count", metadata -> positiveNumber(metadata.getGoodreadsReviewCount())),
+            new BookloreMetadataField("hardcover_rating", metadata -> positiveNumber(metadata.getHardcoverRating())),
+            new BookloreMetadataField("hardcover_review_count", metadata -> positiveNumber(metadata.getHardcoverReviewCount())),
+            new BookloreMetadataField("lubimyczytac_rating", metadata -> positiveNumber(metadata.getLubimyczytacRating())),
+            new BookloreMetadataField("ranobedb_rating", metadata -> positiveNumber(metadata.getRanobedbRating())),
+            new BookloreMetadataField("moods", metadata -> metadata.getMoods() == null || metadata.getMoods().isEmpty()
+                    ? null
+                    : jsonNames(metadata.getMoods().stream().map(MoodEntity::getName))),
+            new BookloreMetadataField("tags", metadata -> metadata.getTags() == null || metadata.getTags().isEmpty()
+                    ? null
+                    : jsonNames(metadata.getTags().stream().map(TagEntity::getName))),
+            new BookloreMetadataField("age_rating", metadata -> metadata.getAgeRating() == null ? null : String.valueOf(metadata.getAgeRating())),
+            new BookloreMetadataField("content_rating", metadata -> nonBlank(metadata.getContentRating()))
+    );
     private final AppSettingService appSettingService;
 
     @Override
@@ -806,62 +830,20 @@ public class EpubMetadataWriter implements MetadataWriter {
             }
         }
 
-        Map<String, String> expected = new TreeMap<>();
-        if (StringUtils.isNotBlank(metadata.getSubtitle())) {
-            expected.put("booklore:subtitle", metadata.getSubtitle());
-        }
-        if (metadata.getPageCount() != null && metadata.getPageCount() > 0) {
-            expected.put("booklore:page_count", String.valueOf(metadata.getPageCount()));
-        }
-        if (metadata.getSeriesTotal() != null && metadata.getSeriesTotal() > 0) {
-            expected.put("booklore:series_total", String.valueOf(metadata.getSeriesTotal()));
-        }
-        if (metadata.getAmazonRating() != null && metadata.getAmazonRating() > 0) {
-            expected.put("booklore:amazon_rating", String.valueOf(metadata.getAmazonRating()));
-        }
-        if (metadata.getAmazonReviewCount() != null && metadata.getAmazonReviewCount() > 0) {
-            expected.put("booklore:amazon_review_count", String.valueOf(metadata.getAmazonReviewCount()));
-        }
-        if (metadata.getGoodreadsRating() != null && metadata.getGoodreadsRating() > 0) {
-            expected.put("booklore:goodreads_rating", String.valueOf(metadata.getGoodreadsRating()));
-        }
-        if (metadata.getGoodreadsReviewCount() != null && metadata.getGoodreadsReviewCount() > 0) {
-            expected.put("booklore:goodreads_review_count", String.valueOf(metadata.getGoodreadsReviewCount()));
-        }
-        if (metadata.getHardcoverRating() != null && metadata.getHardcoverRating() > 0) {
-            expected.put("booklore:hardcover_rating", String.valueOf(metadata.getHardcoverRating()));
-        }
-        if (metadata.getHardcoverReviewCount() != null && metadata.getHardcoverReviewCount() > 0) {
-            expected.put("booklore:hardcover_review_count", String.valueOf(metadata.getHardcoverReviewCount()));
-        }
-        if (metadata.getLubimyczytacRating() != null && metadata.getLubimyczytacRating() > 0) {
-            expected.put("booklore:lubimyczytac_rating", String.valueOf(metadata.getLubimyczytacRating()));
-        }
-        if (metadata.getRanobedbRating() != null && metadata.getRanobedbRating() > 0) {
-            expected.put("booklore:ranobedb_rating", String.valueOf(metadata.getRanobedbRating()));
-        }
-        if (metadata.getMoods() != null && !metadata.getMoods().isEmpty()) {
-            String moodsJson = "[" + metadata.getMoods().stream()
-                .map(mood -> "\"" + mood.getName().replace("\"", "\\\"") + "\"")
-                .sorted()
-                .collect(Collectors.joining(", ")) + "]";
-            expected.put("booklore:moods", moodsJson);
-        }
-        if (metadata.getTags() != null && !metadata.getTags().isEmpty()) {
-            String tagsJson = "[" + metadata.getTags().stream()
-                .map(tag -> "\"" + tag.getName().replace("\"", "\\\"") + "\"")
-                .sorted()
-                .collect(Collectors.joining(", ")) + "]";
-            expected.put("booklore:tags", tagsJson);
-        }
-        if (metadata.getAgeRating() != null) {
-            expected.put("booklore:age_rating", String.valueOf(metadata.getAgeRating()));
-        }
-        if (StringUtils.isNotBlank(metadata.getContentRating())) {
-            expected.put("booklore:content_rating", metadata.getContentRating());
-        }
+        Map<String, String> expected = expectedBookloreMetadata(metadata);
 
         return !existing.equals(expected);
+    }
+
+    private static Map<String, String> expectedBookloreMetadata(BookMetadataEntity metadata) {
+        Map<String, String> expected = new TreeMap<>();
+        for (BookloreMetadataField field : BOOKLORE_METADATA_FIELDS) {
+            String value = field.value(metadata);
+            if (value != null) {
+                expected.put("booklore:" + field.property(), value);
+            }
+        }
+        return expected;
     }
 
     private static boolean isEffectivelyZeroOrBlank(String value) {
@@ -1025,72 +1007,32 @@ public class EpubMetadataWriter implements MetadataWriter {
         
         removeAllBookloreMetadata(metadataElement);
         
-        if (StringUtils.isNotBlank(metadata.getSubtitle())) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "subtitle", metadata.getSubtitle(), epub3));
+        for (BookloreMetadataField field : BOOKLORE_METADATA_FIELDS) {
+            String value = field.value(metadata);
+            if (value != null) {
+                metadataElement.appendChild(createBookloreMetaElement(doc, field.property(), value, epub3));
+            }
         }
-        
-        if (metadata.getPageCount() != null && metadata.getPageCount() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "page_count", String.valueOf(metadata.getPageCount()), epub3));
-        }
-        
-        if (metadata.getSeriesTotal() != null && metadata.getSeriesTotal() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "series_total", String.valueOf(metadata.getSeriesTotal()), epub3));
-        }
-        
-        if (metadata.getAmazonRating() != null && metadata.getAmazonRating() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "amazon_rating", String.valueOf(metadata.getAmazonRating()), epub3));
-        }
-        
-        if (metadata.getAmazonReviewCount() != null && metadata.getAmazonReviewCount() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "amazon_review_count", String.valueOf(metadata.getAmazonReviewCount()), epub3));
-        }
-        
-        if (metadata.getGoodreadsRating() != null && metadata.getGoodreadsRating() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "goodreads_rating", String.valueOf(metadata.getGoodreadsRating()), epub3));
-        }
-        
-        if (metadata.getGoodreadsReviewCount() != null && metadata.getGoodreadsReviewCount() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "goodreads_review_count", String.valueOf(metadata.getGoodreadsReviewCount()), epub3));
-        }
-        
-        if (metadata.getHardcoverRating() != null && metadata.getHardcoverRating() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "hardcover_rating", String.valueOf(metadata.getHardcoverRating()), epub3));
-        }
-        
-        if (metadata.getHardcoverReviewCount() != null && metadata.getHardcoverReviewCount() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "hardcover_review_count", String.valueOf(metadata.getHardcoverReviewCount()), epub3));
-        }
-        
-        if (metadata.getLubimyczytacRating() != null && metadata.getLubimyczytacRating() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "lubimyczytac_rating", String.valueOf(metadata.getLubimyczytacRating()), epub3));
-        }
-        
-        if (metadata.getRanobedbRating() != null && metadata.getRanobedbRating() > 0) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "ranobedb_rating", String.valueOf(metadata.getRanobedbRating()), epub3));
-        }
-        
-        if (metadata.getMoods() != null && !metadata.getMoods().isEmpty()) {
-            String moodsJson = "[" + metadata.getMoods().stream()
-                .map(mood -> "\"" + mood.getName().replace("\"", "\\\"") + "\"")
+    }
+
+    private static String nonBlank(String value) {
+        return StringUtils.isNotBlank(value) ? value : null;
+    }
+
+    private static String positiveNumber(Number value) {
+        return value != null && value.doubleValue() > 0 ? String.valueOf(value) : null;
+    }
+
+    private static String jsonNames(java.util.stream.Stream<String> names) {
+        return "[" + names
+                .map(name -> "\"" + name.replace("\"", "\\\"") + "\"")
                 .sorted()
                 .collect(Collectors.joining(", ")) + "]";
-            metadataElement.appendChild(createBookloreMetaElement(doc, "moods", moodsJson, epub3));
-        }
+    }
 
-        if (metadata.getTags() != null && !metadata.getTags().isEmpty()) {
-            String tagsJson = "[" + metadata.getTags().stream()
-                .map(tag -> "\"" + tag.getName().replace("\"", "\\\"") + "\"")
-                .sorted()
-                .collect(Collectors.joining(", ")) + "]";
-            metadataElement.appendChild(createBookloreMetaElement(doc, "tags", tagsJson, epub3));
-        }
-
-        if (metadata.getAgeRating() != null) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "age_rating", String.valueOf(metadata.getAgeRating()), epub3));
-        }
-
-        if (StringUtils.isNotBlank(metadata.getContentRating())) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "content_rating", metadata.getContentRating(), epub3));
+    private record BookloreMetadataField(String property, Function<BookMetadataEntity, String> valueExtractor) {
+        private String value(BookMetadataEntity metadata) {
+            return valueExtractor.apply(metadata);
         }
     }
 
