@@ -94,6 +94,18 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     @Query("SELECT b.id FROM BookEntity b WHERE b.library.id = :libraryId AND (b.deleted IS NULL OR b.deleted = false)")
     Set<Long> findBookIdsByLibraryId(@Param("libraryId") long libraryId);
 
+    @Query("""
+            SELECT b.id FROM BookEntity b
+            WHERE b.library.id = :libraryId
+              AND (b.deleted IS NULL OR b.deleted = false)
+              AND b.id > :afterId
+            ORDER BY b.id
+            """)
+    List<Long> findBookIdsByLibraryIdAfterId(
+            @Param("libraryId") long libraryId,
+            @Param("afterId") long afterId,
+            Pageable pageable);
+
     @Query("SELECT DISTINCT b FROM BookEntity b JOIN b.bookFiles bf WHERE b.libraryPath.id = :libraryPathId AND (bf.fileSubPath = :fileSubPathPrefix OR bf.fileSubPath LIKE CONCAT(:fileSubPathPrefix, '/%')) AND bf.isBookFormat = true AND (b.deleted IS NULL OR b.deleted = false)")
     List<BookEntity> findAllByLibraryPathIdAndFileSubPathStartingWith(@Param("libraryPathId") Long libraryPathId, @Param("fileSubPathPrefix") String fileSubPathPrefix);
 
@@ -130,6 +142,17 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     })
     @Query("SELECT b FROM BookEntity b WHERE b.library.id = :libraryId AND (b.deleted IS NULL OR b.deleted = false)")
     List<BookEntity> findAllWithMetadataByLibraryId(@Param("libraryId") Long libraryId);
+
+    @EntityGraph(attributePaths = {
+        "metadata", "metadata.comicMetadata",
+        "metadata.comicMetadata.characters", "metadata.comicMetadata.teams", "metadata.comicMetadata.locations", "metadata.comicMetadata.creatorMappings",
+        "metadata.authors", "metadata.categories", "metadata.moods", "metadata.tags",
+        "shelves", "libraryPath", "library", "bookFiles"
+    })
+    @Query("SELECT b FROM BookEntity b WHERE b.id = :bookId AND b.library.id = :libraryId AND (b.deleted IS NULL OR b.deleted = false)")
+    Optional<BookEntity> findByIdForLibraryRescan(
+            @Param("bookId") Long bookId,
+            @Param("libraryId") Long libraryId);
 
     @EntityGraph(attributePaths = {"metadata", "bookFiles", "library"})
     @Query("SELECT b FROM BookEntity b WHERE b.library.id = :libraryId AND (b.deleted IS NULL OR b.deleted = false)")
