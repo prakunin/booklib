@@ -44,6 +44,7 @@ public class IconService {
     private static final String ICONS_DIR = "icons";
     private static final String SVG_DIR = "svg";
     private static final String SVG_EXTENSION = ".svg";
+    private static final String APPLE_DOUBLE_PREFIX = "._";
     private static final String SVG_START_TAG = "<svg";
     private static final String XML_DECLARATION = "<?xml";
     private static final String SVG_END_TAG = "</svg>";
@@ -172,8 +173,10 @@ public class IconService {
         try (Stream<Path> paths = Files.list(iconsPath)) {
             List<String> allIcons = paths
                     .filter(Files::isRegularFile)
-                    .filter(path -> path.toString().endsWith(SVG_EXTENSION))
-                    .map(path -> path.getFileName().toString().replace(SVG_EXTENSION, ""))
+                    .map(path -> path.getFileName().toString())
+                    .filter(filename -> filename.endsWith(SVG_EXTENSION))
+                    .filter(filename -> !filename.startsWith(APPLE_DOUBLE_PREFIX))
+                    .map(filename -> filename.replace(SVG_EXTENSION, ""))
                     .sorted()
                     .toList();
 
