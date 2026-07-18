@@ -21,11 +21,8 @@ public class KoreaderUserEntity {
     @Column(nullable = false, unique = true, length = 100)
     private String username;
 
-    @Column(nullable = false)
-    private String password;
-
-    @Column(name = "password_md5", nullable = false)
-    private String passwordMD5;
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
