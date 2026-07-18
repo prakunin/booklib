@@ -14,13 +14,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class DuplicateDetectionServiceTest {
@@ -116,7 +118,18 @@ class DuplicateDetectionServiceTest {
     }
 
     private void stubBooks(BookEntity... books) {
-        when(bookRepository.findAllForDuplicateDetection(LIBRARY_ID)).thenReturn(List.of(books));
+        List<BookEntity> sortedBooks = Arrays.stream(books)
+                .sorted(Comparator.comparing(BookEntity::getId))
+                .toList();
+        when(bookRepository.findDuplicateDetectionBatch(eq(LIBRARY_ID), anyLong(), any(Pageable.class)))
+                .thenAnswer(invocation -> {
+                    long afterId = invocation.getArgument(1);
+                    Pageable pageable = invocation.getArgument(2);
+                    return sortedBooks.stream()
+                            .filter(book -> book.getId() > afterId)
+                            .limit(pageable.getPageSize())
+                            .toList();
+                });
     }
 
     // ── General tests ───────────────────────────────────────────
@@ -136,11 +149,26 @@ class DuplicateDetectionServiceTest {
 
         @Test
         void returnsEmptyWhenNoBooksInLibrary() {
-            when(bookRepository.findAllForDuplicateDetection(LIBRARY_ID)).thenReturn(List.of());
+            stubBooks();
 
             List<DuplicateGroup> result = service.findDuplicates(allSignals());
 
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        void scansBooksInExplicitKeysetBatches() {
+            BookEntity book1 = createBookWithIsbn(BookFileType.EPUB, "Book", "Author", "9781234567890", null);
+            BookEntity book2 = createBookWithIsbn(BookFileType.MOBI, "Book", "Author", "9781234567890", null);
+            stubBooks(book1, book2);
+
+            List<DuplicateGroup> result = service.findDuplicates(onlyIsbn());
+
+            assertThat(result).hasSize(1);
+            verify(bookRepository, never()).findAllForDuplicateDetection(LIBRARY_ID);
+            verify(bookRepository, atLeastOnce())
+                    .findDuplicateDetectionBatch(eq(LIBRARY_ID), anyLong(), argThat(pageable ->
+                            pageable.getPageSize() == DuplicateDetectionService.DUPLICATE_DETECTION_BATCH_SIZE));
         }
 
         @Test
@@ -892,7 +920,7 @@ class DuplicateDetectionServiceTest {
                         "9781234567890", null);
                 books.add(book);
             }
-            when(bookRepository.findAllForDuplicateDetection(LIBRARY_ID)).thenReturn(books);
+            stubBooks(books.toArray(BookEntity[]::new));
 
             List<DuplicateGroup> result = service.findDuplicates(onlyIsbn());
 
