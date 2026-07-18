@@ -24,7 +24,6 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -72,33 +71,34 @@ public class InpxImportService {
         int skipped = 0;
         int failed = 0;
         List<String> errors = new ArrayList<>();
-        Map<String, ZipFile> openArchives = new HashMap<>();
+        long distinctArchiveCount = request.getBooks().stream()
+                .map(InpxBookReference::getArchiveName)
+                .distinct()
+                .count();
+        log.info("Importing {} INPX books from {} archive(s) with one open archive handle at a time",
+                request.getBooks().size(), distinctArchiveCount);
 
-        try {
-            for (InpxBookReference reference : request.getBooks()) {
-                String id = InpxParser.id(reference.getArchiveName(), reference.getFileName(), reference.getExtension());
-                InpxBookDto book = resolved.get(id);
-                if (book == null) {
-                    failed++;
-                    addError(errors, "Book is not present in the INPX index: " + id);
-                    continue;
-                }
-
-                try {
-                    ImportOutcome outcome = extractBook(book, archiveRoot, destinationRoot, openArchives);
-                    if (outcome == ImportOutcome.IMPORTED) {
-                        imported++;
-                    } else {
-                        skipped++;
-                    }
-                } catch (IOException | IllegalArgumentException e) {
-                    failed++;
-                    addError(errors, book.getTitle() + ": " + e.getMessage());
-                    log.warn("Failed to import INPX book {} from {}: {}", book.getId(), book.getArchiveName(), e.getMessage());
-                }
+        for (InpxBookReference reference : request.getBooks()) {
+            String id = InpxParser.id(reference.getArchiveName(), reference.getFileName(), reference.getExtension());
+            InpxBookDto book = resolved.get(id);
+            if (book == null) {
+                failed++;
+                addError(errors, "Book is not present in the INPX index: " + id);
+                continue;
             }
-        } finally {
-            openArchives.values().forEach(this::closeQuietly);
+
+            try {
+                ImportOutcome outcome = extractBook(book, archiveRoot, destinationRoot);
+                if (outcome == ImportOutcome.IMPORTED) {
+                    imported++;
+                } else {
+                    skipped++;
+                }
+            } catch (IOException | IllegalArgumentException e) {
+                failed++;
+                addError(errors, book.getTitle() + ": " + e.getMessage());
+                log.warn("Failed to import INPX book {} from {}: {}", book.getId(), book.getArchiveName(), e.getMessage());
+            }
         }
 
         return InpxImportResult.builder()
@@ -109,26 +109,12 @@ public class InpxImportService {
                 .build();
     }
 
-    private ImportOutcome extractBook(InpxBookDto book, Path archiveRoot, Path destinationRoot,
-                                      Map<String, ZipFile> openArchives) throws IOException {
+    private ImportOutcome extractBook(InpxBookDto book, Path archiveRoot, Path destinationRoot) throws IOException {
         String archiveName = safeFileName(book.getArchiveName(), ".zip");
         String entryName = safeFileName(book.getFileName(), "") + "." + safeExtension(book.getExtension());
         Path archivePath = archiveRoot.resolve(archiveName).normalize();
         if (!archivePath.startsWith(archiveRoot) || !Files.isRegularFile(archivePath) || !Files.isReadable(archivePath)) {
             throw new IOException("Archive is missing or unreadable: " + archiveName);
-        }
-
-        ZipFile archive = openArchives.get(archiveName);
-        if (archive == null) {
-            archive = new ZipFile(archivePath.toFile());
-            openArchives.put(archiveName, archive);
-        }
-        ZipEntry entry = archive.getEntry(entryName);
-        if (entry == null || entry.isDirectory()) {
-            throw new IOException("Archive entry is missing: " + entryName);
-        }
-        if (entry.getSize() > MAX_EXTRACTED_BOOK_SIZE) {
-            throw new IOException("Book exceeds the 1 GiB extraction limit");
         }
 
         String archiveFolder = archiveName.substring(0, archiveName.length() - ".zip".length());
@@ -141,22 +127,34 @@ public class InpxImportService {
             return ImportOutcome.SKIPPED;
         }
 
-        Files.createDirectories(targetDirectory);
-        Path temporary = Files.createTempFile(targetDirectory, ".inpx-", ".tmp");
-        try {
-            try (InputStream input = archive.getInputStream(entry);
-                 OutputStream output = Files.newOutputStream(temporary)) {
-                copyBounded(input, output);
+        try (ZipFile archive = openArchive(archivePath)) {
+            ZipEntry entry = archive.getEntry(entryName);
+            if (entry == null || entry.isDirectory()) {
+                throw new IOException("Archive entry is missing: " + entryName);
             }
+            if (entry.getSize() > MAX_EXTRACTED_BOOK_SIZE) {
+                throw new IOException("Book exceeds the 1 GiB extraction limit");
+            }
+
+            Files.createDirectories(targetDirectory);
+            Path temporary = Files.createTempFile(targetDirectory, ".inpx-", ".tmp");
             try {
+                try (InputStream input = archive.getInputStream(entry);
+                     OutputStream output = Files.newOutputStream(temporary)) {
+                    copyBounded(input, output);
+                }
                 Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException e) {
                 Files.move(temporary, target);
+            } finally {
+                Files.deleteIfExists(temporary);
             }
-        } finally {
-            Files.deleteIfExists(temporary);
         }
         return ImportOutcome.IMPORTED;
+    }
+
+    ZipFile openArchive(Path archivePath) throws IOException {
+        return new ZipFile(archivePath.toFile());
     }
 
     private void copyBounded(InputStream input, OutputStream output) throws IOException {
@@ -221,14 +219,6 @@ public class InpxImportService {
     private void addError(List<String> errors, String error) {
         if (errors.size() < MAX_REPORTED_ERRORS) {
             errors.add(error);
-        }
-    }
-
-    private void closeQuietly(ZipFile archive) {
-        try {
-            archive.close();
-        } catch (IOException e) {
-            log.debug("Failed to close INPX source archive", e);
         }
     }
 
