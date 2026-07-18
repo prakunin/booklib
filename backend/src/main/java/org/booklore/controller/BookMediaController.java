@@ -28,7 +28,7 @@ import java.util.Optional;
 @RequestMapping("/api/v1/media")
 public class BookMediaController {
 
-    private static final CacheControl IMAGE_CACHE = CacheControl.maxAge(Duration.ofHours(1)).cachePrivate();
+    private static final CacheControl IMAGE_CACHE = CacheControl.maxAge(Duration.ofDays(365)).cachePrivate().immutable();
 
     private final BookService bookService;
     private final CbxReaderService cbxReaderService;
