@@ -42,7 +42,6 @@ public class OidcAuthService {
     private static final String DEFAULT_MOBILE_REDIRECT_URI = "booklib://oauth2-callback";
     private static final String LEGACY_GRIMMORY_MOBILE_REDIRECT_URI = "grimmory://oauth2-callback";
     private static final String LEGACY_BOOKLORE_MOBILE_REDIRECT_URI = "booklore://oauth2-callback";
-    private static final String WILDCARD_REDIRECT_URI = "*";
     private static final String OAUTH2_CALLBACK_PATH = "/oauth2-callback";
     private static final Pattern TRAILING_SLASH_PATTERN = Pattern.compile("/+$");
 
@@ -180,7 +179,7 @@ public class OidcAuthService {
 
     private boolean isAllowedMobileRedirectUri(String redirectUri) {
         List<String> effectiveRedirectUris = getEffectiveMobileRedirectUris();
-        return effectiveRedirectUris.contains(WILDCARD_REDIRECT_URI) || effectiveRedirectUris.contains(redirectUri);
+        return effectiveRedirectUris.contains(redirectUri);
     }
 
     private List<String> getEffectiveMobileRedirectUris() {
