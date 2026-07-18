@@ -18,8 +18,6 @@ import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.reader.CbxReaderService;
 import org.booklore.service.reader.PdfReaderService;
 import org.booklore.service.restriction.ContentRestrictionService;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,10 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
@@ -423,21 +422,6 @@ public class KomgaService {
                 .build();
     }
     
-    public Resource getBookPageImage(Long bookId, Integer pageNumber, boolean convertToPng) throws IOException {
-        log.debug("Getting page {} from book {} (convert to PNG: {})", pageNumber, bookId, convertToPng);
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        streamBookPageImage(bookId, pageNumber, outputStream);
-        
-        byte[] imageData = outputStream.toByteArray();
-        
-        // If conversion to PNG is requested, convert the image
-        if (convertToPng) {
-            imageData = convertImageToPng(imageData);
-        }
-        
-        return new ByteArrayResource(imageData);
-    }
-
     public void streamBookPageImage(Long bookId, Integer pageNumber, OutputStream outputStream) throws IOException {
         log.debug("Streaming page {} from book {}", pageNumber, bookId);
 
@@ -451,19 +435,37 @@ public class KomgaService {
             cbxReaderService.streamPageImage(bookId, pageNumber, outputStream);
         }
     }
-    
-    private byte[] convertImageToPng(byte[] imageData) throws IOException {
+
+    public void streamBookPageImageAsPng(Long bookId, Integer pageNumber, OutputStream outputStream) throws IOException {
+        log.debug("Streaming page {} from book {} as PNG", pageNumber, bookId);
+
+        Path sourceImage = Files.createTempFile("booklore-komga-page-", ".img");
+        try {
+            try (OutputStream sourceOutputStream = Files.newOutputStream(sourceImage)) {
+                streamBookPageImage(bookId, pageNumber, sourceOutputStream);
+            }
+            convertImageToPng(sourceImage, outputStream);
+        } finally {
+            try {
+                Files.deleteIfExists(sourceImage);
+            } catch (IOException e) {
+                log.warn("Failed to delete temporary Komga page image {}", sourceImage, e);
+            }
+        }
+    }
+
+    private void convertImageToPng(Path sourceImage, OutputStream outputStream) throws IOException {
         try {
             PNG_CONVERSION_PERMITS.acquire();
-            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(imageData);
-                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            try (InputStream inputStream = Files.newInputStream(sourceImage)) {
                 BufferedImage image = ImageIO.read(inputStream);
                 if (image == null) {
                     throw new IOException("Failed to read image data");
                 }
 
-                ImageIO.write(image, "png", outputStream);
-                return outputStream.toByteArray();
+                if (!ImageIO.write(image, "png", outputStream)) {
+                    throw new IOException("Failed to write PNG image data");
+                }
             } finally {
                 PNG_CONVERSION_PERMITS.release();
             }

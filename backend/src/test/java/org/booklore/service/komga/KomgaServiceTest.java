@@ -30,6 +30,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.time.Instant;
@@ -250,6 +253,30 @@ class KomgaServiceTest {
     }
 
     @Test
+    void streamBookPageImageAsPng_streamsConvertedPngThroughExistingPageStream() throws Exception {
+        BookEntity book = getBookEntityWithPrimaryFile(BookFileType.CBX);
+        when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(book));
+
+        byte[] sourceImage = createPngImageBytes();
+        doAnswer(invocation -> {
+            OutputStream outputStream = invocation.getArgument(2);
+            outputStream.write(sourceImage);
+            return null;
+        }).when(cbxReaderService).streamPageImage(eq(1L), eq(2), any(OutputStream.class));
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        komgaService.streamBookPageImageAsPng(1L, 2, outputStream);
+
+        byte[] convertedImage = outputStream.toByteArray();
+        assertThat(convertedImage).startsWith(new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a});
+        assertThat(ImageIO.read(new ByteArrayInputStream(convertedImage))).isNotNull();
+        verify(cbxReaderService).streamPageImage(eq(1L), eq(2), any(OutputStream.class));
+        verify(cbxReaderService, never()).getAvailablePages(anyLong());
+        verifyNoInteractions(pdfReaderService);
+    }
+
+    @Test
     void shouldGetAllSeriesOptimized() {
         // Given: Mock the optimized repository method
         List<String> seriesNames = List.of("Series A", "Series B", "Series C");
@@ -407,6 +434,14 @@ class KomgaServiceTest {
         bookFile.setBookFormat(true);
         bookEntity.setBookFiles(List.of(bookFile));
         return bookEntity;
+    }
+
+    private byte[] createPngImageBytes() throws Exception {
+        BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+        image.setRGB(0, 0, 0xff6600);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", outputStream);
+        return outputStream.toByteArray();
     }
 
     BookLoreUser getBookloreUser(boolean isAdmin, List<LibraryEntity> libraries) {

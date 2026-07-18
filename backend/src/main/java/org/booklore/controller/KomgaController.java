@@ -174,14 +174,9 @@ public class KomgaController {
             // Note: When not converting, we assume JPEG as most CBZ files contain JPEG images,
             // but the actual format may vary (PNG, WebP, etc.)
             String contentType = convertToPng ? "image/png" : "image/jpeg";
-            if (convertToPng) {
-                Resource pageImage = komgaService.getBookPageImage(bookId, pageNumber, true);
-                return ResponseEntity.ok()
-                        .header("Content-Type", contentType)
-                        .body(pageImage);
-            }
-
-            StreamingResponseBody body = outputStream -> komgaService.streamBookPageImage(bookId, pageNumber, outputStream);
+            StreamingResponseBody body = convertToPng
+                    ? outputStream -> komgaService.streamBookPageImageAsPng(bookId, pageNumber, outputStream)
+                    : outputStream -> komgaService.streamBookPageImage(bookId, pageNumber, outputStream);
             return ResponseEntity.ok()
                     .header("Content-Type", contentType)
                     .body(body);
