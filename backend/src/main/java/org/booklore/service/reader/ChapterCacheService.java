@@ -1,5 +1,7 @@
 package org.booklore.service.reader;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.config.AppProperties;
@@ -13,8 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -26,10 +28,15 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ChapterCacheService {
 
     private static final long MTIME_TOLERANCE_MS = 2000;
+    static final int CACHE_LOCK_MAX_ENTRIES = 1024;
+    static final Duration CACHE_LOCK_TTL = Duration.ofMinutes(30);
 
     private final AppProperties appProperties;
     private final ArchiveService archiveService;
-    private final ConcurrentHashMap<String, ReentrantLock> cacheLocks = new ConcurrentHashMap<>();
+    private final Cache<String, ReentrantLock> cacheLocks = Caffeine.newBuilder()
+            .maximumSize(CACHE_LOCK_MAX_ENTRIES)
+            .expireAfterAccess(CACHE_LOCK_TTL)
+            .build();
 
     /**
      * Ensures all pages of a CBX archive are extracted to the disk cache.
@@ -37,7 +44,7 @@ public class ChapterCacheService {
      * which can cause SIGSEGV / out-of-memory crashes in the native heap.
      */
     public void prepareCbxCache(String cacheKey, Path cbxPath, List<String> entries) throws IOException {
-        ReentrantLock lock = cacheLocks.computeIfAbsent(cacheKey, _ -> new ReentrantLock());
+        ReentrantLock lock = cacheLocks.get(cacheKey, _ -> new ReentrantLock());
         lock.lock();
         try {
             Path cacheDir = getCacheDir(cacheKey);
@@ -64,6 +71,10 @@ public class ChapterCacheService {
         } finally {
             lock.unlock();
         }
+    }
+
+    Cache<String, ReentrantLock> cacheLocks() {
+        return cacheLocks;
     }
 
     public Path getCachedPage(String cacheKey, int pageNumber) {

@@ -88,6 +88,20 @@ class UserStatsCacheAspectTest {
         verify(joinPoint, times(2)).proceed();
     }
 
+    @Test
+    void usesStableStructuredCacheKeyForEquivalentDtoArguments() throws Throwable {
+        when(authenticationService.getAuthenticatedUser()).thenReturn(user(1L));
+        when(joinPoint.proceed()).thenReturn("R");
+
+        stubJoinPoint("opA", new Object[]{new StatsArg(2026, "ru")});
+        assertThat(aspect.cache(joinPoint)).isEqualTo("R");
+
+        stubJoinPoint("opA", new Object[]{new StatsArg(2026, "ru")});
+        assertThat(aspect.cache(joinPoint)).isEqualTo("R");
+
+        verify(joinPoint, times(1)).proceed();
+    }
+
     private void stubJoinPoint(String methodName, Object[] args) throws NoSuchMethodException {
         when(joinPoint.getSignature()).thenReturn(signature);
         when(signature.getMethod()).thenReturn(sampleMethod(methodName));
@@ -106,5 +120,8 @@ class UserStatsCacheAspectTest {
     private static final class Sample {
         void opA() {
         }
+    }
+
+    private record StatsArg(int year, String locale) {
     }
 }

@@ -45,48 +45,49 @@ public class InpxArchiveBookRefreshService {
     }
 
     public boolean refresh(long bookId) {
-        BookEntity book = bookRepository.findByIdForInpxArchiveRefresh(bookId).orElse(null);
-        if (book == null) {
-            return false;
-        }
-        BookFileEntity bookFile = book.getPrimaryBookFile();
-        if (bookFile == null || !bookFile.isArchivedSource()) {
-            return false;
-        }
+        RefreshResult result = transactionTemplate.execute(status -> {
+            BookEntity managedBook = bookRepository.findByIdForInpxArchiveRefresh(bookId).orElse(null);
+            if (managedBook == null) {
+                return RefreshResult.NOT_REFRESHED;
+            }
+            BookFileEntity bookFile = managedBook.getPrimaryBookFile();
+            if (bookFile == null || !bookFile.isArchivedSource()) {
+                return RefreshResult.NOT_REFRESHED;
+            }
 
-        // Revalidated, not cached: this is the repair path for a replaced archive, so it must read
-        // the archive itself rather than a cached copy that may predate the replacement.
-        File fb2File = archivedBookContentService.resolveRevalidated(bookFile).toFile();
-        try {
+            // Revalidated, not cached: this is the repair path for a replaced archive, so it must read
+            // the archive itself rather than a cached copy that may predate the replacement.
+            File fb2File = archivedBookContentService.resolveRevalidated(bookFile).toFile();
             BookMetadata metadata = fb2MetadataExtractor.extractMetadata(fb2File);
-            transactionTemplate.executeWithoutResult(status -> {
-                BookEntity managedBook = bookRepository.findByIdForInpxArchiveRefresh(bookId)
-                        .orElseThrow(() -> new IllegalStateException("Book disappeared during archive refresh: " + bookId));
-                if (metadata != null) {
-                    bookMetadataUpdater.setBookMetadata(MetadataUpdateContext.builder()
-                            .bookEntity(managedBook)
-                            .metadataUpdateWrapper(MetadataUpdateWrapper.builder().metadata(metadata).build())
-                            .replaceMode(MetadataReplaceMode.REPLACE_WHEN_PROVIDED)
-                            .build());
-                }
-                managedBook.setScannedOn(Instant.now());
-                // A rescan may be repairing a replaced archive that now has a cover it didn't have
-                // before, so a prior "no cover" probe result must not survive it.
-                managedBook.setCoverProbedAt(null);
-                bookRepository.save(managedBook);
-            });
-        } catch (RuntimeException e) {
-            log.warn("Failed to refresh metadata for archived book {}: {}", bookId, e.getMessage());
-            throw e;
+            if (metadata != null) {
+                bookMetadataUpdater.setBookMetadata(MetadataUpdateContext.builder()
+                        .bookEntity(managedBook)
+                        .metadataUpdateWrapper(MetadataUpdateWrapper.builder().metadata(metadata).build())
+                        .replaceMode(MetadataReplaceMode.REPLACE_WHEN_PROVIDED)
+                        .build());
+            }
+            managedBook.setScannedOn(Instant.now());
+            // A rescan may be repairing a replaced archive that now has a cover it didn't have
+            // before, so a prior "no cover" probe result must not survive it.
+            managedBook.setCoverProbedAt(null);
+            bookRepository.save(managedBook);
+            return RefreshResult.REFRESHED;
+        });
+        if (result != RefreshResult.REFRESHED) {
+            return false;
         }
 
         try {
             bookCoverService.regenerateCover(bookId);
+            return true;
         } catch (RuntimeException e) {
             log.debug("No cover regenerated for archived book {}: {}", bookId, e.getMessage());
+            return false;
         }
-        return bookRepository.findById(bookId)
-                .map(refreshed -> refreshed.getBookCoverHash() != null)
-                .orElse(false);
+    }
+
+    private enum RefreshResult {
+        REFRESHED,
+        NOT_REFRESHED
     }
 }

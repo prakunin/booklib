@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -78,10 +79,12 @@ public class InpxArchiveScanner {
         Path root = validateArchiveRoot(archiveRoot);
         try (Stream<Path> paths = Files.list(root)) {
             List<ArchiveFile> archives = new ArrayList<>();
+            Set<Path> seenArchives = new HashSet<>();
             for (Path path : paths.filter(Files::isRegularFile)
                     .filter(this::isZip)
                     .sorted(Comparator.comparing(item -> item.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
                     .toList()) {
+                seenArchives.add(path);
                 long size = Files.size(path);
                 Instant modifiedAt = Files.getLastModifiedTime(path).toInstant();
                 ArchiveFile cached = archiveFileCache.get(path);
@@ -94,10 +97,15 @@ public class InpxArchiveScanner {
                     archives.add(inspected);
                 }
             }
+            archiveFileCache.keySet().retainAll(seenArchives);
             return List.copyOf(archives);
         } catch (IOException e) {
             throw ApiError.FILE_READ_ERROR.createException("Unable to scan INPX archive folder: " + e.getMessage());
         }
+    }
+
+    int archiveFileCacheSize() {
+        return archiveFileCache.size();
     }
 
     public ArchiveCandidate inspectArchive(String archiveRoot, String archiveName) {

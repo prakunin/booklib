@@ -14,7 +14,15 @@ import org.booklore.service.progress.ReadingProgressService;
 import org.booklore.service.recommender.BookRecommendationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,5 +71,24 @@ class BookControllerTest {
 
         assertThat(controller.getBooks(false, true).getBody()).isEqualTo(books);
         verify(bookService).getBookDTOs(false, true);
+    }
+
+    @Test
+    void bookContentReturnsNotModifiedWhenClientCacheIsFresh() {
+        Resource resource = mock(Resource.class);
+        when(bookService.getBookContent(42L, null)).thenReturn(ResponseEntity.ok()
+                .lastModified(123_000L)
+                .cacheControl(CacheControl.noCache().cachePrivate())
+                .body(resource));
+
+        ResponseEntity<Resource> response = controller.getBookContent(
+                42L,
+                null,
+                DateTimeFormatter.RFC_1123_DATE_TIME.format(Instant.ofEpochMilli(123_000L).atZone(ZoneOffset.UTC)));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_MODIFIED);
+        assertThat(response.getBody()).isNull();
+        assertThat(response.getHeaders().getLastModified()).isEqualTo(123_000L);
+        assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-cache, private");
     }
 }
