@@ -367,7 +367,7 @@ export class AuthorBrowserComponent implements OnInit {
   }
 
   onAuthorQuickMatched(updated: AuthorSummary): void {
-    this.thumbnailCacheBusters.set(updated.id, Date.now());
+    this.thumbnailCacheBusters.set(updated.id, updated.photoLastModified ?? Date.now());
     this.allAuthorsState.update(current =>
       (current ?? []).map(author => author.id === updated.id ? updated : author)
     );
@@ -378,9 +378,9 @@ export class AuthorBrowserComponent implements OnInit {
     this.selectionService.deselectAll();
     this.authorService.autoMatchAuthors(ids).subscribe({
       next: (matched) => {
-        this.thumbnailCacheBusters.set(matched.id, Date.now());
+        this.thumbnailCacheBusters.set(matched.id, matched.photoLastModified ?? Date.now());
         this.allAuthorsState.update(current => (current ?? []).map(author => author.id === matched.id
-          ? {...author, asin: matched.asin, hasPhoto: matched.hasPhoto}
+          ? {...author, asin: matched.asin, hasPhoto: matched.hasPhoto, photoLastModified: matched.photoLastModified}
           : author
         ));
       },

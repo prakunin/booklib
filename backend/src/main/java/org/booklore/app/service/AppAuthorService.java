@@ -11,11 +11,16 @@ import org.booklore.model.dto.Library;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.repository.AuthorRepository;
 import org.booklore.service.AuthorPhotoIndex;
+import org.booklore.util.FileService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +37,7 @@ public class AppAuthorService {
     private final AuthenticationService authenticationService;
     private final AuthorPhotoIndex authorPhotoIndex;
     private final EntityManager entityManager;
+    private final FileService fileService;
 
     @Transactional(readOnly = true)
     public AppPageResponse<AppAuthorSummary> getAuthors(
@@ -81,12 +87,14 @@ public class AppAuthorService {
                     AuthorEntity author = (AuthorEntity) row[0];
                     long bookCount = (Long) row[1];
                     boolean authorHasPhoto = authorPhotoIndex.hasPhoto(author.getId());
+                    Long photoLastModified = authorHasPhoto ? getAuthorThumbnailLastModified(author.getId()) : null;
                     return AppAuthorSummary.builder()
                             .id(author.getId())
                             .name(author.getName())
                             .asin(author.getAsin())
                             .bookCount((int) bookCount)
                             .hasPhoto(authorHasPhoto)
+                            .photoLastModified(photoLastModified)
                             .build();
                 })
                 .toList();
@@ -122,6 +130,7 @@ public class AppAuthorService {
         // Count books accessible to this user
         int bookCount = countAccessibleBooks(authorId, accessibleLibraryIds);
         boolean authorHasPhoto = authorPhotoIndex.hasPhoto(author.getId());
+        Long photoLastModified = authorHasPhoto ? getAuthorThumbnailLastModified(author.getId()) : null;
 
         return AppAuthorDetail.builder()
                 .id(author.getId())
@@ -130,6 +139,7 @@ public class AppAuthorService {
                 .asin(author.getAsin())
                 .bookCount(bookCount)
                 .hasPhoto(authorHasPhoto)
+                .photoLastModified(photoLastModified)
                 .build();
     }
 
@@ -215,5 +225,18 @@ public class AppAuthorService {
         return user.getAssignedLibraries().stream()
                 .map(Library::getId)
                 .collect(Collectors.toSet());
+    }
+
+    private Long getAuthorThumbnailLastModified(Long authorId) {
+        String thumbnailPath = fileService.getAuthorThumbnailFile(authorId);
+        if (thumbnailPath == null || thumbnailPath.isBlank()) {
+            return null;
+        }
+        Path path = Paths.get(thumbnailPath);
+        try {
+            return Files.exists(path) ? Files.getLastModifiedTime(path).toMillis() : null;
+        } catch (IOException e) {
+            return null;
+        }
     }
 }

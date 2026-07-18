@@ -78,12 +78,14 @@ public class AuthorMetadataService {
         for (Object[] row : results) {
             AuthorEntity author = (AuthorEntity) row[0];
             long bookCount = (Long) row[1];
+            Long photoLastModified = getAuthorThumbnailLastModified(author.getId());
             summaries.add(AuthorSummary.builder()
                     .id(author.getId())
                     .name(author.getName())
                     .asin(author.getAsin())
                     .bookCount((int) bookCount)
-                    .hasPhoto(Files.exists(Paths.get(fileService.getAuthorThumbnailFile(author.getId()))))
+                    .hasPhoto(photoLastModified != null)
+                    .photoLastModified(photoLastModified)
                     .build());
         }
         return summaries;
@@ -171,7 +173,8 @@ public class AuthorMetadataService {
                                     .id(details.getId())
                                     .name(details.getName())
                                     .asin(details.getAsin())
-                                    .hasPhoto(Files.exists(Paths.get(fileService.getAuthorThumbnailFile(authorId))))
+                                    .hasPhoto(details.getPhotoLastModified() != null)
+                                    .photoLastModified(details.getPhotoLastModified())
                                     .build();
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -389,6 +392,24 @@ public class AuthorMetadataService {
                 .descriptionLocked(author.isDescriptionLocked())
                 .asinLocked(author.isAsinLocked())
                 .photoLocked(author.isPhotoLocked())
+                .photoLastModified(getAuthorThumbnailLastModified(author.getId()))
                 .build();
+    }
+
+    private Long getAuthorThumbnailLastModified(Long authorId) {
+        return getImageLastModified(fileService.getAuthorThumbnailFile(authorId));
+    }
+
+    private Long getImageLastModified(String imagePath) {
+        if (imagePath == null || imagePath.isBlank()) {
+            return null;
+        }
+        Path path = Paths.get(imagePath);
+        try {
+            return Files.exists(path) ? Files.getLastModifiedTime(path).toMillis() : null;
+        } catch (IOException e) {
+            log.warn("Failed to read author image last-modified time: {}", path, e);
+            return null;
+        }
     }
 }

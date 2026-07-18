@@ -12,6 +12,7 @@ import org.booklore.model.dto.Library;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.repository.AuthorRepository;
 import org.booklore.service.AuthorPhotoIndex;
+import org.booklore.util.FileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class AppAuthorServiceTest {
     @Mock private AuthenticationService authenticationService;
     @Mock private AuthorRepository authorRepository;
     @Mock private AuthorPhotoIndex authorPhotoIndex;
+    @Mock private FileService fileService;
 
     private AppAuthorService service;
 
@@ -42,7 +44,8 @@ class AppAuthorServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AppAuthorService(authorRepository, authenticationService, authorPhotoIndex, entityManager);
+        when(fileService.getAuthorThumbnailFile(anyLong())).thenReturn("/tmp/missing-author-thumbnail.jpg");
+        service = new AppAuthorService(authorRepository, authenticationService, authorPhotoIndex, entityManager, fileService);
     }
 
     // ---- getAuthors tests ----

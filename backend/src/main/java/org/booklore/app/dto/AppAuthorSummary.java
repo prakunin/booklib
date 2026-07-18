@@ -17,4 +17,5 @@ public class AppAuthorSummary {
     private String asin;
     private int bookCount;
     private boolean hasPhoto;
+    private Long photoLastModified;
 }

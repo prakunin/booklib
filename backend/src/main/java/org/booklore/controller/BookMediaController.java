@@ -97,9 +97,9 @@ public class BookMediaController {
     public ResponseEntity<Resource> getAuthorPhoto(@Parameter(description = "ID of the author") @PathVariable long authorId) {
         Resource photo = authorMetadataService.getAuthorPhoto(authorId);
         if (photo == null) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.notFound().cacheControl(CacheControl.noStore()).build();
         }
-        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(photo);
+        return toAuthorImageResponse(photo);
     }
 
     @Operation(summary = "Get author thumbnail", description = "Retrieve the thumbnail for a specific author.")
@@ -108,9 +108,26 @@ public class BookMediaController {
     public ResponseEntity<Resource> getAuthorThumbnail(@Parameter(description = "ID of the author") @PathVariable long authorId) {
         Resource thumbnail = authorMetadataService.getAuthorThumbnail(authorId);
         if (thumbnail == null) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.notFound().cacheControl(CacheControl.noStore()).build();
         }
-        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(thumbnail);
+        return toAuthorImageResponse(thumbnail);
+    }
+
+    private ResponseEntity<Resource> toAuthorImageResponse(Resource image) {
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                .cacheControl(IMAGE_CACHE)
+                .contentType(MediaType.IMAGE_JPEG);
+
+        try {
+            long lastModified = image.lastModified();
+            long contentLength = image.contentLength();
+            builder.lastModified(lastModified);
+            builder.eTag("\"" + Long.toHexString(contentLength) + "-" + Long.toHexString(lastModified) + "\"");
+        } catch (IOException e) {
+            // Cache-Control still lets cache-busted author image URLs stay browser-cacheable.
+        }
+
+        return builder.body(image);
     }
 
     @Operation(summary = "Get bookdrop cover", description = "Retrieve the cover image for a specific bookdrop file.")

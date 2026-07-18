@@ -17,4 +17,5 @@ public class AuthorSummary {
     private String asin;
     private int bookCount;
     private boolean hasPhoto;
+    private Long photoLastModified;
 }

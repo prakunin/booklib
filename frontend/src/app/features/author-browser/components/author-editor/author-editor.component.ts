@@ -49,10 +49,10 @@ export class AuthorEditorComponent implements OnInit, OnChanges {
   isSaving = signal(false);
   isUploading = signal(false);
   hasPhoto = true;
-  photoTimestamp = Date.now();
+  photoTimestamp = 0;
 
   get photoUrl(): string {
-    return this.authorService.getAuthorPhotoUrl(this.authorId) + '&t=' + this.photoTimestamp;
+    return this.authorService.getAuthorPhotoUrl(this.authorId, this.photoTimestamp || this.author.photoLastModified);
   }
 
   get uploadUrl(): string {
@@ -62,7 +62,7 @@ export class AuthorEditorComponent implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['author'] && !changes['author'].firstChange) {
       this.hasPhoto = true;
-      this.photoTimestamp = Date.now();
+      this.photoTimestamp = this.author.photoLastModified ?? Date.now();
     }
   }
 
@@ -78,6 +78,7 @@ export class AuthorEditorComponent implements OnInit, OnChanges {
     });
 
     this.applyLockStates();
+    this.photoTimestamp = this.author.photoLastModified ?? 0;
   }
 
   toggleLock(field: string): void {
