@@ -14,6 +14,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.transaction.annotation.Transactional;
@@ -329,6 +331,107 @@ class BookRepositoryDataJpaTest {
 
             assertThat(reloaded.getBookCoverHash()).isEqualTo("hash-1");
             assertThat(reloaded.getCoverProbedAt()).isEqualTo(probedAt);
+        }
+    }
+
+    @Nested
+    class KomgaSeriesQueries {
+
+        @Test
+        void resolvesGroupedSeriesNameBySlugInDatabase() {
+            LibraryEntity library = persistLibrary();
+            persistBook(library, "The Expanse", "Leviathan Wakes", 1F);
+            persistBook(library, "The Expanse", "Caliban's War", 2F);
+            persistBook(library, "Other Series", "Other", 1F);
+            flushAndClear();
+
+            List<String> matches = bookRepository.findGroupedSeriesNameByLibraryIdAndSlug(
+                    library.getId(), "Unknown Series", "the-expanse", PageRequest.of(0, 1));
+
+            assertThat(matches).containsExactly("The Expanse");
+        }
+
+        @Test
+        void pagesGroupedSeriesBooksWithoutLoadingWholeSeries() {
+            LibraryEntity library = persistLibrary();
+            persistBook(library, "The Expanse", "Leviathan Wakes", 1F);
+            persistBook(library, "The Expanse", "Caliban's War", 2F);
+            persistBook(library, "The Expanse", "Abaddon's Gate", 3F);
+            persistBook(library, "Other Series", "Other", 1F);
+            flushAndClear();
+
+            Page<BookEntity> page = bookRepository.findBooksPageBySeriesNameGroupedByLibraryId(
+                    "The Expanse", library.getId(), "Unknown Series", PageRequest.of(1, 1));
+
+            assertThat(page.getTotalElements()).isEqualTo(3);
+            assertThat(page.getContent()).extracting(book -> book.getMetadata().getTitle())
+                    .containsExactly("Caliban's War");
+        }
+
+        @Test
+        void resolvesAndPagesUngroupedTitleFallbackSeries() {
+            LibraryEntity library = persistLibrary();
+            persistBook(library, null, "Standalone Book", null);
+            flushAndClear();
+
+            List<String> matches = bookRepository.findUngroupedSeriesNameByLibraryIdAndSlug(
+                    library.getId(), "standalone-book", PageRequest.of(0, 1));
+            Page<BookEntity> page = bookRepository.findBooksPageBySeriesNameUngroupedByLibraryId(
+                    "Standalone Book", library.getId(), PageRequest.of(0, 1));
+
+            assertThat(matches).containsExactly("Standalone Book");
+            assertThat(page.getTotalElements()).isEqualTo(1);
+            assertThat(page.getContent()).extracting(book -> book.getMetadata().getTitle())
+                    .containsExactly("Standalone Book");
+        }
+
+        private LibraryEntity persistLibrary() {
+            LibraryEntity library = LibraryEntity.builder()
+                    .name("Komga Library")
+                    .icon("book")
+                    .watch(false)
+                    .formatPriority(List.of(BookFileType.EPUB, BookFileType.PDF))
+                    .build();
+            entityManager.persist(library);
+            return library;
+        }
+
+        private void persistBook(LibraryEntity library, String seriesName, String title, Float seriesNumber) {
+            BookEntity book = BookEntity.builder()
+                    .library(library)
+                    .addedOn(Instant.now())
+                    .deleted(false)
+                    .build();
+            entityManager.persist(book);
+
+            BookMetadataEntity metadata = BookMetadataEntity.builder()
+                    .bookId(book.getId())
+                    .book(book)
+                    .title(title)
+                    .seriesName(seriesName)
+                    .seriesNumber(seriesNumber)
+                    .build();
+            entityManager.persist(metadata);
+            book.setMetadata(metadata);
+
+            BookFileEntity bookFile = BookFileEntity.builder()
+                    .book(book)
+                    .fileName(title + ".epub")
+                    .fileSubPath("")
+                    .isBookFormat(true)
+                    .bookType(BookFileType.EPUB)
+                    .fileSizeKb(500L)
+                    .initialHash(title + "-hash")
+                    .currentHash(title + "-hash")
+                    .addedOn(Instant.now())
+                    .build();
+            entityManager.persist(bookFile);
+            book.setBookFiles(List.of(bookFile));
+        }
+
+        private void flushAndClear() {
+            entityManager.flush();
+            entityManager.clear();
         }
     }
 }

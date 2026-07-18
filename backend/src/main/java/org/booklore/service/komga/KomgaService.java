@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
 import java.util.concurrent.Semaphore;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -42,7 +41,6 @@ import java.util.regex.Pattern;
 @Transactional(readOnly = true)
 public class KomgaService {
 
-    private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^a-z0-9]+");
     private static final Semaphore PNG_CONVERSION_PERMITS = new Semaphore(
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2)
     );
@@ -54,6 +52,9 @@ public class KomgaService {
     private final PdfReaderService pdfReaderService;
     private final AppSettingService appSettingService;
     private final ContentRestrictionService contentRestrictionService;
+
+    private record ParsedSeriesId(Long libraryId, String seriesSlug) {
+    }
 
 
     public boolean validateBookContentAccess(BookLoreUser user, Long bookId) {
@@ -202,131 +203,97 @@ public class KomgaService {
     }
 
     public KomgaSeriesDto getSeriesById(String seriesId) {
-        // Parse seriesId to extract library and series name
-        String[] parts = seriesId.split("-", 2);
-        if (parts.length < 2) {
-            throw new RuntimeException("Invalid series ID");
-        }
-        
-        Long libraryId = Long.parseLong(parts[0]);
-        String seriesSlug = parts[1];
-        
+        ParsedSeriesId parsedSeriesId = parseSeriesId(seriesId);
         boolean groupUnknown = appSettingService.getAppSettings().isKomgaGroupUnknown();
-        
-        // Get distinct series names for this library to find the matching name by slug
-        List<String> seriesNames;
-        if (groupUnknown) {
-            seriesNames = bookRepository.findDistinctSeriesNamesGroupedByLibraryId(libraryId, komgaMapper.getUnknownSeriesName());
-        } else {
-            seriesNames = bookRepository.findDistinctSeriesNamesUngroupedByLibraryId(libraryId);
-        }
-        
-        // Find the series name that matches this slug
-        String matchedSeriesName = seriesNames.stream()
-                .filter(name -> {
-                    String slug = NON_ALPHANUMERIC_PATTERN.matcher(name.toLowerCase()).replaceAll("-");
-                    return slug.equals(seriesSlug);
-                })
-                .findFirst()
+        String unknownSeriesName = komgaMapper.getUnknownSeriesName();
+        String matchedSeriesName = resolveSeriesName(parsedSeriesId, groupUnknown, unknownSeriesName)
                 .orElseThrow(() -> new RuntimeException("Series not found"));
-        
-        // Load only the books for this specific series
-        List<BookEntity> seriesBooks;
-        if (groupUnknown) {
-            seriesBooks = bookRepository.findBooksBySeriesNameGroupedByLibraryId(
-                    matchedSeriesName, libraryId, komgaMapper.getUnknownSeriesName());
-        } else {
-            seriesBooks = bookRepository.findBooksBySeriesNameUngroupedByLibraryId(
-                    matchedSeriesName, libraryId);
-        }
-        
-        if (seriesBooks.isEmpty()) {
+
+        Page<BookEntity> seriesBooksPage = findSeriesBooksPage(
+                matchedSeriesName, parsedSeriesId.libraryId(), groupUnknown, unknownSeriesName, PageRequest.of(0, 1));
+        if (seriesBooksPage.isEmpty()) {
             throw new RuntimeException("Series not found");
         }
-        
-        return komgaMapper.toKomgaSeriesDto(matchedSeriesName, libraryId, seriesBooks);
+
+        KomgaSeriesDto seriesDto = komgaMapper.toKomgaSeriesDto(
+                matchedSeriesName, parsedSeriesId.libraryId(), seriesBooksPage.getContent());
+        int booksCount = safeBookCount(seriesBooksPage.getTotalElements());
+        seriesDto.setBooksCount(booksCount);
+        seriesDto.setBooksUnreadCount(booksCount);
+        seriesDto.setOneshot(booksCount == 1);
+        if (seriesDto.getMetadata() != null) {
+            seriesDto.getMetadata().setTotalBookCount(booksCount);
+        }
+        return seriesDto;
     }
 
     public KomgaPageableDto<KomgaBookDto> getBooksBySeries(String seriesId, int page, int size, boolean unpaged) {
-        // Parse seriesId to extract library and series name
-        String[] parts = seriesId.split("-", 2);
-        if (parts.length < 2) {
-            throw new RuntimeException("Invalid series ID");
-        }
-        
-        Long libraryId = Long.parseLong(parts[0]);
-        String seriesSlug = parts[1];
-        
+        ParsedSeriesId parsedSeriesId = parseSeriesId(seriesId);
         boolean groupUnknown = appSettingService.getAppSettings().isKomgaGroupUnknown();
-        
-        // Get distinct series names for this library to find the matching name by slug
-        List<String> seriesNames;
-        if (groupUnknown) {
-            seriesNames = bookRepository.findDistinctSeriesNamesGroupedByLibraryId(libraryId, komgaMapper.getUnknownSeriesName());
-        } else {
-            seriesNames = bookRepository.findDistinctSeriesNamesUngroupedByLibraryId(libraryId);
-        }
-        
-        // Find the series name that matches this slug
-        String matchedSeriesName = seriesNames.stream()
-                .filter(name -> {
-                    String slug = NON_ALPHANUMERIC_PATTERN.matcher(name.toLowerCase()).replaceAll("-");
-                    return slug.equals(seriesSlug);
-                })
-                .findFirst()
-                .orElse(null);
-        
-        // Load only the books for this specific series (already sorted by seriesNumber via query ORDER BY)
-        List<BookEntity> seriesBooks;
-        if (matchedSeriesName == null) {
-            seriesBooks = List.of();
-        } else if (groupUnknown) {
-            seriesBooks = bookRepository.findBooksBySeriesNameGroupedByLibraryId(
-                    matchedSeriesName, libraryId, komgaMapper.getUnknownSeriesName());
-        } else {
-            seriesBooks = bookRepository.findBooksBySeriesNameUngroupedByLibraryId(
-                    matchedSeriesName, libraryId);
-        }
-        
-        // Handle unpaged mode
-        int totalElements = seriesBooks.size();
-        List<KomgaBookDto> content;
+        String unknownSeriesName = komgaMapper.getUnknownSeriesName();
+        Pageable pageable = unpaged ? Pageable.unpaged() : PageRequest.of(page, size);
+
+        Page<BookEntity> seriesBooksPage = resolveSeriesName(parsedSeriesId, groupUnknown, unknownSeriesName)
+                .map(seriesName -> findSeriesBooksPage(
+                        seriesName, parsedSeriesId.libraryId(), groupUnknown, unknownSeriesName, pageable))
+                .orElse(Page.empty(pageable));
+
+        int totalElements = safeBookCount(seriesBooksPage.getTotalElements());
+        List<KomgaBookDto> content = seriesBooksPage.getContent().stream()
+                .map(komgaMapper::toKomgaBookDto)
+                .toList();
         int actualPage;
         int actualSize;
-        int totalPages;
-        
+
         if (unpaged) {
-            // Return all books without pagination
-            content = seriesBooks.stream()
-                    .map(book -> komgaMapper.toKomgaBookDto(book))
-                    .toList();
             actualPage = 0;
             actualSize = totalElements;
-            totalPages = totalElements > 0 ? 1 : 0;
         } else {
-            // Paginate
-            totalPages = (int) Math.ceil((double) totalElements / size);
-            int fromIndex = Math.min(page * size, totalElements);
-            int toIndex = Math.min(fromIndex + size, totalElements);
-            
-            content = seriesBooks.subList(fromIndex, toIndex).stream()
-                    .map(book -> komgaMapper.toKomgaBookDto(book))
-                    .toList();
             actualPage = page;
             actualSize = size;
         }
-        
+
         return KomgaPageableDto.<KomgaBookDto>builder()
                 .content(content)
                 .number(actualPage)
                 .size(actualSize)
                 .numberOfElements(content.size())
                 .totalElements(totalElements)
-                .totalPages(totalPages)
+                .totalPages(unpaged ? (totalElements > 0 ? 1 : 0) : seriesBooksPage.getTotalPages())
                 .first(actualPage == 0)
-                .last(totalElements == 0 || actualPage >= totalPages - 1)
+                .last(totalElements == 0 || actualPage >= (unpaged ? 0 : seriesBooksPage.getTotalPages() - 1))
                 .empty(content.isEmpty())
                 .build();
+    }
+
+    private ParsedSeriesId parseSeriesId(String seriesId) {
+        String[] parts = seriesId.split("-", 2);
+        if (parts.length < 2) {
+            throw new RuntimeException("Invalid series ID");
+        }
+        return new ParsedSeriesId(Long.parseLong(parts[0]), parts[1]);
+    }
+
+    private Optional<String> resolveSeriesName(ParsedSeriesId seriesId, boolean groupUnknown, String unknownSeriesName) {
+        Pageable firstMatch = PageRequest.of(0, 1);
+        List<String> seriesNames = groupUnknown
+                ? bookRepository.findGroupedSeriesNameByLibraryIdAndSlug(
+                        seriesId.libraryId(), unknownSeriesName, seriesId.seriesSlug(), firstMatch)
+                : bookRepository.findUngroupedSeriesNameByLibraryIdAndSlug(
+                        seriesId.libraryId(), seriesId.seriesSlug(), firstMatch);
+        return seriesNames.stream().findFirst();
+    }
+
+    private Page<BookEntity> findSeriesBooksPage(
+            String seriesName, Long libraryId, boolean groupUnknown, String unknownSeriesName, Pageable pageable) {
+        return groupUnknown
+                ? bookRepository.findBooksPageBySeriesNameGroupedByLibraryId(
+                        seriesName, libraryId, unknownSeriesName, pageable)
+                : bookRepository.findBooksPageBySeriesNameUngroupedByLibraryId(seriesName, libraryId, pageable);
+    }
+
+    private int safeBookCount(long count) {
+        return Math.toIntExact(Math.min(count, Integer.MAX_VALUE));
     }
 
     public KomgaPageableDto<KomgaBookDto> getAllBooks(Long libraryId, int page, int size) {

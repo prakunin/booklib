@@ -26,6 +26,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
@@ -115,10 +118,12 @@ class KomgaServiceTest {
     void shouldReturnAllBooksWhenUnpagedIsTrue() {
         // Given
         when(komgaMapper.getUnknownSeriesName()).thenReturn("Unknown Series");
-        when(bookRepository.findDistinctSeriesNamesGroupedByLibraryId(1L, "Unknown Series"))
+        when(bookRepository.findGroupedSeriesNameByLibraryIdAndSlug(
+                eq(1L), eq("Unknown Series"), eq("test-series"), any(Pageable.class)))
                 .thenReturn(List.of("Test Series"));
-        when(bookRepository.findBooksBySeriesNameGroupedByLibraryId("Test Series", 1L, "Unknown Series"))
-                .thenReturn(seriesBooks);
+        when(bookRepository.findBooksPageBySeriesNameGroupedByLibraryId(
+                eq("Test Series"), eq(1L), eq("Unknown Series"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(seriesBooks));
         
         // Mock the mapper to return DTOs
         for (BookEntity book : seriesBooks) {
@@ -139,16 +144,20 @@ class KomgaServiceTest {
         assertThat(result.getTotalPages()).isEqualTo(1);
         assertThat(result.getSize()).isEqualTo(50);
         assertThat(result.getNumber()).isEqualTo(0);
+        verify(bookRepository, never()).findDistinctSeriesNamesGroupedByLibraryId(anyLong(), anyString());
+        verify(bookRepository, never()).findBooksBySeriesNameGroupedByLibraryId(anyString(), anyLong(), anyString());
     }
 
     @Test
     void shouldReturnPagedBooksWhenUnpagedIsFalse() {
         // Given
         when(komgaMapper.getUnknownSeriesName()).thenReturn("Unknown Series");
-        when(bookRepository.findDistinctSeriesNamesGroupedByLibraryId(1L, "Unknown Series"))
+        when(bookRepository.findGroupedSeriesNameByLibraryIdAndSlug(
+                eq(1L), eq("Unknown Series"), eq("test-series"), any(Pageable.class)))
                 .thenReturn(List.of("Test Series"));
-        when(bookRepository.findBooksBySeriesNameGroupedByLibraryId("Test Series", 1L, "Unknown Series"))
-                .thenReturn(seriesBooks);
+        when(bookRepository.findBooksPageBySeriesNameGroupedByLibraryId(
+                eq("Test Series"), eq(1L), eq("Unknown Series"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(seriesBooks.subList(0, 20), PageRequest.of(0, 20), seriesBooks.size()));
         
         // Mock the mapper to return DTOs (only for the books that will be used)
         for (int i = 0; i < 20; i++) {
@@ -170,6 +179,8 @@ class KomgaServiceTest {
         assertThat(result.getTotalPages()).isEqualTo(3);
         assertThat(result.getSize()).isEqualTo(20);
         assertThat(result.getNumber()).isEqualTo(0);
+        verify(bookRepository, never()).findDistinctSeriesNamesGroupedByLibraryId(anyLong(), anyString());
+        verify(bookRepository, never()).findBooksBySeriesNameGroupedByLibraryId(anyString(), anyLong(), anyString());
     }
 
     @Test
