@@ -1,8 +1,6 @@
 package org.booklore.app.service;
 
-import jakarta.persistence.EntityManager;
 import org.booklore.app.dto.UpdateProgressRequest;
-import org.booklore.app.mapper.AppBookMapper;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.exception.APIException;
 import org.booklore.model.dto.BookLoreUser;
@@ -21,13 +19,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.booklore.repository.BookRepository;
-import org.booklore.repository.ShelfRepository;
-import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
 import org.booklore.repository.UserContentRestrictionRepository;
 import org.booklore.service.book.BookService;
-import org.booklore.service.browse.BookSortRegistry;
-import org.booklore.service.opds.MagicShelfBookService;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
@@ -40,22 +34,15 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class AppBookServiceProgressTest {
+class AppBookProgressServiceTest {
 
     @Mock private BookRepository bookRepository;
     @Mock private UserBookProgressRepository userBookProgressRepository;
-    @Mock private UserBookFileProgressRepository userBookFileProgressRepository;
-    @Mock private ShelfRepository shelfRepository;
     @Mock private AuthenticationService authenticationService;
-    @Mock private AppBookMapper mobileBookMapper;
     @Mock private BookService bookService;
-    @Mock private MagicShelfBookService magicShelfBookService;
-    @Mock private EntityManager entityManager;
     @Mock private UserContentRestrictionRepository restrictionRepository;
-    @Mock private BookSortRegistry bookSortRegistry;
-    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
-    private AppBookService service;
+    private AppBookProgressService service;
 
     private final Long userId = 1L;
     private final Long bookId = 42L;
@@ -63,12 +50,8 @@ class AppBookServiceProgressTest {
 
     @BeforeEach
     void setUp() {
-        service = new AppBookService(
-                bookRepository, userBookProgressRepository, userBookFileProgressRepository,
-                shelfRepository, authenticationService, mobileBookMapper,
-                bookService, magicShelfBookService, entityManager, restrictionRepository, bookSortRegistry, eventPublisher,
-                new CatalogSummaryCache(), new FilterOptionsCache()
-        );
+        service = new AppBookProgressService(
+                bookRepository, userBookProgressRepository, authenticationService, bookService, restrictionRepository);
         when(bookRepository.exists(ArgumentMatchers.<Specification<BookEntity>>any())).thenReturn(true);
     }
 
