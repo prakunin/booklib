@@ -2,6 +2,7 @@ package org.booklore.service.opds;
 
 import lombok.RequiredArgsConstructor;
 import org.booklore.config.security.service.AuthenticationService;
+import org.booklore.exception.ApiError;
 import org.booklore.mapper.OpdsUserV2Mapper;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.OpdsUserV2;
@@ -44,6 +45,7 @@ public class OpdsUserV2Service {
 
     public OpdsUserV2 createOpdsUser(OpdsUserV2CreateRequest request) {
         try {
+            validateCreateRequest(request);
             BookLoreUser bookLoreUser = authenticationService.getAuthenticatedUser();
             BookLoreUserEntity userEntity = userRepository.findById(bookLoreUser.getId())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with ID: " + bookLoreUser.getId()));
@@ -63,6 +65,21 @@ public class OpdsUserV2Service {
                 throw new DataIntegrityViolationException("Username '" + request.getUsername() + "' is already taken");
             }
             throw e;
+        }
+    }
+
+    private void validateCreateRequest(OpdsUserV2CreateRequest request) {
+        if (request == null || request.getUsername() == null || request.getUsername().isBlank()) {
+            throw ApiError.GENERIC_BAD_REQUEST.createException("OPDS username is required");
+        }
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw ApiError.GENERIC_BAD_REQUEST.createException("OPDS password is required");
+        }
+        if (request.getUsername().length() > 100) {
+            throw ApiError.GENERIC_BAD_REQUEST.createException("OPDS username must be at most 100 characters");
+        }
+        if (request.getPassword().length() > 72) {
+            throw ApiError.GENERIC_BAD_REQUEST.createException("OPDS password must be at most 72 characters");
         }
     }
 

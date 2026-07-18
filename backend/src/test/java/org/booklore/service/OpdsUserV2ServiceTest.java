@@ -112,6 +112,8 @@ class OpdsUserV2ServiceTest {
         when(userRepository.findById(2L)).thenReturn(Optional.empty());
 
         OpdsUserV2CreateRequest request = mock(OpdsUserV2CreateRequest.class);
+        when(request.getUsername()).thenReturn("alice");
+        when(request.getPassword()).thenReturn("plaintext");
 
         assertThrows(UsernameNotFoundException.class, () -> service.createOpdsUser(request));
         verify(opdsUserV2Repository, never()).save(any());
@@ -206,31 +208,29 @@ class OpdsUserV2ServiceTest {
     }
 
     @Test
-    void createOpdsUser_usernameNull_savedWithNullUsername() {
-        BookLoreUser authUser = mock(BookLoreUser.class);
-        when(authUser.getId()).thenReturn(7L);
-        when(authenticationService.getAuthenticatedUser()).thenReturn(authUser);
-
-        BookLoreUserEntity userEntity = mock(BookLoreUserEntity.class);
-        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
-
+    void createOpdsUser_usernameNull_rejectedBeforeSave() {
         OpdsUserV2CreateRequest request = mock(OpdsUserV2CreateRequest.class);
         when(request.getUsername()).thenReturn(null);
-        when(request.getPassword()).thenReturn("secret");
-        when(passwordEncoder.encode("secret")).thenReturn("encoded-secret");
 
-        OpdsUserV2Entity savedEntity = mock(OpdsUserV2Entity.class);
-        OpdsUserV2 dto = mock(OpdsUserV2.class);
-        when(opdsUserV2Repository.save(any())).thenReturn(savedEntity);
-        when(mapper.toDto(savedEntity)).thenReturn(dto);
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.createOpdsUser(request));
 
-        OpdsUserV2 result = service.createOpdsUser(request);
+        assertTrue(ex.getMessage().contains("OPDS username is required"));
+        verify(authenticationService, never()).getAuthenticatedUser();
+        verify(passwordEncoder, never()).encode(any());
+        verify(opdsUserV2Repository, never()).save(any());
+    }
 
-        assertSame(dto, result);
-        verify(opdsUserV2Repository).save(entityCaptor.capture());
-        OpdsUserV2Entity captured = entityCaptor.getValue();
-        assertNull(captured.getUsername());
-        assertEquals("encoded-secret", captured.getPasswordHash());
-        assertSame(userEntity, captured.getUser());
+    @Test
+    void createOpdsUser_blankPassword_rejectedBeforeSave() {
+        OpdsUserV2CreateRequest request = mock(OpdsUserV2CreateRequest.class);
+        when(request.getUsername()).thenReturn("reader");
+        when(request.getPassword()).thenReturn(" ");
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.createOpdsUser(request));
+
+        assertTrue(ex.getMessage().contains("OPDS password is required"));
+        verify(authenticationService, never()).getAuthenticatedUser();
+        verify(passwordEncoder, never()).encode(any());
+        verify(opdsUserV2Repository, never()).save(any());
     }
 }

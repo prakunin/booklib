@@ -1,10 +1,12 @@
 package org.booklore.config.security.oidc;
 
 import lombok.extern.slf4j.Slf4j;
+import org.booklore.util.NetworkAddressValidator;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -45,6 +47,7 @@ public class OidcDiscoveryService {
 
     public DiscoveryDocument discover(String issuerUri) {
         String normalizedIssuer = TRAILING_SLASH.matcher(issuerUri).replaceAll("");
+        validateExternalHttpsUrl(normalizedIssuer);
 
         return cache.compute(normalizedIssuer, (key, cached) -> {
             if (cached != null && !cached.isExpired()) {
@@ -61,6 +64,7 @@ public class OidcDiscoveryService {
     @SuppressWarnings("unchecked")
     private DiscoveryDocument fetchDiscoveryDocument(String issuerUri) {
         String discoveryUrl = issuerUri + "/.well-known/openid-configuration";
+        validateExternalHttpsUrl(discoveryUrl);
         log.info("Fetching OIDC discovery document from {}", discoveryUrl);
 
         var factory = new SimpleClientHttpRequestFactory();
@@ -82,12 +86,14 @@ public class OidcDiscoveryService {
         if (jwksUriStr == null || jwksUriStr.isBlank()) {
             throw new IllegalStateException("jwks_uri not found in discovery document");
         }
+        URI jwksUri = URI.create(jwksUriStr);
+        validateExternalHttpsUrl(jwksUri.toString());
 
         return new DiscoveryDocument(
                 (String) doc.get("issuer"),
                 (String) doc.get("authorization_endpoint"),
                 (String) doc.get("token_endpoint"),
-                URI.create(jwksUriStr),
+                jwksUri,
                 (String) doc.get("userinfo_endpoint"),
                 (String) doc.get("end_session_endpoint"),
                 (List<String>) doc.get("scopes_supported"),
@@ -95,5 +101,22 @@ public class OidcDiscoveryService {
                 (List<String>) doc.get("code_challenge_methods_supported"),
                 doc.get("backchannel_logout_supported") instanceof Boolean b ? b : null
         );
+    }
+
+    private static void validateExternalHttpsUrl(String url) {
+        URI uri;
+        try {
+            uri = URI.create(url);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("Invalid OIDC URL: " + url, e);
+        }
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IllegalStateException("OIDC URLs must use HTTPS");
+        }
+        try {
+            NetworkAddressValidator.validateExternalHttpUrl(url);
+        } catch (IOException e) {
+            throw new IllegalStateException("Invalid OIDC URL: " + e.getMessage(), e);
+        }
     }
 }

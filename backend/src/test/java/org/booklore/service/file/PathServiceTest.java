@@ -1,7 +1,9 @@
 package org.booklore.service.file;
 
+import org.booklore.config.AppProperties;
 import org.booklore.exception.APIException;
 import org.booklore.model.dto.inpx.InpxIndexOption;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,13 +18,30 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PathServiceTest {
 
-    private final PathService pathService = new PathService();
+    @TempDir
+    private Path tempDir;
+
+    private Path configRoot;
+    private Path bookdropRoot;
+    private PathService pathService;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        configRoot = Files.createDirectory(tempDir.resolve("config"));
+        bookdropRoot = Files.createDirectory(tempDir.resolve("bookdrop"));
+
+        AppProperties appProperties = new AppProperties();
+        appProperties.setPathConfig(configRoot.toString());
+        appProperties.setBookdropFolder(bookdropRoot.toString());
+        pathService = new PathService(appProperties);
+    }
 
     @Nested
     class GetFoldersAtPath {
 
         @Test
-        void returnsOnlyDirectoriesSortedByName(@TempDir Path dir) throws IOException {
+        void returnsOnlyDirectoriesSortedByName() throws IOException {
+            Path dir = configRoot;
             Files.createDirectory(dir.resolve("b-folder"));
             Files.createDirectory(dir.resolve("a-folder"));
             Files.writeString(dir.resolve("not-a-folder.txt"), "text");
@@ -35,8 +54,8 @@ class PathServiceTest {
         }
 
         @Test
-        void returnsEmptyListWhenDirectoryDoesNotExist(@TempDir Path dir) {
-            assertThat(pathService.getFoldersAtPath(dir.resolve("missing").toString())).isEmpty();
+        void returnsEmptyListWhenDirectoryDoesNotExist() {
+            assertThat(pathService.getFoldersAtPath(configRoot.resolve("missing").toString())).isEmpty();
         }
 
         @Test
@@ -50,13 +69,30 @@ class PathServiceTest {
             assertThatThrownBy(() -> pathService.getFoldersAtPath("/proc"))
                     .isInstanceOf(APIException.class);
         }
+
+        @Test
+        void rejectsExistingDirectoryOutsideConfiguredRoots() throws IOException {
+            Path outside = Files.createDirectory(tempDir.resolve("outside"));
+
+            assertThatThrownBy(() -> pathService.getFoldersAtPath(outside.toString()))
+                    .isInstanceOf(APIException.class);
+        }
+
+        @Test
+        void allowsBookdropRoot() throws IOException {
+            Files.createDirectory(bookdropRoot.resolve("incoming"));
+
+            assertThat(pathService.getFoldersAtPath(bookdropRoot.toString()))
+                    .containsExactly(bookdropRoot.resolve("incoming").toString());
+        }
     }
 
     @Nested
     class GetInpxFilesAtPath {
 
         @Test
-        void returnsOnlyInpxFilesSortedByName(@TempDir Path dir) throws IOException {
+        void returnsOnlyInpxFilesSortedByName() throws IOException {
+            Path dir = configRoot;
             Files.writeString(dir.resolve("b-catalog.inpx"), "bb");
             Files.writeString(dir.resolve("a-catalog.inpx"), "a");
             Files.writeString(dir.resolve("fb2-000.zip"), "zip");
@@ -72,7 +108,8 @@ class PathServiceTest {
         }
 
         @Test
-        void matchesExtensionCaseInsensitively(@TempDir Path dir) throws IOException {
+        void matchesExtensionCaseInsensitively() throws IOException {
+            Path dir = configRoot;
             Files.writeString(dir.resolve("catalog.INPX"), "x");
 
             assertThat(pathService.getInpxFilesAtPath(dir.toString()))
@@ -81,7 +118,8 @@ class PathServiceTest {
         }
 
         @Test
-        void excludesAppleDoubleSidecarsAndHiddenDotfiles(@TempDir Path dir) throws IOException {
+        void excludesAppleDoubleSidecarsAndHiddenDotfiles() throws IOException {
+            Path dir = configRoot;
             Files.writeString(dir.resolve("catalog.inpx"), "catalog");
             Files.writeString(dir.resolve("._catalog.inpx"), "resource-fork");
             Files.writeString(dir.resolve(".hidden.inpx"), "hidden");
@@ -93,15 +131,16 @@ class PathServiceTest {
         }
 
         @Test
-        void returnsEmptyListWhenDirectoryHasNoIndexes(@TempDir Path dir) throws IOException {
+        void returnsEmptyListWhenDirectoryHasNoIndexes() throws IOException {
+            Path dir = configRoot;
             Files.writeString(dir.resolve("fb2-000.zip"), "zip");
 
             assertThat(pathService.getInpxFilesAtPath(dir.toString())).isEmpty();
         }
 
         @Test
-        void returnsEmptyListWhenDirectoryDoesNotExist(@TempDir Path dir) {
-            assertThat(pathService.getInpxFilesAtPath(dir.resolve("missing").toString())).isEmpty();
+        void returnsEmptyListWhenDirectoryDoesNotExist() {
+            assertThat(pathService.getInpxFilesAtPath(configRoot.resolve("missing").toString())).isEmpty();
         }
 
         @Test

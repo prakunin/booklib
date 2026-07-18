@@ -24,6 +24,8 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class KoreaderAuthFilterTest {
@@ -70,6 +72,24 @@ class KoreaderAuthFilterTest {
         assertThat(response.getStatus()).isEqualTo(429);
         assertThat(chainCalled).isFalse();
         verify(koreaderUserRepository, never()).findByUsername("reader");
+    }
+
+    @Test
+    void unknownUser_performsDummyCredentialMatchAndRecordsFailure() throws Exception {
+        KoreaderAuthFilter filter = new KoreaderAuthFilter(koreaderUserRepository, koreaderCredentialService, authRateLimitService);
+        MockHttpServletRequest request = request("missing", "0123456789abcdef0123456789abcdef");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicBoolean chainCalled = new AtomicBoolean(false);
+        FilterChain chain = (req, res) -> chainCalled.set(true);
+        when(koreaderUserRepository.findByUsername("missing")).thenReturn(Optional.empty());
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(chainCalled).isTrue();
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(koreaderCredentialService).matches(eq("0123456789abcdef0123456789abcdef"), anyString());
+        verify(authRateLimitService).recordFailedAlternateAuthAttempt("koreader", "192.0.2.10");
+        verify(authRateLimitService).recordFailedAlternateAuthAttemptByCredential("koreader", "missing");
     }
 
     private MockHttpServletRequest request(String username, String key) {

@@ -189,6 +189,7 @@ public class OidcTokenValidator {
             throw e;
         } catch (ParseException | NoSuchAlgorithmException e) {
             log.warn("Failed to validate at_hash: {}", e.getMessage());
+            throw ApiError.OIDC_INVALID_TOKEN.createException("Failed to validate ID token at_hash");
         }
     }
 

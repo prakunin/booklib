@@ -1563,6 +1563,28 @@ class FileServiceTest {
             }
 
             @Test
+            @DisplayName("blocks redirect target that resolves to an internal address before rewrite")
+            @Timeout(5)
+            void downloadImageFromUrl_redirectToInternalRawIp_throwsBeforeSecondFetch() {
+                String originalUrl = "http://example.com/cover.jpg";
+                String internalRedirect = "http://127.0.0.1/cover.jpg";
+
+                RestTemplate mockRestTemplate = mock(RestTemplate.class);
+                FileService testFileService = new FileService(appProperties, mockRestTemplate, appSettingServiceForNetwork, mockRestTemplate);
+
+                ResponseEntity<byte[]> redirectResponse = ResponseEntity.status(302)
+                        .header("Location", internalRedirect).build();
+
+                when(mockRestTemplate.exchange(
+                        anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(byte[].class)
+                )).thenReturn(redirectResponse);
+
+                assertThrows(SecurityException.class, () -> testFileService.downloadImageFromUrl(originalUrl));
+                verify(mockRestTemplate, times(1)).exchange(
+                        anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(byte[].class));
+            }
+
+            @Test
             @DisplayName("preserves redirect path when rewriting raw IP URL back to hostname")
             @Timeout(5)
             void downloadImageFromUrl_redirectToRawIpDifferentPath_preservesPath() throws IOException {

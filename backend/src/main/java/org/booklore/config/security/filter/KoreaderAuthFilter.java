@@ -29,6 +29,7 @@ import java.util.List;
 public class KoreaderAuthFilter extends OncePerRequestFilter {
 
     private static final String AUTH_PATH = "koreader";
+    private static final String DUMMY_PASSWORD_HASH = "$2a$10$7EqJtq98hPqEX7fNZaFWoOhiKehw2iG15o3fG2h51Y1cf22.BjNqC";
 
     private final KoreaderUserRepository koreaderUserRepository;
     private final KoreaderCredentialService koreaderCredentialService;
@@ -53,6 +54,7 @@ public class KoreaderAuthFilter extends OncePerRequestFilter {
 
         var user = koreaderUserRepository.findByUsername(username).orElse(null);
         if (user == null) {
+            koreaderCredentialService.matches(key, DUMMY_PASSWORD_HASH);
             log.info("KOReader user not found");
             recordFailedAttempt(ip, username);
             chain.doFilter(request, response);
