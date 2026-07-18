@@ -594,6 +594,148 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     List<BookEntity> findBooksBySeriesNameUngrouped(
             @Param("seriesName") String seriesName);
 
+    @Query("""
+            SELECT DISTINCT
+                CASE
+                    WHEN m.seriesName IS NOT NULL THEN m.seriesName
+                    ELSE :unknownSeriesName
+                END AS seriesName
+            FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE b.library.id = :libraryId
+              AND (b.deleted IS NULL OR b.deleted = false)
+              AND function('regexp_replace', lower(
+                  CASE
+                      WHEN m.seriesName IS NOT NULL THEN m.seriesName
+                      ELSE :unknownSeriesName
+                  END
+              ), '[^a-z0-9]+', '-') = :seriesSlug
+            ORDER BY seriesName
+            """)
+    List<String> findGroupedSeriesNameByLibraryIdAndSlug(
+            @Param("libraryId") Long libraryId,
+            @Param("unknownSeriesName") String unknownSeriesName,
+            @Param("seriesSlug") String seriesSlug,
+            Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT
+                CASE
+                    WHEN m.seriesName IS NOT NULL THEN m.seriesName
+                    WHEN m.title IS NOT NULL THEN m.title
+                    ELSE (
+                        SELECT bf2.fileName FROM BookFileEntity bf2
+                        WHERE bf2.book = b
+                          AND bf2.isBookFormat = true
+                          AND bf2.id = (
+                              SELECT MIN(bf3.id) FROM BookFileEntity bf3
+                              WHERE bf3.book = b AND bf3.isBookFormat = true
+                          )
+                    )
+                END AS seriesName
+            FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE b.library.id = :libraryId
+              AND (b.deleted IS NULL OR b.deleted = false)
+              AND function('regexp_replace', lower(
+                  CASE
+                      WHEN m.seriesName IS NOT NULL THEN m.seriesName
+                      WHEN m.title IS NOT NULL THEN m.title
+                      ELSE (
+                          SELECT bf2.fileName FROM BookFileEntity bf2
+                          WHERE bf2.book = b
+                            AND bf2.isBookFormat = true
+                            AND bf2.id = (
+                                SELECT MIN(bf3.id) FROM BookFileEntity bf3
+                                WHERE bf3.book = b AND bf3.isBookFormat = true
+                            )
+                      )
+                  END
+              ), '[^a-z0-9]+', '-') = :seriesSlug
+            ORDER BY seriesName
+            """)
+    List<String> findUngroupedSeriesNameByLibraryIdAndSlug(
+            @Param("libraryId") Long libraryId,
+            @Param("seriesSlug") String seriesSlug,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"metadata", "metadata.comicMetadata", "libraryPath", "library"})
+    @Query(value = """
+            SELECT b FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE b.library.id = :libraryId
+              AND (
+                  (m.seriesName = :seriesName)
+                  OR (m.seriesName IS NULL AND :seriesName = :unknownSeriesName)
+              )
+              AND (b.deleted IS NULL OR b.deleted = false)
+            ORDER BY COALESCE(m.seriesNumber, 0), b.id
+            """, countQuery = """
+            SELECT COUNT(b) FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE b.library.id = :libraryId
+              AND (
+                  (m.seriesName = :seriesName)
+                  OR (m.seriesName IS NULL AND :seriesName = :unknownSeriesName)
+              )
+              AND (b.deleted IS NULL OR b.deleted = false)
+            """)
+    Page<BookEntity> findBooksPageBySeriesNameGroupedByLibraryId(
+            @Param("seriesName") String seriesName,
+            @Param("libraryId") Long libraryId,
+            @Param("unknownSeriesName") String unknownSeriesName,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"metadata", "metadata.comicMetadata", "libraryPath", "library"})
+    @Query(value = """
+            SELECT b FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE b.library.id = :libraryId
+              AND (
+                  (m.seriesName = :seriesName)
+                  OR (m.seriesName IS NULL AND m.title = :seriesName)
+                  OR EXISTS (
+                      SELECT 1 FROM BookFileEntity bf
+                      WHERE bf.book = b
+                        AND bf.fileName = :seriesName
+                        AND bf.isBookFormat = true
+                        AND bf.id = (
+                            SELECT MIN(bf2.id) FROM BookFileEntity bf2
+                            WHERE bf2.book = b AND bf2.isBookFormat = true
+                        )
+                        AND m.seriesName IS NULL
+                        AND m.title IS NULL
+                  )
+              )
+              AND (b.deleted IS NULL OR b.deleted = false)
+            ORDER BY COALESCE(m.seriesNumber, 0), b.id
+            """, countQuery = """
+            SELECT COUNT(b) FROM BookEntity b
+            LEFT JOIN b.metadata m
+            WHERE b.library.id = :libraryId
+              AND (
+                  (m.seriesName = :seriesName)
+                  OR (m.seriesName IS NULL AND m.title = :seriesName)
+                  OR EXISTS (
+                      SELECT 1 FROM BookFileEntity bf
+                      WHERE bf.book = b
+                        AND bf.fileName = :seriesName
+                        AND bf.isBookFormat = true
+                        AND bf.id = (
+                            SELECT MIN(bf2.id) FROM BookFileEntity bf2
+                            WHERE bf2.book = b AND bf2.isBookFormat = true
+                        )
+                        AND m.seriesName IS NULL
+                        AND m.title IS NULL
+                  )
+              )
+              AND (b.deleted IS NULL OR b.deleted = false)
+            """)
+    Page<BookEntity> findBooksPageBySeriesNameUngroupedByLibraryId(
+            @Param("seriesName") String seriesName,
+            @Param("libraryId") Long libraryId,
+            Pageable pageable);
+
     /**
      * Paginated query for all non-deleted books with Komga-relevant metadata.
      * Only ToOne paths in EntityGraph to avoid Cartesian product; collections loaded via @BatchSize.
