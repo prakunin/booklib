@@ -6,7 +6,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.booklore.config.security.service.AuthRateLimitService;
 import org.booklore.config.security.userdetails.UserAuthenticationDetails;
+import org.booklore.exception.APIException;
 import org.booklore.mapper.custom.BookLoreUserTransformer;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.entity.UserPermissionsEntity;
@@ -30,26 +32,38 @@ import java.util.List;
 @FilterRegistration(enabled = false)
 public class KoboAuthFilter extends OncePerRequestFilter {
 
+    private static final String AUTH_PATH = "kobo";
+
     private final KoboUserSettingsRepository koboUserSettingsRepository;
     private final UserRepository userRepository;
     private final BookLoreUserTransformer bookLoreUserTransformer;
+    private final AuthRateLimitService authRateLimitService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        String ip = request.getRemoteAddr();
 
         String path = request.getRequestURI();
         String[] parts = path.split("/");
         if (parts.length < 4) {
             log.warn("KOBO token missing in path");
+            if (isRateLimited(response, ip, null)) {
+                return;
+            }
+            recordFailedAttempt(ip, null);
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "KOBO token missing");
             return;
         }
 
         String token = parts[3];
+        if (isRateLimited(response, ip, token)) {
+            return;
+        }
 
         var userTokenOpt = koboUserSettingsRepository.findByToken(token);
         if (userTokenOpt.isEmpty()) {
             log.warn("Invalid KOBO token");
+            recordFailedAttempt(ip, token);
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid KOBO token");
             return;
         }
@@ -59,6 +73,7 @@ public class KoboAuthFilter extends OncePerRequestFilter {
 
         if (userOpt.isEmpty()) {
             log.warn("User not found for KOBO token");
+            recordFailedAttempt(ip, token);
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User not found");
             return;
         }
@@ -75,6 +90,8 @@ public class KoboAuthFilter extends OncePerRequestFilter {
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(user, null, authorities);
         authentication.setDetails(new UserAuthenticationDetails(request, user.getId()));
         SecurityContextHolder.getContext().setAuthentication(authentication);
+        authRateLimitService.resetAlternateAuthAttempts(AUTH_PATH, ip);
+        authRateLimitService.resetAlternateAuthAttemptsByCredential(AUTH_PATH, token);
 
         filterChain.doFilter(request, response);
     }
@@ -95,6 +112,26 @@ public class KoboAuthFilter extends OncePerRequestFilter {
     private void addAuthorityIfPermissionGranted(List<GrantedAuthority> authorities, String role, boolean permissionGranted) {
         if (permissionGranted) {
             authorities.add(new SimpleGrantedAuthority(role));
+        }
+    }
+
+    private boolean isRateLimited(HttpServletResponse response, String ip, String token) throws IOException {
+        try {
+            authRateLimitService.checkAlternateAuthRateLimit(AUTH_PATH, ip);
+            if (token != null) {
+                authRateLimitService.checkAlternateAuthRateLimitByCredential(AUTH_PATH, token);
+            }
+            return false;
+        } catch (APIException e) {
+            response.sendError(e.getStatus().value(), e.getMessage());
+            return true;
+        }
+    }
+
+    private void recordFailedAttempt(String ip, String token) {
+        authRateLimitService.recordFailedAlternateAuthAttempt(AUTH_PATH, ip);
+        if (token != null) {
+            authRateLimitService.recordFailedAlternateAuthAttemptByCredential(AUTH_PATH, token);
         }
     }
 }
