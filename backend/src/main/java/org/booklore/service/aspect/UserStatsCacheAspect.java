@@ -1,5 +1,7 @@
 package org.booklore.service.aspect;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
@@ -29,6 +31,8 @@ import java.util.Arrays;
 @RequiredArgsConstructor
 public class UserStatsCacheAspect {
 
+    private static final ObjectMapper CACHE_KEY_MAPPER = new ObjectMapper().findAndRegisterModules();
+
     private final AuthenticationService authenticationService;
     private final UserStatsCache userStatsCache;
 
@@ -39,7 +43,7 @@ public class UserStatsCacheAspect {
             return joinPoint.proceed();
         }
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-        String op = signature.getMethod().getName() + Arrays.toString(joinPoint.getArgs());
+        String op = signature.getMethod().toGenericString() + stableArgsKey(joinPoint.getArgs());
         return userStatsCache.get(user.getId(), op, () -> proceedUnchecked(joinPoint));
     }
 
@@ -58,6 +62,14 @@ public class UserStatsCacheAspect {
             throw e;
         } catch (Throwable e) {
             throw new IllegalStateException(e);
+        }
+    }
+
+    private static String stableArgsKey(Object[] args) {
+        try {
+            return CACHE_KEY_MAPPER.writeValueAsString(args);
+        } catch (JsonProcessingException e) {
+            return Arrays.deepToString(args);
         }
     }
 }

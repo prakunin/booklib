@@ -126,6 +126,24 @@ class InpxArchiveScannerTest {
         assertThat(book.getFileSizeKb()).isEqualTo(2L);
     }
 
+    @Test
+    void listArchivesPrunesCacheEntriesThatAreNoLongerPresent(@TempDir Path root) throws IOException {
+        Path first = root.resolve("first.zip");
+        Path second = root.resolve("second.zip");
+        createArchive(first, "1.fb2");
+        createArchive(second, "2.fb2");
+
+        assertThat(scanner.listArchives(root.toString())).hasSize(2);
+        assertThat(scanner.archiveFileCacheSize()).isEqualTo(2);
+
+        Files.delete(second);
+
+        assertThat(scanner.listArchives(root.toString()))
+                .extracting(InpxArchiveScanner.ArchiveFile::archiveName)
+                .containsExactly("first.zip");
+        assertThat(scanner.archiveFileCacheSize()).isEqualTo(1);
+    }
+
     private void createArchive(Path path, String... entries) throws IOException {
         try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(path))) {
             for (String entry : entries) {

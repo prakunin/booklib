@@ -43,6 +43,8 @@ import lombok.AllArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
@@ -52,6 +54,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Set;
 import java.io.IOException;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
 @Tag(name = "Books", description = "Endpoints for managing books, their metadata, progress, and recommendations")
 @RequestMapping("/api/v1/books")
@@ -187,9 +192,39 @@ public class BookController {
     @CheckBookAccess(bookIdParam = "bookId")
     public ResponseEntity<Resource> getBookContent(
             @Parameter(description = "ID of the book") @PathVariable long bookId,
-            @Parameter(description = "Optional book type for alternative format (e.g., EPUB, PDF, MOBI)") @RequestParam(required = false) String bookType
+            @Parameter(description = "Optional book type for alternative format (e.g., EPUB, PDF, MOBI)") @RequestParam(required = false) String bookType,
+            @RequestHeader(value = HttpHeaders.IF_MODIFIED_SINCE, required = false) String ifModifiedSince
             ) {
-        return bookService.getBookContent(bookId, bookType);
+        ResponseEntity<Resource> response = bookService.getBookContent(bookId, bookType);
+        long lastModified = response.getHeaders().getLastModified();
+        if (lastModified >= 0 && isNotModified(ifModifiedSince, lastModified)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .headers(copyCacheHeaders(response.getHeaders()))
+                    .build();
+        }
+        return response;
+    }
+
+    private boolean isNotModified(String ifModifiedSince, long lastModified) {
+        if (ifModifiedSince == null || ifModifiedSince.isBlank()) {
+            return false;
+        }
+        long requestedTimestamp;
+        try {
+            requestedTimestamp = ZonedDateTime.parse(ifModifiedSince, DateTimeFormatter.RFC_1123_DATE_TIME)
+                    .toInstant()
+                    .toEpochMilli();
+        } catch (DateTimeParseException e) {
+            return false;
+        }
+        return (lastModified / 1000) <= (requestedTimestamp / 1000);
+    }
+
+    private HttpHeaders copyCacheHeaders(HttpHeaders source) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setCacheControl(source.getCacheControl());
+        headers.setLastModified(source.getLastModified());
+        return headers;
     }
 
     @Operation(summary = "Replace book content", description = "Overwrite the primary PDF file for a book with the uploaded content. Used by the document viewer to persist annotation changes.")

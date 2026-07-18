@@ -12,6 +12,7 @@ import org.booklore.exception.APIException;
 
 import java.nio.file.Path;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
@@ -50,5 +51,16 @@ class ChapterCacheServiceTest {
         assertThrows(APIException.class, () ->
             chapterCacheService.hasPage("../outside", 1)
         );
+    }
+
+    @Test
+    void cacheLocksAreBoundedAndExpireAfterAccess() {
+        var eviction = chapterCacheService.cacheLocks().policy().eviction();
+        var expiration = chapterCacheService.cacheLocks().policy().expireAfterAccess();
+
+        assertThat(eviction).isPresent();
+        assertThat(eviction.get().getMaximum()).isEqualTo(ChapterCacheService.CACHE_LOCK_MAX_ENTRIES);
+        assertThat(expiration).isPresent();
+        assertThat(expiration.get().getExpiresAfter()).isEqualTo(ChapterCacheService.CACHE_LOCK_TTL);
     }
 }

@@ -788,9 +788,20 @@ export class BookBrowserComponent implements AfterViewInit {
       direction: c.direction === SortDirection.ASCENDING ? 'ASC' as const : 'DESC' as const
     }));
 
-    const prefs: EntityViewPreferences = structuredClone(
-      user.userSettings.entityViewPreferences ?? {global: {sortKey: 'title', sortDir: 'ASC', view: 'GRID', coverSize: 1.0, seriesCollapsed: false, overlayBookType: true}, overrides: []}
-    );
+    const currentPrefs = user.userSettings.entityViewPreferences ?? {
+      global: {sortKey: 'title', sortDir: 'ASC', view: 'GRID', coverSize: 1.0, seriesCollapsed: false, overlayBookType: true},
+      overrides: []
+    };
+    const prefs: EntityViewPreferences = {
+      global: {...currentPrefs.global},
+      overrides: currentPrefs.overrides?.map(override => ({
+        ...override,
+        preferences: {
+          ...override.preferences,
+          sortCriteria: override.preferences.sortCriteria ? [...override.preferences.sortCriteria] : undefined
+        }
+      })) ?? []
+    };
 
     if (entityType === EntityType.ALL_BOOKS || entityType === EntityType.UNSHELVED) {
       prefs.global = {

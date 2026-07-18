@@ -179,7 +179,7 @@ export class AppBooksApiService {
   readonly libraryOptions = computed(() => this._filterOptions()?.libraries ?? []);
 
   setFilters(filters: AppBookFilters): void {
-    if (JSON.stringify(this._filters()) !== JSON.stringify(filters)) {
+    if (!appBookFiltersEqual(this._filters(), filters)) {
       this._filters.set(filters);
     }
   }
@@ -553,4 +553,24 @@ function summaryToPrimaryFileExtension(summary: AppBookSummary): string | undefi
   }
 
   return summary.primaryFileType?.toLowerCase();
+}
+
+function appBookFiltersEqual(left: AppBookFilters, right: AppBookFilters): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)] as (keyof AppBookFilters)[]);
+  for (const key of keys) {
+    if (!filterValueEqual(left[key], right[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function filterValueEqual(left: AppBookFilters[keyof AppBookFilters], right: AppBookFilters[keyof AppBookFilters]): boolean {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return false;
+    }
+    return left.every((value, index) => value === right[index]);
+  }
+  return left === right;
 }
