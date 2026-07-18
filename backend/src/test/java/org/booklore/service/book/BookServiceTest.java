@@ -16,6 +16,7 @@ import org.booklore.repository.*;
 import org.booklore.service.audit.AuditService;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
 import org.booklore.service.progress.ReadingProgressService;
+import org.booklore.service.restriction.ContentRestrictionService;
 import org.booklore.util.FileService;
 import org.booklore.util.FileUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +81,8 @@ class BookServiceTest {
     private AuditService auditService;
     @Mock
     private EntityManager entityManager;
+    @Mock
+    private ContentRestrictionService contentRestrictionService;
 
     @InjectMocks
     private BookService bookService;
@@ -145,6 +148,44 @@ class BookServiceTest {
     }
 
     @Test
+    void getBooksByIds_nonAdminAppliesContentRestrictionsAfterLibraryFilter() {
+        BookLoreUser.UserPermissions perms = new BookLoreUser.UserPermissions();
+        perms.setAdmin(false);
+        BookLoreUser user = BookLoreUser.builder()
+                .id(10L)
+                .permissions(perms)
+                .assignedLibraries(List.of(Library.builder().id(100L).build()))
+                .build();
+        LibraryEntity allowedLibrary = new LibraryEntity();
+        allowedLibrary.setId(100L);
+        LibraryEntity otherLibrary = new LibraryEntity();
+        otherLibrary.setId(200L);
+        BookEntity allowedBook = bookEntity(2L, allowedLibrary);
+        BookEntity restrictedBook = bookEntity(3L, allowedLibrary);
+        BookEntity otherLibraryBook = bookEntity(4L, otherLibrary);
+        Book mappedBook = Book.builder()
+                .id(2L)
+                .primaryFile(BookFile.builder().bookType(BookFileType.EPUB).build())
+                .metadata(BookMetadata.builder().description("visible").build())
+                .build();
+        when(authenticationService.getAuthenticatedUser()).thenReturn(user);
+        when(bookQueryService.findAllWithMetadataByIds(Set.of(2L, 3L, 4L)))
+                .thenReturn(List.of(allowedBook, restrictedBook, otherLibraryBook));
+        when(contentRestrictionService.applyRestrictions(List.of(allowedBook, restrictedBook), 10L))
+                .thenReturn(List.of(allowedBook));
+        when(readingProgressService.fetchUserProgress(10L, Set.of(2L))).thenReturn(Map.of());
+        when(readingProgressService.fetchUserFileProgress(10L, Set.of(2L))).thenReturn(Map.of());
+        when(bookMapper.toBook(allowedBook)).thenReturn(mappedBook);
+
+        List<Book> result = bookService.getBooksByIds(Set.of(2L, 3L, 4L), true);
+
+        assertEquals(List.of(mappedBook), result);
+        verify(contentRestrictionService).applyRestrictions(List.of(allowedBook, restrictedBook), 10L);
+        verify(bookMapper, never()).toBook(restrictedBook);
+        verify(bookMapper, never()).toBook(otherLibraryBook);
+    }
+
+    @Test
     void getBook_existingBook_returnsBookWithProgress() {
         BookEntity entity = new BookEntity();
         entity.setId(3L);
@@ -169,6 +210,17 @@ class BookServiceTest {
             assertEquals(3L, result.getId());
             verify(bookRepository).findByIdWithBookFiles(3L);
         }
+    }
+
+    private BookEntity bookEntity(long id, LibraryEntity library) {
+        BookEntity entity = new BookEntity();
+        entity.setId(id);
+        entity.setLibrary(library);
+        BookFileEntity primaryFile = new BookFileEntity();
+        primaryFile.setBook(entity);
+        primaryFile.setBookType(BookFileType.EPUB);
+        entity.setBookFiles(List.of(primaryFile));
+        return entity;
     }
 
     @Test
