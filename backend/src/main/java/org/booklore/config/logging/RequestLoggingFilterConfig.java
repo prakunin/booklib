@@ -19,7 +19,8 @@ public class RequestLoggingFilterConfig {
             "cookie",
             "set-cookie",
             "x-api-key",
-            "x-forwarded-access-token"
+            "x-forwarded-access-token",
+            "x-booklore-kobo-token"
     );
 
     @Bean

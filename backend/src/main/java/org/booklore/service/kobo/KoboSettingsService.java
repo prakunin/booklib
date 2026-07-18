@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +27,7 @@ public class KoboSettingsService {
     private final AuthenticationService authenticationService;
     private final ShelfService shelfService;
     private final HardcoverSyncSettingsService hardcoverSyncSettingsService;
+    private final KoboTokenService koboTokenService;
 
     @Transactional(readOnly = true)
     public KoboSyncSettings getCurrentUserSettings() {
@@ -40,23 +40,26 @@ public class KoboSettingsService {
     @Transactional
     public KoboSyncSettings createOrUpdateToken() {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
-        String newToken = generateToken();
+        String newToken = koboTokenService.generateToken();
+        String newTokenHash = koboTokenService.hashToken(newToken);
 
         KoboUserSettingsEntity entity = repository.findByUserId(user.getId())
                 .map(existing -> {
-                    existing.setToken(newToken);
+                    existing.setTokenHash(newTokenHash);
+                    existing.setTokenExpiresAt(koboTokenService.newExpiry());
                     return existing;
                 })
                 .orElseGet(() -> KoboUserSettingsEntity.builder()
                         .userId(user.getId())
-                        .token(newToken)
+                        .tokenHash(newTokenHash)
+                        .tokenExpiresAt(koboTokenService.newExpiry())
                         .syncEnabled(false)
                         .build());
 
         ensureKoboShelfExists(user.getId());
         repository.save(entity);
 
-        return mapToDto(entity);
+        return mapToDto(entity, newToken);
     }
 
     @Transactional
@@ -95,7 +98,8 @@ public class KoboSettingsService {
         KoboUserSettingsEntity entity = KoboUserSettingsEntity.builder()
                 .userId(userId)
                 .syncEnabled(false)
-                .token(generateToken())
+                .tokenHash(koboTokenService.hashToken(koboTokenService.generateToken()))
+                .tokenExpiresAt(koboTokenService.newExpiry())
                 .build();
         return repository.save(entity);
     }
@@ -113,20 +117,25 @@ public class KoboSettingsService {
         }
     }
 
-    private String generateToken() {
-        return UUID.randomUUID().toString();
-    }
-
     private KoboSyncSettings mapToDto(KoboUserSettingsEntity entity) {
         HardcoverSyncSettings hardcoverSettings = hardcoverSyncSettingsService.getSettingsForUserId(entity.getUserId());
         return mapToDto(entity, hardcoverSettings);
     }
 
     private KoboSyncSettings mapToDto(KoboUserSettingsEntity entity, HardcoverSyncSettings hardcoverSettings) {
+        return mapToDto(entity, hardcoverSettings, null);
+    }
+
+    private KoboSyncSettings mapToDto(KoboUserSettingsEntity entity, String rawToken) {
+        HardcoverSyncSettings hardcoverSettings = hardcoverSyncSettingsService.getSettingsForUserId(entity.getUserId());
+        return mapToDto(entity, hardcoverSettings, rawToken);
+    }
+
+    private KoboSyncSettings mapToDto(KoboUserSettingsEntity entity, HardcoverSyncSettings hardcoverSettings, String rawToken) {
         KoboSyncSettings dto = new KoboSyncSettings();
         dto.setId(entity.getId());
         dto.setUserId(entity.getUserId().toString());
-        dto.setToken(entity.getToken());
+        dto.setToken(rawToken);
         dto.setSyncEnabled(entity.isSyncEnabled());
         dto.setProgressMarkAsReadingThreshold(entity.getProgressMarkAsReadingThreshold());
         dto.setProgressMarkAsFinishedThreshold(entity.getProgressMarkAsFinishedThreshold());

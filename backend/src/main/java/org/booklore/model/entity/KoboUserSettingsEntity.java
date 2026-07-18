@@ -3,6 +3,8 @@ package org.booklore.model.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
+
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -19,8 +21,11 @@ public class KoboUserSettingsEntity {
     @Column(name = "user_id", nullable = false, unique = true)
     private Long userId;
 
-    @Column(name = "token", nullable = false, length = 2048)
-    private String token;
+    @Column(name = "token_hash", nullable = false, length = 64)
+    private String tokenHash;
+
+    @Column(name = "token_expires_at", nullable = false)
+    private Instant tokenExpiresAt;
 
     @Column(name = "sync_enabled")
     @Builder.Default
