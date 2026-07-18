@@ -5,6 +5,7 @@ import jakarta.persistence.Tuple;
 import jakarta.persistence.TypedQuery;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.exception.APIException;
+import org.booklore.app.dto.BookListRequest;
 import org.booklore.app.dto.AppFilterOptions;
 import org.booklore.app.mapper.AppBookMapper;
 import org.booklore.model.dto.BookLoreUser;
@@ -209,9 +210,59 @@ class AppBookServiceFilterOptionsTest {
         assertThrows(RuntimeException.class, () -> service.getFilterOptions(null, null, 7L));
     }
 
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void getAllBookIds_capsCriteriaQueryResults() {
+        mockAdminUser();
+
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        CriteriaQuery<Long> cq = mock(CriteriaQuery.class);
+        Root<BookEntity> root = mock(Root.class);
+        Path<Object> path = mock(Path.class);
+        Predicate predicate = mock(Predicate.class);
+        jakarta.persistence.criteria.Order order = mock(jakarta.persistence.criteria.Order.class);
+        TypedQuery<Long> typedQuery = mock(TypedQuery.class);
+
+        when(entityManager.getCriteriaBuilder()).thenReturn(cb);
+        when(cb.createQuery(Long.class)).thenReturn(cq);
+        when(cq.from(BookEntity.class)).thenReturn(root);
+        when(root.get(anyString())).thenReturn((Path) path);
+        when(cq.select(any())).thenReturn(cq);
+        when(cq.distinct(true)).thenReturn(cq);
+        when(cb.asc(any())).thenReturn(order);
+        when(cq.orderBy(order)).thenReturn(cq);
+        when(cb.conjunction()).thenReturn(predicate);
+        when(cb.isNull(any())).thenReturn(predicate);
+        when(cb.equal(any(), any())).thenReturn(predicate);
+        when(cb.isNotEmpty(any())).thenReturn(predicate);
+        when(cb.or(any(Predicate.class), any(Predicate.class))).thenReturn(predicate);
+        when(cb.and(any(Predicate.class), any(Predicate.class))).thenReturn(predicate);
+        when(cq.where(predicate)).thenReturn(cq);
+        when(entityManager.createQuery(cq)).thenReturn(typedQuery);
+        when(typedQuery.setMaxResults(anyInt())).thenReturn(typedQuery);
+        when(typedQuery.getResultList()).thenReturn(List.of(10L, 20L));
+
+        List<Long> result = service.getAllBookIds(emptyBookListRequest());
+
+        assertEquals(List.of(10L, 20L), result);
+        verify(cq).distinct(true);
+        verify(cq).orderBy(order);
+        verify(typedQuery).setMaxResults(AppBookService.MAX_SELECT_ALL_BOOK_IDS);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private BookListRequest emptyBookListRequest() {
+        return new BookListRequest(
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null
+        );
+    }
 
     private void mockAdminUser() {
         var permissions = new BookLoreUser.UserPermissions();
