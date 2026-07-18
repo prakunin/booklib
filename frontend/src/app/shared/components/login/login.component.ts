@@ -210,18 +210,17 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       const details = publicSettings.oidcProviderDetails;
-      const pkce = await this.oidcService.generatePkce();
-      const state = await this.oidcService.fetchState();
-      const nonce = this.oidcService.generateRandomString();
+      const oidcState = await this.oidcService.fetchState();
 
-      this.oidcService.storePkceState({codeVerifier: pkce.codeVerifier, state, nonce});
+      this.oidcService.storePkceState({state: oidcState.state, nonce: oidcState.nonce});
 
       const authUrl = await this.oidcService.buildAuthUrl(
         details.issuerUri,
         details.clientId,
-        pkce.codeChallenge,
-        state,
-        nonce,
+        oidcState.codeChallenge,
+        oidcState.state,
+        oidcState.nonce,
+        oidcState.codeChallengeMethod,
         undefined,
         details.scopes
       );

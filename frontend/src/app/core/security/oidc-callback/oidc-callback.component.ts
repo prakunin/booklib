@@ -48,7 +48,7 @@ export class OidcCallbackComponent implements OnInit {
       return;
     }
 
-    this.oidcService.exchangeCode(code, pkceState.codeVerifier, pkceState.nonce, pkceState.state).subscribe({
+    this.oidcService.exchangeCode(code, pkceState.state).subscribe({
       next: (response) => {
         sessionStorage.removeItem('oidc_redirect_count');
         this.authService.saveInternalTokens(response.accessToken, response.refreshToken, response.expires, response.isDefaultPassword);

@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 
 @Slf4j
 @AllArgsConstructor
@@ -43,8 +42,8 @@ public class OidcAuthController {
             operationId = "oidcGenerateState"
     )
     @GetMapping("/state")
-    public ResponseEntity<Map<String, String>> generateState() {
-        return ResponseEntity.ok(Map.of("state", oidcStateService.generateState()));
+    public ResponseEntity<OidcStateService.OidcAuthorizationState> generateState(HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(oidcStateService.generateState(httpRequest));
     }
 
     @Operation(
@@ -57,13 +56,13 @@ public class OidcAuthController {
             @RequestBody @Valid OidcCallbackRequest request,
             HttpServletRequest httpRequest) {
         log.info("OIDC callback received");
-        oidcStateService.validateAndConsume(request.state());
+        var oidcFlow = oidcStateService.validateAndConsume(request.state(), httpRequest);
         try {
             return oidcAuthService.exchangeCodeForTokens(
                     request.code(),
-                    request.codeVerifier(),
+                    oidcFlow.codeVerifier(),
                     request.redirectUri(),
-                    request.nonce(),
+                    oidcFlow.nonce(),
                     httpRequest
             );
         } catch (Exception e) {
@@ -80,19 +79,17 @@ public class OidcAuthController {
     @GetMapping("/redirect")
     public ResponseEntity<Void> handleRedirect(
             @RequestParam("code") String code,
-            @RequestParam("code_verifier") String codeVerifier,
             @RequestParam("redirect_uri") String redirectUri,
-            @RequestParam("nonce") String nonce,
             @RequestParam("state") String state,
             @RequestParam("app_redirect_uri") String appRedirectUri,
             HttpServletRequest httpRequest) {
 
-        oidcStateService.validateAndConsume(state);
+        var oidcFlow = oidcStateService.validateAndConsume(state, httpRequest);
         oidcAuthService.validateAppRedirectUri(appRedirectUri);
 
         try {
             ResponseEntity<AccessTokenDto> tokenResponse = oidcAuthService.exchangeCodeForTokens(
-                    code, codeVerifier, redirectUri, nonce, httpRequest);
+                    code, oidcFlow.codeVerifier(), redirectUri, oidcFlow.nonce(), httpRequest);
             AccessTokenDto tokens = tokenResponse.getBody();
 
             if (tokens == null) {
@@ -101,7 +98,6 @@ public class OidcAuthController {
 
             StringBuilder fragment = new StringBuilder();
             fragment.append("access_token=").append(URLEncoder.encode(tokens.getAccessToken(), StandardCharsets.UTF_8));
-            fragment.append("&refresh_token=").append(URLEncoder.encode(tokens.getRefreshToken(), StandardCharsets.UTF_8));
 
             if (tokens.getIsDefaultPassword() != null) {
                 fragment.append("&is_default_password=").append(URLEncoder.encode(tokens.getIsDefaultPassword().toString(), StandardCharsets.UTF_8));
@@ -135,15 +131,13 @@ public class OidcAuthController {
     @PostMapping("/mobile/callback")
     public ResponseEntity<AccessTokenDto> handleMobileCallback(
             @RequestParam("code") String code,
-            @RequestParam("code_verifier") String codeVerifier,
             @RequestParam("redirect_uri") String redirectUri,
-            @RequestParam("nonce") String nonce,
             @RequestParam("state") String state,
             HttpServletRequest httpRequest) {
 
-        oidcStateService.validateAndConsume(state);
+        var oidcFlow = oidcStateService.validateAndConsume(state, httpRequest);
         try {
-            return oidcAuthService.exchangeCodeForTokens(code, codeVerifier, redirectUri, nonce, httpRequest);
+            return oidcAuthService.exchangeCodeForTokens(code, oidcFlow.codeVerifier(), redirectUri, oidcFlow.nonce(), httpRequest);
         } catch (Exception e) {
             auditService.log(AuditAction.OIDC_LOGIN_FAILED, "OIDC mobile callback login failed");
             throw e;

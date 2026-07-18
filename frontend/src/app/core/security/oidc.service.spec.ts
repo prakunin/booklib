@@ -34,41 +34,6 @@ describe('OidcService', () => {
     sessionStorage.clear();
   });
 
-  it('generates PKCE verifier and challenge pairs', async () => {
-    const {service} = createService();
-    const digestSpy = vi.fn(async (_algorithm: string, value: Uint8Array) => value);
-    const getRandomValuesSpy = vi.fn((array: Uint8Array) => {
-      array.set(Uint8Array.from({length: array.length}, (_, index) => index + 1));
-      return array;
-    });
-    vi.stubGlobal('crypto', {
-      getRandomValues: getRandomValuesSpy,
-      subtle: {digest: digestSpy},
-    });
-
-    const result = await service.generatePkce();
-
-    expect(getRandomValuesSpy).toHaveBeenCalledOnce();
-    expect(digestSpy).toHaveBeenCalledOnce();
-    expect(result.codeVerifier).toBeTruthy();
-    expect(result.codeChallenge).toBeTruthy();
-  });
-
-  it('generates random URL-safe strings', () => {
-    const {service} = createService();
-    vi.stubGlobal('crypto', {
-      getRandomValues: (array: Uint8Array) => {
-        array.set(Uint8Array.from({length: array.length}, (_, index) => index + 10));
-        return array;
-      },
-      subtle: {digest: vi.fn()},
-    });
-
-    const value = service.generateRandomString();
-
-    expect(value).toMatch(/^[A-Za-z0-9_-]+$/);
-  });
-
   it('builds an auth url directly when the authorization endpoint is provided', async () => {
     const {service} = createService();
     const authUrl = await service.buildAuthUrl(
@@ -77,6 +42,7 @@ describe('OidcService', () => {
       'challenge',
       'state-token',
       'nonce-token',
+      'S256',
       'https://issuer.example/authorize',
       'openid profile'
     );
@@ -98,7 +64,8 @@ describe('OidcService', () => {
       'client-id',
       'challenge',
       'state-token',
-      'nonce-token'
+      'nonce-token',
+      'S256'
     );
 
     expect(fetch).toHaveBeenCalledWith('https://issuer.example/.well-known/openid-configuration');
@@ -116,17 +83,24 @@ describe('OidcService', () => {
       'client-id',
       'challenge',
       'state-token',
-      'nonce-token'
+      'nonce-token',
+      'S256'
     )).rejects.toThrow('authorization_endpoint not found in discovery document');
   });
 
-  it('fetches the backend-generated OIDC state token', async () => {
+  it('fetches the backend-generated OIDC authorization state', async () => {
     const {service, http} = createService();
-    http.get.mockReturnValue(of({state: 'server-state'}));
+    const authorizationState = {
+      state: 'server-state',
+      nonce: 'server-nonce',
+      codeChallenge: 'server-challenge',
+      codeChallengeMethod: 'S256',
+    };
+    http.get.mockReturnValue(of(authorizationState));
 
     const statePromise = service.fetchState();
 
-    await expect(statePromise).resolves.toBe('server-state');
+    await expect(statePromise).resolves.toEqual(authorizationState);
     expect(http.get).toHaveBeenCalledWith(`${API_CONFIG.BASE_URL}/api/v1/auth/oidc/state`);
   });
 
@@ -134,23 +108,20 @@ describe('OidcService', () => {
     const {service, http} = createService();
     http.post.mockReturnValue(of({accessToken: 'access', refreshToken: 'refresh', isDefaultPassword: false}));
 
-    service.exchangeCode('code-123', 'verifier', 'nonce', 'state').subscribe();
+    service.exchangeCode('code-123', 'state').subscribe();
 
     expect(http.post).toHaveBeenCalledWith(`${API_CONFIG.BASE_URL}/api/v1/auth/oidc/callback`, {
       code: 'code-123',
-      codeVerifier: 'verifier',
       redirectUri: `${window.location.origin}/oauth2-callback`,
-      nonce: 'nonce',
       state: 'state',
     });
   });
 
   it('stores, retrieves, and removes pkce state entries', () => {
     const {service} = createService();
-    service.storePkceState({codeVerifier: 'verifier', state: 'state', nonce: 'nonce'});
+    service.storePkceState({state: 'state', nonce: 'nonce'});
 
     expect(service.retrievePkceState('state')).toEqual({
-      codeVerifier: 'verifier',
       state: 'state',
       nonce: 'nonce',
     });

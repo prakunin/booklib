@@ -2,12 +2,17 @@ import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {firstValueFrom, Observable} from 'rxjs';
 import {API_CONFIG} from '../config/api-config';
-import {AppSettingsService} from '../../shared/service/app-settings.service';
 
 interface OidcPkceState {
-  codeVerifier: string;
   state: string;
   nonce: string;
+}
+
+interface OidcAuthorizationState {
+  state: string;
+  nonce: string;
+  codeChallenge: string;
+  codeChallengeMethod: string;
 }
 
 interface OidcTokenResponse {
@@ -21,25 +26,6 @@ interface OidcTokenResponse {
 export class OidcService {
 
   private http = inject(HttpClient);
-  private appSettingsService = inject(AppSettingsService);
-
-  async generatePkce(): Promise<{codeVerifier: string; codeChallenge: string}> {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    const codeVerifier = this.base64UrlEncode(array);
-
-    const encoder = new TextEncoder();
-    const hash = await crypto.subtle.digest('SHA-256', encoder.encode(codeVerifier));
-    const codeChallenge = this.base64UrlEncode(new Uint8Array(hash));
-
-    return {codeVerifier, codeChallenge};
-  }
-
-  generateRandomString(): string {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    return this.base64UrlEncode(array);
-  }
 
   buildAuthUrl(
     issuerUri: string,
@@ -47,6 +33,7 @@ export class OidcService {
     codeChallenge: string,
     state: string,
     nonce: string,
+    codeChallengeMethod = 'S256',
     authorizationEndpoint?: string,
     scopes?: string
   ): Promise<string> {
@@ -54,7 +41,7 @@ export class OidcService {
     const scope = scopes?.trim() || 'openid profile email groups offline_access';
 
     if (authorizationEndpoint) {
-      return Promise.resolve(this.buildUrl(authorizationEndpoint, clientId, redirectUri, scope, codeChallenge, state, nonce));
+      return Promise.resolve(this.buildUrl(authorizationEndpoint, clientId, redirectUri, scope, codeChallenge, state, nonce, codeChallengeMethod));
     }
 
     // Fetch from discovery if authorization_endpoint not provided
@@ -65,24 +52,22 @@ export class OidcService {
         if (!endpoint) {
           throw new Error('authorization_endpoint not found in discovery document');
         }
-        return this.buildUrl(endpoint, clientId, redirectUri, scope, codeChallenge, state, nonce);
+        return this.buildUrl(endpoint, clientId, redirectUri, scope, codeChallenge, state, nonce, codeChallengeMethod);
       });
   }
 
-  async fetchState(): Promise<string> {
+  async fetchState(): Promise<OidcAuthorizationState> {
     const response = await firstValueFrom(
-      this.http.get<{state: string}>(`${API_CONFIG.BASE_URL}/api/v1/auth/oidc/state`)
+      this.http.get<OidcAuthorizationState>(`${API_CONFIG.BASE_URL}/api/v1/auth/oidc/state`)
     );
-    return response.state;
+    return response;
   }
 
-  exchangeCode(code: string, codeVerifier: string, nonce: string, state: string): Observable<OidcTokenResponse> {
+  exchangeCode(code: string, state: string): Observable<OidcTokenResponse> {
     const redirectUri = `${window.location.origin}/oauth2-callback`;
     return this.http.post<OidcTokenResponse>(`${API_CONFIG.BASE_URL}/api/v1/auth/oidc/callback`, {
       code,
-      codeVerifier,
       redirectUri,
-      nonce,
       state
     });
   }
@@ -110,7 +95,8 @@ export class OidcService {
     scope: string,
     codeChallenge: string,
     state: string,
-    nonce: string
+    nonce: string,
+    codeChallengeMethod: string
   ): string {
     const params = new URLSearchParams({
       response_type: 'code',
@@ -118,21 +104,10 @@ export class OidcService {
       redirect_uri: redirectUri,
       scope,
       code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
+      code_challenge_method: codeChallengeMethod,
       state,
       nonce,
     });
     return `${endpoint}?${params.toString()}`;
-  }
-
-  private base64UrlEncode(bytes: Uint8Array): string {
-    let binary = '';
-    for (const byte of bytes) {
-      binary += String.fromCharCode(byte);
-    }
-    return btoa(binary)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
   }
 }

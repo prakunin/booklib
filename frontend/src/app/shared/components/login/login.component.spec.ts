@@ -49,9 +49,7 @@ describe('LoginComponent', () => {
   };
 
   const oidcService = {
-    generatePkce: vi.fn(),
     fetchState: vi.fn(),
-    generateRandomString: vi.fn(),
     storePkceState: vi.fn(),
     buildAuthUrl: vi.fn(),
   };
@@ -108,9 +106,7 @@ describe('LoginComponent', () => {
     authService.clearSessionOnLoginPage.mockReset();
     authService.internalLogin.mockReset();
     router.navigate.mockClear();
-    oidcService.generatePkce.mockReset();
     oidcService.fetchState.mockReset();
-    oidcService.generateRandomString.mockReset();
     oidcService.storePkceState.mockReset();
     oidcService.buildAuthUrl.mockReset();
     autofillEvents = new Subject<AutofillEvent>();
@@ -246,15 +242,17 @@ describe('LoginComponent', () => {
 
   it('builds the OIDC auth URL and redirects the browser', async () => {
     configureComponent();
-    oidcService.generatePkce.mockResolvedValue({codeVerifier: 'verifier', codeChallenge: 'challenge'});
-    oidcService.fetchState.mockResolvedValue('state-token');
-    oidcService.generateRandomString.mockReturnValue('nonce-token');
+    oidcService.fetchState.mockResolvedValue({
+      state: 'state-token',
+      nonce: 'nonce-token',
+      codeChallenge: 'challenge',
+      codeChallengeMethod: 'S256',
+    });
     oidcService.buildAuthUrl.mockResolvedValue('https://issuer.example/auth');
 
     await component.loginWithOidc();
 
     expect(oidcService.storePkceState).toHaveBeenCalledWith({
-      codeVerifier: 'verifier',
       state: 'state-token',
       nonce: 'nonce-token',
     });
@@ -264,6 +262,7 @@ describe('LoginComponent', () => {
       'challenge',
       'state-token',
       'nonce-token',
+      'S256',
       undefined,
       'openid profile email'
     );
@@ -272,7 +271,7 @@ describe('LoginComponent', () => {
 
   it('shows a translated provider error when OIDC login initialization fails', async () => {
     configureComponent();
-    oidcService.generatePkce.mockRejectedValue(new Error('crypto unavailable'));
+    oidcService.fetchState.mockRejectedValue(new Error('state unavailable'));
 
     await component.loginWithOidc();
 
