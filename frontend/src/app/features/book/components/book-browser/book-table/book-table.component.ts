@@ -78,12 +78,19 @@ const COVER_OVERLAY_POSITIONS: ConnectedPosition[] = [
 export class BookTableComponent {
   readonly selectAllRequested = output<void>();
   readonly loadNextPage = output<void>();
+  readonly loadPreviousPage = output<void>();
 
   readonly books = input<Book[]>([]);
   readonly visibleColumns = input<BookTableColumn[]>([]);
   readonly virtualRowCount = input(0);
   readonly loadedBookCount = input<number | null>(null);
+  // Global index of books()[0]; non-zero once maxPages has evicted earlier pages. Rows map a global
+  // (virtual) index to books()[virtualRow.index - firstLoadedIndex()].
+  readonly firstLoadedIndex = input(0);
   readonly isFetchingNextPage = input(false);
+  readonly hasNextPage = input(false);
+  readonly hasPreviousPage = input(false);
+  readonly isFetchingPreviousPage = input(false);
   readonly useSquareCovers = input(false);
   readonly bookQueryToken = input<unknown>(undefined);
 
@@ -171,7 +178,7 @@ export class BookTableComponent {
     estimateSize: () => ROW_HEIGHT,
     overscan: this.isColumnResizing() ? RESIZE_OVERSCAN_ROWS : RENDER_OVERSCAN_ROWS,
     initialOffset: this.initialScrollOffset,
-    getItemKey: index => this.books()[index]?.id ?? `loading-${index}`,
+    getItemKey: index => this.books()[index - this.firstLoadedIndex()]?.id ?? `loading-${index}`,
   }));
 
   constructor() {
@@ -204,8 +211,8 @@ export class BookTableComponent {
     const loadedBookCount = this.loadedBookCount() ?? items.length;
     const lastVirtualItem = this.rowVirtualizer.getVirtualItems().at(-1);
     if (!lastVirtualItem || items.length === 0) return;
-    if (lastVirtualItem.index < items.length - PAGE_LOAD_AHEAD_ROWS) return;
-    if (items.length >= this.virtualRowCount() || this.isFetchingNextPage()) return;
+    if (lastVirtualItem.index < this.firstLoadedIndex() + items.length - PAGE_LOAD_AHEAD_ROWS) return;
+    if (!this.hasNextPage() || this.isFetchingNextPage()) return;
     if (this.lastLoadRequestLoadedBookCount === loadedBookCount) {
       this.lastLoadRequestLoadedBookCount = undefined;
       return;
@@ -213,6 +220,32 @@ export class BookTableComponent {
 
     this.lastLoadRequestLoadedBookCount = loadedBookCount;
     this.loadNextPage.emit();
+  });
+
+  private lastPrevLoadRequestFirstIndex: number | undefined;
+  private prevLastSeenQueryToken: unknown;
+  // Symmetric to paginatorEffect: once maxPages has evicted earlier pages (firstLoadedIndex > 0),
+  // scrolling back up to the top of the loaded window refetches the preceding page. Inert until an
+  // eviction has happened, so ordinary (shallow) scrolling is unaffected.
+  private readonly prevPaginatorEffect = effect(() => {
+    const queryToken = this.bookQueryToken();
+    if (queryToken !== this.prevLastSeenQueryToken) {
+      this.lastPrevLoadRequestFirstIndex = undefined;
+      this.prevLastSeenQueryToken = queryToken;
+    }
+
+    const firstLoadedIndex = this.firstLoadedIndex();
+    if (firstLoadedIndex === 0 || !this.hasPreviousPage() || this.isFetchingPreviousPage()) return;
+    const firstVirtualItem = this.rowVirtualizer.getVirtualItems().at(0);
+    if (!firstVirtualItem) return;
+    if (firstVirtualItem.index > firstLoadedIndex + PAGE_LOAD_AHEAD_ROWS) return;
+    if (this.lastPrevLoadRequestFirstIndex === firstLoadedIndex) {
+      this.lastPrevLoadRequestFirstIndex = undefined;
+      return;
+    }
+
+    this.lastPrevLoadRequestFirstIndex = firstLoadedIndex;
+    this.loadPreviousPage.emit();
   });
 
   private defaultColumnSize(field: string): number {

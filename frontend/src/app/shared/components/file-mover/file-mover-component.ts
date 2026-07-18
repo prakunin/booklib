@@ -60,7 +60,7 @@ export class FileMoverComponent implements OnDestroy {
     this.defaultMovePattern = settings.uploadPattern || '';
 
     const booksByLibrary = new Map<number | null, Book[]>();
-    this.books.forEach(book => {
+    this.books().forEach(book => {
       const libraryId =
         book.libraryId ??
         book.libraryPath?.id ??
@@ -113,7 +113,9 @@ export class FileMoverComponent implements OnDestroy {
   infoCollapsed = true;
 
   bookIds = new Set<number>();
-  books: Book[] = [];
+  // A signal so the library-pattern effect re-runs once getBooksByIds resolves (it may hit the
+  // network now that the app-books cache only retains a bounded window).
+  readonly books = signal<Book[]>([]);
   filePreviews = signal<FilePreview[]>([]);
   defaultTargetLibraryId: number | null = null;
   defaultTargetLibraryPathId: number | null = null;
@@ -125,7 +127,17 @@ export class FileMoverComponent implements OnDestroy {
 
   constructor() {
     this.bookIds = new Set(this.config.data?.bookIds ?? []);
-    this.books = this.bookService.getBooksByIds([...this.bookIds]);
+    this.bookService.getBooksByIds([...this.bookIds])
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: books => this.books.set(books),
+        error: () => this.messageService.add({
+          severity: 'error',
+          summary: 'Oops! Something went wrong',
+          detail: 'We had trouble loading the selected books. Please try again.',
+          life: 3000
+        }),
+      });
   }
 
   ngOnDestroy(): void {
@@ -134,7 +146,7 @@ export class FileMoverComponent implements OnDestroy {
   }
 
   applyPattern(): void {
-    const previews = this.books.map(book => {
+    const previews = this.books().map(book => {
       const fileName = book.fileName ?? '';
       const fileSubPath = book.fileSubPath ? `${book.fileSubPath.replace(/\/+$/g, '')}/` : '';
 
@@ -185,7 +197,7 @@ export class FileMoverComponent implements OnDestroy {
           preview.targetLibraryPathId = this.defaultTargetLibraryPathId;
           preview.targetLibraryPath = this.defaultAvailableLibraryPaths.find(p => p.id === this.defaultTargetLibraryPathId)?.path || '';
 
-          const book = this.books.find(b => b.id === preview.bookId);
+          const book = this.books().find(b => b.id === preview.bookId);
           if (book) {
             this.updatePreviewPaths(preview, book);
           }
@@ -202,7 +214,7 @@ export class FileMoverComponent implements OnDestroy {
           preview.targetLibraryPathId = this.defaultTargetLibraryPathId;
           preview.targetLibraryPath = this.defaultAvailableLibraryPaths.find(p => p.id === this.defaultTargetLibraryPathId)?.path || '';
 
-          const book = this.books.find(b => b.id === preview.bookId);
+          const book = this.books().find(b => b.id === preview.bookId);
           if (book) {
             this.updatePreviewPaths(preview, book);
           }
@@ -218,7 +230,7 @@ export class FileMoverComponent implements OnDestroy {
     preview.targetLibraryPathId = preview.availableLibraryPaths.length > 0 ? preview.availableLibraryPaths[0].id ?? null : null;
     preview.targetLibraryPath = preview.availableLibraryPaths.length > 0 ? preview.availableLibraryPaths[0].path : '';
 
-    const book = this.books.find(b => b.id === preview.bookId);
+    const book = this.books().find(b => b.id === preview.bookId);
     if (book) {
       this.updatePreviewPaths(preview, book);
     }
@@ -229,7 +241,7 @@ export class FileMoverComponent implements OnDestroy {
     const selectedPath = preview.availableLibraryPaths.find(p => p.id === preview.targetLibraryPathId);
     preview.targetLibraryPath = selectedPath?.path || '';
 
-    const book = this.books.find(b => b.id === preview.bookId);
+    const book = this.books().find(b => b.id === preview.bookId);
     if (book) {
       this.updatePreviewPaths(preview, book);
     }

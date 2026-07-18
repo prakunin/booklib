@@ -254,10 +254,15 @@
               [books]="visibleBooks"
               [virtualRowCount]="virtualRowCount()"
               [loadedBookCount]="loadedBookCount()"
+              [firstLoadedIndex]="firstLoadedBookIndex()"
               [isFetchingNextPage]="isFetchingNextBooksPage()"
+              [hasNextPage]="hasNextBooksPage()"
+              [hasPreviousPage]="hasPreviousBooksPage()"
+              [isFetchingPreviousPage]="isFetchingPreviousBooksPage()"
               [bookQueryToken]="bookQueryToken()"
               (selectAllRequested)="selectAllBooks()"
               (loadNextPage)="loadNextBooksPage()"
+              (loadPreviousPage)="loadPreviousBooksPage()"
               [visibleColumns]="visibleColumns()"
               [useSquareCovers]="isAudiobookOnlyLibrary()"
             ></app-book-table>
@@ -266,7 +271,7 @@
             <div #scrollElement class="virtual-scroller">
               <div class="virtual-content" [style.height.px]="virtualGrid.virtualizer.getTotalSize()">
                 @for (virtualItem of virtualGrid.virtualizer.getVirtualItems(); track virtualItem.key) {
-                  @if (visibleBooks[virtualItem.index]; as book) {
+                  @if (visibleBooks[virtualItem.index - firstLoadedBookIndex()]; as book) {
                     <div
                       class="virtual-cell"
                       [style.width.px]="virtualGrid.itemWidth()"

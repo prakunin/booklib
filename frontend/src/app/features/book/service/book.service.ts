@@ -1,5 +1,5 @@
 import {computed, effect, inject, Injectable, signal} from '@angular/core';
-import {first, from, lastValueFrom, Observable, switchMap, throwError} from 'rxjs';
+import {concatMap, first, from, lastValueFrom, map, Observable, of, switchMap, throwError, toArray} from 'rxjs';
 import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
 import {catchError, tap} from 'rxjs/operators';
 import {Book, BookDeletionResponse, BookRecommendation, BookSetting, BookStatusUpdateResponse, BookType, CreatePhysicalBookRequest, PersonalRatingUpdateResponse, ReadStatus} from '../model/book.model';
@@ -24,6 +24,9 @@ import {
   removeBookQueries,
 } from './book-query-cache';
 import {AppBooksApiService} from './app-books-api.service';
+
+// Max ids per /books/batch GET request; keeps the ids query string within URL-length limits.
+const BOOKS_BATCH_FETCH_SIZE = 200;
 
 @Injectable({
   providedIn: 'root',
@@ -184,13 +187,53 @@ export class BookService {
       ?? this.queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)?.find(book => +book.id === +bookId);
   }
 
-  getBooksByIds(bookIds: number[]): Book[] {
-    if (bookIds.length === 0) return [];
+  // Resolve full Book objects for the given ids. The paginated app-books cache only retains a
+  // bounded window (maxPages), so any requested book outside the loaded window is fetched from the
+  // server (/books/batch returns full DTOs, incl. shelves/file info the summary cache lacks). The
+  // result preserves the requested id order.
+  getBooksByIds(bookIds: number[]): Observable<Book[]> {
+    if (bookIds.length === 0) return of([]);
     const idSet = new Set(bookIds.map(id => +id));
-    const paged = this.appBooksApi.books().filter(book => idSet.has(+book.id));
-    const foundIds = new Set(paged.map(book => +book.id));
-    const legacy = this.queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY) ?? [];
-    return [...paged, ...legacy.filter(book => idSet.has(+book.id) && !foundIds.has(+book.id))];
+    const cached = new Map<number, Book>();
+    for (const book of this.appBooksApi.books()) {
+      if (idSet.has(+book.id)) cached.set(+book.id, book);
+    }
+    for (const book of this.queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY) ?? []) {
+      if (idSet.has(+book.id) && !cached.has(+book.id)) cached.set(+book.id, book);
+    }
+
+    const order = (extra: Map<number, Book>): Book[] =>
+      bookIds.flatMap(id => {
+        const book = cached.get(+id) ?? extra.get(+id);
+        return book ? [book] : [];
+      });
+
+    const missing = bookIds.filter(id => !cached.has(+id));
+    if (missing.length === 0) {
+      return of(order(new Map()));
+    }
+    return this.fetchBooksByIdsFromApi(missing).pipe(
+      map(fetched => order(new Map(fetched.map(book => [+book.id, book])))),
+    );
+  }
+
+  private fetchBooksByIdsFromApi(ids: number[]): Observable<Book[]> {
+    const batches: number[][] = [];
+    // Chunk to keep the /batch GET query string within URL-length limits (ids are query params).
+    for (let offset = 0; offset < ids.length; offset += BOOKS_BATCH_FETCH_SIZE) {
+      batches.push(ids.slice(offset, offset + BOOKS_BATCH_FETCH_SIZE));
+    }
+    return from(batches).pipe(
+      concatMap(batch => {
+        let params = new HttpParams();
+        for (const id of batch) {
+          params = params.append('ids', id.toString());
+        }
+        return this.http.get<Book[]>(`${this.url}/batch`, {params});
+      }),
+      toArray(),
+      map(responses => responses.flat()),
+    );
   }
 
   getBooksInSeries(bookId: number): Observable<Book[]> {

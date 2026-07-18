@@ -43,7 +43,7 @@ describe('BookSocketService', () => {
     vi.restoreAllMocks();
   });
 
-  it('adds newly created books into the list cache', () => {
+  it('adds newly created books into the list cache when it exists', () => {
     const existing = makeBook(1);
     const created = makeBook(2);
     queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [existing]);
@@ -51,6 +51,62 @@ describe('BookSocketService', () => {
     service.handleNewlyCreatedBook(created);
 
     expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([existing, created]);
+  });
+
+  const appBooksInvalidationCount = (invalidateSpy: {mock: {calls: unknown[][]}}) =>
+    invalidateSpy.mock.calls.filter(call => {
+      const arg = call[0] as {queryKey?: unknown[]} | undefined;
+      return Array.isArray(arg?.queryKey) && arg.queryKey[0] === 'app-books';
+    }).length;
+
+  it('coalesces a short burst of book-add events into a single trailing invalidation', () => {
+    vi.useFakeTimers();
+    try {
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      // A short burst (events closer together than the 500ms debounce, well under the max-wait).
+      for (let id = 1; id <= 8; id++) {
+        service.handleNewlyCreatedBook(makeBook(id));
+        vi.advanceTimersByTime(50);
+      }
+
+      // Nothing has fired yet: the trailing timer keeps being reset.
+      expect(appBooksInvalidationCount(invalidateSpy)).toBe(0);
+
+      // After the burst settles, exactly one invalidation covers all 8 additions.
+      vi.advanceTimersByTime(500);
+      expect(appBooksInvalidationCount(invalidateSpy)).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still flushes periodically during a continuous import that never pauses (max-wait)', () => {
+    vi.useFakeTimers();
+    try {
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      // A sustained burst that never leaves a 500ms gap would, with a pure trailing debounce, never
+      // flush; the 2000ms max-wait must force periodic refreshes so the visible list is not starved.
+      for (let id = 1; id <= 60; id++) {
+        service.handleNewlyCreatedBook(makeBook(id));
+        vi.advanceTimersByTime(100); // 60 events over 6000ms, always < 500ms apart
+      }
+
+      const during = appBooksInvalidationCount(invalidateSpy);
+      // ~one flush per 2000ms max-wait window while the burst is ongoing — far fewer than 60, but
+      // crucially non-zero (no multi-minute starvation), and nowhere near one-per-event.
+      expect(during).toBeGreaterThanOrEqual(2);
+      expect(during).toBeLessThan(10);
+
+      // Everything eventually flushes once the burst ends, still coalesced (not one-per-event).
+      vi.advanceTimersByTime(2500);
+      const total = appBooksInvalidationCount(invalidateSpy);
+      expect(total).toBeGreaterThanOrEqual(during);
+      expect(total).toBeLessThan(10);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('invalidates the books query and removes detail queries for removed ids', () => {

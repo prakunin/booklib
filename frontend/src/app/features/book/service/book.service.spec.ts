@@ -180,7 +180,15 @@ describe('BookService', () => {
     expect(service.books()).toEqual(response);
     expect(service.findBookById(2)).toEqual(response[1]);
     expect(service.findBookById(999)).toBeUndefined();
-    expect(service.getBooksByIds([2, 999, 1])).toEqual(response);
+
+    // getBooksByIds resolves cached ids from the legacy list in requested order and fetches only
+    // the ids missing from the cache (999) from /books/batch.
+    let byIds: Book[] = [];
+    service.getBooksByIds([2, 999, 1]).subscribe(books => (byIds = books));
+    const batchReq = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books/batch'));
+    expect(batchReq.request.params.getAll('ids')).toEqual(['999']);
+    batchReq.flush([]);
+    expect(byIds).toEqual([response[1], response[0]]);
     expect(service.uniqueMetadata()).toEqual({
       authors: ['Le Guin', 'Pratchett'],
       categories: ['Fantasy', 'Humor'],

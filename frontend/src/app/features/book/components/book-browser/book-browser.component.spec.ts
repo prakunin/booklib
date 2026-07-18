@@ -153,6 +153,9 @@ function createHarness(options?: {
   const hasData = signal(!(options?.isBooksLoading ?? false));
   const isFetchingNextPage = signal(false);
   const hasNextPage = signal(false);
+  const firstLoadedIndex = signal(0);
+  const hasPreviousPage = signal(false);
+  const isFetchingPreviousPage = signal(false);
   const currentUser = signal(makeCurrentUser());
   const showFilter = signal(false);
   const seriesCollapsed = signal(false);
@@ -294,16 +297,20 @@ function createHarness(options?: {
         useValue: {
           books: books.asReadonly(),
           totalElements: () => options?.totalElements ?? books().length,
+          firstLoadedIndex: firstLoadedIndex.asReadonly(),
           hasData: hasData.asReadonly(),
           hasNextPage: hasNextPage.asReadonly(),
+          hasPreviousPage: hasPreviousPage.asReadonly(),
           isLoading: isBooksLoading.asReadonly(),
           isFetchingNextPage: isFetchingNextPage.asReadonly(),
+          isFetchingPreviousPage: isFetchingPreviousPage.asReadonly(),
           error: booksError.asReadonly(),
           setFilters,
           setBooksEnabled: vi.fn(),
           setSearch: vi.fn(),
           setSort,
           fetchNextPage: vi.fn(),
+          fetchPreviousPage: vi.fn(),
           fetchAllBookIds: vi.fn(() => of(books().map(book => book.id))),
         },
       },

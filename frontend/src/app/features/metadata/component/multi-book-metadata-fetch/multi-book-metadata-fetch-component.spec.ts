@@ -1,7 +1,9 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {of} from 'rxjs';
 import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
+import {MessageService} from 'primeng/api';
 
 import {AppSettings} from '../../../../shared/model/app-settings.model';
 import {AppSettingsService} from '../../../../shared/service/app-settings.service';
@@ -12,12 +14,12 @@ import {MultiBookMetadataFetchComponent} from './multi-book-metadata-fetch-compo
 
 describe('MultiBookMetadataFetchComponent', () => {
   const appSettings = signal<AppSettings | null>(null);
-  const getBooksByIds = vi.fn((bookIds: number[]) => bookIds.map(bookId => ({
+  const getBooksByIds = vi.fn((bookIds: number[]) => of(bookIds.map(bookId => ({
     id: bookId,
     title: `Book ${bookId}`,
     libraryId: 1,
     libraryName: 'Library',
-  } satisfies Book)));
+  } satisfies Book))));
 
   beforeEach(() => {
     getBooksByIds.mockClear();
@@ -37,6 +39,7 @@ describe('MultiBookMetadataFetchComponent', () => {
         {provide: DynamicDialogRef, useValue: {close: vi.fn()}},
         {provide: BookService, useValue: {getBooksByIds}},
         {provide: AppSettingsService, useValue: {appSettings}},
+        {provide: MessageService, useValue: {add: vi.fn()}},
       ]
     });
   });

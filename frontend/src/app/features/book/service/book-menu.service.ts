@@ -5,7 +5,7 @@ import {BookMetadataManageService} from './book-metadata-manage.service';
 import {AGE_RATING_OPTIONS, CONTENT_RATING_LABELS, readStatusLabels} from '../components/book-browser/book-filter/book-filter.config';
 import {ReadStatus} from '../model/book.model';
 import {ResetProgressTypes} from '../../../shared/constants/reset-progress-type';
-import {finalize} from 'rxjs';
+import {catchError, EMPTY, finalize} from 'rxjs';
 import {LoadingService} from '../../../core/services/loading.service';
 import {User} from '../../settings/user-management/user.service';
 import {APIException} from '../../../shared/models/api-exception.model';
@@ -328,7 +328,13 @@ export class BookMenuService {
              rejectLabel: this.t.translate('common.no'),
              accept: () => {
                const loader = this.loadingService.show(this.t.translate('book.menuService.loading.removingFromShelves', {count}));
-               const books = this.bookService.getBooksByIds(Array.from(selectedBooks));
+               this.bookService.getBooksByIds(Array.from(selectedBooks)).pipe(
+                 catchError(() => {
+                   this.loadingService.hide(loader);
+                   this.messageService.add({severity: 'error', summary: this.t.translate('common.error'), detail: this.t.translate('book.menuService.toast.unshelveFailedDetail')});
+                   return EMPTY;
+                 })
+               ).subscribe(books => {
                const allShelfIds = new Set<number>();
                books.forEach(b => b.shelves?.forEach(s => {
                  if (s.id) allShelfIds.add(s.id);
@@ -350,6 +356,7 @@ export class BookMenuService {
                      this.messageService.add({severity: 'error', summary: this.t.translate('common.error'), detail: this.t.translate('book.menuService.toast.unshelveFailedDetail')});
                    }
                  });
+               });
              }
            });
          }
