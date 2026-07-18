@@ -163,7 +163,7 @@ public class KomgaController {
 
     @Operation(summary = "Get book page image")
     @GetMapping("/v1/books/{bookId}/pages/{pageNumber}")
-    public ResponseEntity<Resource> getBookPage(
+    public ResponseEntity<?> getBookPage(
             @Parameter(description = "Book ID") @PathVariable Long bookId,
             @Parameter(description = "Page number") @PathVariable Integer pageNumber,
             @Parameter(description = "Convert image format (e.g., 'png')") @RequestParam(required = false) String convert) {
@@ -171,13 +171,20 @@ public class KomgaController {
 
         try {
             boolean convertToPng = "png".equalsIgnoreCase(convert);
-            Resource pageImage = komgaService.getBookPageImage(bookId, pageNumber, convertToPng);
             // Note: When not converting, we assume JPEG as most CBZ files contain JPEG images,
             // but the actual format may vary (PNG, WebP, etc.)
             String contentType = convertToPng ? "image/png" : "image/jpeg";
+            if (convertToPng) {
+                Resource pageImage = komgaService.getBookPageImage(bookId, pageNumber, true);
+                return ResponseEntity.ok()
+                        .header("Content-Type", contentType)
+                        .body(pageImage);
+            }
+
+            StreamingResponseBody body = outputStream -> komgaService.streamBookPageImage(bookId, pageNumber, outputStream);
             return ResponseEntity.ok()
                     .header("Content-Type", contentType)
-                    .body(pageImage);
+                    .body(body);
         } catch (Exception e) {
             log.error("Failed to get page {} from book {}", pageNumber, bookId, e);
             return ResponseEntity.notFound().build();

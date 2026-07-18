@@ -18,6 +18,7 @@ import org.booklore.repository.LibraryRepository;
 import org.booklore.service.MagicShelfService;
 import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.reader.CbxReaderService;
+import org.booklore.service.reader.PdfReaderService;
 import org.booklore.service.restriction.ContentRestrictionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +55,9 @@ class KomgaServiceTest {
     
     @Mock
     private CbxReaderService cbxReaderService;
+
+    @Mock
+    private PdfReaderService pdfReaderService;
     
     @Mock
     private AppSettingService appSettingService;
@@ -213,6 +219,26 @@ class KomgaServiceTest {
     }
 
     @Test
+    void streamBookPageImage_streamsCbxPageWithoutPrefetchingOrBuffering() throws Exception {
+        BookEntity book = getBookEntityWithPrimaryFile(BookFileType.CBX);
+        when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(book));
+        doAnswer(invocation -> {
+            OutputStream outputStream = invocation.getArgument(2);
+            outputStream.write(new byte[]{1, 2, 3});
+            return null;
+        }).when(cbxReaderService).streamPageImage(eq(1L), eq(2), any(OutputStream.class));
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        komgaService.streamBookPageImage(1L, 2, outputStream);
+
+        assertThat(outputStream.toByteArray()).containsExactly(1, 2, 3);
+        verify(cbxReaderService).streamPageImage(eq(1L), eq(2), same(outputStream));
+        verify(cbxReaderService, never()).getAvailablePages(anyLong());
+        verifyNoInteractions(pdfReaderService);
+    }
+
+    @Test
     void shouldGetAllSeriesOptimized() {
         // Given: Mock the optimized repository method
         List<String> seriesNames = List.of("Series A", "Series B", "Series C");
@@ -353,6 +379,17 @@ class KomgaServiceTest {
                 .id(1L)
                 .library(library)
                 .build();
+    }
+
+    private BookEntity getBookEntityWithPrimaryFile(BookFileType bookFileType) {
+        BookEntity bookEntity = getBookEntity();
+        BookFileEntity bookFile = new BookFileEntity();
+        bookFile.setId(1L);
+        bookFile.setBook(bookEntity);
+        bookFile.setBookType(bookFileType);
+        bookFile.setBookFormat(true);
+        bookEntity.setBookFiles(List.of(bookFile));
+        return bookEntity;
     }
 
     BookLoreUser getBookloreUser(boolean isAdmin, List<LibraryEntity> libraries) {

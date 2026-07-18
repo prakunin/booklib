@@ -31,7 +31,9 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.*;
+import java.util.concurrent.Semaphore;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -41,6 +43,9 @@ import java.util.regex.Pattern;
 public class KomgaService {
 
     private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^a-z0-9]+");
+    private static final Semaphore PNG_CONVERSION_PERMITS = new Semaphore(
+            Math.max(1, Runtime.getRuntime().availableProcessors() / 2)
+    );
     private final BookRepository bookRepository;
     private final LibraryRepository libraryRepository;
     private final KomgaMapper komgaMapper;
@@ -442,24 +447,8 @@ public class KomgaService {
     
     public Resource getBookPageImage(Long bookId, Integer pageNumber, boolean convertToPng) throws IOException {
         log.debug("Getting page {} from book {} (convert to PNG: {})", pageNumber, bookId, convertToPng);
-        
-        BookEntity book = bookRepository.findByIdWithBookFiles(bookId)
-                .orElseThrow(() -> new RuntimeException("Book not found: " + bookId));
-
-        boolean isPDF = book.getPrimaryBookFile().getBookType() == BookFileType.PDF;
-     
-        // Stream the page to a ByteArrayOutputStream
-        // streamPageImage will throw if page does not exist
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-        // Make sure pages are cached
-        if (isPDF) {
-            pdfReaderService.getAvailablePages(bookId);
-            pdfReaderService.streamPageImage(bookId, pageNumber, outputStream);
-        } else {
-            cbxReaderService.getAvailablePages(bookId);
-            cbxReaderService.streamPageImage(bookId, pageNumber, outputStream);
-        }
+        streamBookPageImage(bookId, pageNumber, outputStream);
         
         byte[] imageData = outputStream.toByteArray();
         
@@ -470,17 +459,39 @@ public class KomgaService {
         
         return new ByteArrayResource(imageData);
     }
+
+    public void streamBookPageImage(Long bookId, Integer pageNumber, OutputStream outputStream) throws IOException {
+        log.debug("Streaming page {} from book {}", pageNumber, bookId);
+
+        BookEntity book = bookRepository.findByIdWithBookFiles(bookId)
+                .orElseThrow(() -> new RuntimeException("Book not found: " + bookId));
+
+        boolean isPDF = book.getPrimaryBookFile().getBookType() == BookFileType.PDF;
+        if (isPDF) {
+            pdfReaderService.streamPageImage(bookId, pageNumber, outputStream);
+        } else {
+            cbxReaderService.streamPageImage(bookId, pageNumber, outputStream);
+        }
+    }
     
     private byte[] convertImageToPng(byte[] imageData) throws IOException {
-        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(imageData);
-             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            BufferedImage image = ImageIO.read(inputStream);
-            if (image == null) {
-                throw new IOException("Failed to read image data");
+        try {
+            PNG_CONVERSION_PERMITS.acquire();
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(imageData);
+                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                BufferedImage image = ImageIO.read(inputStream);
+                if (image == null) {
+                    throw new IOException("Failed to read image data");
+                }
+
+                ImageIO.write(image, "png", outputStream);
+                return outputStream.toByteArray();
+            } finally {
+                PNG_CONVERSION_PERMITS.release();
             }
-            
-            ImageIO.write(image, "png", outputStream);
-            return outputStream.toByteArray();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting to convert image to PNG", e);
         }
     }
 }
