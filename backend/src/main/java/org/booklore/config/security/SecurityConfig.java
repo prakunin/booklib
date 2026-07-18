@@ -367,20 +367,16 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        String allowedOriginsStr = env.getProperty("app.cors.allowed-origins", "*").trim();
-        if ("*".equals(allowedOriginsStr) || allowedOriginsStr.isEmpty()) {
-            log.warn(
-                "CORS is configured to allow all origins (*) because 'app.cors.allowed-origins' is '{}'. " +
-                "This maintains backward compatibility, but it's recommended to set it to an explicit origin list.",
-                allowedOriginsStr.isEmpty() ? "empty" : "*"
-            );
-            configuration.setAllowedOriginPatterns(List.of("*"));
-        } else {
+        String allowedOriginsStr = env.getProperty("app.cors.allowed-origins", "").trim();
+        if (!allowedOriginsStr.isEmpty()) {
             List<String> origins = Arrays.stream(ALLOWED.split(allowedOriginsStr))
                     .filter(s -> !s.isEmpty())
                     .map(String::trim)
                     .toList();
-            configuration.setAllowedOriginPatterns(origins);
+            if (origins.contains("*")) {
+                throw new IllegalStateException("CORS cannot allow '*' while credentials are enabled. Set app.cors.allowed-origins to explicit origins.");
+            }
+            configuration.setAllowedOrigins(origins);
         }
 
         configuration.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
