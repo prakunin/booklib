@@ -9,6 +9,7 @@ import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.LibraryPathEntity;
 import org.booklore.service.appsettings.AppSettingService;
+import org.booklore.util.FileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -46,6 +47,7 @@ class EpubMetadataWriterTest {
     private BookMetadataEntity metadata;
     private BookEntity bookEntity;
     private AppSettingService appSettingService;
+    private FileService fileService;
 
     @TempDir
     Path tempDir;
@@ -66,8 +68,9 @@ class EpubMetadataWriterTest {
         AppSettings appSettings = mock(AppSettings.class);
         when(appSettings.getMetadataPersistenceSettings()).thenReturn(metadataPersistenceSettings);
         when(appSettingService.getAppSettings()).thenReturn(appSettings);
+        fileService = mock(FileService.class);
 
-        writer = new EpubMetadataWriter(appSettingService);
+        writer = new EpubMetadataWriter(appSettingService, fileService);
         metadata = new BookMetadataEntity();
         metadata.setTitle("Test Book");
         AuthorEntity author = new AuthorEntity();
@@ -723,4 +726,3 @@ class EpubMetadataWriterTest {
         };
     }
 }
-
