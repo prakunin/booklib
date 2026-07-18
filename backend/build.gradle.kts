@@ -185,7 +185,7 @@ dependencies {
     // --- Database & Migration ---
     implementation("org.mariadb.jdbc:mariadb-java-client:3.5.9")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
-    implementation("org.flywaydb:flyway-mysql:12.10.0")
+    implementation("org.flywaydb:flyway-mysql:12.11.0")
 
     // --- Lombok (For Clean Code) ---
     compileOnly("org.projectlombok:lombok:1.18.46")
@@ -197,10 +197,10 @@ dependencies {
     runtimeOnly("org.grimmory:pdfium4j:$pdfium4jVersion:${pdfiumNativesClassifier()}")
 
     // --- TwelveMonkeys ImageIO ---
-    implementation("com.twelvemonkeys.imageio:imageio-jpeg:3.13.1")
-    implementation("com.twelvemonkeys.imageio:imageio-tiff:3.13.1")
-    implementation("com.twelvemonkeys.imageio:imageio-webp:3.13.1")
-    implementation("com.twelvemonkeys.imageio:imageio-bmp:3.13.1")
+    implementation("com.twelvemonkeys.imageio:imageio-jpeg:3.14.0")
+    implementation("com.twelvemonkeys.imageio:imageio-tiff:3.14.0")
+    implementation("com.twelvemonkeys.imageio:imageio-webp:3.14.0")
+    implementation("com.twelvemonkeys.imageio:imageio-bmp:3.14.0")
 
     // epub4j-grimmory fork publishes as org.grimmory:epub4j-core
     val epub4jCoords = if (useLocalLibs) "org.grimmory:epub4j-core:+" else "org.grimmory:epub4j-core:1.4.0"
@@ -213,7 +213,7 @@ dependencies {
     runtimeOnly("$epub4jNativeCoords:${epub4jNativesClassifier()}")
 
     // --- Audio Metadata (Audiobook Support) ---
-    implementation("com.github.RouHim:jaudiotagger:2.0.24")
+    implementation("com.github.RouHim:jaudiotagger:2.0.25")
 
     // --- Archive Support ---
     implementation("com.github.gotson.nightcompress:nightcompress:1.1.1")
@@ -245,7 +245,10 @@ dependencies {
     implementation("org.freemarker:freemarker:2.3.34")
 
     // --- Jackson 3 ---
-    implementation(platform("tools.jackson:jackson-bom:3.2.0"))
+    // Version is pinned via the dependencyManagement BOM import below. A plain
+    // `platform(...)` import here is silently overridden by Spring Boot's managed
+    // Jackson version, so it would leave jackson-core/databind on the older Boot
+    // pin instead of the version we intend.
     implementation("tools.jackson.core:jackson-core")
     implementation("tools.jackson.core:jackson-databind")
 
@@ -263,6 +266,23 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.27.7")
     testRuntimeOnly("com.h2database:h2")
     add(openApiExportRuntimeOnly.name, "com.h2database:h2")
+}
+
+dependencyManagement {
+    imports {
+        // Import the Jackson 3 BOM here (not via a `platform(...)` dependency) so it
+        // overrides the Jackson version managed by the Spring Boot BOM. Imports declared
+        // here take precedence over Boot's managed versions, keeping jackson-core,
+        // jackson-databind and jackson-annotations aligned on this BOM.
+        mavenBom("tools.jackson:jackson-bom:3.2.1")
+    }
+    dependencies {
+        // Keep flyway-core aligned with the explicitly pinned flyway-mysql module. Boot
+        // manages flyway-core (to an older release), so a plain `implementation` version
+        // would be overridden; declaring it here keeps core and the mysql module on the
+        // same Flyway release train instead of leaving core several minors behind.
+        dependency("org.flywaydb:flyway-core:12.11.0")
+    }
 }
 
 dependencyLocking {
