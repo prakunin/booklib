@@ -470,6 +470,28 @@ class Fb2MetadataExtractorTest {
     }
 
     @Test
+    void extractMetadata_stopsAfterDescriptionWithoutParsingEmbeddedBinaryPayload() throws IOException {
+        Path file = tempDir.resolve("large.fb2");
+        Files.writeString(file, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <FictionBook xmlns="%s" xmlns:l="%s">
+                <description>
+                  <title-info>
+                    <book-title>Metadata only</book-title>
+                    <author><first-name>Streamed</first-name><last-name>Author</last-name></author>
+                  </title-info>
+                </description>
+                <binary id="payload.jpg" content-type="image/jpeg">
+                """.formatted(NS, XLINK), StandardCharsets.UTF_8);
+
+        BookMetadata metadata = extractor.extractMetadata(file.toFile());
+
+        assertThat(metadata).isNotNull();
+        assertThat(metadata.getTitle()).isEqualTo("Metadata only");
+        assertThat(metadata.getAuthors()).containsExactly("Streamed Author");
+    }
+
+    @Test
     void extractMetadata_fullDocument() throws IOException {
         File file = writeFb2("""
                 <description>
@@ -550,6 +572,27 @@ class Fb2MetadataExtractorTest {
                 </description>
                 <binary id="img1" content-type="image/png">%s</binary>
                 """.formatted(base64));
+
+        byte[] cover = extractor.extractCover(file);
+
+        assertThat(cover).isEqualTo(imageData);
+    }
+
+    @Test
+    void extractCover_decodesOnlyReferencedBinaryPayload() throws IOException {
+        byte[] imageData = {0x01, 0x02, 0x03, 0x04};
+        String base64 = Base64.getEncoder().encodeToString(imageData);
+        File file = writeFb2("""
+                <description>
+                  <title-info>
+                    <coverpage>
+                      <image l:href="#img1"/>
+                    </coverpage>
+                  </title-info>
+                </description>
+                <binary id="payload.jpg" content-type="image/jpeg">%s</binary>
+                <binary id="img1" content-type="image/png">%s</binary>
+                """.formatted("!!!not@@base64###".repeat(10_000), base64));
 
         byte[] cover = extractor.extractCover(file);
 
