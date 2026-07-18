@@ -21,6 +21,7 @@ import java.nio.file.WatchEvent;
 import java.time.Instant;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 @Slf4j
@@ -38,8 +39,10 @@ public class BookdropEventHandlerService implements SmartLifecycle {
     private static final long STABILITY_CHECK_INTERVAL_MS = 500;
     private static final int STABILITY_REQUIRED_CHECKS = 3;
     private static final long STABILITY_MAX_WAIT_MS = 30_000;
+    static final int FILE_QUEUE_CAPACITY = 10_000;
 
-    private final BlockingQueue<BookDropFileEvent> fileQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<BookDropFileEvent> fileQueue = new LinkedBlockingQueue<>(FILE_QUEUE_CAPACITY);
+    private final Set<BookDropFileEvent> queuedFiles = ConcurrentHashMap.newKeySet();
     private volatile boolean running;
     private Thread workerThread;
 
@@ -97,15 +100,28 @@ public class BookdropEventHandlerService implements SmartLifecycle {
 
     public void enqueueFile(Path file, WatchEvent.Kind<?> kind) {
         BookDropFileEvent event = new BookDropFileEvent(file, kind);
-        if (!fileQueue.contains(event)) {
-            fileQueue.offer(event);
+        if (!queuedFiles.add(event)) {
+            log.debug("Coalesced duplicate bookdrop event for {}", file);
+            return;
         }
+        if (fileQueue.offer(event)) {
+            int queueSize = fileQueue.size();
+            if (queueSize >= FILE_QUEUE_CAPACITY * 0.8) {
+                log.warn("Bookdrop file queue depth is {}/{}", queueSize, FILE_QUEUE_CAPACITY);
+            }
+            return;
+        }
+        queuedFiles.remove(event);
+        log.warn("Bookdrop file queue is full ({}/{}); dropped {} event for {}",
+                fileQueue.size(), FILE_QUEUE_CAPACITY, kind.name(), file);
     }
 
     private void processQueue() {
         while (running) {
             try {
-                processFile(fileQueue.take());
+                BookDropFileEvent event = fileQueue.take();
+                queuedFiles.remove(event);
+                processFile(event);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.info("File processing thread interrupted, shutting down.");
@@ -241,5 +257,9 @@ public class BookdropEventHandlerService implements SmartLifecycle {
 
         log.warn("File size did not stabilize after {}ms: {}", STABILITY_MAX_WAIT_MS, file);
         return false;
+    }
+
+    int queuedFileCount() {
+        return fileQueue.size();
     }
 }

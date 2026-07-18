@@ -39,8 +39,10 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
     private static final long STABILITY_CHECK_INTERVAL_MS = 3000L;
     private static final long STABILITY_MAX_WAIT_MS = 120000L;
     private static final int MIN_AUDIO_FILES_FOR_FOLDER_AUDIOBOOK = 2;
+    static final int EVENT_QUEUE_CAPACITY = 10_000;
 
-    private final BlockingQueue<FileEvent> eventQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<FileEvent> eventQueue = new LinkedBlockingQueue<>(EVENT_QUEUE_CAPACITY);
+    private final Set<FileEvent> queuedEvents = ConcurrentHashMap.newKeySet();
     private final LibraryRepository libraryRepository;
     private final BookRepository bookRepository;
     private final BookFileTransactionalHandler bookFileTransactionalHandler;
@@ -72,7 +74,9 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
             log.info("LibraryFileEventProcessor virtual thread started.");
             while (running && !Thread.currentThread().isInterrupted()) {
                 try {
-                    handleEvent(eventQueue.take());
+                    FileEvent event = eventQueue.take();
+                    queuedEvents.remove(event);
+                    handleEvent(event);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     log.warn("LibraryFileEventProcessor virtual thread interrupted.");
@@ -115,7 +119,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
 
         if (eventKind == StandardWatchEventKinds.ENTRY_DELETE) {
             ScheduledFuture<?> existing = pendingDeletes.put(path, scheduler.schedule(() -> {
-                eventQueue.offer(new FileEvent(eventKind, libraryId, path, isDirectory));
+                enqueueEvent(new FileEvent(eventKind, libraryId, path, isDirectory));
                 pendingDeletes.remove(path);
             }, DEBOUNCE_MS, TimeUnit.MILLISECONDS));
 
@@ -130,7 +134,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
             if (isDirectory) {
                 log.debug("[DEBOUNCE] Scheduling folder create for '{}' with {}ms delay", path, FOLDER_CREATE_DEBOUNCE_MS);
                 ScheduledFuture<?> existingFolder = pendingFolderCreates.put(path, scheduler.schedule(() -> {
-                    eventQueue.offer(new FileEvent(eventKind, libraryId, path, true));
+                    enqueueEvent(new FileEvent(eventKind, libraryId, path, true));
                     pendingFolderCreates.remove(path);
                     filesFromPendingFolder.removeIf(f -> f.startsWith(path));
                 }, FOLDER_CREATE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
@@ -146,7 +150,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
                         if (oldTimer != null) oldTimer.cancel(false);
                         Path folderPath = entry.getKey();
                         pendingFolderCreates.put(folderPath, scheduler.schedule(() -> {
-                            eventQueue.offer(new FileEvent(eventKind, libraryId, folderPath, true));
+                            enqueueEvent(new FileEvent(eventKind, libraryId, folderPath, true));
                             pendingFolderCreates.remove(folderPath);
                             filesFromPendingFolder.removeIf(f -> f.startsWith(folderPath));
                         }, FOLDER_CREATE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
@@ -156,12 +160,30 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
                 }
                 if (!insidePendingFolder) {
                     scheduleWithStabilityCheck(path, () ->
-                            eventQueue.offer(new FileEvent(eventKind, libraryId, path, false)));
+                            enqueueEvent(new FileEvent(eventKind, libraryId, path, false)));
                 }
             }
         } else {
-            eventQueue.offer(new FileEvent(eventKind, libraryId, path, false));
+            enqueueEvent(new FileEvent(eventKind, libraryId, path, false));
         }
+    }
+
+    boolean enqueueEvent(FileEvent event) {
+        if (!queuedEvents.add(event)) {
+            log.debug("[QUEUE] Coalesced duplicate library file event for '{}'", event.fullPath());
+            return false;
+        }
+        if (eventQueue.offer(event)) {
+            int queueSize = eventQueue.size();
+            if (queueSize >= EVENT_QUEUE_CAPACITY * 0.8) {
+                log.warn("[QUEUE] Library file event queue depth is {}/{}", queueSize, EVENT_QUEUE_CAPACITY);
+            }
+            return true;
+        }
+        queuedEvents.remove(event);
+        log.warn("[QUEUE] Library file event queue is full ({}/{}); dropped {} event for '{}'",
+                eventQueue.size(), EVENT_QUEUE_CAPACITY, event.eventKind().name(), event.fullPath());
+        return false;
     }
 
     private void handleEvent(FileEvent event) {
@@ -595,6 +617,10 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
                 .anyMatch(p -> paths.stream().anyMatch(p::startsWith));
         boolean inPool = pendingDeletionPool.hasPendingForPaths(paths);
         return inQueue || inDeletes || inFolderCreates || inPool;
+    }
+
+    int queuedEventCount() {
+        return eventQueue.size();
     }
 
     public record FileEvent(WatchEvent.Kind<?> eventKind, long libraryId, Path fullPath, boolean isDirectory) {
