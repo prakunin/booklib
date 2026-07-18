@@ -20,7 +20,7 @@ import {finalize} from 'rxjs/operators';
 
 export interface ReadEvent {
   bookId: number;
-  reader?: 'epub-streaming';
+  reader?: 'epub-streaming' | 'epub-blob';
   bookType?: BookType;
 }
 
@@ -160,7 +160,7 @@ export class MetadataTabsComponent {
     });
   }
 
-  read(bookId: number, reader?: 'epub-streaming', bookType?: BookType): void {
+  read(bookId: number, reader?: 'epub-streaming' | 'epub-blob', bookType?: BookType): void {
     this.readBook.emit({ bookId, reader, bookType });
   }
 

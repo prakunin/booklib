@@ -229,7 +229,7 @@
                           severity="primary"
                           [pTooltip]="t('readTooltip')"
                           tooltipPosition="top"
-                          (onClick)="read(currentBook.id)">
+                          (onClick)="read(currentBook.id, 'epub-blob')">
                         </p-button>
                         <p-button
                           icon="pi pi-play"
@@ -317,7 +317,7 @@
                             severity="primary"
                             [pTooltip]="t('readTooltip')"
                             tooltipPosition="top"
-                            (onClick)="read(currentBook.id, undefined, format.bookType)">
+                            (onClick)="read(currentBook.id, 'epub-blob', format.bookType)">
                           </p-button>
                           <p-button
                             icon="pi pi-play"

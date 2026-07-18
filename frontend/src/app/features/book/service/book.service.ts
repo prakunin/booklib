@@ -321,7 +321,7 @@ export class BookService {
 
   /*------------------ Reading & Viewer Settings ------------------*/
 
-  readBook(bookId: number, reader?: 'epub-streaming', explicitBookType?: BookType): void {
+  readBook(bookId: number, reader?: 'epub-streaming' | 'epub-blob', explicitBookType?: BookType): void {
     const book = this.findBookById(bookId);
 
     if (book) {
@@ -336,13 +336,13 @@ export class BookService {
     });
   }
 
-  private navigateToReader(book: Book, bookId: number, reader?: 'epub-streaming', explicitBookType?: BookType): void {
+  private navigateToReader(book: Book, bookId: number, reader?: 'epub-streaming' | 'epub-blob', explicitBookType?: BookType): void {
 
     const bookType: BookType | undefined = explicitBookType ?? book.primaryFile?.bookType;
     const isAlternativeFormat = explicitBookType && explicitBookType !== book.primaryFile?.bookType;
 
     let baseUrl: string | null = null;
-    const queryParams: Partial<{streaming: true; bookType: BookType}> = {};
+    const queryParams: Partial<{streaming: boolean; bookType: BookType}> = {};
 
     switch (bookType) {
       case 'PDF':
@@ -351,8 +351,8 @@ export class BookService {
 
       case 'EPUB':
         baseUrl = 'ebook-reader';
-        if (reader === 'epub-streaming') {
-          queryParams['streaming'] = true;
+        if (reader === 'epub-blob') {
+          queryParams['streaming'] = false;
         }
         break;
 

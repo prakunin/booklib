@@ -55,6 +55,7 @@ describe('BookService', () => {
   let httpTestingController: HttpTestingController;
   let authService: ReturnType<typeof createAuthServiceStub>;
   let queryClientHarness: ReturnType<typeof createQueryClientHarness>;
+  let router: Router;
 
   function setup(initialToken: string | null = 'token-123'): void {
     authService = createAuthServiceStub(initialToken);
@@ -123,6 +124,7 @@ describe('BookService', () => {
     });
 
     service = TestBed.inject(BookService);
+    router = TestBed.inject(Router);
     httpTestingController = TestBed.inject(HttpTestingController);
     flushSignalAndQueryEffects();
   }
@@ -272,6 +274,28 @@ describe('BookService', () => {
     // Screens must be able to say why they are blank instead of rendering an empty library.
     expect(service.legacyCatalogTooLarge()).toBe(true);
     expect(service.books()).toEqual([]);
+  });
+
+  it('navigates EPUB reads without streaming query params so streaming is the default reader path', () => {
+    setup();
+    queryClientHarness.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [
+      buildBook(42, {primaryFile: {id: 1, bookId: 42, bookType: 'EPUB'}}),
+    ]);
+
+    service.readBook(42);
+
+    expect(router.navigate).toHaveBeenCalledWith(['/ebook-reader/book/42'], undefined);
+  });
+
+  it('keeps an explicit blob fallback for EPUB compatibility mode', () => {
+    setup();
+    queryClientHarness.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [
+      buildBook(43, {primaryFile: {id: 1, bookId: 43, bookType: 'EPUB'}}),
+    ]);
+
+    service.readBook(43, 'epub-blob');
+
+    expect(router.navigate).toHaveBeenCalledWith(['/ebook-reader/book/43'], {queryParams: {streaming: false}});
   });
 
   it('removes a shelf from the cached books query without disturbing other shelf assignments', async () => {

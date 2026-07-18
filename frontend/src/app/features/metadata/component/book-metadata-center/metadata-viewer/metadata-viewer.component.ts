@@ -145,9 +145,9 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
     const primaryType = book.primaryFile?.bookType;
     if (primaryType === 'EPUB') {
       items.push({
-        label: this.t.translate('metadata.viewer.menuStreamingReader'),
-        icon: 'pi pi-play',
-        command: () => this.read(book.id, 'epub-streaming')
+        label: this.t.translate('metadata.viewer.menuStandardReader'),
+        icon: 'pi pi-book',
+        command: () => this.read(book.id, 'epub-blob')
       });
     }
 
@@ -169,7 +169,7 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
             {
               label: this.t.translate('metadata.viewer.menuStandardReader'),
               icon: 'pi pi-book',
-              command: () => this.read(book.id, undefined, formatType)
+              command: () => this.read(book.id, 'epub-blob', formatType)
             },
             {
               label: this.t.translate('metadata.viewer.menuStreamingReader'),
@@ -496,7 +496,7 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
     return html ? DOMPurify.sanitize(html) : '';
   }
 
-  read(bookId: number | undefined, reader?: "epub-streaming", bookType?: BookType): void {
+  read(bookId: number | undefined, reader?: "epub-streaming" | "epub-blob", bookType?: BookType): void {
     if (bookId) this.bookService.readBook(bookId, reader, bookType);
   }
 
