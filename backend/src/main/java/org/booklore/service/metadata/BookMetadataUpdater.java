@@ -24,13 +24,12 @@ import org.booklore.service.metadata.writer.MetadataWriterFactory;
 import org.booklore.util.BookCoverUtils;
 import org.booklore.util.FileService;
 import org.booklore.util.MetadataChangeDetector;
+import org.booklore.util.NetworkAddressValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.io.File;
-import java.net.InetAddress;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -751,11 +750,8 @@ public class BookMetadataUpdater {
 
     private boolean isLocalOrPrivateUrl(String url) {
         try {
-            URI uri = new URI(url);
-            String host = uri.getHost();
-            if ("localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)) return true;
-            InetAddress addr = InetAddress.getByName(host);
-            return addr.isLoopbackAddress() || addr.isSiteLocalAddress();
+            NetworkAddressValidator.validateExternalHttpUrl(url);
+            return false;
         } catch (Exception e) {
             log.warn("Invalid thumbnail URL '{}': {}", url, e.getMessage());
             return true;
