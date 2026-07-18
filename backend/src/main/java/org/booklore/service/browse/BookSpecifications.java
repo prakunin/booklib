@@ -1,4 +1,4 @@
-package org.booklore.app.specification;
+package org.booklore.service.browse;
 
 import org.booklore.exception.APIException;
 import org.booklore.model.entity.*;
@@ -16,9 +16,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
-public class AppBookSpecification {
+public class BookSpecifications {
 
-    private AppBookSpecification() {
+    private BookSpecifications() {
     }
 
     private static List<Integer> parseIntList(List<String> values, String paramName) {

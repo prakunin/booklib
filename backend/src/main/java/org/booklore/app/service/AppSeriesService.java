@@ -7,7 +7,7 @@ import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.exception.ApiError;
 import org.booklore.app.dto.*;
 import org.booklore.app.mapper.AppBookMapper;
-import org.booklore.app.specification.AppBookSpecification;
+import org.booklore.service.browse.BookSpecifications;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.Library;
 import org.booklore.model.entity.*;
@@ -361,19 +361,19 @@ public class AppSeriesService {
 
     private Specification<BookEntity> buildSeriesBooksSpec(Set<Long> accessibleLibraryIds, Long libraryId, String seriesName) {
         List<Specification<BookEntity>> specs = new ArrayList<>();
-        specs.add(AppBookSpecification.notDeleted());
-        specs.add(AppBookSpecification.hasDigitalFileOrIsPhysical());
-        specs.add(AppBookSpecification.inSeries(seriesName));
+        specs.add(BookSpecifications.notDeleted());
+        specs.add(BookSpecifications.hasDigitalFileOrIsPhysical());
+        specs.add(BookSpecifications.inSeries(seriesName));
 
         if (accessibleLibraryIds != null) {
             specs.add(libraryId != null
-                    ? AppBookSpecification.inLibrary(libraryId)
-                    : AppBookSpecification.inLibraries(accessibleLibraryIds));
+                    ? BookSpecifications.inLibrary(libraryId)
+                    : BookSpecifications.inLibraries(accessibleLibraryIds));
         } else if (libraryId != null) {
-            specs.add(AppBookSpecification.inLibrary(libraryId));
+            specs.add(BookSpecifications.inLibrary(libraryId));
         }
 
-        return AppBookSpecification.combine(specs.toArray(Specification[]::new));
+        return BookSpecifications.combine(specs.toArray(Specification[]::new));
     }
 
     private Map<Long, UserBookProgressEntity> getProgressMap(Long userId, Set<Long> bookIds) {
