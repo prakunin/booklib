@@ -39,8 +39,18 @@ public class GeoIpService {
         if (cacheKey == null) {
             return null;
         }
-        String result = cache.get(cacheKey, this::fetchCountryCode);
-        return result.isEmpty() ? null : result;
+        String cached = cache.getIfPresent(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        String result = fetchCountryCode(cacheKey);
+        if (result == null || result.isBlank()) {
+            return null;
+        }
+
+        cache.put(cacheKey, result);
+        return result;
     }
 
     private String fetchCountryCode(String ip) {
@@ -64,7 +74,7 @@ public class GeoIpService {
         } catch (Exception e) {
             log.debug("Failed to resolve country code for IP: {}", ip);
         }
-        return "";
+        return null;
     }
 
     private String normalizePublicIp(String ip) {

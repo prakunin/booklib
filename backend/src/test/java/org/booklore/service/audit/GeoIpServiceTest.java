@@ -75,6 +75,28 @@ class GeoIpServiceTest {
                 .isEqualTo("http://ip-api.com/json/2001:4860:4860:0:0:0:0:8888?fields=countryCode");
     }
 
+    @Test
+    void resolveCountryCodeDoesNotCacheTransientFailures() throws Exception {
+        HttpResponse<String> rateLimited = mock();
+        when(rateLimited.statusCode()).thenReturn(429);
+
+        HttpResponse<String> success = mock();
+        when(success.statusCode()).thenReturn(200);
+        when(success.body()).thenReturn("{\"countryCode\":\"US\"}");
+
+        when(httpClient.send(any(HttpRequest.class), anyStringBodyHandler()))
+                .thenReturn(rateLimited)
+                .thenReturn(success);
+
+        assertThat(service.resolveCountryCode("8.8.8.8")).isNull();
+        assertThat(service.cache().getIfPresent("8.8.8.8")).isNull();
+
+        assertThat(service.resolveCountryCode("8.8.8.8")).isEqualTo("US");
+
+        verify(httpClient, times(2)).send(any(HttpRequest.class), anyStringBodyHandler());
+        assertThat(service.cache().getIfPresent("8.8.8.8")).isEqualTo("US");
+    }
+
     private void givenGeoResponse(String countryCode) throws Exception {
         HttpResponse<String> response = mock();
         when(response.statusCode()).thenReturn(200);
