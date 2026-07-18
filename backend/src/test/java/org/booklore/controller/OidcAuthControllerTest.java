@@ -19,7 +19,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,24 +48,27 @@ class OidcAuthControllerTest {
 
     @Test
     void generateState_returnsStateInResponseBody() {
-        when(oidcStateService.generateState()).thenReturn("abc123");
+        var authorizationState = new OidcStateService.OidcAuthorizationState("abc123", "nonce123", "challenge123", "S256");
+        when(oidcStateService.generateState(httpRequest)).thenReturn(authorizationState);
 
-        ResponseEntity<Map<String, String>> response = controller.generateState();
+        ResponseEntity<OidcStateService.OidcAuthorizationState> response = controller.generateState(httpRequest);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsEntry("state", "abc123");
+        assertThat(response.getBody()).isEqualTo(authorizationState);
     }
 
     @Test
     void handleCallback_validatesStateAndReturnsTokens() {
-        var request = new OidcCallbackRequest("code1", "verifier1", "https://redirect", "nonce1", "state1");
+        var request = new OidcCallbackRequest("code1", "https://redirect", "state1");
         var tokenResponse = ResponseEntity.ok(AccessTokenDto.builder().accessToken("at").refreshToken("rt").build());
+        when(oidcStateService.validateAndConsume("state1", httpRequest))
+                .thenReturn(new OidcStateService.OidcAuthorizationFlow("verifier1", "nonce1"));
         when(oidcAuthService.exchangeCodeForTokens("code1", "verifier1", "https://redirect", "nonce1", httpRequest))
                 .thenReturn(tokenResponse);
 
         ResponseEntity<AccessTokenDto> response = controller.handleCallback(request, httpRequest);
 
-        verify(oidcStateService).validateAndConsume("state1");
+        verify(oidcStateService).validateAndConsume("state1", httpRequest);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getAccessToken()).isEqualTo("at");
@@ -74,8 +76,10 @@ class OidcAuthControllerTest {
 
     @Test
     void handleCallback_auditsOnExceptionAndRethrows() {
-        var request = new OidcCallbackRequest("code1", "verifier1", "https://redirect", "nonce1", "state1");
+        var request = new OidcCallbackRequest("code1", "https://redirect", "state1");
         var exception = new APIException("fail", HttpStatus.INTERNAL_SERVER_ERROR);
+        when(oidcStateService.validateAndConsume("state1", httpRequest))
+                .thenReturn(new OidcStateService.OidcAuthorizationFlow("verifier1", "nonce1"));
         when(oidcAuthService.exchangeCodeForTokens("code1", "verifier1", "https://redirect", "nonce1", httpRequest))
                 .thenThrow(exception);
 
@@ -89,31 +93,35 @@ class OidcAuthControllerTest {
     void handleRedirect_returns302WithFragmentContainingTokens() {
         var tokens = AccessTokenDto.builder().accessToken("at123").refreshToken("rt456").build();
         var tokenResponse = ResponseEntity.ok(tokens);
+        when(oidcStateService.validateAndConsume("state", httpRequest))
+                .thenReturn(new OidcStateService.OidcAuthorizationFlow("verifier", "nonce"));
         when(oidcAuthService.exchangeCodeForTokens("code", "verifier", "https://redir", "nonce", httpRequest))
                 .thenReturn(tokenResponse);
 
         ResponseEntity<Void> response = controller.handleRedirect(
-                "code", "verifier", "https://redir", "nonce", "state", "https://app.example.com", httpRequest);
+                "code", "https://redir", "state", "https://app.example.com", httpRequest);
 
-        verify(oidcStateService).validateAndConsume("state");
+        verify(oidcStateService).validateAndConsume("state", httpRequest);
         verify(oidcAuthService).validateAppRedirectUri("https://app.example.com");
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
 
         String location = response.getHeaders().getLocation().toString();
         assertThat(location).startsWith("https://app.example.com#");
         assertThat(location).contains("access_token=" + URLEncoder.encode("at123", StandardCharsets.UTF_8));
-        assertThat(location).contains("refresh_token=" + URLEncoder.encode("rt456", StandardCharsets.UTF_8));
+        assertThat(location).doesNotContain("refresh_token=");
     }
 
     @Test
     void handleRedirect_includesIsDefaultPasswordInFragmentWhenPresent() {
         var tokens = AccessTokenDto.builder().accessToken("at").refreshToken("rt").isDefaultPassword(true).build();
         var tokenResponse = ResponseEntity.ok(tokens);
+        when(oidcStateService.validateAndConsume("state", httpRequest))
+                .thenReturn(new OidcStateService.OidcAuthorizationFlow("verifier", "nonce"));
         when(oidcAuthService.exchangeCodeForTokens("code", "verifier", "https://redir", "nonce", httpRequest))
                 .thenReturn(tokenResponse);
 
         ResponseEntity<Void> response = controller.handleRedirect(
-                "code", "verifier", "https://redir", "nonce", "state", "https://app.example.com", httpRequest);
+                "code", "https://redir", "state", "https://app.example.com", httpRequest);
 
         String location = response.getHeaders().getLocation().toString();
         assertThat(location).contains("is_default_password=true");
@@ -121,11 +129,13 @@ class OidcAuthControllerTest {
 
     @Test
     void handleRedirect_returns302WithErrorFragmentOnException() {
+        when(oidcStateService.validateAndConsume("state", httpRequest))
+                .thenReturn(new OidcStateService.OidcAuthorizationFlow("verifier", "nonce"));
         when(oidcAuthService.exchangeCodeForTokens("code", "verifier", "https://redir", "nonce", httpRequest))
                 .thenThrow(new APIException("fail", HttpStatus.INTERNAL_SERVER_ERROR));
 
         ResponseEntity<Void> response = controller.handleRedirect(
-                "code", "verifier", "https://redir", "nonce", "state", "https://app.example.com", httpRequest);
+                "code", "https://redir", "state", "https://app.example.com", httpRequest);
 
         verify(auditService).log(eq(AuditAction.OIDC_LOGIN_FAILED), any(String.class));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
@@ -137,11 +147,13 @@ class OidcAuthControllerTest {
     @Test
     void handleRedirect_throwsWhenTokenResponseBodyIsNull() {
         ResponseEntity<AccessTokenDto> tokenResponse = ResponseEntity.ok(null);
+        when(oidcStateService.validateAndConsume("state", httpRequest))
+                .thenReturn(new OidcStateService.OidcAuthorizationFlow("verifier", "nonce"));
         when(oidcAuthService.exchangeCodeForTokens("code", "verifier", "https://redir", "nonce", httpRequest))
                 .thenReturn(tokenResponse);
 
         ResponseEntity<Void> response = controller.handleRedirect(
-                "code", "verifier", "https://redir", "nonce", "state", "https://app.example.com", httpRequest);
+                "code", "https://redir", "state", "https://app.example.com", httpRequest);
 
         verify(auditService).log(eq(AuditAction.OIDC_LOGIN_FAILED), any(String.class));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
@@ -152,13 +164,15 @@ class OidcAuthControllerTest {
     @Test
     void handleMobileCallback_validatesStateAndReturnsTokens() {
         var tokenResponse = ResponseEntity.ok(AccessTokenDto.builder().accessToken("at").refreshToken("rt").build());
+        when(oidcStateService.validateAndConsume("state", httpRequest))
+                .thenReturn(new OidcStateService.OidcAuthorizationFlow("verifier", "nonce"));
         when(oidcAuthService.exchangeCodeForTokens("code", "verifier", "https://redir", "nonce", httpRequest))
                 .thenReturn(tokenResponse);
 
         ResponseEntity<AccessTokenDto> response = controller.handleMobileCallback(
-                "code", "verifier", "https://redir", "nonce", "state", httpRequest);
+                "code", "https://redir", "state", httpRequest);
 
-        verify(oidcStateService).validateAndConsume("state");
+        verify(oidcStateService).validateAndConsume("state", httpRequest);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getAccessToken()).isEqualTo("at");
@@ -167,11 +181,13 @@ class OidcAuthControllerTest {
     @Test
     void handleMobileCallback_auditsOnExceptionAndRethrows() {
         var exception = new APIException("fail", HttpStatus.INTERNAL_SERVER_ERROR);
+        when(oidcStateService.validateAndConsume("state", httpRequest))
+                .thenReturn(new OidcStateService.OidcAuthorizationFlow("verifier", "nonce"));
         when(oidcAuthService.exchangeCodeForTokens("code", "verifier", "https://redir", "nonce", httpRequest))
                 .thenThrow(exception);
 
         assertThatThrownBy(() -> controller.handleMobileCallback(
-                "code", "verifier", "https://redir", "nonce", "state", httpRequest))
+                "code", "https://redir", "state", httpRequest))
                 .isSameAs(exception);
 
         verify(auditService).log(eq(AuditAction.OIDC_LOGIN_FAILED), any(String.class));

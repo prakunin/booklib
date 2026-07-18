@@ -88,7 +88,6 @@ describe('OidcCallbackComponent', () => {
 
   it('redirects to login when the returned state does not match the stored PKCE state', () => {
     oidcService.retrievePkceState.mockReturnValue({
-      codeVerifier: 'verifier',
       nonce: 'nonce',
       state: 'other-state',
     });
@@ -103,7 +102,6 @@ describe('OidcCallbackComponent', () => {
   it('saves tokens and redirects to change-password when the backend flags a default password', () => {
     sessionStorage.setItem('oidc_redirect_count', '2');
     oidcService.retrievePkceState.mockReturnValue({
-      codeVerifier: 'verifier',
       nonce: 'nonce',
       state: 'state-123',
     });
@@ -123,7 +121,6 @@ describe('OidcCallbackComponent', () => {
 
   it('saves tokens and redirects to the dashboard after a successful exchange', () => {
     oidcService.retrievePkceState.mockReturnValue({
-      codeVerifier: 'verifier',
       nonce: 'nonce',
       state: 'state-123',
     });
@@ -141,7 +138,6 @@ describe('OidcCallbackComponent', () => {
 
   it('redirects to login with the backend error message when the exchange fails', () => {
     oidcService.retrievePkceState.mockReturnValue({
-      codeVerifier: 'verifier',
       nonce: 'nonce',
       state: 'state-123',
     });
