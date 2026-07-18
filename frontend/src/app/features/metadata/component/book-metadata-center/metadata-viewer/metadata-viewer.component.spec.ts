@@ -320,16 +320,16 @@ describe('MetadataViewerComponent', () => {
 
     const readItems = component.readMenuItems();
     expect(readItems.map(item => item.separator ? 'separator' : item.label)).toEqual([
-      'metadata.viewer.menuStreamingReader',
+      'metadata.viewer.menuStandardReader',
       'separator',
       'EPUB',
       'PDF',
     ]);
     expect(readItems[0].command).toBeDefined();
     runMenuCommand(readItems[0].command);
-    expect(readBook).toHaveBeenCalledWith(21, 'epub-streaming', undefined);
+    expect(readBook).toHaveBeenCalledWith(21, 'epub-blob', undefined);
     runMenuCommand(readItems[2].items?.[0].command);
-    expect(readBook).toHaveBeenLastCalledWith(21, undefined, 'EPUB');
+    expect(readBook).toHaveBeenLastCalledWith(21, 'epub-blob', 'EPUB');
 
     const downloadItems = component.downloadMenuItems();
     expect(downloadItems.some(item => item.separator)).toBe(true);

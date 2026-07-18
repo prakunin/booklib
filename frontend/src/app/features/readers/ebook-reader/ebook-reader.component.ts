@@ -274,7 +274,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
         this.selectionService.initialize(this.bookId);
         this.headerService.initialize(this.bookId, book.metadata?.title || '');
 
-        const useStreaming = this.route.snapshot.queryParamMap.get('streaming') === 'true';
+        const useStreaming = this.route.snapshot.queryParamMap.get('streaming') !== 'false';
         const loadBook$ = bookType === 'EPUB' && useStreaming
           ? this.viewManager.loadEpubStreaming(this.bookId, this.altBookType)
           : this.loadBookBlob();
