@@ -51,6 +51,7 @@ public class PdfReaderService {
         CachedPdfMetadata metadata = getCachedMetadata(pdfPath);
         String cacheKey = getCacheKey(bookId, bookType, metadata.lastModified);
 
+        chapterCacheService.cleanupStaleCacheDirs(cacheKey);
         Path cacheDir = chapterCacheService.getCachedPage(cacheKey, 1).getParent();
         if (!Files.exists(cacheDir)) {
             Files.createDirectories(cacheDir);
@@ -129,6 +130,7 @@ public class PdfReaderService {
         validatePageRequest(bookId, page, metadata.pageCount);
 
         // Render, cache atomically, then stream
+        chapterCacheService.cleanupStaleCacheDirs(cacheKey);
         Path cached = chapterCacheService.getCachedPage(cacheKey, page);
         Files.createDirectories(cached.getParent());
         byte[] jpeg = renderPageToBytes(pdfPath, page);
