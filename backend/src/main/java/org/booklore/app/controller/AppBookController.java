@@ -41,7 +41,7 @@ public class AppBookController {
 
     @Operation(
             summary = "Get all book IDs matching filters",
-            description = "Return all book IDs that match the given filters without pagination. Useful for bulk selection.",
+            description = "Return a bounded set of book IDs that match the given filters. Useful for bulk selection.",
             operationId = "appGetAllBookIds"
     )
     @GetMapping("/ids")

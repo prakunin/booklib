@@ -66,6 +66,7 @@ public class AppBookService {
 
     private static final int DEFAULT_PAGE_SIZE = 50;
     private static final int MAX_PAGE_SIZE = 50;
+    static final int MAX_SELECT_ALL_BOOK_IDS = 500;
     private static final String DEFAULT_SORT = "addedOn";
     private static final int ISBN_QUERY_BATCH_SIZE = 500;
 
@@ -179,13 +180,17 @@ public class AppBookService {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Long> cq = cb.createQuery(Long.class);
         Root<BookEntity> root = cq.from(BookEntity.class);
-        cq.select(root.get("id"));
+        cq.select(root.get("id"))
+                .distinct(true)
+                .orderBy(cb.asc(root.get("id")));
 
         if (spec != null) {
             cq.where(spec.toPredicate(root, cq, cb));
         }
 
-        return entityManager.createQuery(cq).getResultList();
+        return entityManager.createQuery(cq)
+                .setMaxResults(MAX_SELECT_ALL_BOOK_IDS)
+                .getResultList();
     }
 
     public AppCatalogSummary getCatalogSummary() {
