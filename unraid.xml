@@ -14,7 +14,7 @@
     <Category>MediaApp:Books MediaServer:Books</Category>
     <WebUI>http://[IP]:[PORT:6060]/</WebUI>
     <Icon>https://raw.githubusercontent.com/prakunin/booklib/main/frontend/public/icons/icon-144x144.png</Icon>
-    <ExtraParams>--restart=unless-stopped</ExtraParams>
+    <ExtraParams>--restart=unless-stopped --memory=2g</ExtraParams>
     <PostArgs/>
     <CPUset/>
     <DateInstalled/>
@@ -38,6 +38,7 @@
     <Config Name="API_DOCS_ENABLED" Target="API_DOCS_ENABLED" Default="false" Mode="" Description="Enable public API docs and OpenAPI JSON endpoints." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
     <Config Name="DISK_TYPE" Target="DISK_TYPE" Default="LOCAL" Mode="" Description="Storage type: LOCAL (default) or NETWORK (disables file operations for network-mounted storage)." Type="Variable" Display="advanced" Required="false" Mask="false">LOCAL</Config>
     <Config Name="ALLOWED_ORIGINS" Target="ALLOWED_ORIGINS" Default="*" Mode="" Description="Comma-separated list of allowed cross-origin URLs for CORS (e.g. https://app.example.com). Defaults to '*' (allow all) if unset. Leave empty to restrict to same-origin." Type="Variable" Display="advanced" Required="false" Mask="false">*</Config>
+    <Config Name="JAVA_TOOL_OPTIONS" Target="JAVA_TOOL_OPTIONS" Default="" Mode="" Description="Optional JVM override. The image defaults to -XX:MaxRAMPercentage=60.0; with the template's --memory=2g this allows roughly a 1.2 GB heap. Keep custom -Xmx values below the container memory limit." Type="Variable" Display="advanced" Required="false" Mask="false"/>
     <Config Name="USER_ID" Target="USER_ID" Default="99" Mode="" Description="" Type="Variable" Display="advanced-hide" Required="true" Mask="false">99</Config>
     <Config Name="GROUP_ID" Target="GROUP_ID" Default="100" Mode="" Description="" Type="Variable" Display="advanced-hide" Required="true" Mask="false">100</Config>
     <TailscaleStateDir/>

@@ -16,6 +16,10 @@ services:
     # image: ghcr.io/prakunin/booklib:v0.38.2
     # The image already embeds its own release version metadata.
     container_name: booklib
+    # The JVM uses -XX:MaxRAMPercentage=60.0, so this container limit yields
+    # roughly a 1.2 GB max heap. Without a memory limit, Java sizes the heap
+    # against host RAM instead of a BookLib-specific budget.
+    mem_limit: 2g
     environment:
       - USER_ID=1000
       - GROUP_ID=1000
@@ -26,9 +30,9 @@ services:
       - SWAGGER_ENABLED=false
       - FORCE_DISABLE_OIDC=false
       # ALLOWED_ORIGINS=
-      # Override JVM memory defaults (the image ships sensible defaults for ~512 MB heap).
-      # Uncomment and adjust if you want a tighter or looser cap:
-      # JAVA_TOOL_OPTIONS=-Xmx256m
+      # Optional hard heap override. If set, keep it below mem_limit so native
+      # memory, threads, and file buffers still have headroom.
+      # JAVA_TOOL_OPTIONS=-Xmx1g
     depends_on:
       mariadb:
         condition: service_healthy
