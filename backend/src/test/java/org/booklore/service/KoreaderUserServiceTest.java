@@ -12,8 +12,8 @@ import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.entity.KoreaderUserEntity;
 import org.booklore.repository.KoreaderUserRepository;
 import org.booklore.repository.UserRepository;
+import org.booklore.service.koreader.KoreaderCredentialService;
 import org.booklore.service.koreader.KoreaderUserService;
-import org.booklore.util.Md5Util;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +32,7 @@ class KoreaderUserServiceTest {
     @Mock UserRepository userRepository;
     @Mock KoreaderUserRepository koreaderUserRepository;
     @Mock KoreaderUserMapper koreaderUserMapper;
+    @Mock KoreaderCredentialService koreaderCredentialService;
     @InjectMocks
     KoreaderUserService service;
 
@@ -55,7 +56,7 @@ class KoreaderUserServiceTest {
         entity.setBookLoreUser(ownerEntity);
         entity.setUsername("kvUser");
 
-        dto = new KoreaderUser(10L, "kvUser", null, null, false, true);
+        dto = new KoreaderUser(10L, "kvUser", false, true);
         when(koreaderUserMapper.toDto(any(KoreaderUserEntity.class))).thenReturn(dto);
     }
 
@@ -63,6 +64,7 @@ class KoreaderUserServiceTest {
     void upsertUser_createsNew_whenAbsent() {
         when(userRepository.findById(123L)).thenReturn(Optional.of(ownerEntity));
         when(koreaderUserRepository.findByBookLoreUserId(123L)).thenReturn(Optional.empty());
+        when(koreaderCredentialService.hashRawPassword("passA")).thenReturn("hashed-passA");
         when(koreaderUserRepository.save(any(KoreaderUserEntity.class))).thenAnswer(invocation -> {
             KoreaderUserEntity arg = invocation.getArgument(0);
             arg.setId(42L);
@@ -71,7 +73,7 @@ class KoreaderUserServiceTest {
 
         when(koreaderUserMapper.toDto(any(KoreaderUserEntity.class))).thenAnswer(invocation -> {
             KoreaderUserEntity u = invocation.getArgument(0);
-            return new KoreaderUser(u.getId(), u.getUsername(), u.getPassword(), u.getPasswordMD5(), u.isSyncEnabled(), u.isSyncWithWebReader());
+            return new KoreaderUser(u.getId(), u.getUsername(), u.isSyncEnabled(), u.isSyncWithWebReader());
         });
 
         KoreaderUser result = service.upsertUser("userA", "passA");
@@ -81,7 +83,7 @@ class KoreaderUserServiceTest {
         verify(koreaderUserRepository).save(argThat(u ->
             u.getBookLoreUser() == ownerEntity &&
             u.getUsername().equals("userA") &&
-            u.getPasswordMD5().equals(Md5Util.md5Hex("passA"))
+            u.getPasswordHash().equals("hashed-passA")
         ));
     }
 
@@ -89,6 +91,7 @@ class KoreaderUserServiceTest {
     void upsertUser_updatesExisting_whenPresent() {
         when(userRepository.findById(123L)).thenReturn(Optional.of(ownerEntity));
         when(koreaderUserRepository.findByBookLoreUserId(123L)).thenReturn(Optional.of(entity));
+        when(koreaderCredentialService.hashRawPassword("newPass")).thenReturn("hashed-newPass");
         when(koreaderUserRepository.save(entity)).thenReturn(entity);
 
         KoreaderUser result = service.upsertUser("newName", "newPass");
@@ -96,7 +99,7 @@ class KoreaderUserServiceTest {
         assertEquals(dto, result);
         verify(koreaderUserRepository).save(entity);
         assertEquals("newName", entity.getUsername());
-        assertEquals(Md5Util.md5Hex("newPass"), entity.getPasswordMD5());
+        assertEquals("hashed-newPass", entity.getPasswordHash());
     }
 
     @Test

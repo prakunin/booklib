@@ -10,7 +10,6 @@ import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.entity.KoreaderUserEntity;
 import org.booklore.repository.KoreaderUserRepository;
 import org.booklore.repository.UserRepository;
-import org.booklore.util.Md5Util;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +24,7 @@ public class KoreaderUserService {
     private final UserRepository userRepository;
     private final KoreaderUserRepository koreaderUserRepository;
     private final KoreaderUserMapper koreaderUserMapper;
+    private final KoreaderCredentialService koreaderCredentialService;
 
     @Transactional
     public KoreaderUser upsertUser(String username, String rawPassword) {
@@ -32,7 +32,6 @@ public class KoreaderUserService {
         BookLoreUserEntity owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> ApiError.USER_NOT_FOUND.createException(ownerId));
 
-        String md5Password = Md5Util.md5Hex(rawPassword);
         Optional<KoreaderUserEntity> existing = koreaderUserRepository.findByBookLoreUserId(ownerId);
         boolean isUpdate = existing.isPresent();
         KoreaderUserEntity user = existing.orElseGet(() -> {
@@ -42,8 +41,7 @@ public class KoreaderUserService {
         });
 
         user.setUsername(username);
-        user.setPassword(rawPassword);
-        user.setPasswordMD5(md5Password);
+        user.setPasswordHash(koreaderCredentialService.hashRawPassword(rawPassword));
         KoreaderUserEntity saved = koreaderUserRepository.save(user);
 
         log.info("upsertUser: {} KoreaderUser [id={}, username='{}'] for BookLoreUser='{}'",

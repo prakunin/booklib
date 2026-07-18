@@ -21,6 +21,7 @@ import org.booklore.repository.UserBookProgressRepository;
 import org.booklore.repository.UserRepository;
 import org.booklore.repository.KoreaderUserRepository;
 import org.booklore.service.hardcover.HardcoverSyncService;
+import org.booklore.service.koreader.KoreaderCredentialService;
 import org.booklore.service.koreader.KoreaderService;
 import org.booklore.util.koreader.EpubCfiService;
 import org.junit.jupiter.api.*;
@@ -58,6 +59,8 @@ class KoreaderServiceTest {
     HardcoverSyncService hardcoverSyncService;
     @Mock
     EpubCfiService epubCfiService;
+    @Mock
+    KoreaderCredentialService koreaderCredentialService;
 
     @InjectMocks
     KoreaderService service;
@@ -86,14 +89,33 @@ class KoreaderServiceTest {
     @Test
     void authorizeUser_success() {
         var userEntity = new KoreaderUserEntity();
-        userEntity.setPasswordMD5("MD5PWD");
+        userEntity.setPasswordHash("HASH");
         when(koreaderUserRepo.findByUsername("u"))
                 .thenReturn(Optional.of(userEntity));
         when(details.getPassword()).thenReturn("MD5PWD");
+        when(koreaderCredentialService.matches("MD5PWD", "HASH")).thenReturn(true);
 
         ResponseEntity<Map<String, String>> resp = service.authorizeUser();
         assertEquals(200, resp.getStatusCode().value());
         assertEquals("u", resp.getBody().get("username"));
+    }
+
+    @Test
+    void authorizeUser_upgradesLegacyMd5Hash() {
+        String legacyKey = "0123456789abcdef0123456789abcdef";
+        var userEntity = new KoreaderUserEntity();
+        userEntity.setPasswordHash(legacyKey);
+        when(koreaderUserRepo.findByUsername("u"))
+                .thenReturn(Optional.of(userEntity));
+        when(details.getPassword()).thenReturn(legacyKey);
+        when(koreaderCredentialService.matches(legacyKey, legacyKey)).thenReturn(true);
+        when(koreaderCredentialService.isLegacyMd5Hash(legacyKey)).thenReturn(true);
+        when(koreaderCredentialService.hashWireKey(legacyKey)).thenReturn("bcrypt-hash");
+
+        service.authorizeUser();
+
+        assertEquals("bcrypt-hash", userEntity.getPasswordHash());
+        verify(koreaderUserRepo).save(userEntity);
     }
 
     @Test
@@ -106,9 +128,10 @@ class KoreaderServiceTest {
     @Test
     void authorizeUser_badPassword() {
         var userEntity = new KoreaderUserEntity();
-        userEntity.setPasswordMD5("OTHER");
+        userEntity.setPasswordHash("HASH");
         when(koreaderUserRepo.findByUsername("u"))
                 .thenReturn(Optional.of(userEntity));
+        when(koreaderCredentialService.matches("md5pwd", "HASH")).thenReturn(false);
         assertThrows(APIException.class, () -> service.authorizeUser());
     }
 

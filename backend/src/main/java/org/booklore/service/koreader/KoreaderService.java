@@ -33,6 +33,7 @@ public class KoreaderService {
     private final KoreaderUserRepository koreaderUserRepository;
     private final HardcoverSyncService hardcoverSyncService;
     private final EpubCfiService epubCfiService;
+    private final KoreaderCredentialService koreaderCredentialService;
 
     public ResponseEntity<Map<String, String>> authorizeUser() {
         KoreaderUserDetails authDetails = getAuthDetails();
@@ -248,10 +249,13 @@ public class KoreaderService {
     }
 
     private void validatePassword(KoreaderUserEntity koreaderUser, KoreaderUserDetails authDetails) {
-        if (koreaderUser.getPasswordMD5() == null ||
-                !koreaderUser.getPasswordMD5().equalsIgnoreCase(authDetails.getPassword())) {
+        if (!koreaderCredentialService.matches(authDetails.getPassword(), koreaderUser.getPasswordHash())) {
             log.warn("Password mismatch for user '{}'", authDetails.getUsername());
             throw ApiError.GENERIC_UNAUTHORIZED.createException("Invalid credentials");
+        }
+        if (koreaderCredentialService.isLegacyMd5Hash(koreaderUser.getPasswordHash())) {
+            koreaderUser.setPasswordHash(koreaderCredentialService.hashWireKey(authDetails.getPassword()));
+            koreaderUserRepository.save(koreaderUser);
         }
     }
 

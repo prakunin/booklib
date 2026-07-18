@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.booklore.service.koreader.KoreaderCredentialService;
 import org.springframework.boot.web.servlet.FilterRegistration;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -17,8 +18,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -28,6 +27,7 @@ import java.util.List;
 public class KoreaderAuthFilter extends OncePerRequestFilter {
 
     private final KoreaderUserRepository koreaderUserRepository;
+    private final KoreaderCredentialService koreaderCredentialService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
@@ -47,19 +47,14 @@ public class KoreaderAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        try {
-            byte[] expectedMD5Bytes = HexFormat.of().parseHex(user.getPasswordMD5());
-            byte[] actualMD5Bytes = HexFormat.of().parseHex(key);
-
-            if (!MessageDigest.isEqual(expectedMD5Bytes, actualMD5Bytes)) {
-                log.info("KOReader user password not match");
-                chain.doFilter(request, response);
-                return;
-            }
-        } catch (IllegalArgumentException e) {
-            log.info("Problem comparing Koreader md5 checksums: {}", e.getMessage());
+        if (!koreaderCredentialService.matches(key, user.getPasswordHash())) {
+            log.info("KOReader user password not match");
             chain.doFilter(request, response);
             return;
+        }
+        if (koreaderCredentialService.isLegacyMd5Hash(user.getPasswordHash())) {
+            user.setPasswordHash(koreaderCredentialService.hashWireKey(key));
+            koreaderUserRepository.save(user);
         }
 
         Long bookLoreUserId = null;
@@ -69,7 +64,7 @@ public class KoreaderAuthFilter extends OncePerRequestFilter {
 
         UserDetails userDetails = new KoreaderUserDetails(
                 user.getUsername(),
-                user.getPasswordMD5(),
+                key,
                 user.isSyncEnabled(),
                 user.isSyncWithWebReader(),
                 bookLoreUserId,
