@@ -28,6 +28,7 @@ import { ReadingSessionService } from '../../../shared/service/reading-session.s
 import { WakeLockService } from '../../../shared/service/wake-lock.service';
 import { Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import {ReaderFullscreenService} from '../shared/reader-fullscreen.service';
 
 type EmbedPdfMessage =
   | { type: 'ready' }
@@ -190,6 +191,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   private localSettingsService = inject(LocalSettingsService);
   private readonly t = inject(TranslocoService);
   private wakeLockService = inject(WakeLockService);
+  private fullscreenService = inject(ReaderFullscreenService);
   readonly embedPdfBook = inject(EmbedPdfBookService);
   readonly pdfBookmarkService = inject(PdfBookmarkService);
   private readonly ngZone = inject(NgZone);
@@ -1427,15 +1429,11 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   // --- Fullscreen ---
 
   toggleFullscreen(): void {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.();
-    } else {
-      document.exitFullscreen?.();
-    }
+    this.fullscreenService.toggle();
   }
 
   private onFullscreenChange = (): void => {
-    this.isFullscreen.set(!!document.fullscreenElement);
+    this.isFullscreen.set(this.fullscreenService.isFullscreen());
   };
 
   // --- Footer page navigation ---

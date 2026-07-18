@@ -41,6 +41,7 @@ import {
 } from './core/cbx-reader-storage';
 import {computeCbxSpreads, findCbxSpreadForPage} from './core/cbx-spread.util';
 import {CbxSlideshowController} from './core/cbx-slideshow-controller';
+import {ReaderFullscreenService} from '../shared/reader-fullscreen.service';
 
 
 @Component({
@@ -232,6 +233,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   private pageDimensionService = inject(CbxPageDimensionService);
   private wakeLockService = inject(WakeLockService);
   private readerPreferencesService = inject(ReaderPreferencesService);
+  private fullscreenService = inject(ReaderFullscreenService);
   private slideshowController = new CbxSlideshowController({
     canAdvance: () => this.currentPage() < this.pages().length - 1,
     advance: () => this.advancePage(1),
@@ -1817,7 +1819,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   @HostListener('document:fullscreenchange')
   onFullscreenChange(): void {
     const target = this.readerRootRef()?.nativeElement ?? document.documentElement;
-    this.isFullscreen.set(document.fullscreenElement === target);
+    this.isFullscreen.set(this.fullscreenService.isFullscreen(target));
     this.headerService.updateState({ isFullscreen: this.isFullscreen(), isSlideshowActive: this.isSlideshowActive() });
   }
 
@@ -2001,15 +2003,11 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
   private enterFullscreen(): void {
     const elem = this.readerRootRef()?.nativeElement ?? document.documentElement;
-    if (elem.requestFullscreen) {
-      void elem.requestFullscreen().catch(() => undefined);
-    }
+    this.fullscreenService.enter(elem);
   }
 
   private exitFullscreen(): void {
-    if (document.exitFullscreen) {
-      void document.exitFullscreen().catch(() => undefined);
-    }
+    this.fullscreenService.exit();
   }
 
   // Reading direction methods
