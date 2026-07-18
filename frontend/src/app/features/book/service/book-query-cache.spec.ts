@@ -177,6 +177,20 @@ describe('book-query-cache', () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: ['app-filter-options']});
   });
 
+  it('does not fabricate the legacy list from patch or remove helpers when it is not cached', () => {
+    patchBooksInCache(queryClient, [makeBook(1, {libraryName: 'Updated Library'})]);
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toBeUndefined();
+
+    patchBookMetadataInCache(queryClient, 1, {bookId: 1, title: 'Updated'});
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toBeUndefined();
+
+    patchBookInCacheWith(queryClient, 1, book => ({...book, libraryName: 'Updated Library'}));
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toBeUndefined();
+
+    removeBooksFromCache(queryClient, [1]);
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toBeUndefined();
+  });
+
   it('removes detail and recommendation queries for deleted books', () => {
     const firstBook = makeBook(1);
     const secondBook = makeBook(2);

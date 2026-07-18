@@ -326,6 +326,14 @@ describe('BookService', () => {
     ]);
   });
 
+  it('does not fabricate the books query cache when removing a shelf before it is cached', () => {
+    setup();
+
+    service.removeBooksFromShelf(10);
+
+    expect(queryClientHarness.queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toBeUndefined();
+  });
+
   it('removes the books query cache when the auth token is cleared', async () => {
     setup();
 

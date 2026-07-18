@@ -159,6 +159,12 @@ describe('BookSocketService', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({queryKey: ['books', 'detail', 3]});
   });
 
+  it('does not fabricate the books query cache when cover patches arrive before it is cached', () => {
+    service.handleMultipleBookCoverPatches([{id: 3, coverUpdatedOn: '2026-03-26T12:34:00Z'}]);
+
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toBeUndefined();
+  });
+
   it('invalidates recommendations when queued computation completes', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 

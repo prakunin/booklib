@@ -97,12 +97,12 @@ export class BookSocketService {
     if (!patches || patches.length === 0) return;
     const patchMap = new Map(patches.map(p => [p.id, p.coverUpdatedOn]));
     this.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-      (current ?? []).map(book => {
+      current?.map(book => {
         const coverUpdatedOn = patchMap.get(book.id);
         return coverUpdatedOn && book.metadata
           ? {...book, metadata: {...book.metadata, coverUpdatedOn}}
           : book;
-      })
+      }) ?? current
     );
     patchAppBooksCoverInCache(this.queryClient, patches);
     invalidateBookDetailQueries(this.queryClient, patches.map(p => p.id));
