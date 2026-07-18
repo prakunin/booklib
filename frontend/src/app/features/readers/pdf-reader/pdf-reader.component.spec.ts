@@ -1,9 +1,10 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 
 import {PdfReaderComponent} from './pdf-reader.component';
 
 interface PdfReaderHarness {
-  embedPdfIframe: {contentWindow: {postMessage: ReturnType<typeof vi.fn>}} | null;
+  embedPdfIframe: {contentWindow: {postMessage: Mock<(message: unknown, targetOrigin: string) => void>}} | null;
+  pdfEmbedBridge: {post: ReturnType<typeof vi.fn>};
   embedPdfSaveResolve?: (buffer: ArrayBuffer | null) => void;
   pdfBlobUrl: string | null;
   authService: {getInternalAccessToken: () => string | null};
@@ -20,6 +21,12 @@ function makeComponent(savedBuffer: ArrayBuffer): PdfReaderHarness {
         setTimeout(() => component.embedPdfSaveResolve?.(savedBuffer.slice(0)));
       })
     }
+  };
+  component.pdfEmbedBridge = {
+    post: vi.fn((iframe: PdfReaderHarness['embedPdfIframe'], message: unknown) => {
+      iframe?.contentWindow.postMessage(message, location.origin);
+      return true;
+    })
   };
   component.pdfBlobUrl = 'blob:old-pdf';
   component.authService = {getInternalAccessToken: () => null};
