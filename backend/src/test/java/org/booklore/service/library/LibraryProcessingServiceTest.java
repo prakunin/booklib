@@ -1,6 +1,5 @@
 package org.booklore.service.library;
 
-import jakarta.persistence.EntityManager;
 import org.booklore.exception.APIException;
 import org.booklore.model.dto.settings.LibraryFile;
 import org.booklore.model.entity.BookEntity;
@@ -22,11 +21,11 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -62,9 +61,7 @@ class LibraryProcessingServiceTest {
     @Mock
     private InpxLibraryScanner inpxLibraryScanner;
     @Mock
-    private EntityManager entityManager;
-    @Mock
-    private PlatformTransactionManager transactionManager;
+    private BookFileAutoAttacher bookFileAutoAttacher;
 
     private LibraryProcessingService libraryProcessingService;
 
@@ -81,10 +78,28 @@ class LibraryProcessingServiceTest {
                 libraryFileHelper,
                 bookGroupingService,
                 bookCoverGenerator,
-                inpxLibraryScanner,
-                entityManager,
-                transactionManager
+                bookFileAutoAttacher,
+                inpxLibraryScanner
         );
+    }
+
+    @Test
+    void scanEntrypoints_shouldNotWrapLongScansInTransactions() throws NoSuchMethodException {
+        Method processLibrary = LibraryProcessingService.class.getMethod("processLibrary", long.class);
+        Method rescanLibrary = LibraryProcessingService.class.getMethod("rescanLibrary", RescanLibraryContext.class);
+
+        assertThat(processLibrary.getAnnotation(Transactional.class)).isNull();
+        assertThat(rescanLibrary.getAnnotation(Transactional.class)).isNull();
+        assertThat(LibraryProcessingService.class.getAnnotation(Transactional.class)).isNull();
+    }
+
+    @Test
+    void autoAttachWrite_shouldUseBoundedRequiresNewTransaction() throws NoSuchMethodException {
+        Method attach = BookFileAutoAttacher.class.getMethod("attach", Long.class, LibraryFile.class, String.class, Long.class);
+
+        Transactional transactional = attach.getAnnotation(Transactional.class);
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
     }
 
     @Test
@@ -160,8 +175,6 @@ class LibraryProcessingServiceTest {
                 .inpxPath("/path/to/index.inpx")
                 .build();
         when(libraryRepository.findByIdWithPaths(libraryId)).thenReturn(Optional.of(library));
-        TransactionStatus status = mock(TransactionStatus.class);
-        when(transactionManager.getTransaction(any())).thenReturn(status);
 
         libraryProcessingService.rescanLibrary(
                 RescanLibraryContext.builder().libraryId(libraryId).build());
@@ -171,11 +184,7 @@ class LibraryProcessingServiceTest {
     }
 
     @Test
-    void scanInpxLibrary_suspendsTheEnclosingTransactionForTheDurationOfTheScan() throws IOException {
-        // processLibrary/rescanLibrary are @Transactional and are the only callers of the INPX
-        // scan, which can run for hours. Previously that transaction (and its pooled connection
-        // and InnoDB read view) stayed open for the whole scan. The scan must instead run with
-        // PROPAGATION_NOT_SUPPORTED so the enclosing transaction is suspended while it runs.
+    void scanInpxLibrary_runsDirectlyWithoutAServiceLevelTransaction() {
         long libraryId = 51L;
         LibraryEntity library = LibraryEntity.builder()
                 .id(libraryId)
@@ -184,16 +193,10 @@ class LibraryProcessingServiceTest {
                 .inpxPath("/path/to/index.inpx")
                 .build();
         when(libraryRepository.findByIdWithPaths(libraryId)).thenReturn(Optional.of(library));
-        TransactionStatus status = mock(TransactionStatus.class);
-        ArgumentCaptor<TransactionDefinition> definitionCaptor = ArgumentCaptor.forClass(TransactionDefinition.class);
-        when(transactionManager.getTransaction(definitionCaptor.capture())).thenReturn(status);
 
         libraryProcessingService.processLibrary(libraryId);
 
         verify(inpxLibraryScanner).scan(libraryId);
-        assertThat(definitionCaptor.getValue().getPropagationBehavior())
-                .isEqualTo(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
-        verify(transactionManager).commit(status);
     }
 
     @Test
@@ -627,7 +630,7 @@ class LibraryProcessingServiceTest {
     }
 
     @Test
-    void rescanLibrary_shouldRefetchLibraryAfterEntityManagerClear(@TempDir Path tempDir) throws IOException {
+    void rescanLibrary_shouldRefetchLibraryAfterBoundedWriteServices(@TempDir Path tempDir) throws IOException {
 
         long libraryId = 1L;
         Path accessiblePath = tempDir.resolve("accessible");

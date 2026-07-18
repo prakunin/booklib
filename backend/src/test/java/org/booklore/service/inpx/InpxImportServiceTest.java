@@ -13,8 +13,10 @@ import org.booklore.repository.LibraryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +51,14 @@ class InpxImportServiceTest {
         libraryAccessGuard = mock(LibraryAccessGuard.class);
         inpxSourceResolver = mock(InpxSourceResolver.class);
         service = new InpxImportService(new InpxParser(), libraryRepository, libraryAccessGuard, inpxSourceResolver);
+    }
+
+    @Test
+    void importBooks_isNotTransactional() throws NoSuchMethodException {
+        Method importBooks = InpxImportService.class.getMethod("importBooks", long.class, InpxImportRequest.class);
+
+        assertThat(importBooks.getAnnotation(Transactional.class)).isNull();
+        assertThat(InpxImportService.class.getAnnotation(Transactional.class)).isNull();
     }
 
     @Test
@@ -108,7 +118,7 @@ class InpxImportServiceTest {
                 .path(destination.toString())
                 .build();
         library.getLibraryPaths().add(libraryPath);
-        when(libraryRepository.findById(7L)).thenReturn(Optional.of(library));
+        when(libraryRepository.findByIdWithPaths(7L)).thenReturn(Optional.of(library));
     }
 
     private void givenResolvedSource(Path index, Path source) {
