@@ -106,6 +106,7 @@ public class KomgaService {
         
         // Check if we should group unknown series
         boolean groupUnknown = appSettingService.getAppSettings().isKomgaGroupUnknown();
+        String unknownSeriesName = komgaMapper.getUnknownSeriesName();
         
         // Get distinct series names directly from database (MUCH faster than loading all books)
         List<String> sortedSeriesNames;
@@ -113,10 +114,10 @@ public class KomgaService {
             // Use optimized query that groups books without series as "Unknown Series"
             if (libraryId != null) {
                 sortedSeriesNames = bookRepository.findDistinctSeriesNamesGroupedByLibraryId(
-                    libraryId, komgaMapper.getUnknownSeriesName());
+                    libraryId, unknownSeriesName);
             } else {
                 sortedSeriesNames = bookRepository.findDistinctSeriesNamesGrouped(
-                    komgaMapper.getUnknownSeriesName());
+                    unknownSeriesName);
             }
         } else {
             // Use query that gives each book without series its own entry
@@ -151,30 +152,12 @@ public class KomgaService {
             actualSize = size;
         }
         
-        // Now load books only for the series on this page (optimized - only loads what's needed)
+        Map<String, List<BookEntity>> booksBySeriesName = groupBooksBySeriesName(
+                findBooksForSeriesNames(pageSeriesNames, libraryId, groupUnknown, unknownSeriesName));
         List<KomgaSeriesDto> content = new ArrayList<>();
         for (String seriesName : pageSeriesNames) {
             try {
-                // Load only the books for this specific series
-                List<BookEntity> seriesBooks;
-                if (libraryId != null) {
-                    if (groupUnknown) {
-                        seriesBooks = bookRepository.findBooksBySeriesNameGroupedByLibraryId(
-                            seriesName, libraryId, komgaMapper.getUnknownSeriesName());
-                    } else {
-                        seriesBooks = bookRepository.findBooksBySeriesNameUngroupedByLibraryId(
-                            seriesName, libraryId);
-                    }
-                } else {
-                    // For all libraries without library filter
-                    if (groupUnknown) {
-                        seriesBooks = bookRepository.findBooksBySeriesNameGrouped(
-                            seriesName, komgaMapper.getUnknownSeriesName());
-                    } else {
-                        seriesBooks = bookRepository.findBooksBySeriesNameUngrouped(seriesName);
-                    }
-                }
-                
+                List<BookEntity> seriesBooks = booksBySeriesName.getOrDefault(seriesName, List.of());
                 if (!seriesBooks.isEmpty()) {
                     Long libId = seriesBooks.getFirst().getLibrary().getId();
                     KomgaSeriesDto seriesDto = komgaMapper.toKomgaSeriesDto(seriesName, libId, seriesBooks);
@@ -200,6 +183,34 @@ public class KomgaService {
                 .last(totalElements == 0 || actualPage >= totalPages - 1)
                 .empty(content.isEmpty())
                 .build();
+    }
+
+    private List<BookEntity> findBooksForSeriesNames(
+            List<String> seriesNames, Long libraryId, boolean groupUnknown, String unknownSeriesName) {
+        if (seriesNames.isEmpty()) {
+            return List.of();
+        }
+        if (libraryId != null) {
+            return groupUnknown
+                    ? bookRepository.findBooksBySeriesNamesGroupedByLibraryId(
+                            seriesNames, libraryId, unknownSeriesName, seriesNames.contains(unknownSeriesName))
+                    : bookRepository.findBooksBySeriesNamesUngroupedByLibraryId(seriesNames, libraryId);
+        }
+        return groupUnknown
+                ? bookRepository.findBooksBySeriesNamesGrouped(
+                        seriesNames, unknownSeriesName, seriesNames.contains(unknownSeriesName))
+                : bookRepository.findBooksBySeriesNamesUngrouped(seriesNames);
+    }
+
+    private Map<String, List<BookEntity>> groupBooksBySeriesName(List<BookEntity> books) {
+        Map<String, List<BookEntity>> booksBySeriesName = new LinkedHashMap<>();
+        for (BookEntity book : books) {
+            String seriesName = komgaMapper.getBookSeriesName(book);
+            if (seriesName != null) {
+                booksBySeriesName.computeIfAbsent(seriesName, ignored -> new ArrayList<>()).add(book);
+            }
+        }
+        return booksBySeriesName;
     }
 
     public KomgaSeriesDto getSeriesById(String seriesId) {
