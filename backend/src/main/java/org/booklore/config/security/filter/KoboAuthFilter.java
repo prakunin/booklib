@@ -11,9 +11,9 @@ import org.booklore.config.security.userdetails.UserAuthenticationDetails;
 import org.booklore.exception.APIException;
 import org.booklore.mapper.custom.BookLoreUserTransformer;
 import org.booklore.model.dto.BookLoreUser;
-import org.booklore.model.entity.UserPermissionsEntity;
 import org.booklore.repository.KoboUserSettingsRepository;
 import org.booklore.repository.UserRepository;
+import org.booklore.service.kobo.KoboTokenService;
 import org.springframework.boot.web.servlet.FilterRegistration;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
@@ -23,7 +23,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -38,6 +37,7 @@ public class KoboAuthFilter extends OncePerRequestFilter {
     private final UserRepository userRepository;
     private final BookLoreUserTransformer bookLoreUserTransformer;
     private final AuthRateLimitService authRateLimitService;
+    private final KoboTokenService koboTokenService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -55,13 +55,13 @@ public class KoboAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        String token = parts[3];
+        String token = resolveToken(request, parts);
         if (isRateLimited(response, ip, token)) {
             return;
         }
 
-        var userTokenOpt = koboUserSettingsRepository.findByToken(token);
-        if (userTokenOpt.isEmpty()) {
+        var userTokenOpt = koboUserSettingsRepository.findByTokenHash(koboTokenService.hashToken(token));
+        if (userTokenOpt.isEmpty() || koboTokenService.isExpired(userTokenOpt.get().getTokenExpiresAt())) {
             log.warn("Invalid KOBO token");
             recordFailedAttempt(ip, token);
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid KOBO token");
@@ -86,7 +86,7 @@ public class KoboAuthFilter extends OncePerRequestFilter {
         }
 
         BookLoreUser user = bookLoreUserTransformer.toDTO(entity);
-        List<GrantedAuthority> authorities = getAuthorities(entity.getPermissions());
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_SYNC_KOBO"));
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(user, null, authorities);
         authentication.setDetails(new UserAuthenticationDetails(request, user.getId()));
         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -96,23 +96,12 @@ public class KoboAuthFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private List<GrantedAuthority> getAuthorities(UserPermissionsEntity permissions) {
-        List<GrantedAuthority> authorities = new ArrayList<>();
-        if (permissions != null) {
-            addAuthorityIfPermissionGranted(authorities, "ROLE_UPLOAD", permissions.isPermissionUpload());
-            addAuthorityIfPermissionGranted(authorities, "ROLE_DOWNLOAD", permissions.isPermissionDownload());
-            addAuthorityIfPermissionGranted(authorities, "ROLE_EDIT_METADATA", permissions.isPermissionEditMetadata());
-            addAuthorityIfPermissionGranted(authorities, "ROLE_MANAGE_LIBRARY", permissions.isPermissionManageLibrary());
-            addAuthorityIfPermissionGranted(authorities, "ROLE_ADMIN", permissions.isPermissionAdmin());
-            addAuthorityIfPermissionGranted(authorities, "ROLE_SYNC_KOBO", permissions.isPermissionSyncKobo());
+    private String resolveToken(HttpServletRequest request, String[] pathParts) {
+        String headerToken = request.getHeader(KoboTokenService.HEADER_NAME);
+        if (headerToken != null && !headerToken.isBlank()) {
+            return headerToken;
         }
-        return authorities;
-    }
-
-    private void addAuthorityIfPermissionGranted(List<GrantedAuthority> authorities, String role, boolean permissionGranted) {
-        if (permissionGranted) {
-            authorities.add(new SimpleGrantedAuthority(role));
-        }
+        return pathParts[3];
     }
 
     private boolean isRateLimited(HttpServletResponse response, String ip, String token) throws IOException {
