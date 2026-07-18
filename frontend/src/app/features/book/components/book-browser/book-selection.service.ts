@@ -15,10 +15,15 @@ export class BookSelectionService {
   readonly selectedCount = computed(() => this._selectedBooks().size);
 
   private currentBooks: Book[] = [];
+  // Global index of currentBooks[0]. Non-zero once the paginated list evicts earlier pages
+  // (maxPages), so currentBooks is a sliding window rather than a prefix from index 0. Checkbox
+  // events carry the global virtual index, which must be offset by this to hit the right entry.
+  private currentBooksOffset = 0;
   private lastSelectedIndex: number | null = null;
 
-  setCurrentBooks(books: Book[]): void {
+  setCurrentBooks(books: Book[], firstLoadedIndex = 0): void {
     this.currentBooks = books;
+    this.currentBooksOffset = firstLoadedIndex;
   }
 
   getSelectableBookIds(book: Book): number[] {
@@ -61,7 +66,10 @@ export class BookSelectionService {
       const isUnselectingRange = !selected;
 
       for (let i = start; i <= end; i++) {
-        const rangeBook = this.currentBooks[i];
+        // start/end are global virtual indices; map into the loaded window. Books outside the
+        // retained window (e.g. a range spanning pages evicted after a deep scroll) resolve to
+        // undefined and are skipped.
+        const rangeBook = this.currentBooks[i - this.currentBooksOffset];
         if (!rangeBook) continue;
         this.handleBookSelection(rangeBook, !isUnselectingRange);
       }

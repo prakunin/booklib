@@ -1,10 +1,11 @@
 import {HttpTestingController} from '@angular/common/http/testing';
 import {TestBed} from '@angular/core/testing';
+import {InfiniteData, QueryClient} from '@tanstack/angular-query-experimental';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 
-import {createAuthServiceStub, createQueryClientHarness} from '../../../core/testing/query-testing';
+import {createAuthServiceStub, createQueryClientHarness, flushSignalAndQueryEffects} from '../../../core/testing/query-testing';
 import {AuthService} from '../../../shared/service/auth.service';
-import {AppBookSummary} from '../model/app-book.model';
+import {AppBookSummary, AppPageResponse} from '../model/app-book.model';
 import {AppBooksApiService} from './app-books-api.service';
 
 function summary(id: number): AppBookSummary {
@@ -124,5 +125,29 @@ describe('AppBooksApiService', () => {
     }]);
 
     expect(titles).toEqual(['Dune']);
+  });
+
+  it('windows the loaded range from the first retained page so callers can offset virtual indices', () => {
+    // With maxPages, earlier pages are evicted as the user scrolls down, so the accumulated
+    // books() array is a sliding window rather than a prefix from index 0. Simulate a window
+    // whose first retained page is page 3 (books 150..).
+    const queryClient = TestBed.inject(QueryClient);
+    const page: AppPageResponse<AppBookSummary> = {
+      content: [summary(151), summary(152)],
+      page: 3,
+      size: 50,
+      totalElements: 2000,
+      totalPages: 40,
+      hasNext: true,
+      hasPrevious: true,
+    };
+    const data: InfiniteData<AppPageResponse<AppBookSummary>> = {pages: [page], pageParams: [3]};
+
+    // Key mirrors booksQuery's default filters/sort/search so the observer adopts this data.
+    queryClient.setQueryData(['app-books', {}, {field: 'addedOn', dir: 'desc'}, ''], data);
+    flushSignalAndQueryEffects();
+
+    expect(service.firstLoadedIndex()).toBe(150);
+    expect(service.books().map(book => book.id)).toEqual([151, 152]);
   });
 });

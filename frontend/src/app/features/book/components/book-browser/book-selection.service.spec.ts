@@ -58,6 +58,20 @@ describe('BookSelectionService', () => {
     expect(service.selectedBooks()).toEqual(new Set());
   });
 
+  it('maps shift-click range selection through the loaded-window offset', () => {
+    // After maxPages evicts earlier pages the loaded list is a window: books 100..103 sit at global
+    // virtual indices 100..103, so checkbox events (which carry the global index) must be offset.
+    const windowBooks = [makeBook(100), makeBook(101), makeBook(102), makeBook(103)];
+    service.setCurrentBooks(windowBooks, 100);
+
+    service.handleCheckboxClick({index: 100, book: windowBooks[0], selected: true, shiftKey: false});
+    expect(service.selectedBooks()).toEqual(new Set([100]));
+
+    // Shift-click the book at global index 102 selects the in-window range 100..102.
+    service.handleCheckboxClick({index: 102, book: windowBooks[2], selected: true, shiftKey: true});
+    expect(service.selectedBooks()).toEqual(new Set([100, 101, 102]));
+  });
+
   it('selects all current books, resets selection, and clones selected ids', () => {
     expect(() => service.selectAll()).not.toThrow();
 

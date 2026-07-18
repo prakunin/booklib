@@ -44,7 +44,7 @@
 
       <div class="book-table-body" [style.height.px]="rowVirtualizer.getTotalSize()">
         @for (virtualRow of rowVirtualizer.getVirtualItems(); track virtualRow.key) {
-          @if (books()[virtualRow.index]; as book) {
+          @if (books()[virtualRow.index - firstLoadedIndex()]; as book) {
             <app-book-table-row
               [book]="book"
               [cellIds]="visibleCellIds()"

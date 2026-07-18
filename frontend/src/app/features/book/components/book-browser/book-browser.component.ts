@@ -41,8 +41,8 @@ import {TaskHelperService} from '../../../settings/task-management/task-helper.s
 import {FilterLabelHelper} from './filter-label.helper';
 import {LoadingService} from '../../../../core/services/loading.service';
 import {LocalStorageService} from '../../../../shared/service/local-storage.service';
-import {BookNavigationService} from '../../service/book-navigation.service';
 import {BookCardOverlayPreferenceService} from './book-card-overlay-preference.service';
+import {BookNavigationService} from '../../service/book-navigation.service';
 import {BookSelectionService, CheckboxClickEvent} from './book-selection.service';
 import {BookBrowserQueryParamsService, VIEW_MODES} from './book-browser-query-params.service';
 import {BookBrowserEntityService, EntityInfo} from './book-browser-entity.service';
@@ -89,6 +89,7 @@ export class BookBrowserComponent implements AfterViewInit {
   protected taskHelperService = inject(TaskHelperService);
   protected bookCardOverlayPreferenceService = inject(BookCardOverlayPreferenceService);
   protected bookSelectionService = inject(BookSelectionService);
+  private bookNavigationService = inject(BookNavigationService);
   protected appSettingsService = inject(AppSettingsService);
 
   private activatedRoute = inject(ActivatedRoute);
@@ -101,7 +102,6 @@ export class BookBrowserComponent implements AfterViewInit {
   private libraryShelfMenuService = inject(LibraryShelfMenuService);
   private pageTitle = inject(PageTitleService);
   private loadingService = inject(LoadingService);
-  private bookNavigationService = inject(BookNavigationService);
   private queryParamsService = inject(BookBrowserQueryParamsService);
   private entityService = inject(BookBrowserEntityService);
   private localStorageService = inject(LocalStorageService);
@@ -209,6 +209,10 @@ export class BookBrowserComponent implements AfterViewInit {
   });
 
   readonly books = this.appBooksApi.books;
+  // Global index of books()[0]. Non-zero once maxPages has evicted earlier pages: the virtualizer
+  // is sized to the full library, so a virtual item's index is global and maps to
+  // books()[virtualItem.index - firstLoadedBookIndex()].
+  readonly firstLoadedBookIndex = this.appBooksApi.firstLoadedIndex;
   readonly hasRenderedBooks = this.appBooksApi.hasData;
   readonly isBooksRefreshing = this.appBooksApi.isFetchingNextPage;
   readonly isBooksLoading = this.appBooksApi.isLoading;
@@ -250,7 +254,6 @@ export class BookBrowserComponent implements AfterViewInit {
       : Math.round(this.desktopBaseCardWidth() * this.coverScalePreferenceService.scaleFactor())
   );
   readonly virtualRowCount = computed(() => this.bookCountIncludingUnloadedPages(this.books().length));
-  private readonly hasUnloadedBooks = computed(() => this.books().length < this.virtualRowCount());
   readonly loadedBookCount = computed(() => this.books().length);
   readonly virtualGrid = createVirtualGrid({
     items: this.books,
@@ -287,10 +290,11 @@ export class BookBrowserComponent implements AfterViewInit {
 
     const items = this.books();
     const loadedBookCount = this.loadedBookCount();
+    const windowEnd = this.firstLoadedBookIndex() + items.length - 1;
     const lastVirtualItem = this.virtualGrid.virtualizer.getVirtualItems().at(-1);
     if (!lastVirtualItem || items.length === 0) return;
-    if (lastVirtualItem.index < items.length - 1) return;
-    if (!this.hasUnloadedBooks()) return;
+    if (lastVirtualItem.index < windowEnd) return;
+    if (!this.appBooksApi.hasNextPage()) return;
     if (this.gridLastLoadRequestLoadedBookCount === loadedBookCount) {
       this.gridLastLoadRequestLoadedBookCount = undefined;
       return;
@@ -299,7 +303,37 @@ export class BookBrowserComponent implements AfterViewInit {
     this.gridLastLoadRequestLoadedBookCount = loadedBookCount;
     this.loadNextBooksPage();
   });
+  private gridLastPrevLoadRequestFirstIndex: number | undefined;
+  private gridPrevLastSeenQueryToken: unknown;
+  // Symmetric to gridPaginatorEffect: once maxPages has evicted earlier pages (firstLoadedBookIndex > 0),
+  // scrolling back up to the top of the loaded window refetches the preceding page. Inert until an
+  // eviction has happened, so ordinary (shallow) scrolling is unaffected.
+  private readonly gridPrevPaginatorEffect = effect(() => {
+    if (this.currentViewMode() !== VIEW_MODES.GRID) return;
+
+    const queryToken = this.bookQueryToken();
+    if (queryToken !== this.gridPrevLastSeenQueryToken) {
+      this.gridLastPrevLoadRequestFirstIndex = undefined;
+      this.gridPrevLastSeenQueryToken = queryToken;
+    }
+
+    const firstLoadedIndex = this.firstLoadedBookIndex();
+    if (firstLoadedIndex === 0 || !this.appBooksApi.hasPreviousPage()) return;
+    const firstVirtualItem = this.virtualGrid.virtualizer.getVirtualItems().at(0);
+    if (!firstVirtualItem) return;
+    if (firstVirtualItem.index > firstLoadedIndex) return;
+    if (this.gridLastPrevLoadRequestFirstIndex === firstLoadedIndex) {
+      this.gridLastPrevLoadRequestFirstIndex = undefined;
+      return;
+    }
+
+    this.gridLastPrevLoadRequestFirstIndex = firstLoadedIndex;
+    this.loadPreviousBooksPage();
+  });
   readonly isFetchingNextBooksPage = this.appBooksApi.isFetchingNextPage;
+  readonly hasNextBooksPage = this.appBooksApi.hasNextPage;
+  readonly hasPreviousBooksPage = this.appBooksApi.hasPreviousPage;
+  readonly isFetchingPreviousBooksPage = this.appBooksApi.isFetchingPreviousPage;
 
   parsedFilters: Record<string, string[]> = {};
   dynamicDialogRef: DynamicDialogRef | undefined | null;
@@ -394,7 +428,12 @@ export class BookBrowserComponent implements AfterViewInit {
   });
   private readonly syncBooksEffect = effect(() => {
     const books = this.books();
-    this.bookSelectionService.setCurrentBooks(books);
+    // Pass the window offset so shift-click range selection maps global virtual indices correctly
+    // once maxPages has evicted earlier pages.
+    this.bookSelectionService.setCurrentBooks(books, this.firstLoadedBookIndex());
+    // Feed prev/next navigation from the loaded list in its visible (sorted) order. With maxPages
+    // this is the retained window; navigating across evicted pages is a known limitation tracked
+    // for follow-up (a correctly-ordered full-id source is needed to page beyond the window).
     this.bookNavigationService.setAvailableBookIds(books.map(book => book.id));
   });
   private readonly syncMoreActionsMenuEffect = effect(() => {
@@ -446,7 +485,14 @@ export class BookBrowserComponent implements AfterViewInit {
     if (this.showBooksLoadingPlaceholder()) {
       return INITIAL_LOADING_ROW_COUNT;
     }
-    return Math.max(renderedBookCount, this.appBooksApi.totalElements());
+    // Once maxPages evicts earlier pages the loaded window sits at a global offset, so the virtual
+    // count must reach the window's global end (firstLoadedBookIndex + renderedBookCount) even if a
+    // transiently smaller totalElements (e.g. mid-refetch after a catalog shrink) would otherwise
+    // drop below it and make offset subtraction yield negative, unrenderable indices.
+    return Math.max(
+      this.firstLoadedBookIndex() + renderedBookCount,
+      this.appBooksApi.totalElements()
+    );
   }
 
   private minimumLoadingGridItemCount({viewportHeight, columns, itemHeight, gap}: VirtualGridMetrics): number {
@@ -662,6 +708,11 @@ export class BookBrowserComponent implements AfterViewInit {
   loadNextBooksPage(): void {
     if (!this.appBooksApi.hasNextPage() || this.appBooksApi.isFetchingNextPage()) return;
     this.appBooksApi.fetchNextPage();
+  }
+
+  loadPreviousBooksPage(): void {
+    if (!this.appBooksApi.hasPreviousPage() || this.appBooksApi.isFetchingPreviousPage()) return;
+    this.appBooksApi.fetchPreviousPage();
   }
 
   deselectAllBooks(): void {

@@ -1,9 +1,11 @@
-import {Component, effect, inject, Input, OnChanges, OnInit, SimpleChanges} from '@angular/core';
+import {Component, DestroyRef, effect, inject, Input, OnChanges, OnInit, SimpleChanges} from '@angular/core';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 
 import {MetadataRefreshType} from '../../model/request/metadata-refresh-type.enum';
 import {MetadataRefreshOptions} from '../../model/request/metadata-refresh-options.model';
 
 import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
+import {MessageService} from 'primeng/api';
 import {BookService} from '../../../book/service/book.service';
 import {AppSettingsService} from '../../../../shared/service/app-settings.service';
 import {Book} from '../../../book/model/book.model';
@@ -32,9 +34,11 @@ export class MultiBookMetadataFetchComponent implements OnInit, OnChanges {
   currentMetadataOptions!: MetadataRefreshOptions;
 
   private dynamicDialogConfig = inject(DynamicDialogConfig);
+  private destroyRef = inject(DestroyRef);
   dialogRef = inject(DynamicDialogRef);
   private bookService = inject(BookService);
   private appSettingsService = inject(AppSettingsService);
+  private messageService = inject(MessageService);
   expanded = false;
 
   constructor() {
@@ -64,7 +68,19 @@ export class MultiBookMetadataFetchComponent implements OnInit, OnChanges {
     this.bookIds = context.bookIds ?? [];
     this.libraryId = context.libraryId ?? null;
     this.metadataRefreshType = context.metadataRefreshType ?? MetadataRefreshType.BOOKS;
-    this.booksToShow = this.bookService.getBooksByIds(this.bookIds);
+    this.bookService.getBooksByIds(this.bookIds)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: books => this.booksToShow = books,
+        error: () => {
+          this.booksToShow = [];
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to load the selected books.',
+          });
+        },
+      });
   }
 
   get isLibraryRefresh(): boolean {

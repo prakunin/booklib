@@ -63,13 +63,17 @@ export function removeBooksFromCache(queryClient: QueryClient, bookIds: Iterable
 
 // --- Surgical patches (updates cache directly, no list refetch) ---
 
+// Surgical add for the legacy flat ['books'] list. Only patches when that list is already
+// cached: a socket add must not fabricate a partial legacy catalog (the paginated app-books
+// cache is the source of truth), and fabricating it would rebuild an ever-growing array on
+// every event during a bulk import (O(N^2)). The paginated app-books invalidation is coalesced
+// by the caller (see BookSocketService.handleNewlyCreatedBook), so it is not triggered here.
 export function addBookToCache(queryClient: QueryClient, book: Book): void {
   queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current => {
-    const books = current ?? [];
-    const exists = books.some(b => b.id === book.id);
-    return exists ? books.map(b => b.id === book.id ? book : b) : [...books, book];
+    if (!current) return current;
+    const exists = current.some(b => b.id === book.id);
+    return exists ? current.map(b => b.id === book.id ? book : b) : [...current, book];
   });
-  invalidateAppBooksQueries(queryClient);
 }
 
 export function patchBooksInCache(queryClient: QueryClient, updatedBooks: Book[]): void {

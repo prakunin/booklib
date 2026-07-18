@@ -16,6 +16,10 @@ import {
 import {Book, BOOK_TYPES, BookFile, BookType, ReadStatus} from '../model/book.model';
 
 const PAGE_SIZE = 50;
+// Cap the pages the infinite query retains so a full-list refetch (and memory) stays bounded even
+// after scrolling deep into a large library. Evicted pages are refetched on demand via
+// getPreviousPageParam/getNextPageParam as the user scrolls back toward them.
+const MAX_RETAINED_PAGES = 20;
 const BOOK_TYPE_SET = new Set<BookType>(BOOK_TYPES);
 const READ_STATUSES = new Set<ReadStatus>(Object.values(ReadStatus) as ReadStatus[]);
 
@@ -49,6 +53,9 @@ export class AppBooksApiService {
     initialPageParam: 0,
     getNextPageParam: (lastPage: AppPageResponse<AppBookSummary>) =>
       lastPage.hasNext ? lastPage.page + 1 : undefined,
+    getPreviousPageParam: (firstPage: AppPageResponse<AppBookSummary>) =>
+      firstPage.hasPrevious ? firstPage.page - 1 : undefined,
+    maxPages: MAX_RETAINED_PAGES,
     enabled: !!this.token() && this._booksEnabled(),
     staleTime: 5 * 60_000,
   }));
@@ -95,8 +102,22 @@ export class AppBooksApiService {
   });
 
   readonly hasNextPage = computed(() => this.booksQuery.hasNextPage());
+  readonly hasPreviousPage = computed(() => this.booksQuery.hasPreviousPage());
   readonly isLoading = computed(() => this.booksQuery.isLoading());
   readonly isFetchingNextPage = computed(() => this.booksQuery.isFetchingNextPage());
+  readonly isFetchingPreviousPage = computed(() => this.booksQuery.isFetchingPreviousPage());
+
+  // Global index of the first retained book. With maxPages, the earliest pages are evicted as the
+  // user scrolls down, so the accumulated books() array is a sliding window, not a prefix from 0:
+  // callers must map a global (virtual) index to books()[globalIndex - firstLoadedIndex()].
+  readonly firstLoadedIndex = computed(() => {
+    const data = this.booksQuery.data();
+    if (!data || data.pages.length === 0) return 0;
+    // Pages before the first retained one are always full (eviction only removes from the front,
+    // never the partial last page), and the client fixes the page size via PAGE_SIZE, so the global
+    // index of books()[0] is exactly page * PAGE_SIZE.
+    return data.pages[0].page * PAGE_SIZE;
+  });
   readonly isError = computed(() => this.booksQuery.isError());
   readonly hasData = computed(() => this.booksQuery.data() !== undefined);
   readonly error = computed<string | null>(() => {
@@ -285,6 +306,10 @@ export class AppBooksApiService {
 
   fetchNextPage(): void {
     this.booksQuery.fetchNextPage();
+  }
+
+  fetchPreviousPage(): void {
+    this.booksQuery.fetchPreviousPage();
   }
 
   /** Fetch all book IDs matching the current filters (no pagination). */

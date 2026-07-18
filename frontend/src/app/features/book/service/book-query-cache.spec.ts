@@ -43,7 +43,7 @@ describe('book-query-cache', () => {
     queryClient = new QueryClient();
   });
 
-  it('adds new books and replaces existing entries by id', () => {
+  it('adds new books and replaces existing entries by id when the legacy list exists', () => {
     const firstBook = makeBook(1);
     const secondBook = makeBook(2);
     const updatedSecondBook = makeBook(2, {
@@ -63,8 +63,17 @@ describe('book-query-cache', () => {
     addBookToCache(queryClient, updatedSecondBook);
     expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([firstBook, updatedSecondBook]);
 
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: ['app-books']});
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: ['app-filter-options']});
+    // The paginated app-books invalidation is coalesced by BookSocketService, not fired per add.
+    expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({queryKey: ['app-books']});
+  });
+
+  it('does not fabricate the legacy list from a socket add when it is not cached', () => {
+    // A large import emits one add per book; fabricating and growing the legacy ['books'] array
+    // on every event is O(N^2) and freezes the tab. When the legacy catalog was never fetched,
+    // the add is a no-op on it (the paginated app-books cache is the source of truth).
+    addBookToCache(queryClient, makeBook(1));
+
+    expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toBeUndefined();
   });
 
   it('invalidates the full books query and book detail queries', () => {

@@ -157,6 +157,7 @@ describe('BookTableComponent', () => {
 
     fixture.componentRef.setInput('books', books);
     fixture.componentRef.setInput('virtualRowCount', 100);
+    fixture.componentRef.setInput('hasNextPage', true);
     fixture.componentRef.setInput('isFetchingNextPage', false);
     fixture.detectChanges();
 
@@ -183,6 +184,7 @@ describe('BookTableComponent', () => {
     const initialQueryToken = {query: 'first'};
     fixture.componentRef.setInput('books', books);
     fixture.componentRef.setInput('virtualRowCount', 51);
+    fixture.componentRef.setInput('hasNextPage', true);
     fixture.componentRef.setInput('isFetchingNextPage', false);
     fixture.componentRef.setInput('bookQueryToken', initialQueryToken);
     fixture.detectChanges();
@@ -206,6 +208,7 @@ describe('BookTableComponent', () => {
 
     fixture.componentRef.setInput('books', books);
     fixture.componentRef.setInput('virtualRowCount', 51);
+    fixture.componentRef.setInput('hasNextPage', true);
     fixture.componentRef.setInput('isFetchingNextPage', false);
     fixture.detectChanges();
 
@@ -218,7 +221,9 @@ describe('BookTableComponent', () => {
 
     expect(loadNextPageSpy).toHaveBeenCalledTimes(1);
 
-    fixture.componentRef.setInput('virtualRowCount', 52);
+    // A completed refetch that returns the same rows (new array ref, unchanged count) re-arms
+    // pagination so the user is not stuck at the boundary.
+    fixture.componentRef.setInput('books', books.map(book => ({...book, metadata: {...book.metadata}})));
     fixture.detectChanges();
 
     expect(loadNextPageSpy).toHaveBeenCalledTimes(2);
@@ -235,6 +240,7 @@ describe('BookTableComponent', () => {
     fixture.componentRef.setInput('books', books);
     fixture.componentRef.setInput('virtualRowCount', 51);
     fixture.componentRef.setInput('loadedBookCount', 50);
+    fixture.componentRef.setInput('hasNextPage', true);
     fixture.componentRef.setInput('isFetchingNextPage', false);
     fixture.detectChanges();
 
