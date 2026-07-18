@@ -209,8 +209,8 @@ public class PendingDeletionPool {
                         log.info("[EXPIRED] BookFile id={} removed from book id={}", fs.bookFileId(), book.getId());
                     });
                 }
-                notificationService.sendMessageToPermissions(Topic.BOOK_UPDATE, Set.of(book.getId()),
-                        Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY));
+                notificationService.sendMessageToPermissions(Topic.BOOK_UPDATE,
+                        bookMapper.toBookWithDescription(book, false), Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY));
             }
         }
     }
