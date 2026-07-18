@@ -71,7 +71,7 @@ class AppBookServiceFilterOptionsTest {
                 bookRepository, userBookProgressRepository, userBookFileProgressRepository,
                 shelfRepository, authenticationService, mobileBookMapper,
                 bookService, magicShelfBookService, entityManager, restrictionRepository, bookSortRegistry, eventPublisher,
-                new CatalogSummaryCache()
+                new CatalogSummaryCache(), new FilterOptionsCache()
         );
     }
 
@@ -251,6 +251,68 @@ class AppBookServiceFilterOptionsTest {
     }
 
     // -------------------------------------------------------------------------
+    // Caching
+    // -------------------------------------------------------------------------
+
+    @Test
+    void getFilterOptions_secondIdenticalCall_isServedFromCache() {
+        mockAdminUser();
+        mockJpqlQueries();
+
+        service.getFilterOptions(null, null, null);
+        int invocationsAfterFirstCall = mockingDetails(entityManager).getInvocations().size();
+        service.getFilterOptions(null, null, null);
+
+        assertEquals(invocationsAfterFirstCall, mockingDetails(entityManager).getInvocations().size());
+    }
+
+    // -------------------------------------------------------------------------
+    // Shell-book visibility clause
+    // -------------------------------------------------------------------------
+
+    @Test
+    void getFilterOptions_noShellBooks_dropsFileExistencePredicate() {
+        mockAdminUser();
+        mockJpqlQueries();
+
+        service.getFilterOptions(null, null, null);
+
+        List<String> jpql = capturedTupleJpql();
+        assertFalse(jpql.isEmpty());
+        assertTrue(jpql.stream().noneMatch(q -> q.contains("bookFiles IS NOT EMPTY")),
+                "no facet query should pay for the file-existence predicate when there are no shell books");
+    }
+
+    @Test
+    void getFilterOptions_withShellBooks_excludesThemViaNotInClause() {
+        mockAdminUser();
+        mockJpqlQueries();
+        mockShellBookIds(List.of(43L, 42L));
+
+        service.getFilterOptions(null, null, null);
+
+        List<String> jpql = capturedTupleJpql();
+        assertFalse(jpql.isEmpty());
+        assertTrue(jpql.stream().allMatch(q -> q.contains("b.id NOT IN (42, 43)")),
+                "every facet query must exclude shell books when they exist");
+        assertTrue(jpql.stream().noneMatch(q -> q.contains("bookFiles IS NOT EMPTY")));
+    }
+
+    @Test
+    void getFilterOptions_hugeShellSet_fallsBackToFileExistencePredicate() {
+        mockAdminUser();
+        mockJpqlQueries();
+        mockShellBookIds(java.util.stream.LongStream.rangeClosed(1, 1001).boxed().toList());
+
+        service.getFilterOptions(null, null, null);
+
+        List<String> jpql = capturedTupleJpql();
+        assertFalse(jpql.isEmpty());
+        assertTrue(jpql.stream().allMatch(q -> q.contains("bookFiles IS NOT EMPTY")),
+                "an oversized shell set must fall back to the legacy predicate instead of a huge IN list");
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
@@ -262,6 +324,20 @@ class AppBookServiceFilterOptionsTest {
                 null, null, null, null, null, null, null, null, null, null,
                 null, null
         );
+    }
+
+    private List<String> capturedTupleJpql() {
+        var captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(entityManager, atLeastOnce()).createQuery(captor.capture(), eq(Tuple.class));
+        return captor.getAllValues();
+    }
+
+    private void mockShellBookIds(List<Long> ids) {
+        TypedQuery<Long> shellQuery = mock(TypedQuery.class);
+        when(shellQuery.getResultList()).thenReturn(ids);
+        when(entityManager.createQuery(
+                argThat((String s) -> s != null && s.contains("bookFiles IS EMPTY")), eq(Long.class)))
+                .thenReturn(shellQuery);
     }
 
     private void mockAdminUser() {
@@ -314,7 +390,7 @@ class AppBookServiceFilterOptionsTest {
     }
 
     @SuppressWarnings("unchecked")
-    private void mockJpqlQueries() {
+    private TypedQuery<Tuple> mockJpqlQueries() {
         TypedQuery<Tuple> tupleQuery = mock(TypedQuery.class);
         when(tupleQuery.setParameter(anyString(), any())).thenReturn(tupleQuery);
         when(tupleQuery.setMaxResults(anyInt())).thenReturn(tupleQuery);
@@ -330,5 +406,6 @@ class AppBookServiceFilterOptionsTest {
 
         when(entityManager.createQuery(anyString(), eq(Long.class)))
                 .thenReturn(longQuery);
+        return tupleQuery;
     }
 }
