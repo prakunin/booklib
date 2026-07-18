@@ -1,10 +1,13 @@
 package org.booklore.service.watcher;
 
 import org.booklore.mapper.BookMapper;
+import org.booklore.model.dto.Book;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.LibraryPathEntity;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.PermissionType;
+import org.booklore.model.websocket.Topic;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.NotificationService;
@@ -175,6 +178,23 @@ class PendingDeletionPoolTest {
 
         verify(bookFileRepository).delete(bookFile);
         assertThat(book.getDeleted()).isFalse();
+    }
+
+    @Test
+    void expireFileDeletion_sendsMappedBookUpdateWhenFileRemovedButBookRemains() {
+        ScheduledFuture<?> timer = mock(ScheduledFuture.class);
+        pool.addFileDeletion(Path.of("/library/subfolder/test.epub"), 1L, bookFile, book, timer);
+        Book mappedBook = Book.builder().id(10L).build();
+
+        when(bookRepository.findById(10L)).thenReturn(Optional.of(book));
+        when(bookFileRepository.countByBookId(10L)).thenReturn(3L);
+        when(bookFileRepository.findById(100L)).thenReturn(Optional.of(bookFile));
+        when(bookMapper.toBookWithDescription(book, false)).thenReturn(mappedBook);
+
+        pool.expireFileDeletion(Path.of("/library/subfolder/test.epub"));
+
+        verify(notificationService).sendMessageToPermissions(eq(Topic.BOOK_UPDATE), same(mappedBook),
+                eq(Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY)));
     }
 
     @Test
