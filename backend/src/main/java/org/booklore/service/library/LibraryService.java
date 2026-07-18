@@ -318,6 +318,11 @@ public class LibraryService {
         return bookMapper.toBook(bookEntity);
     }
 
+    public long getBookCount(long libraryId) {
+        libraryRepository.findById(libraryId).orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
+        return bookRepository.countByLibraryIdNonDeleted(libraryId);
+    }
+
     public List<Book> getBooks(long libraryId) {
         libraryRepository.findById(libraryId).orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
         List<BookEntity> bookEntities = bookRepository.findAllWithMetadataByLibraryId(libraryId);

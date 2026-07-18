@@ -1,6 +1,7 @@
 package org.booklore.controller;
 
 import org.booklore.config.security.annotation.CheckLibraryAccess;
+import org.booklore.exception.ApiError;
 import org.booklore.model.dto.Book;
 import org.booklore.model.dto.Library;
 import org.booklore.model.dto.request.CreateLibraryRequest;
@@ -25,6 +26,8 @@ import java.util.Map;
 @AllArgsConstructor
 @Tag(name = "Libraries", description = "Endpoints for managing libraries and their books")
 public class LibraryController {
+
+    private static final long MAX_LEGACY_LIBRARY_CATALOG_SIZE = 10_000;
 
     private final LibraryService libraryService;
     private final LibraryHealthService libraryHealthService;
@@ -98,6 +101,12 @@ public class LibraryController {
     @GetMapping("/{libraryId}/book")
     @CheckLibraryAccess(libraryIdParam = "libraryId")
     public ResponseEntity<List<Book>> getBooks(@Parameter(description = "ID of the library") @PathVariable long libraryId) {
+        long bookCount = libraryService.getBookCount(libraryId);
+        if (bookCount > MAX_LEGACY_LIBRARY_CATALOG_SIZE) {
+            throw ApiError.INVALID_INPUT.createException(
+                    "The library books endpoint is disabled for libraries over " + MAX_LEGACY_LIBRARY_CATALOG_SIZE
+                            + " books; use /api/v1/books/page or /api/v1/app/books");
+        }
         List<Book> books = libraryService.getBooks(libraryId);
         return ResponseEntity.ok(books);
     }
