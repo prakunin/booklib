@@ -56,7 +56,8 @@ class AppBookServiceLazyInpxCoverTest {
         service = new AppBookService(
                 bookRepository, userBookProgressRepository, userBookFileProgressRepository,
                 shelfRepository, authenticationService, mobileBookMapper, appBookProgressService,
-                magicShelfBookService, entityManager, restrictionRepository, bookSortRegistry,
+                magicShelfBookService, entityManager, restrictionRepository,
+                new AppContentRestrictionQueryService(restrictionRepository), bookSortRegistry,
                 eventPublisher, new CatalogSummaryCache(), new FilterOptionsCache());
     }
 

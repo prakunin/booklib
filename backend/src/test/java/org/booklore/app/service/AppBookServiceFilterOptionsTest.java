@@ -69,7 +69,8 @@ class AppBookServiceFilterOptionsTest {
         service = new AppBookService(
                 bookRepository, userBookProgressRepository, userBookFileProgressRepository,
                 shelfRepository, authenticationService, mobileBookMapper,
-                appBookProgressService, magicShelfBookService, entityManager, restrictionRepository, bookSortRegistry, eventPublisher,
+                appBookProgressService, magicShelfBookService, entityManager, restrictionRepository,
+                new AppContentRestrictionQueryService(restrictionRepository), bookSortRegistry, eventPublisher,
                 new CatalogSummaryCache(), new FilterOptionsCache()
         );
     }
