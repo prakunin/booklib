@@ -31,10 +31,14 @@
         </svg>
       </div>
     }
-    <div id="foliate-container" tabindex="0"></div>
-    @if (pinchFontSize()) {
+    <div
+      id="foliate-container"
+      tabindex="0"
+      [style.transform]="pinchTransform()"
+      [style.transform-origin]="pinchTransformOrigin()"></div>
+    @if (pinchZoomPercent()) {
       <div class="pinch-font-size-overlay">
-        {{ pinchFontSize() }} px
+        {{ pinchZoomPercent() }}%
       </div>
     }
     @if (readerState().flow === 'paginated') {

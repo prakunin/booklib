@@ -125,6 +125,17 @@ public class AuthenticationService {
         throw new IllegalStateException("No OPDS user authenticated");
     }
 
+    /**
+     * Mints a standard access token for the given main user. Used to embed a token in OPDS
+     * acquisition links so header-less OPDS clients (which don't re-send Basic auth on the
+     * download request) can still authenticate via the {@code token} query parameter.
+     */
+    public String generateDownloadToken(Long userId) {
+        BookLoreUserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> ApiError.INTERNAL_SERVER_ERROR.createException("User not found for download token: " + userId));
+        return jwtUtils.generateAccessToken(user);
+    }
+
     @Transactional
     public ResponseEntity<AccessTokenDto> loginUser(UserLoginRequest loginRequest) {
         if (appSettingService.getAppSettings().isOidcForceOnlyMode()) {

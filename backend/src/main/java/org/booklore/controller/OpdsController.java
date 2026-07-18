@@ -1,7 +1,7 @@
 package org.booklore.controller;
 
-import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.config.security.userdetails.OpdsUserDetails;
+import org.booklore.model.dto.BookLoreUser;
 import org.booklore.service.book.BookDownloadService;
 import org.booklore.service.book.BookService;
 import org.booklore.service.opds.OpdsBookService;
@@ -18,6 +18,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
@@ -41,7 +43,6 @@ public class OpdsController {
     private final BookService bookService;
     private final BookDownloadService bookDownloadService;
     private final OpdsBookService opdsBookService;
-    private final AuthenticationService authenticationService;
 
     @Operation(summary = "Download book file", description = "Download the book file by its ID. Optionally specify a fileId to download a specific format.")
     @ApiResponses({
@@ -193,9 +194,19 @@ public class OpdsController {
     }
 
     private Long getOpdsUserId() {
-        OpdsUserDetails details = authenticationService.getOpdsUser();
-        return details != null && details.getOpdsUserV2() != null
-                ? details.getOpdsUserV2().getUserId()
-                : null;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return null;
+        }
+        Object principal = authentication.getPrincipal();
+        // Basic-auth OPDS clients authenticate as an OPDS user (mapped to a main user id).
+        if (principal instanceof OpdsUserDetails opdsUser && opdsUser.getOpdsUserV2() != null) {
+            return opdsUser.getOpdsUserV2().getUserId();
+        }
+        // Token-authenticated acquisition links resolve to the main user directly.
+        if (principal instanceof BookLoreUser user) {
+            return user.getId();
+        }
+        return null;
     }
 }

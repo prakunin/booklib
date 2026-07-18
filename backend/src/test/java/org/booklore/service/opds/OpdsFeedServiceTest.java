@@ -168,6 +168,61 @@ class OpdsFeedServiceTest {
     }
 
     @Test
+    void generateCatalogFeed_shouldEmbedDownloadTokenInAcquisitionLink() {
+        mockAuthenticatedUser();
+        when(authenticationService.generateDownloadToken(TEST_USER_ID)).thenReturn("test.jwt.token");
+
+        when(request.getParameter(anyString())).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/opds/catalog");
+        when(request.getQueryString()).thenReturn(null);
+
+        Book book = Book.builder()
+                .id(10L)
+                .primaryFile(BookFile.builder().id(7L).bookType(BookFileType.EPUB).build())
+                .addedOn(FIXED_INSTANT)
+                .metadata(BookMetadata.builder().title("Token Book").build())
+                .build();
+
+        Page<Book> page = new PageImpl<>(List.of(book), PageRequest.of(0, 50), 1);
+        when(opdsBookService.getBooksPage(eq(TEST_USER_ID), any(), any(), any(), eq(0), eq(50))).thenReturn(page);
+        when(opdsBookService.applySortOrder(any(), any())).thenReturn(page);
+
+        String xml = opdsFeedService.generateCatalogFeed(request);
+
+        // Acquisition link carries the token so header-less clients authenticate via ?token=.
+        // The '&' separator must be XML-escaped inside the attribute value.
+        assertThat(xml).contains("/api/v1/opds/10/download?fileId=7&amp;token=test.jwt.token");
+        assertThat(xml).doesNotContain("fileId=7&token=");
+        verify(authenticationService).generateDownloadToken(TEST_USER_ID);
+    }
+
+    @Test
+    void generateCatalogFeed_shouldOmitTokenWhenNoneAvailable() {
+        mockAuthenticatedUser();
+        when(authenticationService.generateDownloadToken(TEST_USER_ID)).thenReturn(null);
+
+        when(request.getParameter(anyString())).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/opds/catalog");
+        when(request.getQueryString()).thenReturn(null);
+
+        Book book = Book.builder()
+                .id(10L)
+                .primaryFile(BookFile.builder().id(7L).bookType(BookFileType.EPUB).build())
+                .addedOn(FIXED_INSTANT)
+                .metadata(BookMetadata.builder().title("No Token Book").build())
+                .build();
+
+        Page<Book> page = new PageImpl<>(List.of(book), PageRequest.of(0, 50), 1);
+        when(opdsBookService.getBooksPage(eq(TEST_USER_ID), any(), any(), any(), eq(0), eq(50))).thenReturn(page);
+        when(opdsBookService.applySortOrder(any(), any())).thenReturn(page);
+
+        String xml = opdsFeedService.generateCatalogFeed(request);
+
+        assertThat(xml).contains("/api/v1/opds/10/download?fileId=7\"");
+        assertThat(xml).doesNotContain("token=");
+    }
+
+    @Test
     void generateCatalogFeed_shouldOmitCoverWhenNotUpdatedOn() {
         mockAuthenticatedUser();
 

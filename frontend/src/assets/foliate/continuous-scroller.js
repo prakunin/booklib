@@ -155,6 +155,7 @@ class ContinuousSection {
             'overflow': 'hidden',
             'padding': `${margin}px ${sideMargin}px`,
             'overflow-wrap': 'break-word',
+            'touch-action': 'none',
             '-webkit-line-box-contain': 'block glyphs replaced',
         })
         setStylesImportant(doc.body, {
@@ -162,6 +163,7 @@ class ContinuousSection {
             'max-width': `${maxInlineSize}px`,
             'margin': '0 auto',
             'min-height': '0',
+            'touch-action': 'none',
         })
         for (const el of doc.body.querySelectorAll('img, svg, video')) {
             setStylesImportant(el, {
@@ -363,6 +365,7 @@ export class ContinuousScroller extends HTMLElement {
             overflow: auto;
             box-sizing: border-box;
             overscroll-behavior: contain;
+            touch-action: none;
             -webkit-overflow-scrolling: touch;
             scrollbar-gutter: stable both-edges;
         }
