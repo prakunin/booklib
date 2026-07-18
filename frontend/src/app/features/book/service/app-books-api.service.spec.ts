@@ -150,4 +150,33 @@ describe('AppBooksApiService', () => {
     expect(service.firstLoadedIndex()).toBe(150);
     expect(service.books().map(book => book.id)).toEqual([151, 152]);
   });
+
+  it('preserves book object identity when query data is refreshed with unchanged summaries', () => {
+    const queryClient = TestBed.inject(QueryClient);
+    const firstPage: AppPageResponse<AppBookSummary> = {
+      content: [summary(1), summary(2)],
+      page: 0,
+      size: 50,
+      totalElements: 2,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+    };
+    const firstData: InfiniteData<AppPageResponse<AppBookSummary>> = {pages: [firstPage], pageParams: [0]};
+    const queryKey = ['app-books', {}, {field: 'addedOn', dir: 'desc'}, ''];
+
+    queryClient.setQueryData(queryKey, firstData);
+    flushSignalAndQueryEffects();
+    const firstBooks = service.books();
+
+    const refreshedPage: AppPageResponse<AppBookSummary> = {
+      ...firstPage,
+      content: firstPage.content.map(item => ({...item})),
+    };
+    queryClient.setQueryData(queryKey, {pages: [refreshedPage], pageParams: [0]});
+    flushSignalAndQueryEffects();
+
+    expect(service.books()[0]).toBe(firstBooks[0]);
+    expect(service.books()[1]).toBe(firstBooks[1]);
+  });
 });

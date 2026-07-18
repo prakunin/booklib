@@ -13,6 +13,7 @@
       [title]="displayTitle()"
       [authors]="book().metadata?.authors ?? []"
       [fit]="(isAudiobook() || useSquareCovers()) ? 'contain' : 'cover'"
+      loading="lazy"
       [alt]="('book.card.alt.cover' | transloco: { title: displayTitle() })"/>
 
     <div class="top-left-overlay-stack">

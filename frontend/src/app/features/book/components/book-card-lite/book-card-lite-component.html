@@ -5,6 +5,7 @@
     [title]="book.metadata?.title || book.fileName"
     [authors]="book.metadata?.authors ?? []"
     [alt]="book.metadata?.title || book.fileName || ''"
+    loading="lazy"
     size="sm" />
     
   @if (showSeriesNumber && !book.seriesCount && book.metadata?.seriesNumber !== null && book.metadata?.seriesNumber !== undefined) {

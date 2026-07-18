@@ -43,6 +43,7 @@ export class AppBooksApiService {
   private readonly _catalogSummaryEnabled = signal(false);
   private globalFilterOptionsEnableScheduled = false;
   private catalogSummaryEnableScheduled = false;
+  private readonly mappedBooks = new Map<number, { fingerprint: string; book: Book }>();
 
   readonly booksQuery = injectInfiniteQuery(() => ({
     queryKey: ['app-books', this._filters(), this._sort(), this._search()] as const,
@@ -92,7 +93,17 @@ export class AppBooksApiService {
   readonly books = computed<Book[]>(() => {
     const data = this.booksQuery.data();
     if (!data) return [];
-    return data.pages.flatMap(page => page.content.map(summaryToBook));
+    const visibleIds = new Set<number>();
+    const books = data.pages.flatMap(page => page.content.map(summary => {
+      visibleIds.add(summary.id);
+      return this.summaryToStableBook(summary);
+    }));
+    for (const id of this.mappedBooks.keys()) {
+      if (!visibleIds.has(id)) {
+        this.mappedBooks.delete(id);
+      }
+    }
+    return books;
   });
 
   readonly totalElements = computed(() => {
@@ -410,6 +421,17 @@ export class AppBooksApiService {
     );
   }
 
+  private summaryToStableBook(summary: AppBookSummary): Book {
+    const fingerprint = summaryFingerprint(summary);
+    const cached = this.mappedBooks.get(summary.id);
+    if (cached?.fingerprint === fingerprint) {
+      return cached.book;
+    }
+
+    const book = summaryToBook(summary);
+    this.mappedBooks.set(summary.id, {fingerprint, book});
+    return book;
+  }
 
   private async fetchAllPages(filters: AppBookFilters, sort: AppBookSort): Promise<Book[]> {
     const books: Book[] = [];
@@ -430,6 +452,10 @@ export class AppBooksApiService {
     }
     return books;
   }
+}
+
+function summaryFingerprint(summary: AppBookSummary): string {
+  return JSON.stringify(summary);
 }
 
 /**
