@@ -65,7 +65,7 @@ export class AuthorDetailComponent implements OnInit, AfterViewChecked {
   isExpanded = false;
   isOverflowing = false;
   hasPhoto = true;
-  photoTimestamp = Date.now();
+  photoTimestamp = 0;
   quickMatching = false;
   private authorState = signal<AuthorDetails | null>(null);
   author = this.authorState.asReadonly();
@@ -95,7 +95,7 @@ export class AuthorDetailComponent implements OnInit, AfterViewChecked {
   get photoUrl(): string {
     const author = this.author();
     if (!author) return '';
-    return this.authorService.getAuthorPhotoUrl(author.id) + '&t=' + this.photoTimestamp;
+    return this.authorService.getAuthorPhotoUrl(author.id, this.photoTimestamp || author.photoLastModified);
   }
 
   get canEditMetadata(): boolean {
@@ -134,11 +134,12 @@ export class AuthorDetailComponent implements OnInit, AfterViewChecked {
   onAuthorUpdated(updatedAuthor: AuthorDetails): void {
     this.authorState.set(updatedAuthor);
     this.hasPhoto = true;
-    this.photoTimestamp = Date.now();
+    this.photoTimestamp = updatedAuthor.photoLastModified ?? Date.now();
     this.authorService.patchAuthorInCache(updatedAuthor.id, {
       name: updatedAuthor.name,
       asin: updatedAuthor.asin,
       hasPhoto: true,
+      photoLastModified: this.photoTimestamp,
     });
   }
 
@@ -171,6 +172,7 @@ export class AuthorDetailComponent implements OnInit, AfterViewChecked {
     this.authorService.getAuthorDetails(authorId).subscribe({
       next: (author) => {
         this.authorState.set(author);
+        this.photoTimestamp = author.photoLastModified ?? 0;
         this.loading.set(false);
         this.pageTitle.setPageTitle(author.name);
       },

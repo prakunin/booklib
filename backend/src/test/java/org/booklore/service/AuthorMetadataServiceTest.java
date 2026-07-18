@@ -68,6 +68,7 @@ class AuthorMetadataServiceTest {
         adminPermissions.setAdmin(true);
         BookLoreUser adminUser = BookLoreUser.builder().id(1L).permissions(adminPermissions).build();
         lenient().when(authenticationService.getAuthenticatedUser()).thenReturn(adminUser);
+        lenient().when(fileService.getAuthorThumbnailFile(anyLong())).thenReturn("/tmp/missing-author-thumbnail.jpg");
     }
 
     @Test

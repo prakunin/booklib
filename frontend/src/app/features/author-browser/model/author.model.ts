@@ -4,6 +4,7 @@ export interface AuthorSummary {
   asin?: string;
   bookCount: number;
   hasPhoto: boolean;
+  photoLastModified?: number;
 }
 
 export interface EnrichedAuthor extends AuthorSummary {
@@ -46,6 +47,7 @@ export interface AuthorDetails {
   descriptionLocked: boolean;
   asinLocked: boolean;
   photoLocked: boolean;
+  photoLastModified?: number;
 }
 
 export interface AuthorSearchResult {

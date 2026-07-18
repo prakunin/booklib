@@ -51,7 +51,7 @@ describe('AuthorDetailComponent', () => {
 
   beforeEach(() => {
     getAuthorDetails = vi.fn();
-    getAuthorPhotoUrl = vi.fn((authorId: number) => `/api/authors/${authorId}/photo`);
+    getAuthorPhotoUrl = vi.fn((authorId: number, cacheBuster?: number) => `/api/authors/${authorId}/photo?t=${cacheBuster ?? 'none'}`);
     patchAuthorInCache = vi.fn();
     quickMatchAuthor = vi.fn();
     getCurrentUser = vi.fn(() => null);
@@ -172,7 +172,7 @@ describe('AuthorDetailComponent', () => {
     component.onAuthorUpdated(baseAuthor);
 
     expect(nowSpy).toHaveBeenCalled();
-    expect(component.photoUrl).toBe('/api/authors/9/photo&t=321');
+    expect(component.photoUrl).toBe('/api/authors/9/photo?t=321');
 
     getCurrentUser.mockReturnValue({permissions: {admin: false, canEditMetadata: true}});
     expect(component.canEditMetadata).toBe(true);
@@ -222,6 +222,7 @@ describe('AuthorDetailComponent', () => {
       name: 'Ada Lovelace',
       asin: 'B00UPDATED',
       hasPhoto: true,
+      photoLastModified: 777,
     });
     expect(nowSpy).toHaveBeenCalled();
   });
@@ -246,6 +247,7 @@ describe('AuthorDetailComponent', () => {
     const matchedAuthor: AuthorDetails = {
       ...baseAuthor,
       asin: 'B00MATCH',
+      photoLastModified: 456,
     };
     quickMatchAuthor.mockReturnValue(quickMatch$);
 
@@ -267,6 +269,7 @@ describe('AuthorDetailComponent', () => {
       name: 'Ada Lovelace',
       asin: 'B00MATCH',
       hasPhoto: true,
+      photoLastModified: 456,
     });
     expect(translate).toHaveBeenCalledWith('authorBrowser.toast.quickMatchSuccessSummary');
     expect(translate).toHaveBeenCalledWith('authorBrowser.toast.quickMatchSuccessDetail');

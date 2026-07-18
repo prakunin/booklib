@@ -16,4 +16,5 @@ public class AuthorDetails {
     private boolean descriptionLocked;
     private boolean asinLocked;
     private boolean photoLocked;
+    private Long photoLastModified;
 }

@@ -178,24 +178,24 @@ export class AuthorService {
     return `${this.baseUrl}/${authorId}/photo/upload`;
   }
 
-  getAuthorPhotoUrl(authorId: number): string {
-    const token = this.authService.getInternalAccessToken();
-    let url = `${this.mediaBaseUrl}/author/${authorId}/photo`;
-    if (token) {
-      url += `?token=${token}`;
-    }
-    return url;
+  getAuthorPhotoUrl(authorId: number, cacheBuster?: number): string {
+    return this.buildAuthorMediaUrl(`${this.mediaBaseUrl}/author/${authorId}/photo`, cacheBuster);
   }
 
   getAuthorThumbnailUrl(authorId: number, cacheBuster?: number): string {
+    return this.buildAuthorMediaUrl(`${this.mediaBaseUrl}/author/${authorId}/thumbnail`, cacheBuster);
+  }
+
+  private buildAuthorMediaUrl(baseUrl: string, cacheBuster?: number): string {
     const token = this.authService.getInternalAccessToken();
-    let url = `${this.mediaBaseUrl}/author/${authorId}/thumbnail`;
+    const params = new URLSearchParams();
     if (token) {
-      url += `?token=${token}`;
+      params.set('token', token);
     }
-    if (cacheBuster) {
-      url += (token ? '&' : '?') + 't=' + cacheBuster;
+    if (cacheBuster !== undefined) {
+      params.set('t', String(cacheBuster));
     }
-    return url;
+    const queryString = params.toString();
+    return queryString ? `${baseUrl}?${queryString}` : baseUrl;
   }
 }

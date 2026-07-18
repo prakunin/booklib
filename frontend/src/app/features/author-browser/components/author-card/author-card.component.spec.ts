@@ -240,6 +240,7 @@ describe('AuthorCardComponent', () => {
       descriptionLocked: false,
       asinLocked: true,
       photoLocked: false,
+      photoLastModified: 123,
     });
     quickMatch$.complete();
 
@@ -248,6 +249,7 @@ describe('AuthorCardComponent', () => {
       ...baseAuthor,
       asin: 'B00MATCH',
       hasPhoto: true,
+      photoLastModified: 123,
     });
     expect(component.hasPhoto).toBe(true);
     expect(emitSpy).toHaveBeenCalledWith(component.author);

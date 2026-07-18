@@ -54,7 +54,7 @@ describe('AuthorEditorComponent', () => {
           provide: AuthorService,
           useValue: {
             updateAuthor,
-            getAuthorPhotoUrl: vi.fn((authorId: number) => `/api/authors/${authorId}/photo`),
+            getAuthorPhotoUrl: vi.fn((authorId: number, cacheBuster?: number) => `/api/authors/${authorId}/photo?t=${cacheBuster ?? 'none'}`),
             getUploadAuthorPhotoUrl: vi.fn((authorId: number) => `/api/authors/${authorId}/photo/upload`),
           },
         },

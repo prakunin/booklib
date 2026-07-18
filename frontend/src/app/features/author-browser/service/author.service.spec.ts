@@ -185,11 +185,13 @@ describe('AuthorService', () => {
 
   it('builds tokenized author media urls with and without cache busters', () => {
     expect(service.getAuthorPhotoUrl(5)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/photo?token=token-123`);
+    expect(service.getAuthorPhotoUrl(5, 88)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/photo?token=token-123&t=88`);
     expect(service.getAuthorThumbnailUrl(5)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/thumbnail?token=token-123`);
     expect(service.getAuthorThumbnailUrl(5, 99)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/thumbnail?token=token-123&t=99`);
 
     authService.getInternalAccessToken.mockReturnValue(null);
     expect(service.getAuthorPhotoUrl(5)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/photo`);
+    expect(service.getAuthorPhotoUrl(5, 88)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/photo?t=88`);
     expect(service.getAuthorThumbnailUrl(5, 99)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/thumbnail?t=99`);
   });
 });

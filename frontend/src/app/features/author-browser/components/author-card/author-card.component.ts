@@ -49,7 +49,7 @@ export class AuthorCardComponent implements OnChanges {
     if (changes['author']) {
       const prev = changes['author'].previousValue as AuthorSummary | undefined;
       const curr = changes['author'].currentValue as AuthorSummary;
-      if (!prev || prev.id !== curr.id || prev.hasPhoto !== curr.hasPhoto || prev.asin !== curr.asin) {
+      if (!prev || prev.id !== curr.id || prev.hasPhoto !== curr.hasPhoto || prev.asin !== curr.asin || prev.photoLastModified !== curr.photoLastModified) {
         this.hasPhoto = curr.hasPhoto;
       }
     }
@@ -59,7 +59,7 @@ export class AuthorCardComponent implements OnChanges {
   }
 
   get thumbnailUrl(): string {
-    return this.authorService.getAuthorThumbnailUrl(this.author.id, this.cacheBuster || undefined);
+    return this.authorService.getAuthorThumbnailUrl(this.author.id, this.cacheBuster || this.author.photoLastModified);
   }
 
   get isMatched(): boolean {
@@ -154,7 +154,7 @@ export class AuthorCardComponent implements OnChanges {
     this.authorService.quickMatchAuthor(this.author.id).subscribe({
       next: (updated) => {
         this.quickMatching = false;
-        this.author = {...this.author, asin: updated.asin, hasPhoto: true};
+        this.author = {...this.author, asin: updated.asin, hasPhoto: true, photoLastModified: updated.photoLastModified ?? Date.now()};
         this.hasPhoto = true;
         this.menuInitialized = false;
         this.quickMatched.emit(this.author);
