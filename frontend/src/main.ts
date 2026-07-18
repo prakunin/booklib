@@ -35,7 +35,6 @@ bootstrapApplication(AppComponent, {
         queries: {
           staleTime: Infinity,
           retry: 2,
-          refetchOnWindowFocus: true,
         },
       },
     })),

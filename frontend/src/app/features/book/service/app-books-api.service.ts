@@ -59,6 +59,7 @@ export class AppBooksApiService {
     maxPages: MAX_RETAINED_PAGES,
     enabled: !!this.token() && this._booksEnabled(),
     staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   }));
 
   readonly filterOptionsQuery = injectQuery(() => ({
