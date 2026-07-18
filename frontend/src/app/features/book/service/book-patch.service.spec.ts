@@ -112,6 +112,7 @@ describe('BookPatchService', () => {
   });
 
   it('patches cached progress fields when resetting kobo progress', () => {
+    vi.useFakeTimers();
     service.resetProgress([1, 2], ResetProgressTypes.KOBO).subscribe();
 
     const request = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books/reset-progress'));
@@ -129,7 +130,10 @@ describe('BookPatchService', () => {
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
       expect.objectContaining({queryKey: ['app-books'], predicate: expect.any(Function)})
     );
+    // Derived-aggregate invalidation is trailing-debounced.
+    vi.advanceTimersByTime(3_100);
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['app-filter-options']});
+    vi.useRealTimers();
   });
 
   it('updates cached date finished after the backend accepts the change', () => {
@@ -148,6 +152,7 @@ describe('BookPatchService', () => {
   });
 
   it('updates the read status for multiple books and patches cached fields', () => {
+    vi.useFakeTimers();
     service.updateBookReadStatus([1, 2], ReadStatus.READ).subscribe();
 
     const request = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/books/status'));
@@ -167,7 +172,10 @@ describe('BookPatchService', () => {
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
       expect.objectContaining({queryKey: ['app-books'], predicate: expect.any(Function)})
     );
+    // Derived-aggregate invalidation is trailing-debounced.
+    vi.advanceTimersByTime(3_100);
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['app-filter-options']});
+    vi.useRealTimers();
   });
 
   it('updates the cached last read timestamp without calling the backend', () => {

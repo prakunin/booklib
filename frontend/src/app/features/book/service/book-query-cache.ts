@@ -10,12 +10,37 @@ const APP_CATALOG_SUMMARY_QUERY_KEY = ['app-catalog-summary'] as const;
 const APP_BOOK_SUMMARIES_QUERY_PREFIX = ['app-book-summaries'] as const;
 
 // Derived aggregates (facet counts, catalog totals, summary lists) that depend on book
-// fields but are cheap and often unobserved. Invalidating these is fine even when the
-// heavy app-books list itself is patched in place.
+// fields. Server-side these are expensive aggregations over the whole catalog, and book
+// events arrive in bursts during imports — while the filter panel is open each invalidation
+// triggers an immediate refetch. Trailing-debounce so a burst costs one refetch, not one
+// per event; the max-wait keeps counts moving under a continuous event stream.
+const DERIVED_INVALIDATION_DEBOUNCE_MS = 3_000;
+const DERIVED_INVALIDATION_MAX_WAIT_MS = 15_000;
+
+interface PendingDerivedInvalidation {
+  timer: ReturnType<typeof setTimeout>;
+  firstRequestedAt: number;
+}
+
+const pendingDerivedInvalidations = new WeakMap<QueryClient, PendingDerivedInvalidation>();
+
 export function invalidateAppDerivedQueries(queryClient: QueryClient): void {
-  void queryClient.invalidateQueries({queryKey: APP_FILTER_OPTIONS_QUERY_PREFIX});
-  void queryClient.invalidateQueries({queryKey: APP_CATALOG_SUMMARY_QUERY_KEY});
-  void queryClient.invalidateQueries({queryKey: APP_BOOK_SUMMARIES_QUERY_PREFIX});
+  const pending = pendingDerivedInvalidations.get(queryClient);
+  const firstRequestedAt = pending?.firstRequestedAt ?? Date.now();
+  if (pending) {
+    clearTimeout(pending.timer);
+  }
+  const delay = Math.min(
+    DERIVED_INVALIDATION_DEBOUNCE_MS,
+    Math.max(0, firstRequestedAt + DERIVED_INVALIDATION_MAX_WAIT_MS - Date.now())
+  );
+  const timer = setTimeout(() => {
+    pendingDerivedInvalidations.delete(queryClient);
+    void queryClient.invalidateQueries({queryKey: APP_FILTER_OPTIONS_QUERY_PREFIX});
+    void queryClient.invalidateQueries({queryKey: APP_CATALOG_SUMMARY_QUERY_KEY});
+    void queryClient.invalidateQueries({queryKey: APP_BOOK_SUMMARIES_QUERY_PREFIX});
+  }, delay);
+  pendingDerivedInvalidations.set(queryClient, {timer, firstRequestedAt});
 }
 
 export function invalidateAppBooksQueries(queryClient: QueryClient): void {
