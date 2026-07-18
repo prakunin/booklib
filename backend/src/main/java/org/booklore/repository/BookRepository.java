@@ -148,6 +148,20 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     @Query("SELECT b FROM BookEntity b WHERE b.library.id = :libraryId AND (b.deleted IS NULL OR b.deleted = false)")
     List<BookEntity> findAllForDuplicateDetection(@Param("libraryId") Long libraryId);
 
+    // Keyset-paginated duplicate detection scan. The batch size is set by DuplicateDetectionService.
+    @EntityGraph(attributePaths = {"metadata", "library", "libraryPath"})
+    @Query("""
+            SELECT b FROM BookEntity b
+            WHERE b.library.id = :libraryId
+              AND (b.deleted IS NULL OR b.deleted = false)
+              AND b.id > :afterId
+            ORDER BY b.id
+            """)
+    List<BookEntity> findDuplicateDetectionBatch(
+            @Param("libraryId") Long libraryId,
+            @Param("afterId") long afterId,
+            Pageable pageable);
+
     // Only ToOne paths in EntityGraph; collections (authors, categories, moods, tags, shelves, bookFiles) loaded via @BatchSize.
     @EntityGraph(attributePaths = {"metadata", "metadata.comicMetadata", "library"})
     @Query("SELECT b FROM BookEntity b WHERE b.library.id IN :libraryIds AND (b.deleted IS NULL OR b.deleted = false)")

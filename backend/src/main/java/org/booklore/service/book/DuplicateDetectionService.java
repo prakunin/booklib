@@ -12,10 +12,13 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookRepository;
 import org.booklore.util.BookUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -30,20 +33,19 @@ public class DuplicateDetectionService {
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
     private static final Pattern UNDERSCORE_HYPHEN_PATTERN = Pattern.compile("[_\\-]");
     private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^a-z0-9\\s]");
+    static final int DUPLICATE_DETECTION_BATCH_SIZE = 500;
 
     private final BookRepository bookRepository;
     private final BookMapper bookMapper;
 
     @Transactional(readOnly = true)
     public List<DuplicateGroup> findDuplicates(DuplicateDetectionRequest request) {
-        List<BookEntity> books = bookRepository.findAllForDuplicateDetection(request.libraryId());
-        if (books.size() < 2) {
+        DuplicateDetectionScan scan = loadDuplicateDetectionScan(request.libraryId());
+        if (scan.bookCount() < 2) {
             return List.of();
         }
 
-        List<BookFileType> formatPriority = books.getFirst().getLibrary() != null
-                ? books.getFirst().getLibrary().getFormatPriority()
-                : null;
+        List<BookFileType> formatPriority = scan.formatPriority();
         if (formatPriority == null || formatPriority.isEmpty()) {
             formatPriority = DEFAULT_FORMAT_PRIORITY;
         }
@@ -52,73 +54,101 @@ public class DuplicateDetectionService {
         List<DuplicateGroup> groups = new ArrayList<>();
 
         if (request.matchByIsbn()) {
-            groups.addAll(findByIsbn(books, alreadyGrouped, formatPriority));
+            groups.addAll(findByIsbn(request.libraryId(), alreadyGrouped, formatPriority));
         }
         if (request.matchByExternalId()) {
-            groups.addAll(findByExternalId(books, alreadyGrouped, formatPriority));
+            groups.addAll(findByExternalId(request.libraryId(), alreadyGrouped, formatPriority));
         }
         if (request.matchByTitleAuthor()) {
-            groups.addAll(findByTitleAuthor(books, alreadyGrouped, formatPriority));
+            groups.addAll(findByTitleAuthor(request.libraryId(), alreadyGrouped, formatPriority));
         }
         if (request.matchByDirectory()) {
-            groups.addAll(findByDirectory(books, alreadyGrouped, formatPriority));
+            groups.addAll(findByDirectory(request.libraryId(), alreadyGrouped, formatPriority));
         }
         if (request.matchByFilename()) {
-            groups.addAll(findByFilename(books, alreadyGrouped, formatPriority));
+            groups.addAll(findByFilename(request.libraryId(), alreadyGrouped, formatPriority));
         }
 
         return groups;
     }
 
-    private List<DuplicateGroup> findByIsbn(List<BookEntity> books, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
+    private DuplicateDetectionScan loadDuplicateDetectionScan(Long libraryId) {
+        long count = 0;
+        List<BookFileType> formatPriority = null;
+        long afterId = 0;
+        Pageable pageable = PageRequest.of(0, DUPLICATE_DETECTION_BATCH_SIZE);
+        while (true) {
+            List<BookEntity> batch = bookRepository.findDuplicateDetectionBatch(libraryId, afterId, pageable);
+            if (batch.isEmpty()) {
+                return new DuplicateDetectionScan(count, formatPriority);
+            }
+            count += batch.size();
+            if (formatPriority == null) {
+                BookEntity first = batch.getFirst();
+                formatPriority = first.getLibrary() != null ? first.getLibrary().getFormatPriority() : null;
+            }
+            afterId = batch.getLast().getId();
+        }
+    }
+
+    private void forEachDuplicateDetectionBatch(Long libraryId, Consumer<List<BookEntity>> consumer) {
+        long afterId = 0;
+        Pageable pageable = PageRequest.of(0, DUPLICATE_DETECTION_BATCH_SIZE);
+        while (true) {
+            List<BookEntity> batch = bookRepository.findDuplicateDetectionBatch(libraryId, afterId, pageable);
+            if (batch.isEmpty()) {
+                return;
+            }
+            consumer.accept(batch);
+            afterId = batch.getLast().getId();
+        }
+    }
+
+    private List<DuplicateGroup> findByIsbn(Long libraryId, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
         Map<String, List<BookEntity>> isbnGroups = new HashMap<>();
 
-        for (BookEntity book : books) {
-            if (alreadyGrouped.contains(book.getId())) continue;
-            BookMetadataEntity meta = book.getMetadata();
-            if (meta == null) continue;
+        forEachDuplicateDetectionBatch(libraryId, books -> {
+            for (BookEntity book : books) {
+                if (alreadyGrouped.contains(book.getId())) continue;
+                BookMetadataEntity meta = book.getMetadata();
+                if (meta == null) continue;
 
-            String isbn13 = meta.getIsbn13();
-            if (isbn13 == null && meta.getIsbn10() != null) {
-                isbn13 = BookUtils.isbn10To13(meta.getIsbn10());
+                String isbn13 = meta.getIsbn13();
+                if (isbn13 == null && meta.getIsbn10() != null) {
+                    isbn13 = BookUtils.isbn10To13(meta.getIsbn10());
+                }
+                if (isbn13 != null && !isbn13.isBlank()) {
+                    isbnGroups.computeIfAbsent(isbn13.trim(), k -> new ArrayList<>()).add(book);
+                }
             }
-            if (isbn13 != null && !isbn13.isBlank()) {
-                isbnGroups.computeIfAbsent(isbn13.trim(), k -> new ArrayList<>()).add(book);
-            }
-        }
+        });
 
         return buildGroups(isbnGroups, "ISBN", alreadyGrouped, formatPriority);
     }
 
-    private List<DuplicateGroup> findByExternalId(List<BookEntity> books, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
+    private List<DuplicateGroup> findByExternalId(Long libraryId, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
         Map<Long, Long> parent = new HashMap<>();
         Map<Long, BookEntity> bookMap = new HashMap<>();
-
-        List<BookEntity> candidates = books.stream()
-                .filter(b -> !alreadyGrouped.contains(b.getId()))
-                .filter(b -> b.getMetadata() != null)
-                .toList();
-
-        for (BookEntity book : candidates) {
-            bookMap.put(book.getId(), book);
-            parent.put(book.getId(), book.getId());
-        }
-
         Map<String, Long> idToBook = new HashMap<>();
-        for (BookEntity book : candidates) {
-            BookMetadataEntity meta = book.getMetadata();
-            List<String> externalIds = extractExternalIds(meta);
-            for (String extId : externalIds) {
-                if (idToBook.containsKey(extId)) {
-                    union(parent, book.getId(), idToBook.get(extId));
-                } else {
-                    idToBook.put(extId, book.getId());
+
+        forEachDuplicateDetectionBatch(libraryId, books -> {
+            for (BookEntity book : books) {
+                if (alreadyGrouped.contains(book.getId()) || book.getMetadata() == null) continue;
+                bookMap.put(book.getId(), book);
+                parent.put(book.getId(), book.getId());
+
+                for (String extId : extractExternalIds(book.getMetadata())) {
+                    if (idToBook.containsKey(extId)) {
+                        union(parent, book.getId(), idToBook.get(extId));
+                    } else {
+                        idToBook.put(extId, book.getId());
+                    }
                 }
             }
-        }
+        });
 
         Map<Long, List<BookEntity>> groups = new HashMap<>();
-        for (BookEntity book : candidates) {
+        for (BookEntity book : bookMap.values()) {
             Long root = find(parent, book.getId());
             groups.computeIfAbsent(root, k -> new ArrayList<>()).add(book);
         }
@@ -165,19 +195,21 @@ public class DuplicateDetectionService {
         }
     }
 
-    private List<DuplicateGroup> findByTitleAuthor(List<BookEntity> books, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
+    private List<DuplicateGroup> findByTitleAuthor(Long libraryId, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
         Map<String, List<BookEntity>> titleGroups = new HashMap<>();
 
-        for (BookEntity book : books) {
-            if (alreadyGrouped.contains(book.getId())) continue;
-            BookMetadataEntity meta = book.getMetadata();
-            if (meta == null || meta.getTitle() == null || meta.getTitle().isBlank()) continue;
+        forEachDuplicateDetectionBatch(libraryId, books -> {
+            for (BookEntity book : books) {
+                if (alreadyGrouped.contains(book.getId())) continue;
+                BookMetadataEntity meta = book.getMetadata();
+                if (meta == null || meta.getTitle() == null || meta.getTitle().isBlank()) continue;
 
-            String normalizedTitle = BookUtils.normalizeForSearch(meta.getTitle());
-            if (normalizedTitle != null && !normalizedTitle.isBlank()) {
-                titleGroups.computeIfAbsent(normalizedTitle, k -> new ArrayList<>()).add(book);
+                String normalizedTitle = BookUtils.normalizeForSearch(meta.getTitle());
+                if (normalizedTitle != null && !normalizedTitle.isBlank()) {
+                    titleGroups.computeIfAbsent(normalizedTitle, k -> new ArrayList<>()).add(book);
+                }
             }
-        }
+        });
 
         List<DuplicateGroup> result = new ArrayList<>();
         for (List<BookEntity> group : titleGroups.values()) {
@@ -231,60 +263,64 @@ public class DuplicateDetectionService {
         return result;
     }
 
-    private List<DuplicateGroup> findByDirectory(List<BookEntity> books, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
+    private List<DuplicateGroup> findByDirectory(Long libraryId, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
         Map<String, List<BookEntity>> dirGroups = new HashMap<>();
 
-        for (BookEntity book : books) {
-            if (alreadyGrouped.contains(book.getId())) continue;
-            if (book.getLibraryPath() == null) continue;
+        forEachDuplicateDetectionBatch(libraryId, books -> {
+            for (BookEntity book : books) {
+                if (alreadyGrouped.contains(book.getId())) continue;
+                if (book.getLibraryPath() == null) continue;
 
-            List<BookFileEntity> bookFiles = book.getBookFiles();
-            if (bookFiles == null || bookFiles.isEmpty()) continue;
+                List<BookFileEntity> bookFiles = book.getBookFiles();
+                if (bookFiles == null || bookFiles.isEmpty()) continue;
 
-            BookFileEntity primary = bookFiles.stream()
-                    .filter(BookFileEntity::isBookFormat)
-                    .findFirst()
-                    .orElse(null);
-            if (primary == null) continue;
+                BookFileEntity primary = bookFiles.stream()
+                        .filter(BookFileEntity::isBookFormat)
+                        .findFirst()
+                        .orElse(null);
+                if (primary == null) continue;
 
-            String subPath = primary.getFileSubPath();
-            if (subPath == null || subPath.isBlank()) continue;
+                String subPath = primary.getFileSubPath();
+                if (subPath == null || subPath.isBlank()) continue;
 
-            String key = book.getLibraryPath().getId() + ":" + subPath;
-            dirGroups.computeIfAbsent(key, k -> new ArrayList<>()).add(book);
-        }
+                String key = book.getLibraryPath().getId() + ":" + subPath;
+                dirGroups.computeIfAbsent(key, k -> new ArrayList<>()).add(book);
+            }
+        });
 
         return buildGroups(dirGroups, "DIRECTORY", alreadyGrouped, formatPriority);
     }
 
-    private List<DuplicateGroup> findByFilename(List<BookEntity> books, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
+    private List<DuplicateGroup> findByFilename(Long libraryId, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
         Map<String, List<BookEntity>> nameGroups = new HashMap<>();
 
-        for (BookEntity book : books) {
-            if (alreadyGrouped.contains(book.getId())) continue;
+        forEachDuplicateDetectionBatch(libraryId, books -> {
+            for (BookEntity book : books) {
+                if (alreadyGrouped.contains(book.getId())) continue;
 
-            List<BookFileEntity> bookFiles = book.getBookFiles();
-            if (bookFiles == null || bookFiles.isEmpty()) continue;
+                List<BookFileEntity> bookFiles = book.getBookFiles();
+                if (bookFiles == null || bookFiles.isEmpty()) continue;
 
-            BookFileEntity primary = bookFiles.stream()
-                    .filter(BookFileEntity::isBookFormat)
-                    .findFirst()
-                    .orElse(null);
-            if (primary == null || primary.getFileName() == null) continue;
+                BookFileEntity primary = bookFiles.stream()
+                        .filter(BookFileEntity::isBookFormat)
+                        .findFirst()
+                        .orElse(null);
+                if (primary == null || primary.getFileName() == null) continue;
 
-            String fileName = primary.getFileName();
-            int dotIdx = fileName.lastIndexOf('.');
-            String baseName = dotIdx > 0 ? fileName.substring(0, dotIdx) : fileName;
+                String fileName = primary.getFileName();
+                int dotIdx = fileName.lastIndexOf('.');
+                String baseName = dotIdx > 0 ? fileName.substring(0, dotIdx) : fileName;
 
-            String normalized = baseName.toLowerCase();
-            normalized = UNDERSCORE_HYPHEN_PATTERN.matcher(normalized).replaceAll(" ");
-            normalized = NON_ALPHANUMERIC_PATTERN.matcher(normalized).replaceAll("");
-            normalized = WHITESPACE_PATTERN.matcher(normalized).replaceAll(" ").trim();
+                String normalized = baseName.toLowerCase();
+                normalized = UNDERSCORE_HYPHEN_PATTERN.matcher(normalized).replaceAll(" ");
+                normalized = NON_ALPHANUMERIC_PATTERN.matcher(normalized).replaceAll("");
+                normalized = WHITESPACE_PATTERN.matcher(normalized).replaceAll(" ").trim();
 
-            if (!normalized.isBlank()) {
-                nameGroups.computeIfAbsent(normalized, k -> new ArrayList<>()).add(book);
+                if (!normalized.isBlank()) {
+                    nameGroups.computeIfAbsent(normalized, k -> new ArrayList<>()).add(book);
+                }
             }
-        }
+        });
 
         return buildGroups(nameGroups, "FILENAME", alreadyGrouped, formatPriority);
     }
@@ -331,5 +367,8 @@ public class DuplicateDetectionService {
             }
         }
         return bestScore;
+    }
+
+    private record DuplicateDetectionScan(long bookCount, List<BookFileType> formatPriority) {
     }
 }
