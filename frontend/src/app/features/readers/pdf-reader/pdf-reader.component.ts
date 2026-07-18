@@ -14,6 +14,7 @@ import { PdfAnnotationService } from '../../../shared/service/pdf-annotation.ser
 import { ReaderIconComponent } from '../../readers/ebook-reader/shared/icon.component';
 import { BookMark } from '../../../shared/service/book-mark.service';
 import { EmbedPdfBookService, PdfOutlineItem, PdfScrollLayout } from './services/embedpdf-book.service';
+import {EmbedPdfMessage, PdfEmbedBridgeService} from './services/pdf-embed-bridge.service';
 import type { AnnotationTransferItem } from '@embedpdf/snippet';
 import { PdfBookmarkService } from './services/pdf-bookmark.service';
 import { PdfSidebarComponent, PdfAnnotationListItem } from './components/pdf-sidebar.component';
@@ -29,14 +30,6 @@ import { WakeLockService } from '../../../shared/service/wake-lock.service';
 import { Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {ReaderFullscreenService} from '../shared/reader-fullscreen.service';
-
-type EmbedPdfMessage =
-  | { type: 'ready' }
-  | { type: 'documentOpened'; pageCount?: number }
-  | { type: 'documentError'; error: string }
-  | { type: 'saved'; buffer?: ArrayBuffer }
-  | { type: 'saveError'; error: string }
-  | { type: 'pageChange'; pageNumber: number; totalPages: number };
 
 @Component({
   selector: 'app-pdf-reader',
@@ -192,6 +185,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   private readonly t = inject(TranslocoService);
   private wakeLockService = inject(WakeLockService);
   private fullscreenService = inject(ReaderFullscreenService);
+  private pdfEmbedBridge = inject(PdfEmbedBridgeService);
   readonly embedPdfBook = inject(EmbedPdfBookService);
   readonly pdfBookmarkService = inject(PdfBookmarkService);
   private readonly ngZone = inject(NgZone);
@@ -233,7 +227,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
         if (this.viewerMode() === 'book') {
           this.embedPdfBook.setLocale(lang);
         } else if (this.embedPdfIframe?.contentWindow) {
-          this.embedPdfIframe.contentWindow.postMessage({ type: 'setLocale', locale: lang }, location.origin);
+          this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'setLocale', locale: lang });
         }
       });
 
@@ -749,7 +743,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
       this.embedPdfBook.setPanMode(active);
     }
     if (this.viewerMode() === 'document' && this.embedPdfIframe?.contentWindow) {
-      this.embedPdfIframe.contentWindow.postMessage({ type: 'setPanMode', enable: active }, location.origin);
+      this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'setPanMode', enable: active });
     }
   }
 
@@ -860,7 +854,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     if (this.viewerMode() === 'book') {
       this.embedPdfBook.setScrollLayout(nextLayout);
     } else if (this.embedPdfIframe?.contentWindow) {
-      this.embedPdfIframe.contentWindow.postMessage({ type: 'setScrollLayout', layout: nextLayout }, location.origin);
+      this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'setScrollLayout', layout: nextLayout });
     }
     this.updateViewerSetting();
   }
@@ -997,11 +991,10 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
       iframe.style.cssText = 'width:100%;height:100%;border:none;';
       iframe.setAttribute('allow', 'fullscreen');
 
-      this.embedPdfMessageHandler = (e: MessageEvent) => {
-        if (e.origin !== location.origin) return;
-        if (e.source !== iframe.contentWindow) return;
-        this.handleEmbedPdfMessage(e.data);
-      };
+      this.embedPdfMessageHandler = this.pdfEmbedBridge.createMessageHandler(
+        iframe,
+        message => this.handleEmbedPdfMessage(message)
+      );
       window.addEventListener('message', this.embedPdfMessageHandler);
 
       await new Promise<void>((resolve) => {
@@ -1012,12 +1005,12 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
       this.embedPdfIframe = iframe;
       this.pendingPdfBuffer = pdfBuffer;
 
-      iframe.contentWindow!.postMessage({
+      this.pdfEmbedBridge.post(iframe, {
         type: 'init',
         wasmUrl: '/assets/pdfium/pdfium.wasm',
         theme: this.isDarkTheme() ? 'dark' : 'light',
         locale: this.t.getActiveLang()
-      }, location.origin);
+      });
 
     } catch (err) {
       console.error('[EmbedPDF] FATAL:', err);
@@ -1036,9 +1029,9 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
         if (this.pendingPdfBuffer && this.embedPdfIframe?.contentWindow) {
           const buf = this.pendingPdfBuffer;
           this.pendingPdfBuffer = undefined;
-          this.embedPdfIframe.contentWindow.postMessage(
+          this.pdfEmbedBridge.post(
+            this.embedPdfIframe,
             { type: 'load', buffer: buf },
-            location.origin,
             [buf]
           );
         }
@@ -1049,9 +1042,9 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
           this.totalPages.set(msg.pageCount);
         }
         if (this.embedPdfIframe?.contentWindow && this.initialPage > 1) {
-          this.embedPdfIframe.contentWindow.postMessage(
+          this.pdfEmbedBridge.post(
+            this.embedPdfIframe,
             { type: 'scrollToPage', pageNumber: this.initialPage },
-            location.origin
           );
         }
         this.startDocProgressReleaseFallback();
@@ -1099,7 +1092,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     try {
       const buffer: ArrayBuffer | null = await new Promise((resolve) => {
         this.embedPdfSaveResolve = resolve;
-        this.embedPdfIframe!.contentWindow!.postMessage({ type: 'save' }, location.origin);
+        this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'save' });
         const timer = setTimeout(() => {
           if (this.embedPdfSaveResolve === resolve) {
             resolve(null);
@@ -1222,9 +1215,9 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     if (this.viewerMode() === 'book') {
       this.embedPdfBook.setTheme(this.isDarkTheme() ? 'dark' : 'light');
     } else if (this.embedPdfIframe?.contentWindow) {
-      this.embedPdfIframe.contentWindow.postMessage(
+      this.pdfEmbedBridge.post(
+        this.embedPdfIframe,
         { type: 'setTheme', theme: this.isDarkTheme() ? 'dark' : 'light' },
-        location.origin
       );
     }
   }
@@ -1442,7 +1435,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     if (this.viewerMode() === 'book') {
       this.embedPdfBook.scrollToPage(1);
     } else if (this.embedPdfIframe?.contentWindow) {
-      this.embedPdfIframe.contentWindow.postMessage({ type: 'scrollToPage', pageNumber: 1 }, location.origin);
+      this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'scrollToPage', pageNumber: 1 });
     }
     this.onPageChange(1);
   }
@@ -1454,7 +1447,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
       if (this.viewerMode() === 'book') {
         this.embedPdfBook.scrollToPreviousPage();
       } else if (this.embedPdfIframe?.contentWindow) {
-        this.embedPdfIframe.contentWindow.postMessage({ type: 'prevPage' }, location.origin);
+        this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'prevPage' });
       }
       this.onPageChange(p);
     }
@@ -1468,7 +1461,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
       if (this.viewerMode() === 'book') {
         this.embedPdfBook.scrollToNextPage();
       } else if (this.embedPdfIframe?.contentWindow) {
-        this.embedPdfIframe.contentWindow.postMessage({ type: 'nextPage' }, location.origin);
+        this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'nextPage' });
       }
       this.onPageChange(p);
     }
@@ -1479,7 +1472,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     if (this.viewerMode() === 'book') {
       this.embedPdfBook.scrollToPage(total);
     } else if (this.embedPdfIframe?.contentWindow) {
-      this.embedPdfIframe.contentWindow.postMessage({ type: 'scrollToPage', pageNumber: total }, location.origin);
+      this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'scrollToPage', pageNumber: total });
     }
     this.onPageChange(total);
   }
@@ -1489,7 +1482,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     if (this.viewerMode() === 'book') {
       this.embedPdfBook.scrollToPage(value, 'instant');
     } else if (this.embedPdfIframe?.contentWindow) {
-      this.embedPdfIframe.contentWindow.postMessage({ type: 'scrollToPage', pageNumber: value }, location.origin);
+      this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'scrollToPage', pageNumber: value });
     }
     this.onPageChange(value);
   }
@@ -1501,7 +1494,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
       if (this.viewerMode() === 'book') {
         this.embedPdfBook.scrollToPage(input);
       } else if (this.embedPdfIframe?.contentWindow) {
-        this.embedPdfIframe.contentWindow.postMessage({ type: 'scrollToPage', pageNumber: input }, location.origin);
+        this.pdfEmbedBridge.post(this.embedPdfIframe, { type: 'scrollToPage', pageNumber: input });
       }
       this.onPageChange(input);
       this.goToPageInput.set(null);
