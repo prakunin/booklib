@@ -1,10 +1,11 @@
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {InfiniteData, QueryClient} from '@tanstack/angular-query-experimental';
 
 import {Book, BookMetadata, ReadStatus} from '../model/book.model';
 import {AppBookSummary, AppPageResponse} from '../model/app-book.model';
 import {
   addBookToCache,
+  invalidateAppDerivedQueries,
   invalidateBookDetailQueries,
   invalidateBookQueries,
   invalidateBooksQuery,
@@ -40,8 +41,19 @@ describe('book-query-cache', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     queryClient = new QueryClient();
   });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Derived-aggregate invalidation is trailing-debounced; run the pending timer so its
+  // invalidateQueries calls become observable.
+  function flushDerivedInvalidation(): void {
+    vi.advanceTimersByTime(3_100);
+  }
 
   it('adds new books and replaces existing entries by id when the legacy list exists', () => {
     const firstBook = makeBook(1);
@@ -82,6 +94,7 @@ describe('book-query-cache', () => {
     invalidateBooksQuery(queryClient);
     invalidateBookDetailQueries(queryClient, [1, 1, 2]);
     invalidateBookQueries(queryClient, [3, 3]);
+    flushDerivedInvalidation();
 
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: bookDetailQueryPrefix(1)});
@@ -102,6 +115,7 @@ describe('book-query-cache', () => {
     queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [firstBook, secondBook]);
 
     patchBooksInCache(queryClient, [updatedSecondBook]);
+    flushDerivedInvalidation();
 
     expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([firstBook, updatedSecondBook]);
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: bookDetailQueryPrefix(2)});
@@ -170,6 +184,7 @@ describe('book-query-cache', () => {
         personalRating: 4
       }
     ]);
+    flushDerivedInvalidation();
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: bookDetailQueryPrefix(1)});
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: bookDetailQueryPrefix(2)});
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: bookDetailQueryPrefix(3)});
@@ -218,6 +233,7 @@ describe('book-query-cache', () => {
     queryClient.setQueryData(bookRecommendationsQueryKey(1, 20), [secondBook]);
 
     removeBooksFromCache(queryClient, [1]);
+    flushDerivedInvalidation();
 
     expect(queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)).toEqual([secondBook]);
     expect(queryClient.getQueryData(bookDetailQueryKey(1, false))).toBeUndefined();
@@ -234,6 +250,36 @@ describe('book-query-cache', () => {
 
     expect(setQueryDataSpy).not.toHaveBeenCalled();
     expect(removeQueriesSpy).not.toHaveBeenCalled();
+  });
+
+  describe('derived query invalidation debouncing', () => {
+    it('coalesces a burst of invalidations into a single refetch trigger', () => {
+      const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      invalidateAppDerivedQueries(queryClient);
+      invalidateAppDerivedQueries(queryClient);
+      invalidateAppDerivedQueries(queryClient);
+
+      expect(invalidateQueriesSpy).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(3_100);
+
+      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(3);
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: ['app-filter-options']});
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: ['app-catalog-summary']});
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: ['app-book-summaries']});
+    });
+
+    it('does not defer the refetch forever under a continuous event stream', () => {
+      const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      for (let i = 0; i < 20; i++) {
+        invalidateAppDerivedQueries(queryClient);
+        vi.advanceTimersByTime(1_000);
+      }
+
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: ['app-filter-options']});
+    });
   });
 
   describe('app-books surgical field patching', () => {
@@ -326,6 +372,7 @@ describe('book-query-cache', () => {
         {bookId: 1, fields: {readStatus: ReadStatus.READ, personalRating: 5, lastReadTime: '2026-01-01T00:00:00Z'}},
         {bookId: 2, fields: {epubProgress: {cfi: 'x', percentage: 42}}}
       ]);
+      flushDerivedInvalidation();
 
       const content = contentOf();
       expect(content[0]).toMatchObject({readStatus: ReadStatus.READ, personalRating: 5, lastReadTime: '2026-01-01T00:00:00Z'});

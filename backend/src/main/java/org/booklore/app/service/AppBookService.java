@@ -70,6 +70,7 @@ public class AppBookService {
     static final int MAX_SELECT_ALL_BOOK_IDS = 500;
     private static final String DEFAULT_SORT = "addedOn";
     private static final int ISBN_QUERY_BATCH_SIZE = 500;
+    private static final int MAX_SHELL_IDS_IN_CLAUSE = 1_000;
 
     private final BookRepository bookRepository;
     private final UserBookProgressRepository userBookProgressRepository;
@@ -84,11 +85,8 @@ public class AppBookService {
     private final BookSortRegistry bookSortRegistry;
     private final ApplicationEventPublisher eventPublisher;
     private final CatalogSummaryCache catalogSummaryCache;
+    private final FilterOptionsCache filterOptionsCache;
 
-    private final Cache<String, AppFilterOptions> filterOptionsCache = Caffeine.newBuilder()
-            .expireAfterWrite(Duration.ofSeconds(30))
-            .maximumSize(50)
-            .build();
     private final Cache<Long, RestrictionQueryScope> restrictionQueryScopeCache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
             .maximumSize(100)
@@ -106,7 +104,8 @@ public class AppBookService {
                           UserContentRestrictionRepository restrictionRepository,
                           BookSortRegistry bookSortRegistry,
                           ApplicationEventPublisher eventPublisher,
-                          CatalogSummaryCache catalogSummaryCache) {
+                          CatalogSummaryCache catalogSummaryCache,
+                          FilterOptionsCache filterOptionsCache) {
         this.bookRepository = bookRepository;
         this.userBookProgressRepository = userBookProgressRepository;
         this.userBookFileProgressRepository = userBookFileProgressRepository;
@@ -120,6 +119,7 @@ public class AppBookService {
         this.bookSortRegistry = bookSortRegistry;
         this.eventPublisher = eventPublisher;
         this.catalogSummaryCache = catalogSummaryCache;
+        this.filterOptionsCache = filterOptionsCache;
     }
 
     public AppPageResponse<AppBookSummary> getBooks(BookListRequest req) {
@@ -632,22 +632,31 @@ public class AppBookService {
             }
         }
 
-        // Cache lookup avoid re-running 26+ aggregate queries within the TTL window
-        String cacheKey = userId + ":" + libraryId + ":" + shelfId + ":" + magicShelfId;
-        AppFilterOptions cached = filterOptionsCache.getIfPresent(cacheKey);
-        if (cached != null) {
-            return cached;
-        }
-
         // Access check only. A magic shelf's arbitrary rule Specification cannot be embedded in the
         // JPQL facet aggregates without first materializing every matching id, which is exactly the
         // cost this endpoint avoids on large catalogs. Facets therefore stay library-scoped while
         // the paginated book query applies the shelf rule itself - so on a magic shelf the counts
-        // describe the library, not the shelf.
+        // describe the library, not the shelf. Because facets ignore the magic shelf, it is also
+        // deliberately absent from the cache key.
         if (magicShelfId != null) {
             assertMagicShelfAccessible(userId, magicShelfId);
         }
 
+        // The key encodes the full visibility scope (user, admin flag, accessible libraries,
+        // library/shelf scoping) so a permission or assignment change produces a new key instead of
+        // serving stale counts. All access checks above run before the cache so a hit can never
+        // bypass them.
+        String cacheKey = userId + "|" + user.getPermissions().isAdmin()
+                + "|" + (accessibleLibraryIds == null ? "*" : accessibleLibraryIds.stream().sorted()
+                        .map(String::valueOf).collect(Collectors.joining(",")))
+                + "|" + libraryId + "|" + shelfId;
+        return filterOptionsCache.get(cacheKey,
+                () -> computeFilterOptions(user, userId, accessibleLibraryIds, libraryId, shelfId));
+    }
+
+    private AppFilterOptions computeFilterOptions(BookLoreUser user, Long userId,
+                                                  Set<Long> accessibleLibraryIds,
+                                                  Long libraryId, Long shelfId) {
         String libraryClause = "";
         String shelfClause = "";
         if (shelfId != null) {
@@ -661,8 +670,10 @@ public class AppBookService {
         RestrictionQueryScope restrictionScope = user.getPermissions().isAdmin()
                 ? new RestrictionQueryScope("", Map.of())
                 : restrictionQueryScope(userId);
+        Set<Long> shellBookIds = findShellBookIds();
         String scopeClause = buildScopeClause(libraryClause, shelfClause)
-                + restrictionScope.clause();
+                + restrictionScope.clause()
+                + visibilityClause(shellBookIds);
 
         List<AppFilterOptions.CountedOption> authors = queryCountedOptions(
                 "a.name", "JOIN b.metadata m JOIN m.authors a", "",
@@ -765,8 +776,7 @@ public class AppBookService {
         String personalRatingQuery = "SELECT CAST(ubp.personalRating AS string), COUNT(DISTINCT ubp.book.id) " +
                 "FROM UserBookProgressEntity ubp " +
                 "WHERE ubp.user.id = :userId AND ubp.personalRating IS NOT NULL " +
-                "AND ubp.book.id IN (SELECT b.id FROM BookEntity b WHERE (b.deleted IS NULL OR b.deleted = false) " +
-                "AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true) " +
+                "AND ubp.book.id IN (SELECT b.id FROM BookEntity b WHERE (b.deleted IS NULL OR b.deleted = false)" +
                 scopeClause + ") " +
                 "GROUP BY 1 ORDER BY 1 DESC";
         var prQ = entityManager.createQuery(personalRatingQuery, Tuple.class);
@@ -817,7 +827,6 @@ public class AppBookService {
         String creatorJpql = "SELECT cr.name, mapping.role, COUNT(DISTINCT b.id) FROM BookEntity b"
                 + " JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.creatorMappings mapping JOIN mapping.creator cr"
                 + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
                 + " " + scopeClause
                 + " GROUP BY cr.name, mapping.role ORDER BY COUNT(DISTINCT b.id) DESC";
         var creatorQ = entityManager.createQuery(creatorJpql, Tuple.class);
@@ -840,7 +849,7 @@ public class AppBookService {
                 "CAST(l.id AS string) || ':' || l.name", "JOIN b.library l", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
-        AppFilterOptions result = AppFilterOptions.builder()
+        return AppFilterOptions.builder()
                 .authors(authors)
                 .languages(languages)
                 .fileTypes(fileTypes)
@@ -872,8 +881,6 @@ public class AppBookService {
                 .shelves(shelves)
                 .libraries(libraries)
                 .build();
-        filterOptionsCache.put(cacheKey, result);
-        return result;
     }
 
 
@@ -1348,7 +1355,6 @@ public class AppBookService {
         String jpql = "SELECT " + selectExpr + ", COUNT(DISTINCT b.id) FROM BookEntity b"
                 + " " + joins
                 + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
                 + (extraWhere.isEmpty() ? "" : " " + extraWhere)
                 + " " + scopeClause
                 + " GROUP BY " + selectExpr + " ORDER BY COUNT(DISTINCT b.id) DESC";
@@ -1374,6 +1380,31 @@ public class AppBookService {
         if (!libraryClause.isEmpty()) sb.append(" ").append(libraryClause);
         if (!shelfClause.isEmpty()) sb.append(" ").append(shelfClause);
         return sb.toString();
+    }
+
+    /**
+     * Books with no files that are not physical either would render as empty shells. The legacy
+     * per-query predicate "(b.bookFiles IS NOT EMPTY OR b.isPhysical = true)" excluded them, but
+     * MariaDB executes that OR-EXISTS as a materialized scan of the whole book_file index in every
+     * facet aggregate. The set is almost always empty, so it is computed once per facet
+     * recomputation and the aggregates only pay for it when shells actually exist.
+     */
+    private Set<Long> findShellBookIds() {
+        return Set.copyOf(entityManager.createQuery(
+                "SELECT b.id FROM BookEntity b"
+                        + " WHERE b.bookFiles IS EMPTY AND (b.isPhysical IS NULL OR b.isPhysical = false)",
+                Long.class).getResultList());
+    }
+
+    private String visibilityClause(Set<Long> shellBookIds) {
+        if (shellBookIds.isEmpty()) {
+            return "";
+        }
+        if (shellBookIds.size() > MAX_SHELL_IDS_IN_CLAUSE) {
+            return " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)";
+        }
+        return " AND b.id NOT IN (" + shellBookIds.stream().sorted()
+                .map(String::valueOf).collect(Collectors.joining(", ")) + ")";
     }
 
     private void setFilterQueryParams(Query query, Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
@@ -1512,7 +1543,6 @@ public class AppBookService {
                 + " AND ubp.book.id IN ("
                 + "   SELECT b.id FROM BookEntity b"
                 + "   WHERE (b.deleted IS NULL OR b.deleted = false)"
-                + "   AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
                 + " " + scopeClause
                 + " )"
                 + " GROUP BY ubp.readStatus ORDER BY COUNT(DISTINCT ubp.book.id) DESC";
@@ -1527,7 +1557,6 @@ public class AppBookService {
 
         String baseQuery = "SELECT COUNT(DISTINCT b.id) FROM BookEntity b"
                 + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
                 + " AND b.id NOT IN ("
                 + "   SELECT ubp.book.id FROM UserBookProgressEntity ubp WHERE ubp.user.id = :userId"
                 + " )"
@@ -1566,7 +1595,7 @@ public class AppBookService {
             String scopeClause, Set<Long> accessibleLibraryIds,
             Long libraryId, Long shelfId) {
         String jpql = "SELECT " + caseExpr + ", COUNT(DISTINCT b.id) FROM BookEntity b " + joins +
-                " WHERE (b.deleted IS NULL OR b.deleted = false) AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true) "
+                " WHERE (b.deleted IS NULL OR b.deleted = false) "
                 + extraWhere + " " + scopeClause +
                 " GROUP BY 1";
         var q = entityManager.createQuery(jpql, Tuple.class);

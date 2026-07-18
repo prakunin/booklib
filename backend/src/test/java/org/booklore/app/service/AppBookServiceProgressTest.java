@@ -67,7 +67,7 @@ class AppBookServiceProgressTest {
                 bookRepository, userBookProgressRepository, userBookFileProgressRepository,
                 shelfRepository, authenticationService, mobileBookMapper,
                 bookService, magicShelfBookService, entityManager, restrictionRepository, bookSortRegistry, eventPublisher,
-                new CatalogSummaryCache()
+                new CatalogSummaryCache(), new FilterOptionsCache()
         );
         when(bookRepository.exists(ArgumentMatchers.<Specification<BookEntity>>any())).thenReturn(true);
     }
