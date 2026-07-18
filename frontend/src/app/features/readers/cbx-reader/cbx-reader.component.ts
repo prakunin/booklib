@@ -40,6 +40,7 @@ import {
   writeStripWidthPercentPerBook
 } from './core/cbx-reader-storage';
 import {computeCbxSpreads, findCbxSpreadForPage} from './core/cbx-spread.util';
+import {CbxSlideshowController} from './core/cbx-slideshow-controller';
 
 
 @Component({
@@ -147,7 +148,6 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   // Slideshow state
   isSlideshowActive = signal(false);
   slideshowInterval = signal<CbxSlideshowInterval>(CbxSlideshowInterval.FIVE_SECONDS);
-  private slideshowTimer: ReturnType<typeof setInterval> | null = null;
 
   // Double-tap zoom
   private lastTapTime = 0;
@@ -232,6 +232,11 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   private pageDimensionService = inject(CbxPageDimensionService);
   private wakeLockService = inject(WakeLockService);
   private readerPreferencesService = inject(ReaderPreferencesService);
+  private slideshowController = new CbxSlideshowController({
+    canAdvance: () => this.currentPage() < this.pages().length - 1,
+    advance: () => this.advancePage(1),
+    onActiveChange: active => this.setSlideshowActive(active),
+  });
 
   protected readonly CbxScrollMode = CbxScrollMode;
   protected readonly CbxFitMode = CbxFitMode;
@@ -2022,52 +2027,30 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
   // Slideshow methods
   toggleSlideshow(): void {
-    if (this.isSlideshowActive()) {
-      this.stopSlideshow();
-    } else {
-      this.startSlideshow();
-    }
+    this.slideshowController.toggle(this.slideshowInterval());
   }
 
   startSlideshow(): void {
-    if (this.currentPage() >= this.pages().length - 1) return;
-
-    this.isSlideshowActive.set(true);
-    this.headerService.updateState({ isFullscreen: this.isFullscreen(), isSlideshowActive: true });
-
-    this.slideshowTimer = setInterval(() => {
-      if (this.currentPage() < this.pages().length - 1) {
-        this.advancePage(1);
-      } else {
-        this.stopSlideshow();
-      }
-    }, this.slideshowInterval());
+    this.slideshowController.start(this.slideshowInterval());
   }
 
   stopSlideshow(): void {
-    if (this.slideshowTimer) {
-      clearInterval(this.slideshowTimer);
-      this.slideshowTimer = null;
-    }
-    this.isSlideshowActive.set(false);
-    this.headerService.updateState({ isFullscreen: this.isFullscreen(), isSlideshowActive: false });
+    this.slideshowController.stop();
   }
 
   private pauseSlideshowOnInteraction(): void {
-    if (this.isSlideshowActive()) {
-      this.stopSlideshow();
-    }
+    this.slideshowController.pauseOnInteraction();
   }
 
   onSlideshowIntervalChange(interval: CbxSlideshowInterval): void {
     this.slideshowInterval.set(interval);
     this.quickSettingsService.setSlideshowInterval(interval);
+    this.slideshowController.updateInterval(interval);
+  }
 
-    // Restart slideshow with new interval if active
-    if (this.isSlideshowActive()) {
-      this.stopSlideshow();
-      this.startSlideshow();
-    }
+  private setSlideshowActive(active: boolean): void {
+    this.isSlideshowActive.set(active);
+    this.headerService.updateState({ isFullscreen: this.isFullscreen(), isSlideshowActive: active });
   }
 
   onMagnifierZoomChange(zoom: CbxMagnifierZoom): void {
@@ -2245,7 +2228,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
 
   ngOnDestroy(): void {
-    this.stopSlideshow();
+    this.slideshowController.destroy();
     if (this.infiniteScrollPageDebounceTimer) {
       clearTimeout(this.infiniteScrollPageDebounceTimer);
       this.infiniteScrollPageDebounceTimer = null;
