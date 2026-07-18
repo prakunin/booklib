@@ -21,6 +21,7 @@ import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
 import org.booklore.service.annotation.InvalidateUserStats;
 import org.booklore.service.progress.ReadingProgressService;
+import org.booklore.service.restriction.ContentRestrictionService;
 import org.booklore.util.BookUtils;
 import org.booklore.util.FileService;
 import org.booklore.util.FileUtils;
@@ -73,6 +74,7 @@ public class BookService {
     private final FileStreamingService fileStreamingService;
     private final AuditService auditService;
     private final ArchivedBookContentService archivedBookContentService;
+    private final ContentRestrictionService contentRestrictionService;
 
 
     public List<Book> getBookDTOs(boolean includeDescription, boolean stripForListView) {
@@ -154,6 +156,7 @@ public class BookService {
             bookEntities = bookEntities.stream()
                     .filter(book -> userLibraryIds.contains(book.getLibrary().getId()))
                     .toList();
+            bookEntities = contentRestrictionService.applyRestrictions(bookEntities, user.getId());
         }
 
         Set<Long> entityIds = bookEntities.stream().map(BookEntity::getId).collect(Collectors.toSet());
