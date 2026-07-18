@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 @DependsOnDatabaseInitialization
 public class AppSettingService {
     private static final String DEFAULT_MOBILE_REDIRECT_URI = "booklib://oauth2-callback";
-    private static final String WILDCARD_REDIRECT_URI = "*";
 
     private final AppProperties appProperties;
     private final SettingPersistenceHelper settingPersistenceHelper;
@@ -152,18 +151,12 @@ public class AppSettingService {
                 })
                 .toList();
 
-        if (redirectUris.contains(WILDCARD_REDIRECT_URI) && redirectUris.size() > 1) {
-            throw ApiError.GENERIC_BAD_REQUEST.createException("Wildcard redirect URI must be the only value");
-        }
-
         Set<String> uniqueUris = new LinkedHashSet<>();
         for (String redirectUri : redirectUris) {
             if (redirectUri == null || redirectUri.isBlank()) {
                 throw ApiError.GENERIC_BAD_REQUEST.createException("Redirect URI cannot be blank");
             }
-            if (!WILDCARD_REDIRECT_URI.equals(redirectUri)) {
-                validateMobileRedirectUriShape(redirectUri);
-            }
+            validateMobileRedirectUriShape(redirectUri);
             if (!uniqueUris.add(redirectUri)) {
                 throw ApiError.GENERIC_BAD_REQUEST.createException("Duplicate redirect URI: " + redirectUri);
             }

@@ -597,27 +597,15 @@ class OidcAuthServiceTest {
     }
 
     @Test
-    void validateRedirectUri_allowsAnyConfiguredWildcardMobileRedirect() {
+    void validateRedirectUri_rejectsConfiguredWildcardMobileRedirect() {
         var settings = enabledSettings();
         settings.setOidcRedirectUris(List.of("*"));
-        var tokenResponse = tokenResponse(null, "id-token");
-        var claims = new JWTClaimsSet.Builder().subject("sub-123").build();
-        var userClaims = userClaims("jdoe", "sub-123");
-        var user = existingOidcUser("jdoe", "sub-123");
-
         when(appSettingService.getAppSettings()).thenReturn(settings);
-        when(oidcTokenClient.exchangeAuthorizationCode(eq(CODE), eq(CODE_VERIFIER), eq("grimmory://some-other-path"), any()))
-                .thenReturn(tokenResponse);
-        when(oidcTokenValidator.validateIdToken("id-token", ISSUER_URI, CLIENT_ID, NONCE, null))
-                .thenReturn(claims);
-        when(oidcClaimExtractor.extractClaims(eq(claims), any(), eq(Map.of()))).thenReturn(userClaims);
-        when(userRepository.findByOidcIssuerAndOidcSubject(ISSUER_URI, "sub-123")).thenReturn(Optional.of(user));
-        when(appSettingService.getSettingValue("oidc_session_duration_hours")).thenReturn(null);
-        when(authenticationService.loginUser(user)).thenReturn(ResponseEntity.ok(AccessTokenDto.builder().build()));
 
-        var result = oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "grimmory://some-other-path", NONCE, mockRequest());
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "grimmory://some-other-path", NONCE, mockRequest()))
+                .isInstanceOf(APIException.class);
 
-        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        verify(oidcTokenClient, never()).exchangeAuthorizationCode(anyString(), anyString(), anyString(), any());
     }
 
     @Test

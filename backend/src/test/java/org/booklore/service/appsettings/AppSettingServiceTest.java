@@ -76,19 +76,14 @@ class AppSettingServiceTest {
     }
 
     @Test
-    void updateSetting_acceptsWildcardOidcRedirectUri() throws Exception {
-        appSettingService.updateSetting(
+    void updateSetting_rejectsWildcardOidcRedirectUri() {
+        assertThatThrownBy(() -> appSettingService.updateSetting(
                 AppSettingKey.OIDC_REDIRECT_URIS,
                 List.of("*")
-        );
+        ))
+                .hasMessageContaining("Redirect URI must include a scheme");
 
-        ArgumentCaptor<AppSettingEntity> settingCaptor = ArgumentCaptor.forClass(AppSettingEntity.class);
-        verify(appSettingsRepository).save(settingCaptor.capture());
-
-        AppSettingEntity savedSetting = settingCaptor.getValue();
-        assertThat(savedSetting.getName()).isEqualTo(AppSettingKey.OIDC_REDIRECT_URIS.toString());
-        assertThat(savedSetting.getVal()).isEqualTo("[\"*\"]");
-        verify(auditService).log(AuditAction.OIDC_CONFIG_CHANGED, "Updated setting: " + AppSettingKey.OIDC_REDIRECT_URIS);
+        verify(appSettingsRepository, never()).save(any());
     }
 
     @Test
@@ -123,7 +118,7 @@ class AppSettingServiceTest {
                 AppSettingKey.OIDC_REDIRECT_URIS,
                 List.of("*", "booklib://oauth2-callback")
         ))
-                .hasMessageContaining("Wildcard redirect URI must be the only value");
+                .hasMessageContaining("Redirect URI must include a scheme");
 
         verify(appSettingsRepository, never()).save(any());
     }
