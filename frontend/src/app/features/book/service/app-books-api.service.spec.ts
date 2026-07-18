@@ -82,6 +82,27 @@ describe('AppBooksApiService', () => {
     expect(service.isLoading()).toBe(false);
   });
 
+  it('does not refetch the heavy book list when the window regains focus', () => {
+    const queryClient = TestBed.inject(QueryClient);
+    service.setBooksEnabled(true);
+    flushSignalAndQueryEffects();
+    const query = queryClient.getQueryCache().findAll({queryKey: ['app-books']})[0];
+    const options = query?.options as {refetchOnWindowFocus?: unknown} | undefined;
+
+    expect(options?.refetchOnWindowFocus).toBe(false);
+
+    const request = http.expectOne(req => req.url.endsWith('/api/v1/app/books'));
+    request.flush({
+      content: [],
+      page: 0,
+      size: 50,
+      totalElements: 0,
+      totalPages: 0,
+      hasNext: false,
+      hasPrevious: false,
+    });
+  });
+
   it('loads summaries in bounded sequential batches and preserves requested order', () => {
     const ids = Array.from({length: 501}, (_, index) => index + 1);
     let result: number[] = [];
