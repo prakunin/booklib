@@ -213,12 +213,12 @@ public class KomgaService {
         boolean groupUnknown = appSettingService.getAppSettings().isKomgaGroupUnknown();
         String unknownSeriesName = komgaMapper.getUnknownSeriesName();
         String matchedSeriesName = resolveSeriesName(parsedSeriesId, groupUnknown, unknownSeriesName)
-                .orElseThrow(() -> new RuntimeException("Series not found"));
+                .orElseThrow(() -> ApiError.INTERNAL_SERVER_ERROR.createException("Series not found"));
 
         Page<BookEntity> seriesBooksPage = findSeriesBooksPage(
                 matchedSeriesName, parsedSeriesId.libraryId(), groupUnknown, unknownSeriesName, PageRequest.of(0, 1));
         if (seriesBooksPage.isEmpty()) {
-            throw new IllegalStateException("Series not found");
+            throw ApiError.INTERNAL_SERVER_ERROR.createException("Series not found");
         }
 
         KomgaSeriesDto seriesDto = komgaMapper.toKomgaSeriesDto(
@@ -278,7 +278,7 @@ public class KomgaService {
     private ParsedSeriesId parseSeriesId(String seriesId) {
         String[] parts = seriesId.split("-", 2);
         if (parts.length < 2) {
-            throw new IllegalArgumentException("Invalid series ID");
+            throw ApiError.INTERNAL_SERVER_ERROR.createException("Invalid series ID");
         }
         return new ParsedSeriesId(Long.parseLong(parts[0]), parts[1]);
     }

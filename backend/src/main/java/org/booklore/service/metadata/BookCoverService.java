@@ -709,7 +709,7 @@ public class BookCoverService {
             return file.getBytes();
         } catch (Exception e) {
             log.error("Failed to read cover file: {}", e.getMessage());
-            throw ApiError.INVALID_INPUT.createException("Failed to read cover file");
+            throw ApiError.INTERNAL_SERVER_ERROR.createException("Failed to read cover file");
         }
     }
 
