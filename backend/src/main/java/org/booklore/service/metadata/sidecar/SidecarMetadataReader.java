@@ -1,6 +1,7 @@
 package org.booklore.service.metadata.sidecar;
 
 import lombok.extern.slf4j.Slf4j;
+import org.booklore.model.dto.sidecar.SidecarBookMetadata;
 import org.booklore.model.dto.sidecar.SidecarMetadata;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
@@ -142,15 +143,19 @@ public class SidecarMetadataReader {
         if (!nullSafeEquals(sm.getLanguage(), db.getLanguage())) return true;
         if (!nullSafeEquals(sm.getPageCount(), db.getPageCount())) return true;
 
+        if (isSeriesDifferent(sm, db)) return true;
+
+        return false;
+    }
+
+    private boolean isSeriesDifferent(SidecarBookMetadata sm, BookMetadataEntity db) {
         if (sm.getSeries() != null) {
             if (!nullSafeEquals(sm.getSeries().getName(), db.getSeriesName())) return true;
             if (!nullSafeEquals(sm.getSeries().getNumber(), db.getSeriesNumber())) return true;
             if (!nullSafeEquals(sm.getSeries().getTotal(), db.getSeriesTotal())) return true;
-        } else if (db.getSeriesName() != null || db.getSeriesNumber() != null || db.getSeriesTotal() != null) {
-            return true;
+            return false;
         }
-
-        return false;
+        return db.getSeriesName() != null || db.getSeriesNumber() != null || db.getSeriesTotal() != null;
     }
 
     private boolean nullSafeEquals(Object a, Object b) {

@@ -67,13 +67,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                 audiobookBuilder.chapterCount(chapters.size());
             }
 
-            if (tag != null) {
-                String narrator = tag.getFirst(FieldKey.COMPOSER);
-                if (StringUtils.isNotBlank(narrator)) {
-                    builder.narrator(narrator);
-                }
-            }
-
+            applyNarrator(builder, tag);
             builder.audiobookMetadata(audiobookBuilder.build());
 
             if (tag == null) {
@@ -81,69 +75,9 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                 return builder.build();
             }
 
-            String album = tag.getFirst(FieldKey.ALBUM);
-            String title = tag.getFirst(FieldKey.TITLE);
-            if (StringUtils.isNotBlank(album)) {
-                builder.title(album);
-            } else if (StringUtils.isNotBlank(title)) {
-                builder.title(title);
-            } else {
-                builder.title(FilenameUtils.getBaseName(audioFile.getName()));
-            }
-
-            String albumArtist = tag.getFirst(FieldKey.ALBUM_ARTIST);
-            String artist = tag.getFirst(FieldKey.ARTIST);
-            List<String> authors = new ArrayList<>();
-            if (StringUtils.isNotBlank(albumArtist)) {
-                authors.add(albumArtist);
-            } else if (StringUtils.isNotBlank(artist)) {
-                authors.add(artist);
-            }
-            if (!authors.isEmpty()) {
-                builder.authors(authors);
-            }
-
-            String comment = tag.getFirst(FieldKey.COMMENT);
-            if (StringUtils.isNotBlank(comment)) {
-                builder.description(comment);
-            }
-
-            String publisher = tag.getFirst(FieldKey.RECORD_LABEL);
-            if (StringUtils.isNotBlank(publisher)) {
-                builder.publisher(publisher);
-            }
-
-            String year = tag.getFirst(FieldKey.YEAR);
-            if (StringUtils.isNotBlank(year)) {
-                applyYearIfValid(builder, year);
-            }
-
-            String genre = tag.getFirst(FieldKey.GENRE);
-            if (StringUtils.isNotBlank(genre)) {
-                Set<String> categories = new HashSet<>();
-                categories.add(genre);
-                builder.categories(categories);
-            }
-
-            String language = tag.getFirst(FieldKey.LANGUAGE);
-            if (StringUtils.isNotBlank(language)) {
-                builder.language(language);
-            }
-
-            String grouping = tag.getFirst(FieldKey.GROUPING);
-            if (StringUtils.isNotBlank(grouping)) {
-                builder.seriesName(grouping);
-            }
-
-            String trackNo = tag.getFirst(FieldKey.TRACK);
-            if (StringUtils.isNotBlank(trackNo)) {
-                applyTrackNumberIfValid(builder, trackNo);
-            }
-
-            String trackTotal = tag.getFirst(FieldKey.TRACK_TOTAL);
-            if (StringUtils.isNotBlank(trackTotal)) {
-                applyTrackTotalIfValid(builder, trackTotal);
-            }
+            applyTitle(builder, tag, audioFile);
+            applyAuthors(builder, tag);
+            applyTagFields(builder, tag);
 
             return builder.build();
 
@@ -152,6 +86,86 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             return BookMetadata.builder()
                     .title(FilenameUtils.getBaseName(audioFile.getName()))
                     .build();
+        }
+    }
+
+    private void applyNarrator(BookMetadata.BookMetadataBuilder builder, Tag tag) {
+        if (tag == null) {
+            return;
+        }
+        String narrator = tag.getFirst(FieldKey.COMPOSER);
+        if (StringUtils.isNotBlank(narrator)) {
+            builder.narrator(narrator);
+        }
+    }
+
+    private void applyTitle(BookMetadata.BookMetadataBuilder builder, Tag tag, File audioFile) {
+        String album = tag.getFirst(FieldKey.ALBUM);
+        String title = tag.getFirst(FieldKey.TITLE);
+        if (StringUtils.isNotBlank(album)) {
+            builder.title(album);
+        } else if (StringUtils.isNotBlank(title)) {
+            builder.title(title);
+        } else {
+            builder.title(FilenameUtils.getBaseName(audioFile.getName()));
+        }
+    }
+
+    private void applyAuthors(BookMetadata.BookMetadataBuilder builder, Tag tag) {
+        String albumArtist = tag.getFirst(FieldKey.ALBUM_ARTIST);
+        String artist = tag.getFirst(FieldKey.ARTIST);
+        List<String> authors = new ArrayList<>();
+        if (StringUtils.isNotBlank(albumArtist)) {
+            authors.add(albumArtist);
+        } else if (StringUtils.isNotBlank(artist)) {
+            authors.add(artist);
+        }
+        if (!authors.isEmpty()) {
+            builder.authors(authors);
+        }
+    }
+
+    private void applyTagFields(BookMetadata.BookMetadataBuilder builder, Tag tag) {
+        String comment = tag.getFirst(FieldKey.COMMENT);
+        if (StringUtils.isNotBlank(comment)) {
+            builder.description(comment);
+        }
+
+        String publisher = tag.getFirst(FieldKey.RECORD_LABEL);
+        if (StringUtils.isNotBlank(publisher)) {
+            builder.publisher(publisher);
+        }
+
+        String year = tag.getFirst(FieldKey.YEAR);
+        if (StringUtils.isNotBlank(year)) {
+            applyYearIfValid(builder, year);
+        }
+
+        String genre = tag.getFirst(FieldKey.GENRE);
+        if (StringUtils.isNotBlank(genre)) {
+            Set<String> categories = new HashSet<>();
+            categories.add(genre);
+            builder.categories(categories);
+        }
+
+        String language = tag.getFirst(FieldKey.LANGUAGE);
+        if (StringUtils.isNotBlank(language)) {
+            builder.language(language);
+        }
+
+        String grouping = tag.getFirst(FieldKey.GROUPING);
+        if (StringUtils.isNotBlank(grouping)) {
+            builder.seriesName(grouping);
+        }
+
+        String trackNo = tag.getFirst(FieldKey.TRACK);
+        if (StringUtils.isNotBlank(trackNo)) {
+            applyTrackNumberIfValid(builder, trackNo);
+        }
+
+        String trackTotal = tag.getFirst(FieldKey.TRACK_TOTAL);
+        if (StringUtils.isNotBlank(trackTotal)) {
+            applyTrackTotalIfValid(builder, trackTotal);
         }
     }
 
@@ -354,42 +368,9 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
     }
 
     private List<AudiobookMetadata.ChapterInfo> extractChaptersWithFfprobe(File audioFile) {
-        List<AudiobookMetadata.ChapterInfo> chapters = new ArrayList<>();
-
         try {
-            Path ffprobeBinary = ffprobeService.getFfprobeBinary();
-            if (ffprobeBinary == null) {
-                log.debug("ffprobe binary not available, skipping chapter extraction for {}", audioFile.getName());
-                return List.of();
-            }
-
-            ProcessBuilder pb = new ProcessBuilder(
-                    ffprobeBinary.toAbsolutePath().toString(),
-                    "-v", "quiet",
-                    "-print_format", "json",
-                    "-show_chapters",
-                    audioFile.getAbsolutePath()
-            );
-            pb.redirectErrorStream(true);
-
-            Process process = pb.start();
-            StringBuilder output = new StringBuilder();
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line);
-                }
-            }
-
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                log.debug("FFprobe exited with code {} for {}", exitCode, audioFile.getName());
-                return List.of();
-            }
-
-            String jsonOutput = output.toString().trim();
-            if (jsonOutput.isEmpty() || jsonOutput.equals("{}")) {
+            String jsonOutput = runFfprobeShowChapters(audioFile);
+            if (jsonOutput == null || jsonOutput.isEmpty() || jsonOutput.equals("{}")) {
                 return List.of();
             }
 
@@ -400,45 +381,9 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                 return List.of();
             }
 
+            List<AudiobookMetadata.ChapterInfo> chapters = new ArrayList<>();
             for (int i = 0; i < chaptersNode.size(); i++) {
-                JsonNode chapterNode = chaptersNode.get(i);
-
-                double startTime = 0;
-                double endTime = 0;
-
-                if (chapterNode.has("start_time")) {
-                    startTime = chapterNode.get("start_time").asDouble();
-                } else if (chapterNode.has("start")) {
-                    long start = chapterNode.get("start").asLong();
-                    String timeBase = chapterNode.has(TIME_BASE_FIELD) ? chapterNode.get(TIME_BASE_FIELD).asString() : "1/1000";
-                    startTime = convertTimebaseToSeconds(start, timeBase);
-                }
-
-                if (chapterNode.has("end_time")) {
-                    endTime = chapterNode.get("end_time").asDouble();
-                } else if (chapterNode.has("end")) {
-                    long end = chapterNode.get("end").asLong();
-                    String timeBase = chapterNode.has(TIME_BASE_FIELD) ? chapterNode.get(TIME_BASE_FIELD).asString() : "1/1000";
-                    endTime = convertTimebaseToSeconds(end, timeBase);
-                }
-
-                long startTimeMs = Math.round(startTime * 1000);
-                long endTimeMs = Math.round(endTime * 1000);
-                long durationMs = endTimeMs - startTimeMs;
-
-                String title = "Chapter " + (i + 1);
-                JsonNode tagsNode = chapterNode.get("tags");
-                if (tagsNode != null && tagsNode.has("title")) {
-                    title = tagsNode.get("title").asString();
-                }
-
-                chapters.add(AudiobookMetadata.ChapterInfo.builder()
-                        .index(i)
-                        .title(title)
-                        .startTimeMs(startTimeMs)
-                        .endTimeMs(endTimeMs)
-                        .durationMs(durationMs)
-                        .build());
+                chapters.add(parseFfprobeChapter(chaptersNode.get(i), i));
             }
 
             return chapters;
@@ -449,6 +394,76 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             log.debug("Failed to extract chapters with ffprobe from {}: {}", audioFile.getName(), e.getMessage());
             return List.of();
         }
+    }
+
+    private String runFfprobeShowChapters(File audioFile) throws Exception {
+        Path ffprobeBinary = ffprobeService.getFfprobeBinary();
+        if (ffprobeBinary == null) {
+            log.debug("ffprobe binary not available, skipping chapter extraction for {}", audioFile.getName());
+            return null;
+        }
+
+        ProcessBuilder pb = new ProcessBuilder(
+                ffprobeBinary.toAbsolutePath().toString(),
+                "-v", "quiet",
+                "-print_format", "json",
+                "-show_chapters",
+                audioFile.getAbsolutePath()
+        );
+        pb.redirectErrorStream(true);
+
+        Process process = pb.start();
+        StringBuilder output = new StringBuilder();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line);
+            }
+        }
+
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            log.debug("FFprobe exited with code {} for {}", exitCode, audioFile.getName());
+            return null;
+        }
+
+        return output.toString().trim();
+    }
+
+    private AudiobookMetadata.ChapterInfo parseFfprobeChapter(JsonNode chapterNode, int index) {
+        double startTime = resolveChapterTimeSeconds(chapterNode, "start_time", "start");
+        double endTime = resolveChapterTimeSeconds(chapterNode, "end_time", "end");
+
+        long startTimeMs = Math.round(startTime * 1000);
+        long endTimeMs = Math.round(endTime * 1000);
+        long durationMs = endTimeMs - startTimeMs;
+
+        String title = "Chapter " + (index + 1);
+        JsonNode tagsNode = chapterNode.get("tags");
+        if (tagsNode != null && tagsNode.has("title")) {
+            title = tagsNode.get("title").asString();
+        }
+
+        return AudiobookMetadata.ChapterInfo.builder()
+                .index(index)
+                .title(title)
+                .startTimeMs(startTimeMs)
+                .endTimeMs(endTimeMs)
+                .durationMs(durationMs)
+                .build();
+    }
+
+    private double resolveChapterTimeSeconds(JsonNode chapterNode, String secondsKey, String rawKey) {
+        if (chapterNode.has(secondsKey)) {
+            return chapterNode.get(secondsKey).asDouble();
+        }
+        if (chapterNode.has(rawKey)) {
+            long raw = chapterNode.get(rawKey).asLong();
+            String timeBase = chapterNode.has(TIME_BASE_FIELD) ? chapterNode.get(TIME_BASE_FIELD).asString() : "1/1000";
+            return convertTimebaseToSeconds(raw, timeBase);
+        }
+        return 0;
     }
 
     private List<AudiobookMetadata.ChapterInfo> createDefaultChapter(AudioHeader header) {

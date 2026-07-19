@@ -421,21 +421,13 @@ public class CoverImageGenerator {
         int bottomBound = h - margin;
 
         String[] authors = author.split(",");
-        StringBuilder formattedAuthors = new StringBuilder();
-        for (int i = 0; i < authors.length; i++) {
-            if (i > 0) formattedAuthors.append("\n").append(authors[i].trim());
-            else formattedAuthors.append(authors[i].trim());
-        }
+        String formattedAuthors = formatAuthorNames(authors);
 
-        Font authorFont = resolveFont(g, formattedAuthors.toString(), maxW, authorSize(formattedAuthors.length()), MAX_AUTHOR_LINES, false);
+        Font authorFont = resolveFont(g, formattedAuthors, maxW, authorSize(formattedAuthors.length()), MAX_AUTHOR_LINES, false);
         g.setFont(authorFont);
         FontMetrics authorFm = g.getFontMetrics();
 
-        String[] authorLinesArray = formattedAuthors.toString().split("\n");
-        List<String> lines = new ArrayList<>();
-        for (String line : authorLinesArray) {
-            lines.add(line.trim());
-        }
+        List<String> lines = toTrimmedLines(formattedAuthors);
 
         int authorLineH = (int) (authorFm.getHeight() * 1.18);
         int authorTotalH = lines.size() * authorLineH;
@@ -478,12 +470,34 @@ public class CoverImageGenerator {
         g.setFont(authorFont);
         float tracking = 0.08f;
 
+        renderAuthorLines(g, lines, currentY, authorFm, authorLineH, w, bottomBound, tracking, p);
+    }
+
+    private static String formatAuthorNames(String[] authors) {
+        StringBuilder formattedAuthors = new StringBuilder();
+        for (int i = 0; i < authors.length; i++) {
+            if (i > 0) formattedAuthors.append("\n").append(authors[i].trim());
+            else formattedAuthors.append(authors[i].trim());
+        }
+        return formattedAuthors.toString();
+    }
+
+    private static List<String> toTrimmedLines(String text) {
+        List<String> lines = new ArrayList<>();
+        for (String line : text.split("\n")) {
+            lines.add(line.trim());
+        }
+        return lines;
+    }
+
+    private void renderAuthorLines(Graphics2D g, List<String> lines, int startY, FontMetrics authorFm,
+                                   int authorLineH, int w, int bottomBound, float tracking, Palette p) {
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
             if (!line.isEmpty()) {  // Only render non-empty lines
                 int lw = trackedWidth(authorFm, line, tracking);
                 int x = (w - lw) / 2;
-                int y = currentY + authorFm.getAscent() + i * authorLineH;
+                int y = startY + authorFm.getAscent() + i * authorLineH;
                 if (y + authorFm.getDescent() > bottomBound) break;
                 renderText(g, line, x, y, tracking, p.textSub, false);
             }

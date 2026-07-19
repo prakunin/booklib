@@ -221,27 +221,8 @@ public class HardcoverParser implements BookParser {
         metadata.setSubtitle(edition.getSubtitle());
         metadata.setDescription(book.getDescription());
 
-        if (edition.getCachedContributors() != null) {
-            metadata.setAuthors(edition.getCachedContributors().stream()
-                    .map(GraphQLResponse.Contributor::getAuthor)
-                    .filter(Objects::nonNull)
-                    .map(GraphQLResponse.Author::getName)
-                    .filter(Objects::nonNull)
-                    .toList());
-        }
-
-        if (book.getFeaturedBookSeries() != null && book.getFeaturedBookSeries().getSeries() != null) {
-            metadata.setSeriesName(book.getFeaturedBookSeries().getSeries().getName());
-            metadata.setSeriesTotal(book.getFeaturedBookSeries().getSeries().getPrimaryBooksCount());
-
-            if (book.getFeaturedBookSeries().getPosition() != null) {
-                try {
-                    metadata.setSeriesNumber(Float.parseFloat(String.valueOf(book.getFeaturedBookSeries().getPosition())));
-                } catch (NumberFormatException _) {
-                    // position is not a valid number; leave series number unset
-                }
-            }
-        }
+        mapEditionAuthors(edition, metadata);
+        mapEditionSeries(book, metadata);
 
         if (book.getRating() != null) {
             metadata.setHardcoverRating(
@@ -251,6 +232,45 @@ public class HardcoverParser implements BookParser {
         metadata.setHardcoverReviewCount(book.getRatingsCount());
         metadata.setPageCount(edition.getPages());
 
+        mapEditionReleaseDate(edition, metadata);
+        mapEditionLanguageAndPublisher(edition, metadata);
+        mapEditionCachedTags(book.getCachedTags(), metadata);
+        mapEditionIsbns(edition, metadata);
+
+        metadata.setThumbnailUrl(edition.getImage() != null ? edition.getImage().getUrl() : null);
+        metadata.setProvider(MetadataProvider.Hardcover);
+
+        return metadata;
+    }
+
+    private void mapEditionAuthors(GraphQLResponse.Edition edition, BookMetadata metadata) {
+        if (edition.getCachedContributors() != null) {
+            metadata.setAuthors(edition.getCachedContributors().stream()
+                    .map(GraphQLResponse.Contributor::getAuthor)
+                    .filter(Objects::nonNull)
+                    .map(GraphQLResponse.Author::getName)
+                    .filter(Objects::nonNull)
+                    .toList());
+        }
+    }
+
+    private void mapEditionSeries(GraphQLResponse.BookWithEditions book, BookMetadata metadata) {
+        if (book.getFeaturedBookSeries() == null || book.getFeaturedBookSeries().getSeries() == null) {
+            return;
+        }
+        metadata.setSeriesName(book.getFeaturedBookSeries().getSeries().getName());
+        metadata.setSeriesTotal(book.getFeaturedBookSeries().getSeries().getPrimaryBooksCount());
+
+        if (book.getFeaturedBookSeries().getPosition() != null) {
+            try {
+                metadata.setSeriesNumber(Float.parseFloat(String.valueOf(book.getFeaturedBookSeries().getPosition())));
+            } catch (NumberFormatException _) {
+                // position is not a valid number; leave series number unset
+            }
+        }
+    }
+
+    private void mapEditionReleaseDate(GraphQLResponse.Edition edition, BookMetadata metadata) {
         if (edition.getReleaseDate() != null) {
             try {
                 metadata.setPublishedDate(LocalDate.parse(edition.getReleaseDate()));
@@ -258,7 +278,9 @@ public class HardcoverParser implements BookParser {
                 log.debug("Could not parse release date: {}", edition.getReleaseDate());
             }
         }
+    }
 
+    private void mapEditionLanguageAndPublisher(GraphQLResponse.Edition edition, BookMetadata metadata) {
         // Set the language from the edition
         if (edition.getLanguage() != null && edition.getLanguage().getCode2() != null) {
             metadata.setLanguage(LanguageNormalizer.normalize(edition.getLanguage().getCode2()));
@@ -268,30 +290,36 @@ public class HardcoverParser implements BookParser {
         if (edition.getPublisher() != null && edition.getPublisher().getName() != null) {
             metadata.setPublisher(edition.getPublisher().getName());
         }
+    }
 
-        GraphQLResponse.CachedTags cachedTags = book.getCachedTags();
+    private void mapEditionCachedTags(GraphQLResponse.CachedTags cachedTags, BookMetadata metadata) {
+        if (cachedTags == null) {
+            return;
+        }
 
-        if (cachedTags != null && cachedTags.getMood() != null && !cachedTags.getMood().isEmpty()) {
+        if (cachedTags.getMood() != null && !cachedTags.getMood().isEmpty()) {
             Set<String> basicFilteredMoods = HardcoverMoodFilter.filterMoodsWithCounts(cachedTags.getMood());
             metadata.setMoods(basicFilteredMoods.stream()
                     .map(WordUtils::capitalizeFully)
                     .collect(Collectors.toCollection(LinkedHashSet::new)));
         }
 
-        if (cachedTags != null && cachedTags.getGenre() != null && !cachedTags.getGenre().isEmpty()) {
+        if (cachedTags.getGenre() != null && !cachedTags.getGenre().isEmpty()) {
             Set<String> filteredGenres = HardcoverMoodFilter.filterGenresWithCounts(cachedTags.getGenre());
             metadata.setCategories(filteredGenres.stream()
                     .map(WordUtils::capitalizeFully)
                     .collect(Collectors.toSet()));
         }
 
-        if (cachedTags != null && cachedTags.getTag() != null && !cachedTags.getTag().isEmpty()) {
+        if (cachedTags.getTag() != null && !cachedTags.getTag().isEmpty()) {
             Set<String> filteredTags = HardcoverMoodFilter.filterTagsWithCounts(cachedTags.getTag());
             metadata.setTags(filteredTags.stream()
                     .map(WordUtils::capitalizeFully)
                     .collect(Collectors.toSet()));
         }
+    }
 
+    private void mapEditionIsbns(GraphQLResponse.Edition edition, BookMetadata metadata) {
         metadata.setIsbn10(edition.getIsbn10());
         metadata.setIsbn13(edition.getIsbn13());
 
@@ -301,11 +329,6 @@ public class HardcoverParser implements BookParser {
         } else if (metadata.getIsbn13() != null && metadata.getIsbn10() == null) {
             metadata.setIsbn10(BookUtils.isbn13to10(edition.getIsbn13()));
         }
-
-        metadata.setThumbnailUrl(edition.getImage() != null ? edition.getImage().getUrl() : null);
-        metadata.setProvider(MetadataProvider.Hardcover);
-
-        return metadata;
     }
 
     private String parseBookId(String id) {
@@ -399,33 +422,44 @@ public class HardcoverParser implements BookParser {
             return;
         }
 
-        String inputIsbn = request.getIsbn();
-        String matchingIsbn = null;
+        String matchingIsbn = selectMatchingIsbn(doc.getIsbns(), request.getIsbn());
+        applyMatchingIsbn(matchingIsbn, metadata);
+    }
+
+    private String selectMatchingIsbn(List<String> isbns, String inputIsbn) {
         if (StringUtils.isBlank(inputIsbn)) {
             // If we didn't search by ISBN, use first ISBN from results
-            matchingIsbn = doc.getIsbns().stream()
+            return isbns.stream()
                     .filter(isbn -> isbn.length() == 10 || isbn.length() == 13)
                     .findFirst()
                     .orElse(null);
-        } else if (doc.getIsbns().contains(inputIsbn)) {
+        }
+        if (isbns.contains(inputIsbn)) {
             // If we searched by ISBN and it matches a result perfectly, use that
-            matchingIsbn = inputIsbn;
-        } else {
-            // If we searched by ISBN but got no exact matches, get response ISBN that most closely matches it
-            LevenshteinDistance distance = LevenshteinDistance.getDefaultInstance();
-            int smallestDistance = Integer.MAX_VALUE;
-            for (String isbn : doc.getIsbns()) {
-                if (isbn.length() != 10 && isbn.length() != 13) {
-                    continue;
-                }
-                int currentDistance = distance.apply(isbn, inputIsbn);
-                if (smallestDistance > currentDistance) {
-                    smallestDistance = currentDistance;
-                    matchingIsbn = isbn;
-                }
+            return inputIsbn;
+        }
+        // If we searched by ISBN but got no exact matches, get response ISBN that most closely matches it
+        return findClosestIsbn(isbns, inputIsbn);
+    }
+
+    private String findClosestIsbn(List<String> isbns, String inputIsbn) {
+        LevenshteinDistance distance = LevenshteinDistance.getDefaultInstance();
+        int smallestDistance = Integer.MAX_VALUE;
+        String matchingIsbn = null;
+        for (String isbn : isbns) {
+            if (isbn.length() != 10 && isbn.length() != 13) {
+                continue;
+            }
+            int currentDistance = distance.apply(isbn, inputIsbn);
+            if (smallestDistance > currentDistance) {
+                smallestDistance = currentDistance;
+                matchingIsbn = isbn;
             }
         }
+        return matchingIsbn;
+    }
 
+    private void applyMatchingIsbn(String matchingIsbn, BookMetadata metadata) {
         // Whatever ISBN we end up with, calculate the other one
         if (matchingIsbn != null && matchingIsbn.length() == 10) {
             metadata.setIsbn10(matchingIsbn);

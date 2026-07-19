@@ -680,50 +680,60 @@ public class OpdsFeedService {
         return switch (bookFile.getBookType()) {
             case PDF -> "application/pdf";
             case EPUB -> "application/epub+zip";
-            case FB2 -> {
-                if (hasValidFilePath(bookFile)) {
-                    ArchiveUtils.ArchiveType type = ArchiveUtils.detectArchiveType(new File(bookFile.getFilePath()));
-                    if (type == ArchiveUtils.ArchiveType.ZIP) {
-                        yield "application/zip";
-                    }
-                }
-                yield "application/x-fictionbook+xml";
-            }
+            case FB2 -> fb2MimeType(bookFile);
             case MOBI -> "application/x-mobipocket-ebook";
             case AZW3 -> "application/vnd.amazon.ebook";
-            case CBX -> {
-                if (bookFile.getArchiveType() != null) {
-                    if (bookFile.getArchiveType() == ArchiveUtils.ArchiveType.RAR) {
-                        yield "application/vnd.comicbook-rar";
-                    }
-                    if (bookFile.getArchiveType() == ArchiveUtils.ArchiveType.ZIP) {
-                        yield COMICBOOK_ZIP_MEDIA_TYPE;
-                    }
-                    if (bookFile.getArchiveType() == ArchiveUtils.ArchiveType.SEVEN_ZIP) {
-                        yield "application/x-7z-compressed";
-                    }
-                }
-
-                if (hasValidFilePath(bookFile)) {
-                    ArchiveUtils.ArchiveType type = ArchiveUtils.detectArchiveType(new File(bookFile.getFilePath()));
-                    if (type != ArchiveUtils.ArchiveType.UNKNOWN) {
-                        yield switch (type) {
-                            case RAR -> "application/vnd.comicbook-rar";
-                            case ZIP -> COMICBOOK_ZIP_MEDIA_TYPE;
-                            case SEVEN_ZIP -> "application/x-7z-compressed";
-                            default -> COMICBOOK_ZIP_MEDIA_TYPE;
-                        };
-                    }
-                }
-                yield COMICBOOK_ZIP_MEDIA_TYPE;
-            }
-            case AUDIOBOOK -> {
-                String lower = bookFile.getFileName().toLowerCase();
-                if (lower.endsWith(".mp3")) yield "audio/mpeg";
-                if (lower.endsWith(".opus")) yield "audio/opus";
-                yield "audio/mp4";
-            }
+            case CBX -> cbxMimeType(bookFile);
+            case AUDIOBOOK -> audiobookMimeType(bookFile);
         };
+    }
+
+    private String fb2MimeType(BookFile bookFile) {
+        if (hasValidFilePath(bookFile)) {
+            ArchiveUtils.ArchiveType type = ArchiveUtils.detectArchiveType(new File(bookFile.getFilePath()));
+            if (type == ArchiveUtils.ArchiveType.ZIP) {
+                return "application/zip";
+            }
+        }
+        return "application/x-fictionbook+xml";
+    }
+
+    private String cbxMimeType(BookFile bookFile) {
+        if (bookFile.getArchiveType() != null) {
+            if (bookFile.getArchiveType() == ArchiveUtils.ArchiveType.RAR) {
+                return "application/vnd.comicbook-rar";
+            }
+            if (bookFile.getArchiveType() == ArchiveUtils.ArchiveType.ZIP) {
+                return COMICBOOK_ZIP_MEDIA_TYPE;
+            }
+            if (bookFile.getArchiveType() == ArchiveUtils.ArchiveType.SEVEN_ZIP) {
+                return "application/x-7z-compressed";
+            }
+        }
+
+        if (hasValidFilePath(bookFile)) {
+            ArchiveUtils.ArchiveType type = ArchiveUtils.detectArchiveType(new File(bookFile.getFilePath()));
+            if (type != ArchiveUtils.ArchiveType.UNKNOWN) {
+                return comicMimeForArchiveType(type);
+            }
+        }
+        return COMICBOOK_ZIP_MEDIA_TYPE;
+    }
+
+    private String comicMimeForArchiveType(ArchiveUtils.ArchiveType type) {
+        return switch (type) {
+            case RAR -> "application/vnd.comicbook-rar";
+            case ZIP -> COMICBOOK_ZIP_MEDIA_TYPE;
+            case SEVEN_ZIP -> "application/x-7z-compressed";
+            default -> COMICBOOK_ZIP_MEDIA_TYPE;
+        };
+    }
+
+    private String audiobookMimeType(BookFile bookFile) {
+        String lower = bookFile.getFileName().toLowerCase();
+        if (lower.endsWith(".mp3")) return "audio/mpeg";
+        if (lower.endsWith(".opus")) return "audio/opus";
+        return "audio/mp4";
     }
 
     private String escapeXml(String input) {

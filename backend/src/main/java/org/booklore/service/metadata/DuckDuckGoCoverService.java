@@ -83,66 +83,11 @@ public class DuckDuckGoCoverService implements BookCoverProvider {
                 AtomicInteger index = new AtomicInteger(1);
                 Set<String> emittedUrls = new HashSet<>();
 
-                // 1. Site-filtered search
-                String encodedSiteQuery = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8);
-                String siteUrl = SEARCH_BASE_URL + encodedSiteQuery + SITE_FILTER + searchParams;
-                Connection.Response siteResponse = getResponse(siteUrl);
-                Document siteDoc = parseResponse(siteResponse);
-                Map<String, String> cookies = siteResponse.cookies();
-                Pattern tokenPattern = Pattern.compile("vqd=\"(\\d+-\\d+)\"");
-                Matcher siteMatcher = tokenPattern.matcher(siteDoc.html());
-
-                if (siteMatcher.find()) {
-                    String siteSearchToken = siteMatcher.group(1);
-                    List<CoverImage> siteFilteredImages = fetchImagesFromApi(searchTerm + " (site:amazon.com OR site:goodreads.com)", siteSearchToken, cookies, siteUrl, jsonParams);
-                    siteFilteredImages.removeIf(dto -> dto.getWidth() < 350);
-                    if (isAudiobook) {
-                        siteFilteredImages.removeIf(dto -> !isApproximatelySquare(dto.getWidth(), dto.getHeight()));
-                    } else {
-                        siteFilteredImages.removeIf(dto -> dto.getWidth() >= dto.getHeight());
-                    }
-
-                    int count = 0;
-                    for (CoverImage img : siteFilteredImages) {
-                        if (sink.isCancelled()) return;
-                        if (count >= 7) break;
-                        CoverImage indexedImg = new CoverImage(img.getUrl(), img.getWidth(), img.getHeight(), index.getAndIncrement());
-                        sink.next(indexedImg);
-                        emittedUrls.add(img.getUrl());
-                        count++;
-                    }
-                }
-
+                emitSiteFilteredCovers(searchTerm, isAudiobook, searchParams, jsonParams, index, emittedUrls, sink);
                 if (sink.isCancelled()) return;
 
-                // 2. General search
-                String encodedGeneralQuery = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8);
-                String generalUrl = SEARCH_BASE_URL + encodedGeneralQuery + searchParams;
-                Connection.Response generalResponse = getResponse(generalUrl);
-                Document generalDoc = parseResponse(generalResponse);
-                Map<String, String> generalCookies = generalResponse.cookies();
-                Matcher generalMatcher = tokenPattern.matcher(generalDoc.html());
-
-                if (generalMatcher.find()) {
-                    String generalSearchToken = generalMatcher.group(1);
-                    List<CoverImage> generalBookImages = fetchImagesFromApi(searchTerm, generalSearchToken, generalCookies, generalUrl, jsonParams);
-                    generalBookImages.removeIf(dto -> dto.getWidth() < 350);
-                    if (isAudiobook) {
-                        generalBookImages.removeIf(dto -> !isApproximatelySquare(dto.getWidth(), dto.getHeight()));
-                    } else {
-                        generalBookImages.removeIf(dto -> dto.getWidth() >= dto.getHeight());
-                    }
-                    generalBookImages.removeIf(dto -> emittedUrls.contains(dto.getUrl()));
-
-                    int count = 0;
-                    for (CoverImage img : generalBookImages) {
-                        if (sink.isCancelled()) return;
-                        if (count >= 10) break;
-                        if (emitGeneralImage(img, emittedUrls, index, sink)) {
-                            count++;
-                        }
-                    }
-                }
+                emitGeneralCovers(searchTerm, isAudiobook, searchParams, jsonParams, index, emittedUrls, sink);
+                if (sink.isCancelled()) return;
 
                 sink.complete();
             } catch (Exception e) {
@@ -150,6 +95,74 @@ public class DuckDuckGoCoverService implements BookCoverProvider {
                 sink.error(e);
             }
         });
+    }
+
+    // 1. Site-filtered search
+    private void emitSiteFilteredCovers(String searchTerm, boolean isAudiobook, String searchParams, String jsonParams,
+                                        AtomicInteger index, Set<String> emittedUrls, FluxSink<CoverImage> sink) {
+        String encodedSiteQuery = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8);
+        String siteUrl = SEARCH_BASE_URL + encodedSiteQuery + SITE_FILTER + searchParams;
+        Connection.Response siteResponse = getResponse(siteUrl);
+        Document siteDoc = parseResponse(siteResponse);
+        Map<String, String> cookies = siteResponse.cookies();
+        String siteSearchToken = findSearchToken(siteDoc.html());
+        if (siteSearchToken == null) {
+            return;
+        }
+
+        List<CoverImage> siteFilteredImages = fetchImagesFromApi(searchTerm + " (site:amazon.com OR site:goodreads.com)", siteSearchToken, cookies, siteUrl, jsonParams);
+        applySizeFilters(siteFilteredImages, isAudiobook);
+
+        int count = 0;
+        for (CoverImage img : siteFilteredImages) {
+            if (sink.isCancelled()) return;
+            if (count >= 7) break;
+            CoverImage indexedImg = new CoverImage(img.getUrl(), img.getWidth(), img.getHeight(), index.getAndIncrement());
+            sink.next(indexedImg);
+            emittedUrls.add(img.getUrl());
+            count++;
+        }
+    }
+
+    // 2. General search
+    private void emitGeneralCovers(String searchTerm, boolean isAudiobook, String searchParams, String jsonParams,
+                                   AtomicInteger index, Set<String> emittedUrls, FluxSink<CoverImage> sink) {
+        String encodedGeneralQuery = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8);
+        String generalUrl = SEARCH_BASE_URL + encodedGeneralQuery + searchParams;
+        Connection.Response generalResponse = getResponse(generalUrl);
+        Document generalDoc = parseResponse(generalResponse);
+        Map<String, String> generalCookies = generalResponse.cookies();
+        String generalSearchToken = findSearchToken(generalDoc.html());
+        if (generalSearchToken == null) {
+            return;
+        }
+
+        List<CoverImage> generalBookImages = fetchImagesFromApi(searchTerm, generalSearchToken, generalCookies, generalUrl, jsonParams);
+        applySizeFilters(generalBookImages, isAudiobook);
+        generalBookImages.removeIf(dto -> emittedUrls.contains(dto.getUrl()));
+
+        int count = 0;
+        for (CoverImage img : generalBookImages) {
+            if (sink.isCancelled()) return;
+            if (count >= 10) break;
+            if (emitGeneralImage(img, emittedUrls, index, sink)) {
+                count++;
+            }
+        }
+    }
+
+    private String findSearchToken(String html) {
+        Matcher matcher = Pattern.compile("vqd=\"(\\d+-\\d+)\"").matcher(html);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private void applySizeFilters(List<CoverImage> images, boolean isAudiobook) {
+        images.removeIf(dto -> dto.getWidth() < 350);
+        if (isAudiobook) {
+            images.removeIf(dto -> !isApproximatelySquare(dto.getWidth(), dto.getHeight()));
+        } else {
+            images.removeIf(dto -> dto.getWidth() >= dto.getHeight());
+        }
     }
 
     public Flux<CoverImage> searchImages(String searchTerm) {

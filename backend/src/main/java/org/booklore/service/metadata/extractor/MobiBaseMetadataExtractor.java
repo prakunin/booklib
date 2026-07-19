@@ -112,43 +112,11 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
 
             // Extract metadata from EXTH records
             for (var entry : mobiHeader.exthData.entrySet()) {
-                int recordType = entry.getKey();
                 String value = entry.getValue();
-
                 if (StringUtils.isBlank(value)) {
                     continue;
                 }
-
-                switch (recordType) {
-                    case EXTH_AUTHOR -> authors.add(value.trim());
-                    case EXTH_PUBLISHER -> builder.publisher(value.trim());
-                    case EXTH_DESCRIPTION -> builder.description(value.trim());
-                    case EXTH_ISBN -> {
-                        String isbn = ISBN_INVALID_CHARS_PATTERN.matcher(value).replaceAll("");
-                        if (isbn.length() == 13) {
-                            builder.isbn13(isbn);
-                        } else if (isbn.length() == 10) {
-                            builder.isbn10(isbn);
-                        }
-                    }
-                    case EXTH_SUBJECT -> {
-                        for (String category : CATEGORY_SEPARATOR_PATTERN.split(value)) {
-                            String trimmed = category.trim();
-                            if (StringUtils.isNotBlank(trimmed)) {
-                                categories.add(trimmed);
-                            }
-                        }
-                    }
-                    case EXTH_PUBLISHED_DATE -> {
-                        LocalDate date = parseDate(value.trim());
-                        if (date != null) {
-                            builder.publishedDate(date);
-                        }
-                    }
-                    case EXTH_LANGUAGE -> builder.language(value.trim());
-                    case EXTH_ASIN -> builder.asin(value.trim());
-                    default -> log.debug("Unhandled EXTH record type: {}", recordType);
-                }
+                applyExthRecord(builder, authors, categories, entry.getKey(), value);
             }
 
             builder.authors(authors);
@@ -158,6 +126,44 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         } catch (Exception e) {
             log.error("Failed to extract metadata from {}: {}", getFormatName(), file.getName(), e);
             return null;
+        }
+    }
+
+    private void applyExthRecord(BookMetadata.BookMetadataBuilder builder, List<String> authors,
+                                 Set<String> categories, int recordType, String value) {
+        switch (recordType) {
+            case EXTH_AUTHOR -> authors.add(value.trim());
+            case EXTH_PUBLISHER -> builder.publisher(value.trim());
+            case EXTH_DESCRIPTION -> builder.description(value.trim());
+            case EXTH_ISBN -> applyIsbn(builder, value);
+            case EXTH_SUBJECT -> addCategories(categories, value);
+            case EXTH_PUBLISHED_DATE -> {
+                LocalDate date = parseDate(value.trim());
+                if (date != null) {
+                    builder.publishedDate(date);
+                }
+            }
+            case EXTH_LANGUAGE -> builder.language(value.trim());
+            case EXTH_ASIN -> builder.asin(value.trim());
+            default -> log.debug("Unhandled EXTH record type: {}", recordType);
+        }
+    }
+
+    private void applyIsbn(BookMetadata.BookMetadataBuilder builder, String value) {
+        String isbn = ISBN_INVALID_CHARS_PATTERN.matcher(value).replaceAll("");
+        if (isbn.length() == 13) {
+            builder.isbn13(isbn);
+        } else if (isbn.length() == 10) {
+            builder.isbn10(isbn);
+        }
+    }
+
+    private void addCategories(Set<String> categories, String value) {
+        for (String category : CATEGORY_SEPARATOR_PATTERN.split(value)) {
+            String trimmed = category.trim();
+            if (StringUtils.isNotBlank(trimmed)) {
+                categories.add(trimmed);
+            }
         }
     }
 
@@ -338,26 +344,37 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
                 break;
             }
 
-            int dataLength = recordLength - 8;
-            byte[] data = new byte[dataLength];
+            byte[] data = new byte[recordLength - 8];
             raf.readFully(data);
 
-            if (recordType == EXTH_COVER_OFFSET || recordType == EXTH_THUMB_OFFSET) {
-                if (dataLength >= 4) {
-                    int value = ((data[0] & 0xFF) << 24) | ((data[1] & 0xFF) << 16) |
-                               ((data[2] & 0xFF) << 8) | (data[3] & 0xFF);
-                    header.exthRecords.put(recordType, value);
-                    log.debug("EXTH record {} (int): {}", recordType, value);
-                }
-            } else {
-                String value = new String(data, charset).trim();
-                value = value.replace("\0", "");
-                if (!value.isEmpty()) {
-                    header.exthData.put(recordType, value);
-                    log.debug("EXTH record {} (string): {}", recordType,
-                             value.length() > 100 ? value.substring(0, 100) + "..." : value);
-                }
-            }
+            storeExthRecord(header, charset, recordType, data);
+        }
+    }
+
+    private void storeExthRecord(MobiHeader header, Charset charset, int recordType, byte[] data) {
+        if (recordType == EXTH_COVER_OFFSET || recordType == EXTH_THUMB_OFFSET) {
+            storeExthIntRecord(header, recordType, data);
+        } else {
+            storeExthStringRecord(header, charset, recordType, data);
+        }
+    }
+
+    private void storeExthIntRecord(MobiHeader header, int recordType, byte[] data) {
+        if (data.length >= 4) {
+            int value = ((data[0] & 0xFF) << 24) | ((data[1] & 0xFF) << 16) |
+                       ((data[2] & 0xFF) << 8) | (data[3] & 0xFF);
+            header.exthRecords.put(recordType, value);
+            log.debug("EXTH record {} (int): {}", recordType, value);
+        }
+    }
+
+    private void storeExthStringRecord(MobiHeader header, Charset charset, int recordType, byte[] data) {
+        String value = new String(data, charset).trim();
+        value = value.replace("\0", "");
+        if (!value.isEmpty()) {
+            header.exthData.put(recordType, value);
+            log.debug("EXTH record {} (string): {}", recordType,
+                     value.length() > 100 ? value.substring(0, 100) + "..." : value);
         }
     }
 

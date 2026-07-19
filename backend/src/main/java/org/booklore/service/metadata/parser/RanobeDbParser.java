@@ -72,44 +72,59 @@ public class RanobeDbParser implements BookParser {
     
     private void waitForRateLimit() {
         while (true) {
-            long currentTime = System.currentTimeMillis();
-            long lastTime = lastRequestTime.get();
-            long timeSinceLastRequest = currentTime - lastTime;
-            
-            // Refill tokens based on time elapsed
-            if (timeSinceLastRequest >= RATE_LIMIT_WINDOW_MS) {
-                // More than 1 second has passed, refill to max tokens
-                if (lastRequestTime.compareAndSet(lastTime, currentTime)) {
-                    tokenCount.set(MAX_REQUESTS_PER_SECOND);
-                }
-            } else {
-                // Calculate how many tokens to add based on time elapsed
-                long tokensToAdd = (timeSinceLastRequest * MAX_REQUESTS_PER_SECOND) / RATE_LIMIT_WINDOW_MS;
-                if (tokensToAdd > 0) {
-                    long currentTokens = tokenCount.get();
-                    long newTokens = Math.min(currentTokens + tokensToAdd, MAX_REQUESTS_PER_SECOND);
-                    tokenCount.compareAndSet(currentTokens, newTokens);
-                }
+            refillTokens();
+            if (tryConsumeToken()) {
+                return;
             }
-            
-            // Try to consume a token
-            long currentTokens = tokenCount.get();
-            if (currentTokens > 0) {
-                if (tokenCount.compareAndSet(currentTokens, currentTokens - 1)) {
-                    lastRequestTime.set(System.currentTimeMillis());
-                    return; // Successfully acquired a token
-                }
-            } else {
-                // No tokens available, wait before retrying
-                try {
-                    long waitTime = RATE_LIMIT_WINDOW_MS / MAX_REQUESTS_PER_SECOND;
-                    Thread.sleep(waitTime);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    log.warn("Rate limiter interrupted", e);
-                    return;
-                }
+        }
+    }
+
+    private void refillTokens() {
+        long currentTime = System.currentTimeMillis();
+        long lastTime = lastRequestTime.get();
+        long timeSinceLastRequest = currentTime - lastTime;
+
+        // Refill tokens based on time elapsed
+        if (timeSinceLastRequest >= RATE_LIMIT_WINDOW_MS) {
+            // More than 1 second has passed, refill to max tokens
+            if (lastRequestTime.compareAndSet(lastTime, currentTime)) {
+                tokenCount.set(MAX_REQUESTS_PER_SECOND);
             }
+        } else {
+            // Calculate how many tokens to add based on time elapsed
+            long tokensToAdd = (timeSinceLastRequest * MAX_REQUESTS_PER_SECOND) / RATE_LIMIT_WINDOW_MS;
+            if (tokensToAdd > 0) {
+                long currentTokens = tokenCount.get();
+                long newTokens = Math.min(currentTokens + tokensToAdd, MAX_REQUESTS_PER_SECOND);
+                tokenCount.compareAndSet(currentTokens, newTokens);
+            }
+        }
+    }
+
+    // Returns true when the caller should stop waiting: either a token was acquired or the thread was interrupted.
+    private boolean tryConsumeToken() {
+        long currentTokens = tokenCount.get();
+        if (currentTokens > 0) {
+            if (tokenCount.compareAndSet(currentTokens, currentTokens - 1)) {
+                lastRequestTime.set(System.currentTimeMillis());
+                return true; // Successfully acquired a token
+            }
+            return false;
+        }
+        // No tokens available, wait before retrying
+        return sleepBeforeRetry();
+    }
+
+    // Returns true only if interrupted while waiting, signalling the caller to stop.
+    private boolean sleepBeforeRetry() {
+        try {
+            long waitTime = RATE_LIMIT_WINDOW_MS / MAX_REQUESTS_PER_SECOND;
+            Thread.sleep(waitTime);
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Rate limiter interrupted", e);
+            return true;
         }
     }
 
@@ -201,75 +216,7 @@ public class RanobeDbParser implements BookParser {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200) {
-                RanobedbBookResponse responstObj = objectMapper.readValue(response.body(), RanobedbBookResponse.class);
-                RanobedbBookResponse.Book book = responstObj.getBook();
-                if (book == null) {
-                    return null;
-                }
-
-                RanobedbBookResponse.TitleEntry englishTitleEntry = book.getTitles().stream()
-                        .filter(titleEntry -> "en".equalsIgnoreCase(titleEntry.getLang()))
-                        .filter(RanobedbBookResponse.TitleEntry::getOfficial)
-                        .findFirst()
-                        .orElse(null);
-
-                RanobedbBookResponse.Release englishRelease = book.getReleases().stream()
-                        .filter(release -> "en".equalsIgnoreCase(release.getLang()))
-                        .findFirst()
-                        .orElse(null);
-
-                RanobedbBookResponse.Publisher englishPublisher = book.getPublishers().stream()
-                        .filter(publisher -> "en".equalsIgnoreCase(publisher.getLang()))
-                        .filter(publisher -> RanobedbBookResponse.PublisherType.PUBLISHER.equals(publisher.getPublisherType()))
-                        .findFirst()
-                        .orElse(null);
-
-                List<RanobedbBookResponse.SeriesBook> seriesBooks = book.getSeries() != null ? book.getSeries().getBooks() : List.of();
-                int seriesIndex = IntStream.range(0, seriesBooks.size())
-                        .filter(i -> seriesBooks.get(i).getId().equals(book.getId()))
-                        .findFirst()
-                        .orElse(-1);
-
-                List<String> authors = book.getEditions().stream()
-                        .flatMap(edition -> edition.getStaff().stream())
-                        .filter(staff -> RanobedbBookResponse.RoleType.AUTHOR.equals(staff.getRoleType()))
-                        .map(staff -> staff.getRomaji() != null ? staff.getRomaji() : staff.getName())
-                        .toList();
-
-                HashSet<String> genres = book.getSeries() != null ? book.getSeries().getTags().stream()
-                        .filter(tag -> RanobedbBookResponse.TagType.GENRE.equals(tag.getTtype()))
-                        .map(RanobedbBookResponse.Tag::getName)
-                        .map(genre -> Pattern.compile("\\b(.)(.*?)\\b").matcher(genre).replaceAll(m -> m.group(1).toUpperCase() + m.group(2).toLowerCase()))
-                        .collect(Collectors.toCollection(HashSet::new)) : new HashSet<>();
-
-                String title = englishTitleEntry != null ? englishTitleEntry.getTitle() : book.getTitle();
-                String subtitle = null;
-                if (book.getSeries() != null && book.getSeries().getTitle() != null && title.startsWith(book.getSeries().getTitle())) {
-                    String remainingTitle = title.substring(book.getSeries().getTitle().length()).trim();
-                    String[] titleParts = remainingTitle.split(":", 2);
-                    if (titleParts.length == 2) {
-                        title = title.substring(0, title.indexOf(titleParts[1]) - 1).trim();
-                        subtitle = titleParts[1].trim();
-                    }
-                }
-
-                return BookMetadata.builder()
-                    .provider(MetadataProvider.Ranobedb)
-                    .ranobedbId(String.valueOf(book.getId()))
-                    .ranobedbRating(book.getRating() != null ? book.getRating().getScore() / 2.0 : null)
-                    .title(title) 
-                    .subtitle(subtitle)
-                    .authors(authors)
-                    .categories(genres)
-                    .publisher(englishPublisher != null ? englishPublisher.getName() : null)
-                    .thumbnailUrl(book.getImage() != null ? RANOBEDB_IMAGE_URL + book.getImage().getFilename() : null)
-                    .description(book.getDescription())
-                    .language(LanguageNormalizer.normalize(englishRelease != null ? englishRelease.getLang() : book.getLang()))
-                    .seriesName(book.getSeries() != null ? book.getSeries().getTitle() : null)
-                    .seriesNumber(seriesIndex != -1 ? seriesIndex + 1.0f : null)
-                    .seriesTotal(seriesBooks.isEmpty() ? null : seriesBooks.size())
-                    .publishedDate(englishRelease != null ? parseDate(englishRelease.getReleaseDate()) : parseDate(book.getCReleaseDate()))
-                    .build();
+                return mapBookResponse(response.body());
             } else {
                 log.error("Ranobedb Get Book API returned status code {}", response.statusCode());
             }
@@ -282,6 +229,102 @@ public class RanobeDbParser implements BookParser {
 
         return null;
     }
+
+    private BookMetadata mapBookResponse(String responseBody) {
+        RanobedbBookResponse responstObj = objectMapper.readValue(responseBody, RanobedbBookResponse.class);
+        RanobedbBookResponse.Book book = responstObj.getBook();
+        if (book == null) {
+            return null;
+        }
+
+        RanobedbBookResponse.Release englishRelease = findEnglishRelease(book);
+        RanobedbBookResponse.Publisher englishPublisher = findEnglishPublisher(book);
+
+        List<RanobedbBookResponse.SeriesBook> seriesBooks = book.getSeries() != null ? book.getSeries().getBooks() : List.of();
+        int seriesIndex = findSeriesIndex(seriesBooks, book);
+
+        List<String> authors = extractAuthors(book);
+        HashSet<String> genres = extractGenres(book);
+        TitleAndSubtitle resolved = resolveTitleAndSubtitle(book);
+
+        return BookMetadata.builder()
+            .provider(MetadataProvider.Ranobedb)
+            .ranobedbId(String.valueOf(book.getId()))
+            .ranobedbRating(book.getRating() != null ? book.getRating().getScore() / 2.0 : null)
+            .title(resolved.title())
+            .subtitle(resolved.subtitle())
+            .authors(authors)
+            .categories(genres)
+            .publisher(englishPublisher != null ? englishPublisher.getName() : null)
+            .thumbnailUrl(book.getImage() != null ? RANOBEDB_IMAGE_URL + book.getImage().getFilename() : null)
+            .description(book.getDescription())
+            .language(LanguageNormalizer.normalize(englishRelease != null ? englishRelease.getLang() : book.getLang()))
+            .seriesName(book.getSeries() != null ? book.getSeries().getTitle() : null)
+            .seriesNumber(seriesIndex != -1 ? seriesIndex + 1.0f : null)
+            .seriesTotal(seriesBooks.isEmpty() ? null : seriesBooks.size())
+            .publishedDate(englishRelease != null ? parseDate(englishRelease.getReleaseDate()) : parseDate(book.getCReleaseDate()))
+            .build();
+    }
+
+    private RanobedbBookResponse.Release findEnglishRelease(RanobedbBookResponse.Book book) {
+        return book.getReleases().stream()
+                .filter(release -> "en".equalsIgnoreCase(release.getLang()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private RanobedbBookResponse.Publisher findEnglishPublisher(RanobedbBookResponse.Book book) {
+        return book.getPublishers().stream()
+                .filter(publisher -> "en".equalsIgnoreCase(publisher.getLang()))
+                .filter(publisher -> RanobedbBookResponse.PublisherType.PUBLISHER.equals(publisher.getPublisherType()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private int findSeriesIndex(List<RanobedbBookResponse.SeriesBook> seriesBooks, RanobedbBookResponse.Book book) {
+        return IntStream.range(0, seriesBooks.size())
+                .filter(i -> seriesBooks.get(i).getId().equals(book.getId()))
+                .findFirst()
+                .orElse(-1);
+    }
+
+    private List<String> extractAuthors(RanobedbBookResponse.Book book) {
+        return book.getEditions().stream()
+                .flatMap(edition -> edition.getStaff().stream())
+                .filter(staff -> RanobedbBookResponse.RoleType.AUTHOR.equals(staff.getRoleType()))
+                .map(staff -> staff.getRomaji() != null ? staff.getRomaji() : staff.getName())
+                .toList();
+    }
+
+    private HashSet<String> extractGenres(RanobedbBookResponse.Book book) {
+        return book.getSeries() != null ? book.getSeries().getTags().stream()
+                .filter(tag -> RanobedbBookResponse.TagType.GENRE.equals(tag.getTtype()))
+                .map(RanobedbBookResponse.Tag::getName)
+                .map(genre -> Pattern.compile("\\b(.)(.*?)\\b").matcher(genre).replaceAll(m -> m.group(1).toUpperCase() + m.group(2).toLowerCase()))
+                .collect(Collectors.toCollection(HashSet::new)) : new HashSet<>();
+    }
+
+    private TitleAndSubtitle resolveTitleAndSubtitle(RanobedbBookResponse.Book book) {
+        RanobedbBookResponse.TitleEntry englishTitleEntry = book.getTitles().stream()
+                .filter(titleEntry -> "en".equalsIgnoreCase(titleEntry.getLang()))
+                .filter(RanobedbBookResponse.TitleEntry::getOfficial)
+                .findFirst()
+                .orElse(null);
+
+        String title = englishTitleEntry != null ? englishTitleEntry.getTitle() : book.getTitle();
+        String subtitle = null;
+        if (book.getSeries() != null && book.getSeries().getTitle() != null && title.startsWith(book.getSeries().getTitle())) {
+            String remainingTitle = title.substring(book.getSeries().getTitle().length()).trim();
+            String[] titleParts = remainingTitle.split(":", 2);
+            if (titleParts.length == 2) {
+                title = title.substring(0, title.indexOf(titleParts[1]) - 1).trim();
+                subtitle = titleParts[1].trim();
+            }
+        }
+        return new TitleAndSubtitle(title, subtitle);
+    }
+
+    private record TitleAndSubtitle(String title, String subtitle) {}
 
     private LocalDate parseDate(Long dateInt) {
         if (dateInt == null || dateInt == 0) {

@@ -102,53 +102,66 @@ public class KomgaService {
         // Check if we should group unknown series
         boolean groupUnknown = appSettingService.getAppSettings().isKomgaGroupUnknown();
         String unknownSeriesName = komgaMapper.getUnknownSeriesName();
-        
+
         // Get distinct series names directly from database (MUCH faster than loading all books)
-        List<String> sortedSeriesNames;
+        List<String> sortedSeriesNames = resolveSeriesNames(groupUnknown, libraryId, unknownSeriesName);
+
+        log.debug("Found {} distinct series names from database (optimized)", sortedSeriesNames.size());
+
+        // Calculate pagination
+        int totalElements = sortedSeriesNames.size();
+        SeriesPage seriesPage = paginateSeriesNames(sortedSeriesNames, page, size, unpaged);
+
+        Map<String, List<BookEntity>> booksBySeriesName = groupBooksBySeriesName(
+                findBooksForSeriesNames(seriesPage.names(), libraryId, groupUnknown, unknownSeriesName));
+        List<KomgaSeriesDto> content = buildSeriesDtos(seriesPage.names(), booksBySeriesName);
+
+        log.debug("Mapped {} series DTOs for this page", content.size());
+
+        return KomgaPageableDto.<KomgaSeriesDto>builder()
+                .content(content)
+                .number(seriesPage.page())
+                .size(seriesPage.size())
+                .numberOfElements(content.size())
+                .totalElements(totalElements)
+                .totalPages(seriesPage.totalPages())
+                .first(seriesPage.page() == 0)
+                .last(totalElements == 0 || seriesPage.page() >= seriesPage.totalPages() - 1)
+                .empty(content.isEmpty())
+                .build();
+    }
+
+    private List<String> resolveSeriesNames(boolean groupUnknown, Long libraryId, String unknownSeriesName) {
         if (groupUnknown) {
             // Use optimized query that groups books without series as "Unknown Series"
             if (libraryId != null) {
-                sortedSeriesNames = bookRepository.findDistinctSeriesNamesGroupedByLibraryId(
-                    libraryId, unknownSeriesName);
-            } else {
-                sortedSeriesNames = bookRepository.findDistinctSeriesNamesGrouped(
-                    unknownSeriesName);
+                return bookRepository.findDistinctSeriesNamesGroupedByLibraryId(libraryId, unknownSeriesName);
             }
-        } else {
-            // Use query that gives each book without series its own entry
-            if (libraryId != null) {
-                sortedSeriesNames = bookRepository.findDistinctSeriesNamesUngroupedByLibraryId(libraryId);
-            } else {
-                sortedSeriesNames = bookRepository.findDistinctSeriesNamesUngrouped();
-            }
+            return bookRepository.findDistinctSeriesNamesGrouped(unknownSeriesName);
         }
-        
-        log.debug("Found {} distinct series names from database (optimized)", sortedSeriesNames.size());
-        
-        // Calculate pagination
+        // Use query that gives each book without series its own entry
+        if (libraryId != null) {
+            return bookRepository.findDistinctSeriesNamesUngroupedByLibraryId(libraryId);
+        }
+        return bookRepository.findDistinctSeriesNamesUngrouped();
+    }
+
+    private record SeriesPage(List<String> names, int page, int size, int totalPages) {
+    }
+
+    private SeriesPage paginateSeriesNames(List<String> sortedSeriesNames, int page, int size, boolean unpaged) {
         int totalElements = sortedSeriesNames.size();
-        List<String> pageSeriesNames;
-        int actualPage;
-        int actualSize;
-        int totalPages;
-        
         if (unpaged) {
-            pageSeriesNames = sortedSeriesNames;
-            actualPage = 0;
-            actualSize = totalElements;
-            totalPages = totalElements > 0 ? 1 : 0;
-        } else {
-            totalPages = (int) Math.ceil((double) totalElements / size);
-            int fromIndex = Math.min(page * size, totalElements);
-            int toIndex = Math.min(fromIndex + size, totalElements);
-            
-            pageSeriesNames = sortedSeriesNames.subList(fromIndex, toIndex);
-            actualPage = page;
-            actualSize = size;
+            return new SeriesPage(sortedSeriesNames, 0, totalElements, totalElements > 0 ? 1 : 0);
         }
-        
-        Map<String, List<BookEntity>> booksBySeriesName = groupBooksBySeriesName(
-                findBooksForSeriesNames(pageSeriesNames, libraryId, groupUnknown, unknownSeriesName));
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+        int fromIndex = Math.min(page * size, totalElements);
+        int toIndex = Math.min(fromIndex + size, totalElements);
+        return new SeriesPage(sortedSeriesNames.subList(fromIndex, toIndex), page, size, totalPages);
+    }
+
+    private List<KomgaSeriesDto> buildSeriesDtos(List<String> pageSeriesNames,
+            Map<String, List<BookEntity>> booksBySeriesName) {
         List<KomgaSeriesDto> content = new ArrayList<>();
         for (String seriesName : pageSeriesNames) {
             try {
@@ -164,20 +177,7 @@ public class KomgaService {
                 log.error("Error mapping series: {}", seriesName, e);
             }
         }
-        
-        log.debug("Mapped {} series DTOs for this page", content.size());
-        
-        return KomgaPageableDto.<KomgaSeriesDto>builder()
-                .content(content)
-                .number(actualPage)
-                .size(actualSize)
-                .numberOfElements(content.size())
-                .totalElements(totalElements)
-                .totalPages(totalPages)
-                .first(actualPage == 0)
-                .last(totalElements == 0 || actualPage >= totalPages - 1)
-                .empty(content.isEmpty())
-                .build();
+        return content;
     }
 
     private List<BookEntity> findBooksForSeriesNames(

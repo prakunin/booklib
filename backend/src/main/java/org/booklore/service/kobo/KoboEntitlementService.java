@@ -356,44 +356,17 @@ public class KoboEntitlementService {
                 .map(list -> list.stream().map(CategoryEntity::getName).toList())
                 .orElse(Collections.emptyList());
 
-        KoboBookMetadata.Series series = null;
-        if (metadata.getSeriesName() != null && !metadata.getSeriesName().isBlank()) {
-            series = KoboBookMetadata.Series.builder()
-                    .id("series_" + metadata.getSeriesName().hashCode())
-                    .name(metadata.getSeriesName())
-                    .number(metadata.getSeriesNumber() != null 
-                        ? BigDecimal.valueOf(metadata.getSeriesNumber()).stripTrailingZeros().toPlainString() 
-                        : "1")
-                    .numberFloat(metadata.getSeriesNumber() != null ? metadata.getSeriesNumber().doubleValue() : 1.0)
-                    .build();
-        } else {
-            series = KoboBookMetadata.Series.builder()
-                    .id("")
-                    .name("")
-                    .number("")
-                    .numberFloat(0.0)
-                    .build();
-        }
+        KoboBookMetadata.Series series = buildSeries(metadata);
 
         String downloadUrl = koboUrlBuilder.downloadUrl(token, book.getId());
 
-        KoboBookFormat bookFormat = KoboBookFormat.EPUB3;
         KoboSettings koboSettings = appSettingService.getAppSettings().getKoboSettings();
 
         var primaryFile = book.getPrimaryBookFile();
         if (primaryFile == null) {
             return null;
         }
-        boolean isEpubFile = primaryFile.getBookType() == BookFileType.EPUB;
-        boolean isCbxFile = primaryFile.getBookType() == BookFileType.CBX;
-
-        if (isEpubFile && primaryFile.isFixedLayout()) {
-            bookFormat = KoboBookFormat.EPUB3FL;
-        } else if (isEpubFile && koboSettings != null && koboSettings.isConvertToKepub()) {
-            bookFormat = KoboBookFormat.KEPUB;
-        } else if (koboSettings != null && isCbxFile && koboSettings.isConvertCbxToEpub()) {
-            bookFormat = KoboBookFormat.EPUB3;
-        }
+        KoboBookFormat bookFormat = determineBookFormat(primaryFile, koboSettings);
 
         return KoboBookMetadata.builder()
                 .crossRevisionId(String.valueOf(book.getId()))
@@ -426,6 +399,39 @@ public class KoboEntitlementService {
                                 .build()
                 ))
                 .build();
+    }
+
+    private KoboBookMetadata.Series buildSeries(BookMetadataEntity metadata) {
+        if (metadata.getSeriesName() != null && !metadata.getSeriesName().isBlank()) {
+            return KoboBookMetadata.Series.builder()
+                    .id("series_" + metadata.getSeriesName().hashCode())
+                    .name(metadata.getSeriesName())
+                    .number(metadata.getSeriesNumber() != null
+                        ? BigDecimal.valueOf(metadata.getSeriesNumber()).stripTrailingZeros().toPlainString()
+                        : "1")
+                    .numberFloat(metadata.getSeriesNumber() != null ? metadata.getSeriesNumber().doubleValue() : 1.0)
+                    .build();
+        }
+        return KoboBookMetadata.Series.builder()
+                .id("")
+                .name("")
+                .number("")
+                .numberFloat(0.0)
+                .build();
+    }
+
+    private KoboBookFormat determineBookFormat(BookFileEntity primaryFile, KoboSettings koboSettings) {
+        boolean isEpubFile = primaryFile.getBookType() == BookFileType.EPUB;
+        boolean isCbxFile = primaryFile.getBookType() == BookFileType.CBX;
+
+        if (isEpubFile && primaryFile.isFixedLayout()) {
+            return KoboBookFormat.EPUB3FL;
+        } else if (isEpubFile && koboSettings != null && koboSettings.isConvertToKepub()) {
+            return KoboBookFormat.KEPUB;
+        } else if (koboSettings != null && isCbxFile && koboSettings.isConvertCbxToEpub()) {
+            return KoboBookFormat.EPUB3;
+        }
+        return KoboBookFormat.EPUB3;
     }
 
     private OffsetDateTime getCurrentUtc() {

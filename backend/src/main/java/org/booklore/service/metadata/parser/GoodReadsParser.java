@@ -145,23 +145,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
     public Flux<BookMetadata> fetchMetadataStream(Book book, FetchMetadataRequest fetchMetadataRequest) {
         return Flux.create(sink -> {
             try {
-                String isbn = ParserUtils.cleanIsbn(fetchMetadataRequest.getIsbn());
-                if (isbn != null && !isbn.isBlank()) {
-                    tryFetchByIsbn(sink, isbn);
-                }
-
-                List<String> searchResultIds = fetchSearchResults(book, fetchMetadataRequest).stream()
-                        .limit(COUNT_DETAILED_METADATA_TO_GET)
-                        .toList();
-
-                for (String goodreadsId : searchResultIds) {
-                    if (sink.isCancelled()) {
-                        return;
-                    }
-                    log.info("GoodReads: Fetching metadata for: Goodreads ID {}", goodreadsId);
-                    fetchAndEmitSearchResult(sink, goodreadsId);
-                }
-
+                emitMetadataResults(sink, book, fetchMetadataRequest);
                 sink.complete();
             } catch (Exception e) {
                 if (e instanceof InterruptedException) {
@@ -170,6 +154,25 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
                 sink.error(e);
             }
         });
+    }
+
+    private void emitMetadataResults(FluxSink<BookMetadata> sink, Book book, FetchMetadataRequest fetchMetadataRequest) throws InterruptedException {
+        String isbn = ParserUtils.cleanIsbn(fetchMetadataRequest.getIsbn());
+        if (isbn != null && !isbn.isBlank()) {
+            tryFetchByIsbn(sink, isbn);
+        }
+
+        List<String> searchResultIds = fetchSearchResults(book, fetchMetadataRequest).stream()
+                .limit(COUNT_DETAILED_METADATA_TO_GET)
+                .toList();
+
+        for (String goodreadsId : searchResultIds) {
+            if (sink.isCancelled()) {
+                return;
+            }
+            log.info("GoodReads: Fetching metadata for: Goodreads ID {}", goodreadsId);
+            fetchAndEmitSearchResult(sink, goodreadsId);
+        }
     }
 
     private void tryFetchByIsbn(FluxSink<BookMetadata> sink, String isbn) {
@@ -310,7 +313,15 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
     private void extractContributorDetails(JsonNode bookNode, BookMetadata.BookMetadataBuilder builder) {
         List<String> authors = new ArrayList<>();
 
-        JsonNode primaryEdge = bookNode.get("primaryContributorEdge");
+        addPrimaryContributor(bookNode.get("primaryContributorEdge"), authors);
+        addSecondaryContributors(bookNode.get("secondaryContributorEdges"), authors);
+
+        if (!authors.isEmpty()) {
+            builder.authors(authors);
+        }
+    }
+
+    private void addPrimaryContributor(JsonNode primaryEdge, List<String> authors) {
         if (primaryEdge != null && primaryEdge.isObject()) {
             JsonNode node = primaryEdge.get("node");
             if (node != null) {
@@ -320,8 +331,9 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
                 }
             }
         }
+    }
 
-        JsonNode secondaryEdges = bookNode.get("secondaryContributorEdges");
+    private void addSecondaryContributors(JsonNode secondaryEdges, List<String> authors) {
         if (secondaryEdges != null && secondaryEdges.isArray()) {
             for (int i = 0; i < secondaryEdges.size(); i++) {
                 JsonNode node = secondaryEdges.get(i).path("node");
@@ -330,10 +342,6 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
                     authors.add(name);
                 }
             }
-        }
-
-        if (!authors.isEmpty()) {
-            builder.authors(authors);
         }
     }
 

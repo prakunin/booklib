@@ -40,23 +40,41 @@ public class MetadataMatchService {
         if (totalWeight == 0) return 0f;
 
         float score = 0f;
+        score = scoreBasicFields(metadata, weights, score);
+        score = scoreSeriesFields(metadata, weights, score);
+        score = scoreBibliographicFields(metadata, weights, score);
+        score = scoreRatingsAndCover(metadata, weights, score);
 
+        return (score / totalWeight) * 100f;
+    }
 
-
+    private float scoreBasicFields(BookMetadataEntity metadata, MetadataMatchWeights weights, float score) {
         if (isPresent(metadata.getTitle(), metadata.getTitleLocked())) score += weights.getTitle();
         if (isPresent(metadata.getSubtitle(), metadata.getSubtitleLocked())) score += weights.getSubtitle();
         if (isPresent(metadata.getDescription(), metadata.getDescriptionLocked())) score += weights.getDescription();
         if (hasContent(metadata.getAuthors(), metadata.getAuthorsLocked())) score += weights.getAuthors();
         if (isPresent(metadata.getPublisher(), metadata.getPublisherLocked())) score += weights.getPublisher();
         if (metadata.getPublishedDate() != null || Boolean.TRUE.equals(metadata.getPublishedDateLocked())) score += weights.getPublishedDate();
+        return score;
+    }
+
+    private float scoreSeriesFields(BookMetadataEntity metadata, MetadataMatchWeights weights, float score) {
         if (isPresent(metadata.getSeriesName(), metadata.getSeriesNameLocked())) score += weights.getSeriesName();
         if ((metadata.getSeriesNumber() != null && metadata.getSeriesNumber() > 0) || Boolean.TRUE.equals(metadata.getSeriesNumberLocked())) score += weights.getSeriesNumber();
         if ((metadata.getSeriesTotal() != null && metadata.getSeriesTotal() > 0) || Boolean.TRUE.equals(metadata.getSeriesTotalLocked())) score += weights.getSeriesTotal();
+        return score;
+    }
+
+    private float scoreBibliographicFields(BookMetadataEntity metadata, MetadataMatchWeights weights, float score) {
         if (isPresent(metadata.getIsbn13(), metadata.getIsbn13Locked())) score += weights.getIsbn13();
         if (isPresent(metadata.getIsbn10(), metadata.getIsbn10Locked())) score += weights.getIsbn10();
         if (isPresent(metadata.getLanguage(), metadata.getLanguageLocked())) score += weights.getLanguage();
         if ((metadata.getPageCount() != null && metadata.getPageCount() > 0) || Boolean.TRUE.equals(metadata.getPageCountLocked())) score += weights.getPageCount();
         if (hasContent(metadata.getCategories(), metadata.getCategoriesLocked())) score += weights.getCategories();
+        return score;
+    }
+
+    private float scoreRatingsAndCover(BookMetadataEntity metadata, MetadataMatchWeights weights, float score) {
         if (isPositive(metadata.getAmazonRating(), metadata.getAmazonRatingLocked())) score += weights.getAmazonRating();
         if (isPositive(metadata.getAmazonReviewCount(), metadata.getAmazonReviewCountLocked())) score += weights.getAmazonReviewCount();
         if (isPositive(metadata.getGoodreadsRating(), metadata.getGoodreadsRatingLocked())) score += weights.getGoodreadsRating();
@@ -68,8 +86,7 @@ public class MetadataMatchService {
         if (isPositive(metadata.getAudibleRating(), metadata.getAudibleRatingLocked())) score += weights.getAudibleRating();
         if (isPositive(metadata.getAudibleReviewCount(), metadata.getAudibleReviewCountLocked())) score += weights.getAudibleReviewCount();
         if (metadata.getCoverUpdatedOn() != null || Boolean.TRUE.equals(metadata.getCoverLocked())) score += weights.getCoverImage();
-
-        return (score / totalWeight) * 100f;
+        return score;
     }
 
     private boolean isPresent(String value, Boolean locked) {

@@ -30,6 +30,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -262,39 +263,63 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
             score += 100;
         }
 
-        if (volume.getName() != null && volume.getName().equalsIgnoreCase(seriesName)) {
-            score += 50;
-        } else if (volume.getName() != null && volume.getName().toLowerCase().contains(seriesName.toLowerCase())) {
-            score += 25;
-        }
+        score += scoreNameMatch(volume, seriesName);
+        score += scoreIssueCount(volume, normalizedIssue);
+        score += scoreMajorPublisher(volume);
+        score += scoreStartYearRecency(volume);
 
+        return score;
+    }
+
+    private int scoreNameMatch(Comic volume, String seriesName) {
+        if (volume.getName() == null) {
+            return 0;
+        }
+        if (volume.getName().equalsIgnoreCase(seriesName)) {
+            return 50;
+        }
+        if (volume.getName().toLowerCase().contains(seriesName.toLowerCase())) {
+            return 25;
+        }
+        return 0;
+    }
+
+    private int scoreIssueCount(Comic volume, String normalizedIssue) {
         try {
             int requestedIssue = (int) Math.floor(Double.parseDouble(normalizedIssue));
             if (volume.getCountOfIssues() != null && volume.getCountOfIssues() >= requestedIssue) {
-                score += 20;
+                return 20;
             }
         } catch (NumberFormatException _) {
             // ignore unparseable issue number
         }
+        return 0;
+    }
 
+    private int scoreMajorPublisher(Comic volume) {
         Set<String> majorPublishers = Set.of("Marvel", "DC Comics", "Image Comics", "Dark Horse Comics", "IDW Publishing", "Dynamite Entertainment", "BOOM! Studios", "Valiant Entertainment");
         if (volume.getPublisher() != null && volume.getPublisher().getName() != null
                 && majorPublishers.stream().anyMatch(p -> volume.getPublisher().getName().contains(p))) {
-            score += 10;
+            return 10;
         }
+        return 0;
+    }
 
-        if (volume.getStartYear() != null) {
-            try {
-                int year = Integer.parseInt(volume.getStartYear());
-                if (year >= 2000) score += 5;
-                if (year >= 2010) score += 5;
-                if (year >= 2020) score += 5;
-            } catch (NumberFormatException _) {
-                // ignore unparseable start year
-            }
+    private int scoreStartYearRecency(Comic volume) {
+        if (volume.getStartYear() == null) {
+            return 0;
         }
-
-        return score;
+        try {
+            int year = Integer.parseInt(volume.getStartYear());
+            int score = 0;
+            if (year >= 2000) score += 5;
+            if (year >= 2010) score += 5;
+            if (year >= 2020) score += 5;
+            return score;
+        } catch (NumberFormatException _) {
+            // ignore unparseable start year
+            return 0;
+        }
     }
 
     private boolean matchesYear(Comic volume, int targetYear) {
@@ -505,31 +530,13 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
     }
 
     private <T> T sendRequestWithRetry(URI uri, Class<T> responseType, int retriesLeft) {
-        if (rateLimited.get()) {
-            long currentTime = System.currentTimeMillis();
-            if (currentTime < rateLimitResetTime.get()) {
-                log.warn("ComicVine API is currently rate limited. Skipping request. Rate limit resets at: {}",
-                        Instant.ofEpochMilli(rateLimitResetTime.get()));
-                return null;
-            } else {
-                rateLimited.compareAndSet(true, false);
-                log.info("ComicVine rate limit period expired, resuming normal requests");
-            }
+        if (isRateLimitedNow()) {
+            return null;
         }
 
-        long now = System.currentTimeMillis();
-        long timeSinceLastRequest = now - lastRequestTime.get();
-        if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
-            long sleepTime = MIN_REQUEST_INTERVAL_MS - timeSinceLastRequest;
-            log.debug("Rate limiting: sleeping {}ms before next request", sleepTime);
-            try {
-                Thread.sleep(sleepTime);
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-            }
-        }
+        throttleRequests();
         lastRequestTime.set(System.currentTimeMillis());
-        
+
         long callNumber = apiCallCounter.incrementAndGet();
         String endpoint = extractEndpointFromUri(uri);
 
@@ -542,37 +549,76 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            log.debug("ComicVine API call #{} completed: status={}, size={}bytes", 
+            log.debug("ComicVine API call #{} completed: status={}, size={}bytes",
                     callNumber, response.statusCode(), response.body() != null ? response.body().length() : 0);
 
-            if (response.statusCode() == 200) {
-                return objectMapper.readValue(response.body(), responseType);
-            } else if (response.statusCode() == 420 || response.statusCode() == 429) {
-                handleRateLimit(response);
-                return null;
-            } else if (response.statusCode() >= 500 && retriesLeft > 0) {
-                log.warn("ComicVine API returned status {}. Retrying... ({} retries left)",
-                         response.statusCode(), retriesLeft);
-                sleepBeforeRetry(2000);
-                return sendRequestWithRetry(uri, responseType, retriesLeft - 1);
-            } else {
-                log.error("Comicvine API returned status code {}. Body: {}", response.statusCode(), response.body());
-            }
+            return handleResponse(uri, responseType, retriesLeft, response);
         } catch (IOException e) {
-            if (retriesLeft > 0) {
-                log.warn("IOException during ComicVine request. Retrying... ({} retries left)", retriesLeft, e);
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException _) {
-                    Thread.currentThread().interrupt();
-                }
-                return sendRequestWithRetry(uri, responseType, retriesLeft - 1);
-            } else {
-                log.error("Error fetching data from Comicvine API after retries", e);
-            }
+            return handleRequestIoException(uri, responseType, retriesLeft, e);
         } catch (InterruptedException e) {
             log.error("Request interrupted", e);
             Thread.currentThread().interrupt();
+        }
+        return null;
+    }
+
+    private boolean isRateLimitedNow() {
+        if (!rateLimited.get()) {
+            return false;
+        }
+        if (System.currentTimeMillis() < rateLimitResetTime.get()) {
+            log.warn("ComicVine API is currently rate limited. Skipping request. Rate limit resets at: {}",
+                    Instant.ofEpochMilli(rateLimitResetTime.get()));
+            return true;
+        }
+        rateLimited.compareAndSet(true, false);
+        log.info("ComicVine rate limit period expired, resuming normal requests");
+        return false;
+    }
+
+    private void throttleRequests() {
+        long now = System.currentTimeMillis();
+        long timeSinceLastRequest = now - lastRequestTime.get();
+        if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
+            long sleepTime = MIN_REQUEST_INTERVAL_MS - timeSinceLastRequest;
+            log.debug("Rate limiting: sleeping {}ms before next request", sleepTime);
+            try {
+                Thread.sleep(sleepTime);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private <T> T handleResponse(URI uri, Class<T> responseType, int retriesLeft, HttpResponse<String> response) {
+        int statusCode = response.statusCode();
+        if (statusCode == 200) {
+            return objectMapper.readValue(response.body(), responseType);
+        } else if (statusCode == 420 || statusCode == 429) {
+            handleRateLimit(response);
+            return null;
+        } else if (statusCode >= 500 && retriesLeft > 0) {
+            log.warn("ComicVine API returned status {}. Retrying... ({} retries left)",
+                     statusCode, retriesLeft);
+            sleepBeforeRetry(2000);
+            return sendRequestWithRetry(uri, responseType, retriesLeft - 1);
+        } else {
+            log.error("Comicvine API returned status code {}. Body: {}", statusCode, response.body());
+        }
+        return null;
+    }
+
+    private <T> T handleRequestIoException(URI uri, Class<T> responseType, int retriesLeft, IOException e) {
+        if (retriesLeft > 0) {
+            log.warn("IOException during ComicVine request. Retrying... ({} retries left)", retriesLeft, e);
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+            return sendRequestWithRetry(uri, responseType, retriesLeft - 1);
+        } else {
+            log.error("Error fetching data from Comicvine API after retries", e);
         }
         return null;
     }
@@ -644,6 +690,39 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
             return buildVolumeMetadata(comic);
         }
 
+        BookMetadata detailedFallback = fetchDetailedIssueIfCreditsMissing(comic, volumeContext);
+        if (detailedFallback != null) {
+            return detailedFallback;
+        }
+
+        VolumeContextInfo contextInfo = extractVolumeContext(volumeContext);
+        String volumeName = comic.getVolume() != null ? comic.getVolume().getName() : null;
+        List<String> authors = extractAuthors(comic.getPersonCredits());
+        String formattedTitle = formatTitle(volumeName, comic.getIssueNumber(), comic.getName());
+        String dateToUse = comic.getStoreDate() != null ? comic.getStoreDate() : comic.getCoverDate();
+        ComicMetadata comicMetadata = buildComicMetadata(comic, volumeName);
+
+        BookMetadata metadata = BookMetadata.builder()
+                .provider(MetadataProvider.Comicvine)
+                .comicvineId(PREFIX_ISSUE + comic.getId())
+                .title(formattedTitle)
+                .authors(authors)
+                .thumbnailUrl(comic.getImage() != null ? comic.getImage().getMediumUrl() : null)
+                .description(resolveDescription(comic))
+                .seriesName(volumeName)
+                .seriesNumber(safeParseFloat(comic.getIssueNumber()))
+                .seriesTotal(contextInfo.seriesTotal())
+                .publisher(contextInfo.publisher())
+                .publishedDate(safeParseDate(dateToUse))
+                .externalUrl(comic.getSiteDetailUrl())
+                .comicMetadata(comicMetadata)
+                .build();
+
+        logIncompleteMetadata(metadata);
+        return metadata;
+    }
+
+    private BookMetadata fetchDetailedIssueIfCreditsMissing(Comic comic, Comic volumeContext) {
         // For issue search/list responses ComicVine often omits creator credits (including writers).
         // If we don't have any author information here, fall back to the issue detail endpoint
         // to obtain full credits before building the metadata object.
@@ -654,53 +733,35 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                 return detailed;
             }
         }
+        return null;
+    }
 
-        String publisher = null;
-        Integer seriesTotal = null;
-        if (volumeContext != null) {
-            if (volumeContext.getPublisher() != null) {
-                publisher = volumeContext.getPublisher().getName();
-            }
-            seriesTotal = volumeContext.getCountOfIssues();
+    private VolumeContextInfo extractVolumeContext(Comic volumeContext) {
+        if (volumeContext == null) {
+            return new VolumeContextInfo(null, null);
         }
+        String publisher = volumeContext.getPublisher() != null ? volumeContext.getPublisher().getName() : null;
+        return new VolumeContextInfo(publisher, volumeContext.getCountOfIssues());
+    }
 
-        String volumeName = comic.getVolume() != null ? comic.getVolume().getName() : null;
-        List<String> authors = extractAuthors(comic.getPersonCredits());
-        String formattedTitle = formatTitle(volumeName, comic.getIssueNumber(), comic.getName());
-        String dateToUse = comic.getStoreDate() != null ? comic.getStoreDate() : comic.getCoverDate();
-
+    private String resolveDescription(Comic comic) {
         String description = comic.getDescription();
         if ((description == null || description.isEmpty()) && comic.getDeck() != null) {
-            description = comic.getDeck();
+            return comic.getDeck();
         }
+        return description;
+    }
 
-        ComicMetadata comicMetadata = buildComicMetadata(comic, volumeName);
-
-        BookMetadata metadata = BookMetadata.builder()
-                .provider(MetadataProvider.Comicvine)
-                .comicvineId(PREFIX_ISSUE + comic.getId())
-                .title(formattedTitle)
-                .authors(authors)
-                .thumbnailUrl(comic.getImage() != null ? comic.getImage().getMediumUrl() : null)
-                .description(description)
-                .seriesName(volumeName)
-                .seriesNumber(safeParseFloat(comic.getIssueNumber()))
-                .seriesTotal(seriesTotal)
-                .publisher(publisher)
-                .publishedDate(safeParseDate(dateToUse))
-                .externalUrl(comic.getSiteDetailUrl())
-                .comicMetadata(comicMetadata)
-                .build();
-
+    private void logIncompleteMetadata(BookMetadata metadata) {
         if (metadata.getSeriesName() == null || metadata.getSeriesNumber() == null) {
             log.warn("Incomplete metadata for issue {}: missing series name or number", metadata.getComicvineId());
         }
         if (metadata.getAuthors().isEmpty()) {
             log.debug("No authors found for issue {} ({})", metadata.getComicvineId(), metadata.getTitle());
         }
-
-        return metadata;
     }
+
+    private record VolumeContextInfo(String publisher, Integer seriesTotal) {}
 
     private BookMetadata buildVolumeMetadata(Comic volume) {
         List<String> authors = extractAuthors(volume.getPersonCredits());
@@ -765,43 +826,19 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         }
 
         if (personCredits != null && !personCredits.isEmpty()) {
-            // "artist" in Comicvine means both pencils and inks — map to pencillers
-            Set<String> pencillers = extractByRole(personCredits, "pencil");
-            personCredits.stream()
-                    .filter(pc -> pc.getRole() != null)
-                    .filter(pc -> Arrays.stream(pc.getRole().toLowerCase().split(","))
-                            .map(String::trim)
-                            .anyMatch(r -> r.equals("artist")))
-                    .map(Comic.PersonCredit::getName)
-                    .filter(name -> name != null && !name.isEmpty())
-                    .forEach(pencillers::add);
-            builder.pencillers(pencillers);
-            builder.inkers(extractByRole(personCredits, "ink"));
-            builder.colorists(extractByRole(personCredits, "color"));
-            builder.letterers(extractByRole(personCredits, "letter"));
-            builder.coverArtists(extractByRole(personCredits, "cover"));
-            builder.editors(extractByRole(personCredits, "editor"));
+            applyPersonCredits(builder, personCredits);
         }
 
         if (characterCredits != null && !characterCredits.isEmpty()) {
-            builder.characters(characterCredits.stream()
-                    .map(Comic.CharacterCredit::getName)
-                    .filter(n -> n != null && !n.isEmpty())
-                    .collect(Collectors.toCollection(LinkedHashSet::new)));
+            builder.characters(collectCreditNames(characterCredits, Comic.CharacterCredit::getName));
         }
 
         if (teamCredits != null && !teamCredits.isEmpty()) {
-            builder.teams(teamCredits.stream()
-                    .map(Comic.TeamCredit::getName)
-                    .filter(n -> n != null && !n.isEmpty())
-                    .collect(Collectors.toCollection(LinkedHashSet::new)));
+            builder.teams(collectCreditNames(teamCredits, Comic.TeamCredit::getName));
         }
 
         if (locationCredits != null && !locationCredits.isEmpty()) {
-            builder.locations(locationCredits.stream()
-                    .map(Comic.LocationCredit::getName)
-                    .filter(n -> n != null && !n.isEmpty())
-                    .collect(Collectors.toCollection(LinkedHashSet::new)));
+            builder.locations(collectCreditNames(locationCredits, Comic.LocationCredit::getName));
         }
 
         if (siteDetailUrl != null && !siteDetailUrl.isEmpty()) {
@@ -809,6 +846,32 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         }
 
         return builder.build();
+    }
+
+    private void applyPersonCredits(ComicMetadata.ComicMetadataBuilder builder, List<Comic.PersonCredit> personCredits) {
+        // "artist" in Comicvine means both pencils and inks — map to pencillers
+        Set<String> pencillers = extractByRole(personCredits, "pencil");
+        personCredits.stream()
+                .filter(pc -> pc.getRole() != null)
+                .filter(pc -> Arrays.stream(pc.getRole().toLowerCase().split(","))
+                        .map(String::trim)
+                        .anyMatch(r -> r.equals("artist")))
+                .map(Comic.PersonCredit::getName)
+                .filter(name -> name != null && !name.isEmpty())
+                .forEach(pencillers::add);
+        builder.pencillers(pencillers);
+        builder.inkers(extractByRole(personCredits, "ink"));
+        builder.colorists(extractByRole(personCredits, "color"));
+        builder.letterers(extractByRole(personCredits, "letter"));
+        builder.coverArtists(extractByRole(personCredits, "cover"));
+        builder.editors(extractByRole(personCredits, "editor"));
+    }
+
+    private static <C> Set<String> collectCreditNames(List<C> credits, Function<C, String> nameExtractor) {
+        return credits.stream()
+                .map(nameExtractor)
+                .filter(n -> n != null && !n.isEmpty())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private Set<String> extractByRole(List<Comic.PersonCredit> personCredits, String roleFragment) {

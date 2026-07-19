@@ -92,6 +92,19 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
     ) {
         BookMetadata.BookMetadataBuilder builder = BookMetadata.builder();
 
+        applyCoreFields(document, builder, fallbackTitle);
+        applyGtin(document, builder);
+        applyBookCollections(document, builder);
+
+        // Extract comic-specific metadata
+        ComicMetadata.ComicMetadataBuilder comicBuilder = ComicMetadata.builder();
+        if (applyComicMetadata(document, builder, comicBuilder)) {
+            builder.comicMetadata(comicBuilder.build());
+        }
+        return builder.build();
+    }
+
+    private void applyCoreFields(Document document, BookMetadata.BookMetadataBuilder builder, String fallbackTitle) {
         String title = getTextContent(document, "Title");
         builder.title(title == null || title.isBlank() ? fallbackTitle : title);
 
@@ -122,19 +135,24 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
                 )
         );
         builder.language(getTextContent(document, "LanguageISO"));
+    }
 
+    private void applyGtin(Document document, BookMetadata.BookMetadataBuilder builder) {
         // GTIN is the standard ComicInfo field for ISBN (EAN/UPC)
         // Validate it's a 13-digit number (ISBN-13/EAN-13)
         String gtin = getTextContent(document, "GTIN");
-        if (gtin != null && !gtin.isBlank()) {
-            String normalized = ISBN_CLEANER_PATTERN.matcher(gtin).replaceAll("");
-            if (ISBN13_PATTERN.matcher(normalized).matches()) {
-                builder.isbn13(normalized);
-            } else {
-                log.debug("Invalid GTIN format (expected 13 digits): {}", gtin);
-            }
+        if (gtin == null || gtin.isBlank()) {
+            return;
         }
+        String normalized = ISBN_CLEANER_PATTERN.matcher(gtin).replaceAll("");
+        if (ISBN13_PATTERN.matcher(normalized).matches()) {
+            builder.isbn13(normalized);
+        } else {
+            log.debug("Invalid GTIN format (expected 13 digits): {}", gtin);
+        }
+    }
 
+    private void applyBookCollections(Document document, BookMetadata.BookMetadataBuilder builder) {
         List<String> authors = new ArrayList<>(splitValues(getTextContent(document, "Writer")));
         if (!authors.isEmpty()) {
             builder.authors(authors);
@@ -149,9 +167,22 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         if (!tags.isEmpty()) {
             builder.tags(tags);
         }
+    }
 
-        // Extract comic-specific metadata
-        ComicMetadata.ComicMetadataBuilder comicBuilder = ComicMetadata.builder();
+    private boolean applyComicMetadata(
+            Document document,
+            BookMetadata.BookMetadataBuilder builder,
+            ComicMetadata.ComicMetadataBuilder comicBuilder
+    ) {
+        boolean hasComicFields = applyComicIssueFields(document, comicBuilder);
+        hasComicFields |= applyComicCreators(document, comicBuilder);
+        hasComicFields |= applyComicPublicationFields(document, comicBuilder);
+        hasComicFields |= applyComicEntities(document, comicBuilder);
+        hasComicFields |= applyComicWebAndNotes(document, builder, comicBuilder);
+        return hasComicFields;
+    }
+
+    private boolean applyComicIssueFields(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
         boolean hasComicFields = false;
 
         String issueNumber = getTextContent(document, "Number");
@@ -180,6 +211,12 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             comicBuilder.alternateIssue(getTextContent(document, "AlternateNumber"));
             hasComicFields = true;
         }
+
+        return hasComicFields;
+    }
+
+    private boolean applyComicCreators(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
+        boolean hasComicFields = false;
 
         Set<String> pencillers = splitValues(getTextContent(document, "Penciller"));
         if (!pencillers.isEmpty()) {
@@ -217,6 +254,12 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             hasComicFields = true;
         }
 
+        return hasComicFields;
+    }
+
+    private boolean applyComicPublicationFields(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
+        boolean hasComicFields = false;
+
         String imprint = getTextContent(document, "Imprint");
         if (imprint != null && !imprint.isBlank()) {
             comicBuilder.imprint(imprint);
@@ -235,17 +278,30 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             hasComicFields = true;
         }
 
-        String manga = getTextContent(document, "Manga");
-        if (manga != null && !manga.isBlank()) {
-            boolean isManga = "yes".equalsIgnoreCase(manga) || "true".equalsIgnoreCase(manga) || "yesandrighttoleft".equalsIgnoreCase(manga);
-            comicBuilder.manga(isManga);
-            if ("yesandrighttoleft".equalsIgnoreCase(manga)) {
-                comicBuilder.readingDirection("rtl");
-            } else {
-                comicBuilder.readingDirection("ltr");
-            }
+        if (applyMangaField(document, comicBuilder)) {
             hasComicFields = true;
         }
+
+        return hasComicFields;
+    }
+
+    private boolean applyMangaField(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
+        String manga = getTextContent(document, "Manga");
+        if (manga == null || manga.isBlank()) {
+            return false;
+        }
+        boolean isManga = "yes".equalsIgnoreCase(manga) || "true".equalsIgnoreCase(manga) || "yesandrighttoleft".equalsIgnoreCase(manga);
+        comicBuilder.manga(isManga);
+        if ("yesandrighttoleft".equalsIgnoreCase(manga)) {
+            comicBuilder.readingDirection("rtl");
+        } else {
+            comicBuilder.readingDirection("ltr");
+        }
+        return true;
+    }
+
+    private boolean applyComicEntities(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
+        boolean hasComicFields = false;
 
         Set<String> characters = splitValues(getTextContent(document, "Characters"));
         if (!characters.isEmpty()) {
@@ -265,6 +321,16 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             hasComicFields = true;
         }
 
+        return hasComicFields;
+    }
+
+    private boolean applyComicWebAndNotes(
+            Document document,
+            BookMetadata.BookMetadataBuilder builder,
+            ComicMetadata.ComicMetadataBuilder comicBuilder
+    ) {
+        boolean hasComicFields = false;
+
         String web = getTextContent(document, "Web");
         if (web != null && !web.isBlank()) {
             comicBuilder.webLink(web);
@@ -278,27 +344,27 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             comicBuilder.notes(notes);
             hasComicFields = true;
             parseNotes(notes, builder);
+            applyNotesDescriptionFallback(document, builder, notes);
+        }
 
-            // Store whether we already have a description from Summary/Description XML elements
-            String existingDescription = coalesce(
-                    getTextContent(document, "Summary"),
-                    getTextContent(document, "Description")
-            );
-            boolean hasDescription = existingDescription != null && !existingDescription.isBlank();
+        return hasComicFields;
+    }
 
-            // If description is missing, use cleaned notes (removing BookLore tags)
-            if (!hasDescription) {
-                String cleanedNotes = BOOKLORE_TAG_PATTERN.matcher(notes).replaceAll("").trim();
-                if (!cleanedNotes.isEmpty()) {
-                    builder.description(cleanedNotes);
-                }
+    private void applyNotesDescriptionFallback(Document document, BookMetadata.BookMetadataBuilder builder, String notes) {
+        // Store whether we already have a description from Summary/Description XML elements
+        String existingDescription = coalesce(
+                getTextContent(document, "Summary"),
+                getTextContent(document, "Description")
+        );
+        boolean hasDescription = existingDescription != null && !existingDescription.isBlank();
+
+        // If description is missing, use cleaned notes (removing BookLore tags)
+        if (!hasDescription) {
+            String cleanedNotes = BOOKLORE_TAG_PATTERN.matcher(notes).replaceAll("").trim();
+            if (!cleanedNotes.isEmpty()) {
+                builder.description(cleanedNotes);
             }
         }
-
-        if (hasComicFields) {
-            builder.comicMetadata(comicBuilder.build());
-        }
-        return builder.build();
     }
 
     private void parseWebField(String web, BookMetadata.BookMetadataBuilder builder) {
@@ -703,8 +769,10 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
     private int naturalCompare(String a, String b) {
         if (a == null) return b == null ? 0 : -1;
         if (b == null) return 1;
-        String s1 = a.toLowerCase();
-        String s2 = b.toLowerCase();
+        return compareNaturally(a.toLowerCase(), b.toLowerCase());
+    }
+
+    private int compareNaturally(String s1, String s2) {
         int i = 0;
         int j = 0;
         int n1 = s1.length();
@@ -713,23 +781,32 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             char c1 = s1.charAt(i);
             char c2 = s2.charAt(j);
             if (Character.isDigit(c1) && Character.isDigit(c2)) {
-                int i1 = i;
-                while (i1 < n1 && Character.isDigit(s1.charAt(i1))) i1++;
-                int j1 = j;
-                while (j1 < n2 && Character.isDigit(s2.charAt(j1))) j1++;
-                String num1 = LEADING_ZEROS_PATTERN.matcher(s1.substring(i, i1)).replaceFirst("");
-                String num2 = LEADING_ZEROS_PATTERN.matcher(s2.substring(j, j1)).replaceFirst("");
-                int cmp = Integer.compare(num1.isEmpty() ? 0 : Integer.parseInt(num1), num2.isEmpty() ? 0 : Integer.parseInt(num2));
-                if (cmp != 0) return cmp;
-                i = i1;
-                j = j1;
+                DigitRun run = compareDigitRuns(s1, s2, i, j, n1, n2);
+                if (run.comparison() != 0) return run.comparison();
+                i = run.nextI();
+                j = run.nextJ();
+            } else if (c1 != c2) {
+                return Character.compare(c1, c2);
             } else {
-                if (c1 != c2) return Character.compare(c1, c2);
                 i++;
                 j++;
             }
         }
         return Integer.compare(n1 - i, n2 - j);
+    }
+
+    private DigitRun compareDigitRuns(String s1, String s2, int i, int j, int n1, int n2) {
+        int i1 = i;
+        while (i1 < n1 && Character.isDigit(s1.charAt(i1))) i1++;
+        int j1 = j;
+        while (j1 < n2 && Character.isDigit(s2.charAt(j1))) j1++;
+        String num1 = LEADING_ZEROS_PATTERN.matcher(s1.substring(i, i1)).replaceFirst("");
+        String num2 = LEADING_ZEROS_PATTERN.matcher(s2.substring(j, j1)).replaceFirst("");
+        int cmp = Integer.compare(num1.isEmpty() ? 0 : Integer.parseInt(num1), num2.isEmpty() ? 0 : Integer.parseInt(num2));
+        return new DigitRun(cmp, i1, j1);
+    }
+
+    private record DigitRun(int comparison, int nextI, int nextJ) {
     }
 
     private static boolean isComicInfoName(String name) {

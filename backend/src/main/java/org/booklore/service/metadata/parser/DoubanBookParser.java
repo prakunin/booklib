@@ -67,27 +67,31 @@ public class DoubanBookParser implements BookParser {
         if (topResult.getDoubanId() != null && areDoubanReviewsEnabled()) {
             BookMetadata detailedMetadata = getBookMetadata(topResult.getDoubanId());
             if (detailedMetadata != null) {
-                // Merge detailed metadata with search result, preserving search result data where detailed is missing
-                if (detailedMetadata.getThumbnailUrl() == null && topResult.getThumbnailUrl() != null) {
-                    detailedMetadata.setThumbnailUrl(topResult.getThumbnailUrl());
-                }
-                if (detailedMetadata.getAuthors() == null || detailedMetadata.getAuthors().isEmpty()) {
-                    detailedMetadata.setAuthors(topResult.getAuthors());
-                }
-                if (detailedMetadata.getPublisher() == null && topResult.getPublisher() != null) {
-                    detailedMetadata.setPublisher(topResult.getPublisher());
-                }
-                if (detailedMetadata.getPublishedDate() == null && topResult.getPublishedDate() != null) {
-                    detailedMetadata.setPublishedDate(topResult.getPublishedDate());
-                }
-                if (detailedMetadata.getDoubanRating() == null && topResult.getDoubanRating() != null) {
-                    detailedMetadata.setDoubanRating(topResult.getDoubanRating());
-                }
+                mergeSearchResultDefaults(detailedMetadata, topResult);
                 return detailedMetadata;
             }
         }
 
         return topResult;
+    }
+
+    // Merge detailed metadata with search result, preserving search result data where detailed is missing
+    private void mergeSearchResultDefaults(BookMetadata detailedMetadata, BookMetadata topResult) {
+        if (detailedMetadata.getThumbnailUrl() == null && topResult.getThumbnailUrl() != null) {
+            detailedMetadata.setThumbnailUrl(topResult.getThumbnailUrl());
+        }
+        if (detailedMetadata.getAuthors() == null || detailedMetadata.getAuthors().isEmpty()) {
+            detailedMetadata.setAuthors(topResult.getAuthors());
+        }
+        if (detailedMetadata.getPublisher() == null && topResult.getPublisher() != null) {
+            detailedMetadata.setPublisher(topResult.getPublisher());
+        }
+        if (detailedMetadata.getPublishedDate() == null && topResult.getPublishedDate() != null) {
+            detailedMetadata.setPublishedDate(topResult.getPublishedDate());
+        }
+        if (detailedMetadata.getDoubanRating() == null && topResult.getDoubanRating() != null) {
+            detailedMetadata.setDoubanRating(topResult.getDoubanRating());
+        }
     }
 
     @Override
@@ -131,16 +135,7 @@ public class DoubanBookParser implements BookParser {
             Document doc = fetchDocument(queryUrl);
 
             // Extract JSON data from window.__DATA__
-            String htmlContent = doc.html();
-            String jsonData = null;
-
-            // Use regex to find the JSON object in window.__DATA__
-            Matcher matcher = WINDOW_DATA_JSON_PATTERN.matcher(htmlContent);
-             if (matcher.find()) {
-                 jsonData = matcher.group(1);
-                 log.debug("Successfully extracted JSON data, length: {}", jsonData.length());
-             }
-
+            String jsonData = extractWindowDataJson(doc);
             if (jsonData == null) {
                 log.warn("No JSON data found in Douban search response");
                 return List.of();
@@ -153,17 +148,9 @@ public class DoubanBookParser implements BookParser {
             if (rootNode == null) {
                 return List.of();
             }
-            JsonNode itemsNode = rootNode.get("items");
 
-            log.debug("Items node: {}", itemsNode != null ? itemsNode.toString() : "null");
-
-            if (itemsNode == null || !itemsNode.isArray()) {
-                log.warn("No items found in Douban search response or items is not an array");
-                return List.of();
-            }
-
-            if (itemsNode.isEmpty()) {
-                log.info("No books found for the search query");
+            JsonNode itemsNode = extractSearchItems(rootNode);
+            if (itemsNode == null) {
                 return List.of();
             }
 
@@ -179,6 +166,35 @@ public class DoubanBookParser implements BookParser {
         }
         log.info("Douban: Found {} search results", searchResults.size());
         return searchResults;
+    }
+
+    // Use regex to find the JSON object assigned to window.__DATA__
+    private String extractWindowDataJson(Document doc) {
+        Matcher matcher = WINDOW_DATA_JSON_PATTERN.matcher(doc.html());
+        if (matcher.find()) {
+            String jsonData = matcher.group(1);
+            log.debug("Successfully extracted JSON data, length: {}", jsonData.length());
+            return jsonData;
+        }
+        return null;
+    }
+
+    private JsonNode extractSearchItems(JsonNode rootNode) {
+        JsonNode itemsNode = rootNode.get("items");
+
+        log.debug("Items node: {}", itemsNode != null ? itemsNode.toString() : "null");
+
+        if (itemsNode == null || !itemsNode.isArray()) {
+            log.warn("No items found in Douban search response or items is not an array");
+            return null;
+        }
+
+        if (itemsNode.isEmpty()) {
+            log.info("No books found for the search query");
+            return null;
+        }
+
+        return itemsNode;
     }
 
     private JsonNode parseSearchJson(String jsonData) {
@@ -582,19 +598,7 @@ public class DoubanBookParser implements BookParser {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
 
         try {
-            Elements reviewElements = doc.select("#comments .comment-item");
-            log.debug("Douban: Found {} review elements with selector '#comments .comment-item'", reviewElements.size());
-
-            if (reviewElements.isEmpty()) {
-                // Try alternative selectors that Douban might be using
-                reviewElements = doc.select(".comment-item");
-                log.debug("Douban: Trying alternative selector '.comment-item', found {} elements", reviewElements.size());
-
-                if (reviewElements.isEmpty()) {
-                    reviewElements = doc.select("[class*=comment]");
-                    log.debug("Douban: Trying broad selector '[class*=comment]', found {} elements", reviewElements.size());
-                }
-            }
+            Elements reviewElements = selectReviewElements(doc);
 
             int count = 0;
             int index = 0;
@@ -603,43 +607,66 @@ public class DoubanBookParser implements BookParser {
                 Element reviewElement = reviewElements.get(index);
                 index++;
 
-                Elements reviewerElements = reviewElement.select(".comment-info a");
-                String reviewerName = !reviewerElements.isEmpty() ? reviewerElements.first().text() : null;
-
-                Elements ratingElements = reviewElement.select(".comment-info .rating");
-                Float ratingValue = null;
-                if (!ratingElements.isEmpty()) {
-                    String ratingClass = ratingElements.first().className();
-                    Matcher matcher = RATING_NUMBER_PATTERN.matcher(ratingClass);
-                     if (matcher.find()) {
-                         ratingValue = Float.parseFloat(matcher.group(1)) / 2.0f; // Convert 5-star scale to 10-star scale
-                     }
+                BookReview review = parseReviewElement(reviewElement, formatter);
+                if (review != null) {
+                    reviews.add(review);
+                    count++;
                 }
-
-                Elements dateElements = reviewElement.select(".comment-info .comment-time");
-                Instant dateInstant = parseReviewDate(dateElements, formatter);
-
-                Elements bodyElements = reviewElement.select(".comment-content");
-                String body = !bodyElements.isEmpty() ? bodyElements.first().text() : null;
-                if (body == null || body.isEmpty()) {
-                    continue;
-                }
-
-                reviews.add(BookReview.builder()
-                        .metadataProvider(MetadataProvider.Douban)
-                        .reviewerName(reviewerName != null ? reviewerName.trim() : null)
-                        .rating(ratingValue)
-                        .date(dateInstant)
-                        .body(body.trim())
-                        .build());
-
-                count++;
             }
         } catch (Exception e) {
             log.warn("Failed to parse reviews: {}", e.getMessage());
         }
         log.info("Douban: Extracted {} reviews from page", reviews.size());
         return reviews;
+    }
+
+    private Elements selectReviewElements(Document doc) {
+        Elements reviewElements = doc.select("#comments .comment-item");
+        log.debug("Douban: Found {} review elements with selector '#comments .comment-item'", reviewElements.size());
+
+        if (reviewElements.isEmpty()) {
+            // Try alternative selectors that Douban might be using
+            reviewElements = doc.select(".comment-item");
+            log.debug("Douban: Trying alternative selector '.comment-item', found {} elements", reviewElements.size());
+
+            if (reviewElements.isEmpty()) {
+                reviewElements = doc.select("[class*=comment]");
+                log.debug("Douban: Trying broad selector '[class*=comment]', found {} elements", reviewElements.size());
+            }
+        }
+        return reviewElements;
+    }
+
+    private BookReview parseReviewElement(Element reviewElement, DateTimeFormatter formatter) {
+        Elements reviewerElements = reviewElement.select(".comment-info a");
+        String reviewerName = !reviewerElements.isEmpty() ? reviewerElements.first().text() : null;
+
+        Elements ratingElements = reviewElement.select(".comment-info .rating");
+        Float ratingValue = null;
+        if (!ratingElements.isEmpty()) {
+            String ratingClass = ratingElements.first().className();
+            Matcher matcher = RATING_NUMBER_PATTERN.matcher(ratingClass);
+             if (matcher.find()) {
+                 ratingValue = Float.parseFloat(matcher.group(1)) / 2.0f; // Convert 5-star scale to 10-star scale
+             }
+        }
+
+        Elements dateElements = reviewElement.select(".comment-info .comment-time");
+        Instant dateInstant = parseReviewDate(dateElements, formatter);
+
+        Elements bodyElements = reviewElement.select(".comment-content");
+        String body = !bodyElements.isEmpty() ? bodyElements.first().text() : null;
+        if (body == null || body.isEmpty()) {
+            return null;
+        }
+
+        return BookReview.builder()
+                .metadataProvider(MetadataProvider.Douban)
+                .reviewerName(reviewerName != null ? reviewerName.trim() : null)
+                .rating(ratingValue)
+                .date(dateInstant)
+                .body(body.trim())
+                .build();
     }
 
     private Instant parseReviewDate(Elements dateElements, DateTimeFormatter formatter) {
@@ -689,25 +716,33 @@ public class DoubanBookParser implements BookParser {
 
     private Integer getPageCount(Document doc) {
         try {
-            Element infoElement = doc.selectFirst(INFO_SELECTOR);
-            if (infoElement != null) {
-                Element span = infoElement.selectFirst("span:contains(页数)");
-                if (span != null) {
-                    Node next = span.nextSibling();
-                    if (next instanceof TextNode textNode) {
-                        String pageText = textNode.text().trim();
-                        if (!pageText.isEmpty()) {
-                            Integer parsed = parsePageCount(pageText);
-                            if (parsed != null) {
-                                return parsed;
-                            }
-                        }
-                    }
+            String pageText = extractInfoFieldText(doc, "页数");
+            if (pageText != null && !pageText.isEmpty()) {
+                Integer parsed = parsePageCount(pageText);
+                if (parsed != null) {
+                    return parsed;
                 }
             }
             log.debug("Failed to parse page count: Element not found.");
         } catch (Exception e) {
             log.warn("Failed to parse page count: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    // Returns the trimmed text node immediately following the #info span whose text contains the label.
+    private String extractInfoFieldText(Document doc, String label) {
+        Element infoElement = doc.selectFirst(INFO_SELECTOR);
+        if (infoElement == null) {
+            return null;
+        }
+        Element span = infoElement.selectFirst("span:contains(" + label + ")");
+        if (span == null) {
+            return null;
+        }
+        Node next = span.nextSibling();
+        if (next instanceof TextNode textNode) {
+            return textNode.text().trim();
         }
         return null;
     }

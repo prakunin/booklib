@@ -111,32 +111,35 @@ public class SidecarMetadataMapper {
         }
 
         if (m.getRatings() != null) {
-            SidecarRatings r = m.getRatings();
-            if (r.getAmazon() != null) {
-                builder.amazonRating(r.getAmazon().getAverage())
-                        .amazonReviewCount(r.getAmazon().getCount());
-            }
-            if (r.getGoodreads() != null) {
-                builder.goodreadsRating(r.getGoodreads().getAverage())
-                        .goodreadsReviewCount(r.getGoodreads().getCount());
-            }
-            if (r.getHardcover() != null) {
-                builder.hardcoverRating(r.getHardcover().getAverage())
-                        .hardcoverReviewCount(r.getHardcover().getCount());
-            }
-            if (r.getLubimyczytac() != null) {
-                builder.lubimyczytacRating(r.getLubimyczytac().getAverage());
-            }
-            if (r.getRanobedb() != null) {
-                builder.ranobedbRating(r.getRanobedb().getAverage());
-            }
-            if (r.getAudible() != null) {
-                builder.audibleRating(r.getAudible().getAverage())
-                        .audibleReviewCount(r.getAudible().getCount());
-            }
+            applyRatings(builder, m.getRatings());
         }
 
         return builder.build();
+    }
+
+    private void applyRatings(BookMetadata.BookMetadataBuilder builder, SidecarRatings r) {
+        if (r.getAmazon() != null) {
+            builder.amazonRating(r.getAmazon().getAverage())
+                    .amazonReviewCount(r.getAmazon().getCount());
+        }
+        if (r.getGoodreads() != null) {
+            builder.goodreadsRating(r.getGoodreads().getAverage())
+                    .goodreadsReviewCount(r.getGoodreads().getCount());
+        }
+        if (r.getHardcover() != null) {
+            builder.hardcoverRating(r.getHardcover().getAverage())
+                    .hardcoverReviewCount(r.getHardcover().getCount());
+        }
+        if (r.getLubimyczytac() != null) {
+            builder.lubimyczytacRating(r.getLubimyczytac().getAverage());
+        }
+        if (r.getRanobedb() != null) {
+            builder.ranobedbRating(r.getRanobedb().getAverage());
+        }
+        if (r.getAudible() != null) {
+            builder.audibleRating(r.getAudible().getAverage())
+                    .audibleReviewCount(r.getAudible().getCount());
+        }
     }
 
     public String getCoverFileName(Path bookPath) {

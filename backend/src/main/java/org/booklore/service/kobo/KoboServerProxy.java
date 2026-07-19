@@ -80,62 +80,11 @@ public class KoboServerProxy {
 
     private ResponseEntity<JsonNode> executeProxyRequest(HttpServletRequest request, Object body, String path, boolean includeSyncToken, BookloreSyncToken syncToken) {
         try {
-            String koboBaseUrl = "https://storeapi.kobo.com";
-
-            String queryString = request.getQueryString();
-            String uriString = koboBaseUrl + path;
-            if (queryString != null && !queryString.isBlank()) {
-                uriString += "?" + queryString;
-            }
-
-            URI uri = URI.create(uriString);
-            log.debug("Kobo proxy URL: {}", uri);
-
-            String bodyString = body != null ? objectMapper.writeValueAsString(body) : "{}";
-            HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(uri)
-                    .timeout(Duration.ofMinutes(1))
-                    .method(request.getMethod(), HttpRequest.BodyPublishers.ofString(bodyString))
-                    .header(HttpHeaders.CONTENT_TYPE, "application/json")
-                    .header(HttpHeaders.ACCEPT, "application/json");
-
-            Collections.list(request.getHeaderNames()).forEach(headerName -> {
-                if (!HEADERS_OUT_EXCLUDE.contains(headerName.toLowerCase()) &&
-                        (HEADERS_OUT_INCLUDE.contains(headerName) || isKoboHeader(headerName))) {
-                    Collections.list(request.getHeaders(headerName))
-                            .forEach(value -> builder.header(headerName, value));
-                }
-            });
-
-            if (includeSyncToken && syncToken != null && syncToken.getRawKoboSyncToken() != null && !syncToken.getRawKoboSyncToken().isBlank()) {
-                builder.header(KoboHeaders.X_KOBO_SYNCTOKEN, syncToken.getRawKoboSyncToken());
-            }
-
-            HttpRequest httpRequest = builder.build();
+            HttpRequest httpRequest = buildProxyRequest(request, body, path, includeSyncToken, syncToken);
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
-            JsonNode responseBody = response.body() != null && !response.body().isBlank()
-                    ? objectMapper.readTree(response.body())
-                    : null;
-
-            HttpHeaders responseHeaders = new HttpHeaders();
-            response.headers().map().forEach((key, values) -> {
-                if (isKoboHeader(key)) {
-                    responseHeaders.addAll(key, values);
-                }
-            });
-
-            if (responseHeaders.getFirst(KoboHeaders.X_KOBO_SYNCTOKEN) != null && includeSyncToken && syncToken != null) {
-                String koboToken = responseHeaders.getFirst(KoboHeaders.X_KOBO_SYNCTOKEN);
-                if (koboToken != null) {
-                    BookloreSyncToken updated = BookloreSyncToken.builder()
-                            .ongoingSyncPointId(syncToken.getOngoingSyncPointId())
-                            .lastSuccessfulSyncPointId(syncToken.getLastSuccessfulSyncPointId())
-                            .rawKoboSyncToken(koboToken)
-                            .build();
-                    responseHeaders.set(KoboHeaders.X_KOBO_SYNCTOKEN, bookloreSyncTokenGenerator.toBase64(updated));
-                }
-            }
+            JsonNode responseBody = parseResponseBody(response);
+            HttpHeaders responseHeaders = buildResponseHeaders(response, includeSyncToken, syncToken);
 
             log.debug("Kobo proxy response status: {}", response.statusCode());
 
@@ -148,5 +97,68 @@ public class KoboServerProxy {
             log.error("Failed to proxy request to Kobo", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to proxy request to Kobo", e);
         }
+    }
+
+    private HttpRequest buildProxyRequest(HttpServletRequest request, Object body, String path, boolean includeSyncToken, BookloreSyncToken syncToken) {
+        String koboBaseUrl = "https://storeapi.kobo.com";
+
+        String queryString = request.getQueryString();
+        String uriString = koboBaseUrl + path;
+        if (queryString != null && !queryString.isBlank()) {
+            uriString += "?" + queryString;
+        }
+
+        URI uri = URI.create(uriString);
+        log.debug("Kobo proxy URL: {}", uri);
+
+        String bodyString = body != null ? objectMapper.writeValueAsString(body) : "{}";
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(uri)
+                .timeout(Duration.ofMinutes(1))
+                .method(request.getMethod(), HttpRequest.BodyPublishers.ofString(bodyString))
+                .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                .header(HttpHeaders.ACCEPT, "application/json");
+
+        Collections.list(request.getHeaderNames()).forEach(headerName -> {
+            if (!HEADERS_OUT_EXCLUDE.contains(headerName.toLowerCase()) &&
+                    (HEADERS_OUT_INCLUDE.contains(headerName) || isKoboHeader(headerName))) {
+                Collections.list(request.getHeaders(headerName))
+                        .forEach(value -> builder.header(headerName, value));
+            }
+        });
+
+        if (includeSyncToken && syncToken != null && syncToken.getRawKoboSyncToken() != null && !syncToken.getRawKoboSyncToken().isBlank()) {
+            builder.header(KoboHeaders.X_KOBO_SYNCTOKEN, syncToken.getRawKoboSyncToken());
+        }
+
+        return builder.build();
+    }
+
+    private JsonNode parseResponseBody(HttpResponse<String> response) {
+        return response.body() != null && !response.body().isBlank()
+                ? objectMapper.readTree(response.body())
+                : null;
+    }
+
+    private HttpHeaders buildResponseHeaders(HttpResponse<String> response, boolean includeSyncToken, BookloreSyncToken syncToken) {
+        HttpHeaders responseHeaders = new HttpHeaders();
+        response.headers().map().forEach((key, values) -> {
+            if (isKoboHeader(key)) {
+                responseHeaders.addAll(key, values);
+            }
+        });
+
+        if (responseHeaders.getFirst(KoboHeaders.X_KOBO_SYNCTOKEN) != null && includeSyncToken && syncToken != null) {
+            String koboToken = responseHeaders.getFirst(KoboHeaders.X_KOBO_SYNCTOKEN);
+            if (koboToken != null) {
+                BookloreSyncToken updated = BookloreSyncToken.builder()
+                        .ongoingSyncPointId(syncToken.getOngoingSyncPointId())
+                        .lastSuccessfulSyncPointId(syncToken.getLastSuccessfulSyncPointId())
+                        .rawKoboSyncToken(koboToken)
+                        .build();
+                responseHeaders.set(KoboHeaders.X_KOBO_SYNCTOKEN, bookloreSyncTokenGenerator.toBase64(updated));
+            }
+        }
+        return responseHeaders;
     }
 }

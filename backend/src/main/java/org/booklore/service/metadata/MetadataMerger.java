@@ -406,17 +406,29 @@ class MetadataMerger {
     }
 
     private void applyExistingFallbacks(BookMetadata existingMetadata, BookMetadata metadata) {
+        applyExistingDescriptiveFallbacks(existingMetadata, metadata);
+        applyExistingSeriesAndIsbnFallbacks(existingMetadata, metadata);
+        applyExistingClassificationFallbacks(existingMetadata, metadata);
+    }
+
+    private void applyExistingDescriptiveFallbacks(BookMetadata existingMetadata, BookMetadata metadata) {
         if (metadata.getTitle() == null) metadata.setTitle(existingMetadata.getTitle());
         if (metadata.getSubtitle() == null) metadata.setSubtitle(existingMetadata.getSubtitle());
         if (metadata.getDescription() == null) metadata.setDescription(existingMetadata.getDescription());
         if (metadata.getAuthors() == null) metadata.setAuthors(existingMetadata.getAuthors());
         if (metadata.getPublisher() == null) metadata.setPublisher(existingMetadata.getPublisher());
         if (metadata.getPublishedDate() == null) metadata.setPublishedDate(existingMetadata.getPublishedDate());
+    }
+
+    private void applyExistingSeriesAndIsbnFallbacks(BookMetadata existingMetadata, BookMetadata metadata) {
         if (metadata.getSeriesName() == null) metadata.setSeriesName(existingMetadata.getSeriesName());
         if (metadata.getSeriesNumber() == null) metadata.setSeriesNumber(existingMetadata.getSeriesNumber());
         if (metadata.getSeriesTotal() == null) metadata.setSeriesTotal(existingMetadata.getSeriesTotal());
         if (metadata.getIsbn13() == null) metadata.setIsbn13(existingMetadata.getIsbn13());
         if (metadata.getIsbn10() == null) metadata.setIsbn10(existingMetadata.getIsbn10());
+    }
+
+    private void applyExistingClassificationFallbacks(BookMetadata existingMetadata, BookMetadata metadata) {
         if (metadata.getLanguage() == null) metadata.setLanguage(existingMetadata.getLanguage());
         if (metadata.getPageCount() == null) metadata.setPageCount(existingMetadata.getPageCount());
         if (metadata.getThumbnailUrl() == null) metadata.setThumbnailUrl(existingMetadata.getThumbnailUrl());

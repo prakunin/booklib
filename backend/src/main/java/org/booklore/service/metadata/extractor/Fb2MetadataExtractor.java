@@ -65,45 +65,18 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     private CoverCandidate findCoverCandidate(File file) throws Exception {
         try (InputStream inputStream = getInputStream(file)) {
             XMLStreamReader reader = createXmlStreamReader(inputStream);
-            String coverBinaryId = null;
-            String referencedImageId = null;
-            int titleInfoDepth = 0;
-            int coverpageDepth = 0;
+            CoverScan scan = new CoverScan();
             try {
                 while (reader.hasNext()) {
                     int event = reader.next();
                     if (event == XMLStreamConstants.START_ELEMENT) {
-                        if (titleInfoDepth > 0) {
-                            titleInfoDepth++;
-                        }
-                        if (coverpageDepth > 0) {
-                            coverpageDepth++;
-                        }
-
-                        String localName = reader.getLocalName();
-                        if (TITLE_INFO_ELEMENT.equals(localName)) {
-                            titleInfoDepth = 1;
-                        } else if (titleInfoDepth > 0 && "coverpage".equals(localName)) {
-                            coverpageDepth = 1;
-                        } else if (coverpageDepth > 0 && "image".equals(localName) && referencedImageId == null) {
-                            String href = getHrefAttribute(reader);
-                            if (href != null && href.startsWith("#")) {
-                                referencedImageId = href.substring(1);
-                            }
-                        } else if (BINARY_ELEMENT.equals(localName) && coverBinaryId == null) {
-                            String id = reader.getAttributeValue(null, "id");
-                            String contentType = reader.getAttributeValue(null, "content-type");
-                            if (Strings.CI.contains(id, "cover")
-                                    && Strings.CI.startsWith(contentType, "image/")) {
-                                coverBinaryId = id;
-                            }
-                        }
+                        handleCoverStartElement(reader, scan);
                     } else if (event == XMLStreamConstants.END_ELEMENT) {
-                        if (coverpageDepth > 0) {
-                            coverpageDepth--;
+                        if (scan.coverpageDepth > 0) {
+                            scan.coverpageDepth--;
                         }
-                        if (titleInfoDepth > 0) {
-                            titleInfoDepth--;
+                        if (scan.titleInfoDepth > 0) {
+                            scan.titleInfoDepth--;
                         }
                     }
                 }
@@ -111,38 +84,71 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                 reader.close();
             }
 
-            String binaryId = StringUtils.defaultIfBlank(coverBinaryId, referencedImageId);
+            String binaryId = StringUtils.defaultIfBlank(scan.coverBinaryId, scan.referencedImageId);
             return StringUtils.isBlank(binaryId) ? null : new CoverCandidate(binaryId);
         }
+    }
+
+    private void handleCoverStartElement(XMLStreamReader reader, CoverScan scan) {
+        if (scan.titleInfoDepth > 0) {
+            scan.titleInfoDepth++;
+        }
+        if (scan.coverpageDepth > 0) {
+            scan.coverpageDepth++;
+        }
+
+        String localName = reader.getLocalName();
+        if (TITLE_INFO_ELEMENT.equals(localName)) {
+            scan.titleInfoDepth = 1;
+        } else if (scan.titleInfoDepth > 0 && "coverpage".equals(localName)) {
+            scan.coverpageDepth = 1;
+        } else if (scan.coverpageDepth > 0 && "image".equals(localName) && scan.referencedImageId == null) {
+            readReferencedImageId(reader, scan);
+        } else if (BINARY_ELEMENT.equals(localName) && scan.coverBinaryId == null) {
+            readCoverBinaryId(reader, scan);
+        }
+    }
+
+    private void readReferencedImageId(XMLStreamReader reader, CoverScan scan) {
+        String href = getHrefAttribute(reader);
+        if (href != null && href.startsWith("#")) {
+            scan.referencedImageId = href.substring(1);
+        }
+    }
+
+    private void readCoverBinaryId(XMLStreamReader reader, CoverScan scan) {
+        String id = reader.getAttributeValue(null, "id");
+        String contentType = reader.getAttributeValue(null, "content-type");
+        if (Strings.CI.contains(id, "cover")
+                && Strings.CI.startsWith(contentType, "image/")) {
+            scan.coverBinaryId = id;
+        }
+    }
+
+    private static final class CoverScan {
+        private String coverBinaryId;
+        private String referencedImageId;
+        private int titleInfoDepth;
+        private int coverpageDepth;
     }
 
     @SuppressWarnings("java:S1168") // return value flows straight through to extractCover's null-means-no-cover contract
     private byte[] decodeCoverBinary(File file, String binaryId) throws Exception {
         try (InputStream inputStream = getInputStream(file)) {
             XMLStreamReader reader = createXmlStreamReader(inputStream);
-            StringBuilder base64 = null;
-            int targetDepth = 0;
+            BinaryScan scan = new BinaryScan();
             try {
                 while (reader.hasNext()) {
                     int event = reader.next();
                     if (event == XMLStreamConstants.START_ELEMENT) {
-                        if (base64 != null) {
-                            targetDepth++;
-                        } else if (BINARY_ELEMENT.equals(reader.getLocalName())
-                                && binaryId.equals(reader.getAttributeValue(null, "id"))) {
-                            base64 = new StringBuilder();
-                            targetDepth = 1;
+                        handleBinaryStart(reader, scan, binaryId);
+                    } else if (isTextEvent(event) && scan.base64 != null) {
+                        scan.base64.append(reader.getText());
+                    } else if (event == XMLStreamConstants.END_ELEMENT && scan.base64 != null) {
+                        byte[] decoded = handleBinaryEnd(reader, scan);
+                        if (decoded != null) {
+                            return decoded;
                         }
-                    } else if ((event == XMLStreamConstants.CHARACTERS
-                            || event == XMLStreamConstants.CDATA
-                            || event == XMLStreamConstants.SPACE)
-                            && base64 != null) {
-                        base64.append(reader.getText());
-                    } else if (event == XMLStreamConstants.END_ELEMENT && base64 != null) {
-                        if (targetDepth == 1 && BINARY_ELEMENT.equals(reader.getLocalName())) {
-                            return Base64.getMimeDecoder().decode(base64.toString().trim());
-                        }
-                        targetDepth--;
                     }
                 }
             } finally {
@@ -150,6 +156,35 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
             }
             return null;
         }
+    }
+
+    private void handleBinaryStart(XMLStreamReader reader, BinaryScan scan, String binaryId) {
+        if (scan.base64 != null) {
+            scan.targetDepth++;
+        } else if (BINARY_ELEMENT.equals(reader.getLocalName())
+                && binaryId.equals(reader.getAttributeValue(null, "id"))) {
+            scan.base64 = new StringBuilder();
+            scan.targetDepth = 1;
+        }
+    }
+
+    private byte[] handleBinaryEnd(XMLStreamReader reader, BinaryScan scan) {
+        if (scan.targetDepth == 1 && BINARY_ELEMENT.equals(reader.getLocalName())) {
+            return Base64.getMimeDecoder().decode(scan.base64.toString().trim());
+        }
+        scan.targetDepth--;
+        return null;
+    }
+
+    private static boolean isTextEvent(int event) {
+        return event == XMLStreamConstants.CHARACTERS
+                || event == XMLStreamConstants.CDATA
+                || event == XMLStreamConstants.SPACE;
+    }
+
+    private static final class BinaryScan {
+        private StringBuilder base64;
+        private int targetDepth;
     }
 
     @Override
@@ -223,25 +258,9 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                     case "genre" -> addCategory(categories, readElementText(reader));
                     case "author" -> addAuthor(authors, extractPersonName(reader));
                     case "book-title" -> builder.title(readElementText(reader));
-                    case "annotation" -> {
-                        String description = readElementText(reader);
-                        if (StringUtils.isNotBlank(description)) {
-                            builder.description(description);
-                        }
-                    }
+                    case "annotation" -> applyAnnotation(reader, builder);
                     case "keywords" -> addKeywords(categories, readElementText(reader));
-                    case "date" -> {
-                        String dateValue = reader.getAttributeValue(null, "value");
-                        if (StringUtils.isBlank(dateValue)) {
-                            dateValue = readElementText(reader);
-                        } else {
-                            skipElement(reader);
-                        }
-                        LocalDate publishedDate = parseDate(dateValue);
-                        if (publishedDate != null) {
-                            builder.publishedDate(publishedDate);
-                        }
-                    }
+                    case "date" -> applyDate(reader, builder);
                     case "lang" -> builder.language(readElementText(reader));
                     case "sequence" -> {
                         extractSequence(reader, builder);
@@ -254,6 +273,26 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
             } else if (event == XMLStreamConstants.END_ELEMENT && TITLE_INFO_ELEMENT.equals(reader.getLocalName())) {
                 return;
             }
+        }
+    }
+
+    private void applyAnnotation(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder) throws XMLStreamException {
+        String description = readElementText(reader);
+        if (StringUtils.isNotBlank(description)) {
+            builder.description(description);
+        }
+    }
+
+    private void applyDate(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder) throws XMLStreamException {
+        String dateValue = reader.getAttributeValue(null, "value");
+        if (StringUtils.isBlank(dateValue)) {
+            dateValue = readElementText(reader);
+        } else {
+            skipElement(reader);
+        }
+        LocalDate publishedDate = parseDate(dateValue);
+        if (publishedDate != null) {
+            builder.publishedDate(publishedDate);
         }
     }
 
@@ -309,6 +348,10 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     }
 
     private String extractPersonName(XMLStreamReader reader) throws XMLStreamException {
+        return assembleName(readPersonNameParts(reader));
+    }
+
+    private PersonName readPersonNameParts(XMLStreamReader reader) throws XMLStreamException {
         String firstName = null;
         String middleName = null;
         String lastName = null;
@@ -331,25 +374,37 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
             }
         }
 
+        return new PersonName(firstName, middleName, lastName, nickname);
+    }
+
+    private String assembleName(PersonName parts) {
         StringBuilder name = new StringBuilder(64);
 
-        if (StringUtils.isNotBlank(firstName)) {
-            name.append(firstName.trim());
+        if (StringUtils.isNotBlank(parts.firstName())) {
+            name.append(parts.firstName().trim());
         }
-        if (StringUtils.isNotBlank(middleName)) {
-            if (!name.isEmpty()) name.append(" ");
-            name.append(middleName.trim());
+        if (StringUtils.isNotBlank(parts.middleName())) {
+            appendWithSpace(name, parts.middleName().trim());
         }
-        if (StringUtils.isNotBlank(lastName)) {
-            if (!name.isEmpty()) name.append(" ");
-            name.append(lastName.trim());
+        if (StringUtils.isNotBlank(parts.lastName())) {
+            appendWithSpace(name, parts.lastName().trim());
         }
 
-        if (name.isEmpty() && StringUtils.isNotBlank(nickname)) {
-            name.append(nickname.trim());
+        if (name.isEmpty() && StringUtils.isNotBlank(parts.nickname())) {
+            name.append(parts.nickname().trim());
         }
 
         return name.toString();
+    }
+
+    private void appendWithSpace(StringBuilder name, String value) {
+        if (!name.isEmpty()) {
+            name.append(" ");
+        }
+        name.append(value);
+    }
+
+    private record PersonName(String firstName, String middleName, String lastName, String nickname) {
     }
 
     private void extractSequence(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder) {

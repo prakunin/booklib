@@ -476,32 +476,15 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
     private String getPublisher(Document doc) {
         try {
             Element featureElement = doc.getElementById(DETAIL_BULLETS_FEATURE_DIV_ID);
-            if (featureElement != null) {
-                Elements listItems = featureElement.select("li");
-                for (Element listItem : listItems) {
-                    Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
-                    if (boldText != null) {
-                        String header = boldText.text().toLowerCase();
-                        if (header.contains("publisher") ||
-                            header.contains("herausgeber") || 
-                            header.contains("éditeur") || 
-                            header.contains("editoriale") || 
-                            header.contains("editorial") || 
-                            header.contains("uitgever") || 
-                            header.contains("wydawca") ||
-                            header.contains("出版社") ||
-                            header.contains("editora")) {
-                            
-                            Element publisherSpan = boldText.nextElementSibling();
-                            if (publisherSpan != null) {
-                                String fullPublisher = publisherSpan.text().trim();
-                                return PARENTHESES_WITH_WHITESPACE_PATTERN.matcher(fullPublisher.split(";")[0].trim()).replaceAll("").trim();
-                            }
-                        }
-                    }
-                }
-            } else {
+            if (featureElement == null) {
                 log.debug("Failed to parse publisher: Element 'detailBullets_feature_div' not found.");
+                return null;
+            }
+            for (Element listItem : featureElement.select("li")) {
+                String publisher = extractPublisherFromListItem(listItem);
+                if (publisher != null) {
+                    return publisher;
+                }
             }
         } catch (Exception e) {
             log.warn("Failed to parse publisher: {}", e.getMessage());
@@ -509,7 +492,43 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         return null;
     }
 
+    private String extractPublisherFromListItem(Element listItem) {
+        Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
+        if (boldText == null) {
+            return null;
+        }
+        if (!isPublisherHeader(boldText.text().toLowerCase())) {
+            return null;
+        }
+        Element publisherSpan = boldText.nextElementSibling();
+        if (publisherSpan == null) {
+            return null;
+        }
+        String fullPublisher = publisherSpan.text().trim();
+        return PARENTHESES_WITH_WHITESPACE_PATTERN.matcher(fullPublisher.split(";")[0].trim()).replaceAll("").trim();
+    }
+
+    private static boolean isPublisherHeader(String header) {
+        return header.contains("publisher") ||
+                header.contains("herausgeber") ||
+                header.contains("éditeur") ||
+                header.contains("editoriale") ||
+                header.contains("editorial") ||
+                header.contains("uitgever") ||
+                header.contains("wydawca") ||
+                header.contains("出版社") ||
+                header.contains("editora");
+    }
+
     private LocalDate getPublicationDate(Document doc) {
+        LocalDate rpiDate = parsePublicationDateFromRpi(doc);
+        if (rpiDate != null) {
+            return rpiDate;
+        }
+        return parsePublicationDateFromDetailBullets(doc);
+    }
+
+    private LocalDate parsePublicationDateFromRpi(Document doc) {
         try {
             Element publicationDateElement = doc.select("#rpi-attribute-book_details-publication_date .rpi-attribute-value span").first();
             if (publicationDateElement != null) {
@@ -520,31 +539,39 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         } catch (Exception e) {
             log.debug("RPI Publication Date extraction failed: {}", e.getMessage());
         }
+        return null;
+    }
 
+    private LocalDate parsePublicationDateFromDetailBullets(Document doc) {
         try {
             Element featureElement = doc.getElementById(DETAIL_BULLETS_FEATURE_DIV_ID);
             if (featureElement != null) {
-                Elements listItems = featureElement.select("li");
-                for (Element listItem : listItems) {
-                    Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
-                    Element valueSpan = boldText != null ? boldText.nextElementSibling() : null;
-                    
-                    if (valueSpan != null) {
-                         LocalDate d = parseDate(valueSpan.text());
-                         if (d != null) return d;
-
-                         Matcher matcher = Pattern.compile("\\((.*?)\\)").matcher(valueSpan.text());
-                         while (matcher.find()) {
-                             LocalDate pd = parseDate(matcher.group(1));
-                             if (pd != null) return pd;
-                         }
-                    }
+                for (Element listItem : featureElement.select("li")) {
+                    LocalDate date = parseDateFromDetailBulletItem(listItem);
+                    if (date != null) return date;
                 }
             }
         } catch (Exception e) {
              log.warn("DetailBullets Publication Date extraction failed: {}", e.getMessage());
         }
-        
+        return null;
+    }
+
+    private LocalDate parseDateFromDetailBulletItem(Element listItem) {
+        Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
+        Element valueSpan = boldText != null ? boldText.nextElementSibling() : null;
+        if (valueSpan == null) {
+            return null;
+        }
+
+        LocalDate d = parseDate(valueSpan.text());
+        if (d != null) return d;
+
+        Matcher matcher = Pattern.compile("\\((.*?)\\)").matcher(valueSpan.text());
+        while (matcher.find()) {
+            LocalDate pd = parseDate(matcher.group(1));
+            if (pd != null) return pd;
+        }
         return null;
     }
 
@@ -709,65 +736,67 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
 
         try {
             Elements reviewElements = doc.select("li[data-hook=review]");
-            int count = 0;
             int index = 0;
-
-            while (count < maxReviews && index < reviewElements.size()) {
-                Element reviewElement = reviewElements.get(index);
+            while (reviews.size() < maxReviews && index < reviewElements.size()) {
+                BookReview review = parseReview(reviewElements.get(index), localeInfo);
                 index++;
-
-                Elements reviewerNameElements = reviewElement.select(".a-profile-name");
-                String reviewerName = !reviewerNameElements.isEmpty() ? reviewerNameElements.first().text() : null;
-
-                String title = null;
-                Elements titleElements = reviewElement.select("[data-hook=review-title] span");
-                if (!titleElements.isEmpty()) {
-                    title = titleElements.last().text();
-                    if (title.isEmpty()) title = null;
+                if (review != null) {
+                    reviews.add(review);
                 }
-
-                Elements ratingElements = reviewElement.select("[data-hook=review-star-rating] .a-icon-alt");
-                String ratingText = !ratingElements.isEmpty() ? ratingElements.first().text() : "";
-                Float ratingValue = parseReviewRating(ratingText);
-
-                Elements fullDateElements = reviewElement.select("[data-hook=review-date]");
-                String fullDateText = !fullDateElements.isEmpty() ? fullDateElements.first().text() : "";
-                ReviewDateInfo dateInfo = parseReviewDateInfo(fullDateText, localeInfo);
-                String country = dateInfo.country();
-                Instant dateInstant = dateInfo.dateInstant();
-
-                Elements bodyElements = reviewElement.select("[data-hook=review-body]");
-                String body = !bodyElements.isEmpty() ? Objects.requireNonNull(bodyElements.first()).text() : null;
-                if (body != null && body.isEmpty()) {
-                    body = null;
-                } else if (body != null) {
-                    String toRemove = " Read more";
-                    int lastIndex = body.lastIndexOf(toRemove);
-                    if (lastIndex != -1) {
-                        body = body.substring(0, lastIndex) + body.substring(lastIndex + toRemove.length());
-                    }
-                }
-
-                if (body == null) {
-                    continue;
-                }
-
-                reviews.add(BookReview.builder()
-                        .metadataProvider(MetadataProvider.Amazon)
-                        .reviewerName(reviewerName != null ? reviewerName.trim() : null)
-                        .title(title != null ? title.trim() : null)
-                        .rating(ratingValue)
-                        .country(country != null ? country.trim() : null)
-                        .date(dateInstant)
-                        .body(body.trim())
-                        .build());
-
-                count++;
             }
         } catch (Exception e) {
             log.warn("Failed to parse reviews: {}", e.getMessage());
         }
         return reviews;
+    }
+
+    private BookReview parseReview(Element reviewElement, LocaleInfo localeInfo) {
+        Elements reviewerNameElements = reviewElement.select(".a-profile-name");
+        String reviewerName = !reviewerNameElements.isEmpty() ? reviewerNameElements.first().text() : null;
+
+        String title = null;
+        Elements titleElements = reviewElement.select("[data-hook=review-title] span");
+        if (!titleElements.isEmpty()) {
+            title = titleElements.last().text();
+            if (title.isEmpty()) title = null;
+        }
+
+        Elements ratingElements = reviewElement.select("[data-hook=review-star-rating] .a-icon-alt");
+        String ratingText = !ratingElements.isEmpty() ? ratingElements.first().text() : "";
+        Float ratingValue = parseReviewRating(ratingText);
+
+        Elements fullDateElements = reviewElement.select("[data-hook=review-date]");
+        String fullDateText = !fullDateElements.isEmpty() ? fullDateElements.first().text() : "";
+        ReviewDateInfo dateInfo = parseReviewDateInfo(fullDateText, localeInfo);
+
+        Elements bodyElements = reviewElement.select("[data-hook=review-body]");
+        String rawBody = !bodyElements.isEmpty() ? Objects.requireNonNull(bodyElements.first()).text() : null;
+        String body = cleanReviewBody(rawBody);
+        if (body == null) {
+            return null;
+        }
+
+        return BookReview.builder()
+                .metadataProvider(MetadataProvider.Amazon)
+                .reviewerName(reviewerName != null ? reviewerName.trim() : null)
+                .title(title != null ? title.trim() : null)
+                .rating(ratingValue)
+                .country(dateInfo.country() != null ? dateInfo.country().trim() : null)
+                .date(dateInfo.dateInstant())
+                .body(body.trim())
+                .build();
+    }
+
+    private String cleanReviewBody(String body) {
+        if (body == null || body.isEmpty()) {
+            return null;
+        }
+        String toRemove = " Read more";
+        int lastIndex = body.lastIndexOf(toRemove);
+        if (lastIndex != -1) {
+            return body.substring(0, lastIndex) + body.substring(lastIndex + toRemove.length());
+        }
+        return body;
     }
 
     private Integer getReviewCount(Document doc) {
@@ -934,63 +963,72 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
     private String cleanDescriptionHtml(String html) {
         try {
             Document document = Jsoup.parse(html);
-            document.select(BOLD_TEXT_SELECTOR).tagName("b").removeAttr(HTML_CLASS_ATTR);
-            document.select("span.a-text-italic").tagName("i").removeAttr(HTML_CLASS_ATTR);
-            for (Element span : document.select("span.a-list-item")) {
-                span.unwrap();
-            }
-            document.select("ol.a-ordered-list.a-vertical").tagName("ol").removeAttr(HTML_CLASS_ATTR);
-            document.select("ul.a-unordered-list.a-vertical").tagName("ul").removeAttr(HTML_CLASS_ATTR);
-            for (Element span : document.select("span")) {
-                span.unwrap();
-            }
-            document.select("li").forEach(li -> {
-                Element prev = li.previousElementSibling();
-                if (prev != null && "br".equals(prev.tagName())) {
-                    prev.remove();
-                }
-                Element next = li.nextElementSibling();
-                if (next != null && "br".equals(next.tagName())) {
-                    next.remove();
-                }
-            });
-            document.select("p").stream()
-                    .filter(p -> p.text().trim().isEmpty())
-                    .forEach(Element::remove);
-
-            // Remove excessive line breaks (more than 2 consecutive <br> tags)
-            Elements brTags = document.select("br");
-            for (Element br : brTags) {
-                int consecutiveBrCount = 1;
-                Element next = br.nextElementSibling();
-
-                // Count consecutive <br> tags
-                while (next != null && "br".equals(next.tagName())) {
-                    consecutiveBrCount++;
-                    Element temp = next;
-                    next = next.nextElementSibling();
-
-                    // Remove extra <br> tags beyond the first two
-                    if (consecutiveBrCount > 2) {
-                        temp.remove();
-                    }
-                }
-            }
-
-            // "trim" the start and end of the document of whitespace & <br>
-            Node node;
-            while ((node = document.body().firstChild()) != null && isWhitespaceNode(node)) {
-                node.remove();
-            }
-            while ((node = document.body().lastChild()) != null && isWhitespaceNode(node)) {
-                node.remove();
-            }
-
+            simplifyDescriptionTags(document);
+            collapseConsecutiveBrTags(document);
+            trimBoundaryWhitespace(document);
             // Clean up any remaining whitespace issues
             return document.body().html().trim();
         } catch (Exception e) {
             log.warn("Error cleaning html description, Error: {}", e.getMessage());
         }
         return html;
+    }
+
+    private void simplifyDescriptionTags(Document document) {
+        document.select(BOLD_TEXT_SELECTOR).tagName("b").removeAttr(HTML_CLASS_ATTR);
+        document.select("span.a-text-italic").tagName("i").removeAttr(HTML_CLASS_ATTR);
+        for (Element span : document.select("span.a-list-item")) {
+            span.unwrap();
+        }
+        document.select("ol.a-ordered-list.a-vertical").tagName("ol").removeAttr(HTML_CLASS_ATTR);
+        document.select("ul.a-unordered-list.a-vertical").tagName("ul").removeAttr(HTML_CLASS_ATTR);
+        for (Element span : document.select("span")) {
+            span.unwrap();
+        }
+        document.select("li").forEach(li -> {
+            Element prev = li.previousElementSibling();
+            if (prev != null && "br".equals(prev.tagName())) {
+                prev.remove();
+            }
+            Element next = li.nextElementSibling();
+            if (next != null && "br".equals(next.tagName())) {
+                next.remove();
+            }
+        });
+        document.select("p").stream()
+                .filter(p -> p.text().trim().isEmpty())
+                .forEach(Element::remove);
+    }
+
+    // Remove excessive line breaks (more than 2 consecutive <br> tags)
+    private void collapseConsecutiveBrTags(Document document) {
+        Elements brTags = document.select("br");
+        for (Element br : brTags) {
+            int consecutiveBrCount = 1;
+            Element next = br.nextElementSibling();
+
+            // Count consecutive <br> tags
+            while (next != null && "br".equals(next.tagName())) {
+                consecutiveBrCount++;
+                Element temp = next;
+                next = next.nextElementSibling();
+
+                // Remove extra <br> tags beyond the first two
+                if (consecutiveBrCount > 2) {
+                    temp.remove();
+                }
+            }
+        }
+    }
+
+    // "trim" the start and end of the document of whitespace & <br>
+    private void trimBoundaryWhitespace(Document document) {
+        Node node;
+        while ((node = document.body().firstChild()) != null && isWhitespaceNode(node)) {
+            node.remove();
+        }
+        while ((node = document.body().lastChild()) != null && isWhitespaceNode(node)) {
+            node.remove();
+        }
     }
 }
