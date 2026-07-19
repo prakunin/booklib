@@ -1,0 +1,60 @@
+[versions]
+spring-boot = "4.1.0"
+spring-dependency-management = "1.1.7"
+hibernate-orm = "7.4.3.Final"
+ben-manes-versions = "0.54.0"
+nimbus-jose-jwt = "10.9.1"
+mariadb-java-client = "3.5.9"
+flyway = "12.11.0"
+lombok = "1.18.46"
+pdfium4j = "1.2.0"
+twelvemonkeys = "3.14.0"
+epub4j = "1.4.0"
+jaudiotagger = "2.0.25"
+nightcompress = "1.1.1"
+jsoup = "1.22.2"
+nv-i18n = "1.29"
+mapstruct = "1.6.3"
+springdoc = "3.0.3"
+commons-compress = "1.28.0"
+xz = "1.12"
+commons-text = "1.15.0"
+tika = "3.3.1"
+jakarta-xml-bind = "4.0.5"
+jaxb-runtime = "4.0.9"
+freemarker = "2.3.34"
+caffeine = "3.2.4"
+assertj = "3.27.7"
+jackson-bom = "3.2.1"
+
+[libraries]
+nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus-jose-jwt" }
+mariadb-java-client = { module = "org.mariadb.jdbc:mariadb-java-client", version.ref = "mariadb-java-client" }
+flyway-mysql = { module = "org.flywaydb:flyway-mysql", version.ref = "flyway" }
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+twelvemonkeys-imageio-jpeg = { module = "com.twelvemonkeys.imageio:imageio-jpeg", version.ref = "twelvemonkeys" }
+twelvemonkeys-imageio-tiff = { module = "com.twelvemonkeys.imageio:imageio-tiff", version.ref = "twelvemonkeys" }
+twelvemonkeys-imageio-webp = { module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys" }
+twelvemonkeys-imageio-bmp = { module = "com.twelvemonkeys.imageio:imageio-bmp", version.ref = "twelvemonkeys" }
+jaudiotagger = { module = "com.github.RouHim:jaudiotagger", version.ref = "jaudiotagger" }
+nightcompress = { module = "com.github.gotson.nightcompress:nightcompress", version.ref = "nightcompress" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+nv-i18n = { module = "com.neovisionaries:nv-i18n", version.ref = "nv-i18n" }
+mapstruct = { module = "org.mapstruct:mapstruct", version.ref = "mapstruct" }
+mapstruct-processor = { module = "org.mapstruct:mapstruct-processor", version.ref = "mapstruct" }
+springdoc-openapi-starter-webmvc-api = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api", version.ref = "springdoc" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
+xz = { module = "org.tukaani:xz", version.ref = "xz" }
+commons-text = { module = "org.apache.commons:commons-text", version.ref = "commons-text" }
+tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }
+jakarta-xml-bind-api = { module = "jakarta.xml.bind:jakarta.xml.bind-api", version.ref = "jakarta-xml-bind" }
+jaxb-runtime = { module = "org.glassfish.jaxb:jaxb-runtime", version.ref = "jaxb-runtime" }
+freemarker = { module = "org.freemarker:freemarker", version.ref = "freemarker" }
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+hibernate-orm = { id = "org.hibernate.orm", version.ref = "hibernate-orm" }
+ben-manes-versions = { id = "com.github.ben-manes.versions", version.ref = "ben-manes-versions" }

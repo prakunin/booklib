@@ -7,10 +7,10 @@ import org.springframework.boot.gradle.tasks.run.BootRun
 
 plugins {
     java
-    id("org.springframework.boot") version "4.1.0"
-    id("io.spring.dependency-management") version "1.1.7"
-    id("org.hibernate.orm") version "7.4.3.Final"
-    id("com.github.ben-manes.versions") version "0.54.0"
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
+    alias(libs.plugins.hibernate.orm)
+    alias(libs.plugins.ben.manes.versions)
     jacoco
 }
 
@@ -161,6 +161,16 @@ configurations {
 
 val openApiExportRuntimeOnly by configurations.creating
 
+// --- Book & Image Processing --- pinned version, "+" (latest local) when useLocalLibs.
+val pdfium4jVersion = if (useLocalLibs) "+" else libs.versions.pdfium4j.get()
+
+// epub4j-grimmory fork publishes as org.grimmory:epub4j-core
+val epub4jCoords = if (useLocalLibs) "org.grimmory:epub4j-core:+" else "org.grimmory:epub4j-core:${libs.versions.epub4j.get()}"
+
+// epub4j-native for native archive parsing
+val epub4jNativeVersion = libs.versions.epub4j.get()
+val epub4jNativeCoords = if (useLocalLibs) "org.grimmory:epub4j-native:+" else "org.grimmory:epub4j-native:$epub4jNativeVersion"
+
 dependencies {
     // --- Dev tooling ---
     // Auto-restart the app when compiled classes change. Pair `./gradlew bootRun`
@@ -177,72 +187,57 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-mail")
-    implementation("com.nimbusds:nimbus-jose-jwt:10.9.1")
+    implementation(libs.nimbus.jose.jwt)
 
     // --- Reactive Streams ---
     implementation("io.projectreactor:reactor-core")
 
     // --- Database & Migration ---
-    implementation("org.mariadb.jdbc:mariadb-java-client:3.5.9")
+    implementation(libs.mariadb.java.client)
     implementation("org.springframework.boot:spring-boot-starter-flyway")
-    implementation("org.flywaydb:flyway-mysql:12.11.0")
-
-    // --- Lombok (For Clean Code) ---
-    compileOnly("org.projectlombok:lombok:1.18.46")
-    annotationProcessor("org.projectlombok:lombok:1.18.46")
+    implementation(libs.flyway.mysql)
 
     // --- Book & Image Processing ---
-    val pdfium4jVersion = if (useLocalLibs) "+" else "1.2.0"
     implementation("org.grimmory:pdfium4j:$pdfium4jVersion")
-    runtimeOnly("org.grimmory:pdfium4j:$pdfium4jVersion:${pdfiumNativesClassifier()}")
 
     // --- TwelveMonkeys ImageIO ---
-    implementation("com.twelvemonkeys.imageio:imageio-jpeg:3.14.0")
-    implementation("com.twelvemonkeys.imageio:imageio-tiff:3.14.0")
-    implementation("com.twelvemonkeys.imageio:imageio-webp:3.14.0")
-    implementation("com.twelvemonkeys.imageio:imageio-bmp:3.14.0")
+    implementation(libs.twelvemonkeys.imageio.jpeg)
+    implementation(libs.twelvemonkeys.imageio.tiff)
+    implementation(libs.twelvemonkeys.imageio.webp)
+    implementation(libs.twelvemonkeys.imageio.bmp)
 
-    // epub4j-grimmory fork publishes as org.grimmory:epub4j-core
-    val epub4jCoords = if (useLocalLibs) "org.grimmory:epub4j-core:+" else "org.grimmory:epub4j-core:1.4.0"
     implementation(epub4jCoords)
-
-    // epub4j-native for native archive parsing
-    val epub4jNativeVersion = "1.4.0"
-    val epub4jNativeCoords = if (useLocalLibs) "org.grimmory:epub4j-native:+" else "org.grimmory:epub4j-native:$epub4jNativeVersion"
     implementation(epub4jNativeCoords)
-    runtimeOnly("$epub4jNativeCoords:${epub4jNativesClassifier()}")
 
     // --- Audio Metadata (Audiobook Support) ---
-    implementation("com.github.RouHim:jaudiotagger:2.0.25")
+    implementation(libs.jaudiotagger)
 
     // --- Archive Support ---
-    implementation("com.github.gotson.nightcompress:nightcompress:1.1.1")
+    implementation(libs.nightcompress)
 
     // --- JSON & Web Scraping ---
-    implementation("org.jsoup:jsoup:1.22.2")
+    implementation(libs.jsoup)
 
     // --- i18n / Language Normalization ---
-    implementation("com.neovisionaries:nv-i18n:1.29")
+    implementation(libs.nv.i18n)
 
     // --- Mapping (DTOs & Entities) ---
-    implementation("org.mapstruct:mapstruct:1.6.3")
-    annotationProcessor("org.mapstruct:mapstruct-processor:1.6.3")
+    implementation(libs.mapstruct)
 
     // --- API Documentation ---
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.3")
-    implementation("org.apache.commons:commons-compress:1.28.0")
-    implementation("org.tukaani:xz:1.12") // Required by commons-compress for 7z support
-    implementation("org.apache.commons:commons-text:1.15.0")
+    implementation(libs.springdoc.openapi.starter.webmvc.api)
+    implementation(libs.commons.compress)
+    implementation(libs.xz) // Required by commons-compress for 7z support
+    implementation(libs.commons.text)
 
     // --- MIME Detection ---
-    implementation("org.apache.tika:tika-core:3.3.1")
+    implementation(libs.tika.core)
 
     // --- XML Support (JAXB) ---
-    implementation("jakarta.xml.bind:jakarta.xml.bind-api:4.0.5")
-    runtimeOnly("org.glassfish.jaxb:jaxb-runtime:4.0.9")
+    implementation(libs.jakarta.xml.bind.api)
 
     // --- Template Engine ---
-    implementation("org.freemarker:freemarker:2.3.34")
+    implementation(libs.freemarker)
 
     // --- Jackson 3 ---
     // Version is pinned via the dependencyManagement BOM import below. A plain
@@ -258,13 +253,27 @@ dependencies {
 
     // --- Caching ---
     implementation("org.springframework.boot:spring-boot-starter-cache")
-    implementation("com.github.ben-manes.caffeine:caffeine:3.2.4")
+    implementation(libs.caffeine)
+
+    // --- Lombok (For Clean Code) ---
+    compileOnly(libs.lombok)
+
+    // --- Annotation Processors ---
+    annotationProcessor(libs.lombok)
+    annotationProcessor(libs.mapstruct.processor)
+
+    // --- Native libraries (resolved at runtime only, keyed by platform classifier) ---
+    runtimeOnly("org.grimmory:pdfium4j:$pdfium4jVersion:${pdfiumNativesClassifier()}")
+    runtimeOnly("$epub4jNativeCoords:${epub4jNativesClassifier()}")
+    runtimeOnly(libs.jaxb.runtime)
 
     // --- Test Dependencies ---
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
-    testImplementation("org.assertj:assertj-core:3.27.7")
+    testImplementation(libs.assertj.core)
     testRuntimeOnly("com.h2database:h2")
+
+    // --- OpenAPI export tooling classpath ---
     add(openApiExportRuntimeOnly.name, "com.h2database:h2")
 }
 
@@ -274,14 +283,14 @@ dependencyManagement {
         // overrides the Jackson version managed by the Spring Boot BOM. Imports declared
         // here take precedence over Boot's managed versions, keeping jackson-core,
         // jackson-databind and jackson-annotations aligned on this BOM.
-        mavenBom("tools.jackson:jackson-bom:3.2.1")
+        mavenBom("tools.jackson:jackson-bom:${libs.versions.jackson.bom.get()}")
     }
     dependencies {
         // Keep flyway-core aligned with the explicitly pinned flyway-mysql module. Boot
         // manages flyway-core (to an older release), so a plain `implementation` version
         // would be overridden; declaring it here keeps core and the mysql module on the
         // same Flyway release train instead of leaving core several minors behind.
-        dependency("org.flywaydb:flyway-core:12.11.0")
+        dependency("org.flywaydb:flyway-core:${libs.versions.flyway.get()}")
     }
 }
 
