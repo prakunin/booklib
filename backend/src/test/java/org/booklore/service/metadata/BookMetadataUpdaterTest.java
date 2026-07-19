@@ -33,7 +33,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -365,6 +365,62 @@ class BookMetadataUpdaterTest {
             updater.setBookMetadata(context);
 
             assertThat(metadataEntity.getAuthors()).containsExactly(newAuthor);
+        }
+    }
+
+    @Test
+    void setBookMetadata_authorsAndReviewsDoNotUseMergeCategoriesFlag() {
+        AuthorEntity existing = AuthorEntity.builder().id(1L).name("Old Author").build();
+        metadataEntity.setAuthors(new ArrayList<>(List.of(existing)));
+
+        AuthorEntity newAuthor = AuthorEntity.builder().id(2L).name("New Author").build();
+        when(authorRepository.findByName("New Author")).thenReturn(Optional.of(newAuthor));
+
+        BookMetadata newMeta = BookMetadata.builder().title("T").authors(List.of("New Author")).build();
+        MetadataUpdateContext context = MetadataUpdateContext.builder()
+                .bookEntity(bookEntity)
+                .metadataUpdateWrapper(MetadataUpdateWrapper.builder().metadata(newMeta).build())
+                .replaceMode(MetadataReplaceMode.REPLACE_ALL)
+                .mergeCategories(true)
+                .mergeAuthors(false)
+                .mergeReviews(false)
+                .build();
+
+        try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+            mockSettingsAndChangeDetector(mcd, true, true);
+
+            updater.setBookMetadata(context);
+
+            assertThat(metadataEntity.getAuthors()).containsExactly(newAuthor);
+            verify(bookReviewUpdateService).updateBookReviews(any(), any(), any(), eq(false));
+        }
+    }
+
+    @Test
+    void setBookMetadata_canMergeAuthorsAndReviewsIndependentlyFromCategories() {
+        AuthorEntity existing = AuthorEntity.builder().id(1L).name("Old Author").build();
+        metadataEntity.setAuthors(new ArrayList<>(List.of(existing)));
+
+        AuthorEntity newAuthor = AuthorEntity.builder().id(2L).name("New Author").build();
+        when(authorRepository.findByName("New Author")).thenReturn(Optional.of(newAuthor));
+
+        BookMetadata newMeta = BookMetadata.builder().title("T").authors(List.of("New Author")).build();
+        MetadataUpdateContext context = MetadataUpdateContext.builder()
+                .bookEntity(bookEntity)
+                .metadataUpdateWrapper(MetadataUpdateWrapper.builder().metadata(newMeta).build())
+                .replaceMode(MetadataReplaceMode.REPLACE_ALL)
+                .mergeCategories(false)
+                .mergeAuthors(true)
+                .mergeReviews(true)
+                .build();
+
+        try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+            mockSettingsAndChangeDetector(mcd, true, true);
+
+            updater.setBookMetadata(context);
+
+            assertThat(metadataEntity.getAuthors()).containsExactly(existing, newAuthor);
+            verify(bookReviewUpdateService).updateBookReviews(any(), any(), any(), eq(true));
         }
     }
 

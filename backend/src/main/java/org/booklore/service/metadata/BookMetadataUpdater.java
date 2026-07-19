@@ -67,9 +67,11 @@ public class BookMetadataUpdater {
     public void setBookMetadata(MetadataUpdateContext context) {
         BookEntity bookEntity = context.getBookEntity();
         MetadataUpdateWrapper wrapper = context.getMetadataUpdateWrapper();
+        boolean mergeAuthors = context.isMergeAuthors();
         boolean mergeCategories = context.isMergeCategories();
         boolean mergeMoods = context.isMergeMoods();
         boolean mergeTags = context.isMergeTags();
+        boolean mergeReviews = context.isMergeReviews();
         boolean updateThumbnail = context.isUpdateThumbnail();
         MetadataReplaceMode replaceMode = context.getReplaceMode();
 
@@ -106,11 +108,11 @@ public class BookMetadataUpdater {
         boolean hasValueChangesForFileWrite = MetadataChangeDetector.hasValueChangesForFileWrite(newMetadata, metadata, clearFlags);
 
         updateBasicFields(newMetadata, metadata, clearFlags, replaceMode);
-        updateAuthorsIfNeeded(newMetadata, metadata, clearFlags, mergeCategories, replaceMode);
+        updateAuthorsIfNeeded(newMetadata, metadata, clearFlags, mergeAuthors, replaceMode);
         updateCategoriesIfNeeded(newMetadata, metadata, clearFlags, mergeCategories, replaceMode);
         updateMoodsIfNeeded(newMetadata, metadata, clearFlags, mergeMoods, replaceMode);
         updateTagsIfNeeded(newMetadata, metadata, clearFlags, mergeTags, replaceMode);
-        bookReviewUpdateService.updateBookReviews(newMetadata, metadata, clearFlags, mergeCategories);
+        bookReviewUpdateService.updateBookReviews(newMetadata, metadata, clearFlags, mergeReviews);
         updateThumbnailIfNeeded(bookId, bookEntity, newMetadata, metadata, updateThumbnail, bookType);
         updateAudiobookMetadataIfNeeded(bookEntity, newMetadata, metadata, clearFlags, replaceMode);
         updateComicMetadataIfNeeded(newMetadata, metadata, replaceMode);

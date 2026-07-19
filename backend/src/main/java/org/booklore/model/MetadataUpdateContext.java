@@ -15,8 +15,10 @@ public class MetadataUpdateContext {
     private BookEntity bookEntity;
     private MetadataUpdateWrapper metadataUpdateWrapper;
     private boolean updateThumbnail;
+    private boolean mergeAuthors;
     private boolean mergeCategories;
     private boolean mergeMoods;
     private boolean mergeTags;
+    private boolean mergeReviews;
     private MetadataReplaceMode replaceMode;
 }

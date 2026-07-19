@@ -37,6 +37,8 @@ public class FileMoveService {
 
     private static final long EVENT_DRAIN_TIMEOUT_MS = 300;
 
+    private record PlannedMove(Path source, Path temp, Path target) {}
+
     private final AppProperties appProperties;
     private final BookRepository bookRepository;
     private final BookAdditionalFileRepository bookFileRepository;
@@ -94,10 +96,10 @@ public class FileMoveService {
         Long targetLibraryId = move.getTargetLibraryId();
         Long targetLibraryPathId = move.getTargetLibraryPathId();
 
-        record PlannedMove(Path source, Path temp, Path target) {}
-
-        Map<Long, PlannedMove> plannedMovesByBookFileId = new HashMap<>();
+        Map<Long, PlannedMove> plannedMovesByBookFileId = new LinkedHashMap<>();
+        List<PlannedMove> committedMoves = new ArrayList<>();
         Set<Path> sourceParentsToCleanup = new HashSet<>();
+        boolean databaseUpdated = false;
 
         try {
             Optional<BookEntity> optionalBook = bookRepository.findByIdWithBookFiles(bookId);
@@ -190,14 +192,14 @@ public class FileMoveService {
                 return;
             }
 
-            List<PlannedMove> committedMoves = new ArrayList<>();
-
             // Commit file moves FIRST before updating database
-            for (PlannedMove planned : plannedMovesByBookFileId.values()) {
+            Iterator<PlannedMove> plannedMoveIterator = plannedMovesByBookFileId.values().iterator();
+            while (plannedMoveIterator.hasNext()) {
+                PlannedMove planned = plannedMoveIterator.next();
                 fileMoveHelper.commitMove(planned.temp(), planned.target());
                 committedMoves.add(planned);
+                plannedMoveIterator.remove();
             }
-            plannedMovesByBookFileId.clear();
 
             // Only update database after all file commits succeed
             try {
@@ -215,15 +217,9 @@ public class FileMoveService {
 
                     bookRepository.updateLibrary(bookEntity.getId(), targetLibrary.getId(), libraryPathEntity);
                 });
+                databaseUpdated = true;
             } catch (Exception e) {
-                log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", bookId, e);
-                for (PlannedMove committed : committedMoves) {
-                    try {
-                        fileMoveHelper.moveFile(committed.target(), committed.source());
-                    } catch (Exception rollbackEx) {
-                        log.error("Failed to rollback file move (Target -> Source) for book ID {}: {} -> {}", bookId, committed.target(), committed.source(), rollbackEx);
-                    }
-                }
+                log.error("Database update failed after files were moved for book ID {}", bookId, e);
                 throw e;
             }
 
@@ -255,6 +251,9 @@ public class FileMoveService {
         } catch (Exception e) {
             log.error("Error moving file for book ID {}: {}", bookId, e.getMessage(), e);
         } finally {
+            if (!databaseUpdated) {
+                rollbackCommittedMoves(bookId, committedMoves);
+            }
             for (PlannedMove planned : plannedMovesByBookFileId.values()) {
                 fileMoveHelper.rollbackMove(planned.temp(), planned.source());
             }
@@ -262,8 +261,6 @@ public class FileMoveService {
     }
 
     public FileMoveResult moveSingleFile(BookEntity bookEntity) {
-        record PlannedMove(Path source, Path temp, Path target) {}
-
         validateLocalStorage();
 
         Long libraryId = bookEntity.getLibraryPath().getLibrary().getId();
@@ -280,8 +277,10 @@ public class FileMoveService {
         }
 
         boolean isLibraryMonitoredWhenCalled = false;
-        Map<Long, PlannedMove> plannedMovesByBookFileId = new HashMap<>();
+        Map<Long, PlannedMove> plannedMovesByBookFileId = new LinkedHashMap<>();
+        List<PlannedMove> committedMoves = new ArrayList<>();
         Set<Path> sourceParentsToCleanup = new HashSet<>();
+        boolean databaseUpdated = false;
 
         try {
             Set<Path> existingPaths = monitoringRegistrationService.getPathsForLibraries(Set.of(libraryId));
@@ -367,14 +366,14 @@ public class FileMoveService {
                 return FileMoveResult.builder().moved(false).build();
             }
 
-            List<PlannedMove> committedMoves = new ArrayList<>();
-
             // Commit all file moves FIRST before updating database
-            for (PlannedMove planned : plannedMovesByBookFileId.values()) {
+            Iterator<PlannedMove> plannedMoveIterator = plannedMovesByBookFileId.values().iterator();
+            while (plannedMoveIterator.hasNext()) {
+                PlannedMove planned = plannedMoveIterator.next();
                 fileMoveHelper.commitMove(planned.temp(), planned.target());
                 committedMoves.add(planned);
+                plannedMoveIterator.remove();
             }
-            plannedMovesByBookFileId.clear();
 
             // Update database for ALL BookFileEntity records (only after all commits succeed)
             BookEntity finalBookWithFiles = bookWithFiles;
@@ -391,15 +390,9 @@ public class FileMoveService {
                         bookFileRepository.updateFileNameAndSubPath(bookFile.getId(), newFileName, newFileSubPath);
                     }
                 });
+                databaseUpdated = true;
             } catch (Exception e) {
-                log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", bookEntity.getId(), e);
-                for (PlannedMove committed : committedMoves) {
-                    try {
-                        fileMoveHelper.moveFile(committed.target(), committed.source());
-                    } catch (Exception rollbackEx) {
-                        log.error("Failed to rollback file move (Target -> Source) for book ID {}: {} -> {}", bookEntity.getId(), committed.target(), committed.source(), rollbackEx);
-                    }
-                }
+                log.error("Database update failed after files were moved for book ID {}", bookEntity.getId(), e);
                 throw e;
             }
 
@@ -442,6 +435,9 @@ public class FileMoveService {
         } catch (Exception e) {
             log.error("Failed to move files for book ID {}: {}", bookEntity.getId(), e.getMessage(), e);
         } finally {
+            if (!databaseUpdated) {
+                rollbackCommittedMoves(bookEntity.getId(), committedMoves);
+            }
             // Rollback any uncommitted moves
             for (PlannedMove planned : plannedMovesByBookFileId.values()) {
                 fileMoveHelper.rollbackMove(planned.temp(), planned.source());
@@ -458,6 +454,16 @@ public class FileMoveService {
         }
 
         return FileMoveResult.builder().moved(false).build();
+    }
+
+    private void rollbackCommittedMoves(Long bookId, List<PlannedMove> committedMoves) {
+        for (PlannedMove committed : committedMoves) {
+            try {
+                fileMoveHelper.moveFile(committed.target(), committed.source());
+            } catch (Exception rollbackEx) {
+                log.error("Failed to rollback file move (Target -> Source) for book ID {}: {} -> {}", bookId, committed.target(), committed.source(), rollbackEx);
+            }
+        }
     }
 
     protected void sleep(long millis) {
