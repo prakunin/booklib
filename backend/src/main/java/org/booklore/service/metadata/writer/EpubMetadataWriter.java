@@ -37,6 +37,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,6 +61,8 @@ import java.io.UncheckedIOException;
 public class EpubMetadataWriter implements MetadataWriter {
 
     private static final String OPF_NS = "http://www.idpf.org/2007/opf";
+    private static final int REMOTE_IMAGE_CONNECT_TIMEOUT_MS = 10_000;
+    private static final int REMOTE_IMAGE_READ_TIMEOUT_MS = 15_000;
     private static final Pattern CALIBRE_PREFIX_PATTERN = Pattern.compile("calibre:\\s*https?://[^\\s]+");
     private static final List<BookloreMetadataField> BOOKLORE_METADATA_FIELDS = List.of(
             new BookloreMetadataField("subtitle", metadata -> nonBlank(metadata.getSubtitle())),
@@ -542,12 +545,22 @@ public class EpubMetadataWriter implements MetadataWriter {
     }
 
     private byte[] loadImage(String pathOrUrl) {
-        try (InputStream stream = pathOrUrl.startsWith("http") ? URI.create(pathOrUrl).toURL().openStream() : new FileInputStream(pathOrUrl)) {
+        try (InputStream stream = openImageStream(pathOrUrl)) {
             return stream.readAllBytes();
         } catch (IOException e) {
             log.warn("Failed to load image from {}: {}", pathOrUrl, e.getMessage());
             return null;
         }
+    }
+
+    private InputStream openImageStream(String pathOrUrl) throws IOException {
+        if (!pathOrUrl.startsWith("http")) {
+            return new FileInputStream(pathOrUrl);
+        }
+        URLConnection connection = URI.create(pathOrUrl).toURL().openConnection();
+        connection.setConnectTimeout(REMOTE_IMAGE_CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(REMOTE_IMAGE_READ_TIMEOUT_MS);
+        return connection.getInputStream();
     }
 
     private void extractZipToDirectory(File zipSource, Path targetDir) throws IOException {

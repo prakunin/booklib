@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
@@ -103,6 +104,7 @@ class GoogleParserTest {
         String uri = requests.get(1).uri().toString();
         assertTrue(uri.contains("inauthor") || uri.contains("inauthor%3A"));
         assertTrue(uri.contains("My") && uri.contains("Author"));
+        requests.forEach(httpRequest -> assertEquals(Duration.ofSeconds(15), httpRequest.timeout().orElseThrow()));
     }
 
     @Test

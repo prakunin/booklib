@@ -20,6 +20,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -46,6 +47,7 @@ public class GoogleParser implements BookParser {
     private static final Pattern EDGE_CURL_PATTERN = Pattern.compile("&?edge=curl");
     private static final Pattern ZOOM_PATTERN = Pattern.compile("zoom=\\d+");
     private static final Pattern CATEGORY_SPLIT_PATTERN = Pattern.compile(" / ");
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
     private final ObjectMapper objectMapper;
     private final AppSettingService appSettingService;
     private final HttpClient httpClient;
@@ -158,6 +160,7 @@ public class GoogleParser implements BookParser {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(uri)
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
 
@@ -642,6 +645,5 @@ public class GoogleParser implements BookParser {
         return count;
     }
 }
-
 
 

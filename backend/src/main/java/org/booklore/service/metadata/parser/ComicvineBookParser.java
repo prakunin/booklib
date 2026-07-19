@@ -20,6 +20,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -57,6 +58,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
     private static final Pattern ISSUE_NUMBER_PATTERN = Pattern.compile("issue\\s*#?\\d+");
     private static final Pattern ID_FORMAT_PATTERN = Pattern.compile("\\d+(-\\d+)?");
     private static final Pattern VOLUME_SUFFIX_PATTERN = Pattern.compile("\\s+Vol\\.?\\s*\\d+$");
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
     private static final String RESOURCE_TYPE_ISSUE = "4000";
     private static final String RESOURCE_TYPE_VOLUME = "4050";
@@ -537,6 +539,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
             log.debug("ComicVine API call #{} to {}", callNumber, endpoint);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(uri)
+                    .timeout(REQUEST_TIMEOUT)
                     .header("User-Agent", "BookLore/1.0 (Book and Comic Metadata Fetcher; +https://github.com/booklore-app/booklore)")
                     .GET()
                     .build();

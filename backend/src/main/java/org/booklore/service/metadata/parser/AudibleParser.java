@@ -24,6 +24,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -52,6 +53,7 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
     private static final String PATH_SEARCH = "/1.0/catalog/products";
     private static final String PATH_ASIN = "/1.0/catalog/products/{asin}";
     private static final String IMAGE_SIZE = "1000";
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
     private static final Set<String> RESPONSE_GROUPS = Set.of(
             "rating",
@@ -220,6 +222,7 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
         );
 
         HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(REQUEST_TIMEOUT)
                 .GET()
                 .build();
 
@@ -244,6 +247,7 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
         );
 
         HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(REQUEST_TIMEOUT)
                 .GET()
                 .build();
 

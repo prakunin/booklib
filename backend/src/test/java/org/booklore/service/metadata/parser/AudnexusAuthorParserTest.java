@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,6 +116,7 @@ class AudnexusAuthorParserTest {
         assertThat(uri).contains("api.audnex.us/authors");
         assertThat(uri).contains("name=Stephen%20King");
         assertThat(uri).contains("region=uk");
+        assertThat(requestCaptor.getValue().timeout()).contains(Duration.ofSeconds(15));
     }
 
     @Test
@@ -181,5 +183,6 @@ class AudnexusAuthorParserTest {
         String uri = requestCaptor.getValue().uri().toString();
         assertThat(uri).contains("api.audnex.us/authors/B000APZGGS");
         assertThat(uri).contains("region=uk");
+        assertThat(requestCaptor.getValue().timeout()).contains(Duration.ofSeconds(15));
     }
 }

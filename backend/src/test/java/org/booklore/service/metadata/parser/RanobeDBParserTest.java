@@ -7,18 +7,29 @@ import org.booklore.service.appsettings.AppSettingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import tools.jackson.databind.ObjectMapper;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 class RanobeDbParserTest {
 
     @Mock
     private AppSettingService appSettingService;
+
+    @Mock
+    private HttpClient httpClient;
 
     @InjectMocks
     private RanobeDbParser parser;
@@ -45,6 +56,25 @@ class RanobeDbParserTest {
         // Then
         assertNotNull(results);
         assertTrue(results.isEmpty(), "Should return empty list when query is empty");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testFetchMetadata_UsesRequestTimeout() throws Exception {
+        HttpResponse<String> response = (HttpResponse<String>) mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(500);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        RanobeDbParser parser = new RanobeDbParser(new ObjectMapper(), appSettingService, httpClient);
+
+        List<BookMetadata> results = parser.fetchMetadata(Book.builder().build(), FetchMetadataRequest.builder()
+                .title("Test Book")
+                .build());
+
+        assertTrue(results.isEmpty());
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertEquals(Duration.ofSeconds(15), requestCaptor.getValue().timeout().orElseThrow());
     }
 
     @Test

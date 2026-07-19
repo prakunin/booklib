@@ -22,6 +22,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
@@ -103,7 +104,10 @@ public class GoodReadsParserTest {
     private void mockHttpClientResponse(String urlPrefix, int statusCode, String response) throws Exception {
         when(
                 httpClient.<String>send(
-                        argThat(r -> r != null && r.uri() != null && r.uri().toString().startsWith(urlPrefix)),
+                        argThat(r -> r != null
+                                && r.uri() != null
+                                && r.uri().toString().startsWith(urlPrefix)
+                                && r.timeout().filter(Duration.ofSeconds(15)::equals).isPresent()),
                         any()
                 )
         ).thenAnswer((_) -> getMockResponse(statusCode, response));

@@ -87,6 +87,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
     private static final String BASE_ISBN_URL = "https://www.goodreads.com/book/isbn/";
     private static final Pattern PATTERN_PATH_GOODREADS_ID = Pattern.compile("^/book/show/([0-9]+)[^/]+$");
     private static final int COUNT_DETAILED_METADATA_TO_GET = 3;
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
     private final HttpClient httpClient;
     private final AppSettingService appSettingService;
@@ -196,6 +197,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
     private String resolveIsbn(String isbn) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_ISBN_URL + isbn))
+                .timeout(REQUEST_TIMEOUT)
                 .GET()
                 .build();
         HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
@@ -221,6 +223,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(GRAPHQL_ENDPOINT))
+                    .timeout(REQUEST_TIMEOUT)
                     .header("x-api-key", API_KEY)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -569,6 +572,7 @@ return;
     private <T> T fetchJson(String url, TypeReference<T> typeReference) throws InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
+                .timeout(REQUEST_TIMEOUT)
                 .GET()
                 .build();
 
