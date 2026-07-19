@@ -70,8 +70,10 @@ export class PdfSidebarComponent {
     }
   }
 
-  onOverlayClick(): void {
-    this.closed.emit();
+  onOverlayClick(event: Event): void {
+    if ((event.target as HTMLElement).classList.contains('sidebar-overlay')) {
+      this.closed.emit();
+    }
   }
 
   setActiveTab(tab: PdfSidebarTab): void {

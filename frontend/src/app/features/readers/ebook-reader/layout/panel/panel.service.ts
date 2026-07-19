@@ -12,6 +12,8 @@ interface ReaderSearchSubitem {
   excerpt: SearchResult['excerpt'];
 }
 
+const DEFAULT_NOTE_HIGHLIGHT_COLOR = '#60A5FA';
+
 @Injectable()
 export class ReaderLeftSidebarService {
   private readonly viewManager = inject(ReaderViewManagerService);
@@ -67,7 +69,10 @@ export class ReaderLeftSidebarService {
   private loadNotes(): void {
     this.bookNoteV2Service.getNotesForBook(this.bookId)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(notes => this._notes.set(notes));
+      .subscribe(notes => {
+        this._notes.set(notes);
+        this.renderNoteHighlights(notes);
+      });
   }
 
   refreshNotes(): void {
@@ -104,16 +109,22 @@ export class ReaderLeftSidebarService {
   }
 
   navigateToNote(cfi: string): void {
-    this.viewManager.goTo(cfi)
+    this.viewManager.goToAnnotation(cfi)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.close());
   }
 
   deleteNote(noteId: number): void {
+    const note = this._notes().find(item => item.id === noteId);
     this.bookNoteV2Service.deleteNote(noteId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
-        this._notes.update(notes => notes.filter(note => note.id !== noteId));
+        this._notes.update(notes => notes.filter(item => item.id !== noteId));
+        if (note?.cfi) {
+          this.viewManager.deleteAnnotation(note.cfi)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe();
+        }
       });
   }
 
@@ -201,8 +212,26 @@ export class ReaderLeftSidebarService {
     });
   }
 
+  addOrUpdateNoteHighlight(note: BookNoteV2): void {
+    this.viewManager.addAnnotation(this.toNoteHighlight(note))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe();
+  }
+
+  private renderNoteHighlights(notes: BookNoteV2[]): void {
+    this.viewManager.addAnnotations(notes.map(note => this.toNoteHighlight(note)));
+  }
+
+  private toNoteHighlight(note: BookNoteV2): { value: string; color: string; style: 'highlight' } {
+    return {
+      value: note.cfi,
+      color: note.color || DEFAULT_NOTE_HIGHLIGHT_COLOR,
+      style: 'highlight'
+    };
+  }
+
   navigateToSearchResult(cfi: string): void {
-    this.viewManager.goTo(cfi)
+    this.viewManager.goToAnnotation(cfi)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.close());
   }

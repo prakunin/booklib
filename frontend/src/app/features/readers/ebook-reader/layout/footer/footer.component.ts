@@ -1,4 +1,4 @@
-import {Component, EventEmitter, HostListener, inject, Input, Output} from '@angular/core';
+import {Component, EventEmitter, HostListener, inject, Input, OnDestroy, Output, signal} from '@angular/core';
 import {TranslocoDirective} from '@jsverse/transloco';
 import {ReaderViewManagerService} from '../../core/view-manager.service';
 import {ReaderIconComponent} from '../../shared/icon.component';
@@ -11,7 +11,7 @@ import {RelocateProgressData} from '../../state/progress.service';
   templateUrl: './footer.component.html',
   styleUrls: ['./footer.component.scss']
 })
-export class ReaderNavbarComponent {
+export class ReaderNavbarComponent implements OnDestroy {
   @Input() progressData: RelocateProgressData | null = null;
   @Input() forceVisible = false;
   @Input() set sectionFractions(value: number[]) {
@@ -26,7 +26,17 @@ export class ReaderNavbarComponent {
   @Output() hoverChange = new EventEmitter<boolean>();
 
   private readonly managerService = inject(ReaderViewManagerService);
+  private readonly clockInterval = globalThis.setInterval(() => {
+    this.currentClock.set(this.formatClock(new Date()));
+  }, 15000);
+
+  readonly currentClock = signal(this.formatClock(new Date()));
+  readonly navbarVisible = true;
   showLocationPopover = false;
+
+  ngOnDestroy(): void {
+    globalThis.clearInterval(this.clockInterval);
+  }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent) {
@@ -58,6 +68,14 @@ export class ReaderNavbarComponent {
     return Math.round(this.currentFraction * 100);
   }
 
+  get progressPercentage(): number {
+    return this.currentFraction * 100;
+  }
+
+  get precisePercentage(): string {
+    return `${this.progressPercentage.toFixed(1)}%`;
+  }
+
   get timeTotal(): string {
     return this.formatDuration((this.progressData?.time?.total ?? 0) * 60);
   }
@@ -82,8 +100,23 @@ export class ReaderNavbarComponent {
     return this.progressData?.pageItem?.label ?? '';
   }
 
-  get navbarVisible(): boolean {
-    return this.forceVisible;
+  get compactPosition(): string {
+    const page = this.currentPage.trim();
+    if (page) {
+      return `[${page}]`;
+    }
+    if (this.sectionTotal > 0) {
+      return `[${this.sectionCurrent + 1}]`;
+    }
+    return '';
+  }
+
+  get compactTitle(): string {
+    const chapter = this.currentChapter.trim();
+    const section = this.sectionTotal > 0
+      ? `(${this.sectionCurrent + 1}/${this.sectionTotal})`
+      : '';
+    return [chapter, section].filter(Boolean).join(' ');
   }
 
   get canGoPrevious(): boolean {
@@ -140,5 +173,9 @@ export class ReaderNavbarComponent {
     return remainingMinutes > 0
       ? `${hours} hr ${remainingMinutes} min`
       : `${hours} hr`;
+  }
+
+  private formatClock(date: Date): string {
+    return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   }
 }

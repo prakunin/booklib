@@ -179,7 +179,9 @@ export class CbxQuickSettingsComponent {
     this.quickSettingsService.emitAutoCloseMenuChange(!this.state().autoCloseMenu);
   }
 
-  onOverlayClick(): void {
-    this.quickSettingsService.close();
+  onOverlayClick(event: Event): void {
+    if ((event.target as HTMLElement).classList.contains('quick-settings-overlay')) {
+      this.quickSettingsService.close();
+    }
   }
 }

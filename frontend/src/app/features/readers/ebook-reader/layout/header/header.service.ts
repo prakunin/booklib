@@ -19,6 +19,9 @@ export class ReaderHeaderService {
   private readonly _forceVisible = signal(false);
   readonly forceVisible = this._forceVisible.asReadonly();
 
+  private readonly _headerPinned = signal(false);
+  readonly headerPinned = this._headerPinned.asReadonly();
+
   private readonly _isCurrentCfiBookmarked = signal(false);
   readonly isCurrentCfiBookmarked = this._isCurrentCfiBookmarked.asReadonly();
 
@@ -26,12 +29,14 @@ export class ReaderHeaderService {
   private readonly _showMetadata = new Subject<void>();
   private readonly _toggleFullscreen = new Subject<void>();
   private readonly _showShortcutsHelp = new Subject<void>();
+  private readonly _toggleHeaderPinned = new Subject<void>();
   private readonly _isFullscreen = signal(false);
   readonly isFullscreen = this._isFullscreen.asReadonly();
   showControls$ = this._showControls.asObservable();
   showMetadata$ = this._showMetadata.asObservable();
   toggleFullscreen$ = this._toggleFullscreen.asObservable();
   showShortcutsHelp$ = this._showShortcutsHelp.asObservable();
+  toggleHeaderPinned$ = this._toggleHeaderPinned.asObservable();
   readonly theme = computed(() => this.stateService.state().theme);
   readonly justify = computed(() => this.stateService.state().justify);
 
@@ -42,6 +47,10 @@ export class ReaderHeaderService {
 
   setForceVisible(visible: boolean): void {
     this._forceVisible.set(visible);
+  }
+
+  setHeaderPinned(pinned: boolean): void {
+    this._headerPinned.set(pinned);
   }
 
   setCurrentCfiBookmarked(bookmarked: boolean): void {
@@ -80,6 +89,10 @@ export class ReaderHeaderService {
     this._showShortcutsHelp.next();
   }
 
+  toggleHeaderPinned(): void {
+    this._toggleHeaderPinned.next();
+  }
+
   close(): void {
     this.location.back();
   }
@@ -110,6 +123,7 @@ export class ReaderHeaderService {
 
   reset(): void {
     this._forceVisible.set(false);
+    this._headerPinned.set(false);
     this._isCurrentCfiBookmarked.set(false);
     this._isFullscreen.set(false);
     this._bookTitle.set('');

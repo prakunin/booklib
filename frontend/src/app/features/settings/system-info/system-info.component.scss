@@ -165,10 +165,9 @@
 }
 
 .entry-item-inline {
-  flex-direction: row;
+  flex-flow: row wrap;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 0.6563rem;
 }
 
@@ -194,7 +193,6 @@
   border-radius: 4px;
   padding: 0.1563rem 0.4375rem;
   overflow-wrap: anywhere;
-  word-break: break-word;
   white-space: normal;
 }
 

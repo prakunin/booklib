@@ -1,6 +1,6 @@
 <ng-container *transloco="let t; prefix: 'readerEbook.metadataDialog'">
-<div class="dialog-overlay" tabindex="0" (click)="closed.emit()" (keydown.escape)="closed.emit()">
-  <dialog class="dialog" tabindex="0" open aria-modal="true" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+<div class="dialog-overlay" role="button" tabindex="0" (click)="onOverlayClick($event)" (keydown.escape)="onOverlayClick($event)">
+  <dialog class="dialog" open aria-modal="true">
     <div class="dialog-header">
       <h2>{{ t('title') }}</h2>
       <button class="close-btn" (click)="closed.emit()">&#10005;</button>

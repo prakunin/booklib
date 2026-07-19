@@ -53,6 +53,8 @@ export type ReaderIconName =
   | 'zoom-out'
   | 'align-left'
   | 'align-justify'
+  | 'pin'
+  | 'pin-off'
   | 'save';
 
 interface IconPath {
@@ -305,6 +307,23 @@ const ICONS: Record<ReaderIconName, IconPath[]> = {
     {d: 'M4,10 L20,10', type: 'line'},
     {d: 'M4,14 L20,14', type: 'line'},
     {d: 'M4,18 L20,18', type: 'line'}
+  ],
+  'pin': [
+    {d: 'M12 17v5'},
+    {d: 'M5 17h14'},
+    {d: 'M7 10h10'},
+    {d: 'M9 10V4h6v6'},
+    {d: 'M8 4h8'}
+  ],
+  'pin-off': [
+    {d: 'M2 2l20 20'},
+    {d: 'M12 17v5'},
+    {d: 'M5 17h12'},
+    {d: 'M7 10h3'},
+    {d: 'M14 10h3'},
+    {d: 'M9 10V6'},
+    {d: 'M15 8V4'},
+    {d: 'M8 4h8'}
   ],
   'save': [
     {d: 'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z'},

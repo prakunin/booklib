@@ -261,7 +261,7 @@ export class ReaderSidebarService {
   }
 
   navigateToAnnotation(cfi: string): void {
-    this.viewManager.goTo(cfi)
+    this.viewManager.goToAnnotation(cfi)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.close());
   }

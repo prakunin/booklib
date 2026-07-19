@@ -96,6 +96,8 @@
         "fullscreen": "Полноэкранный режим",
         "exitFullscreen": "Выйти из полноэкранного режима",
         "keyboardShortcuts": "Горячие клавиши",
+        "pinHeader": "Закрепить панель",
+        "unpinHeader": "Автоскрытие панели",
         "decreaseFontSize": "Уменьшить шрифт",
         "increaseFontSize": "Увеличить шрифт",
         "enableJustify": "Выровнять по ширине",

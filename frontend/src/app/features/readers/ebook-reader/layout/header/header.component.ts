@@ -16,6 +16,7 @@ export class ReaderHeaderComponent {
   private readonly router = inject(Router);
 
   readonly forceVisible = this.headerService.forceVisible;
+  readonly headerPinned = this.headerService.headerPinned;
   readonly isCurrentCfiBookmarked = this.headerService.isCurrentCfiBookmarked;
   readonly isFullscreen = this.headerService.isFullscreen;
   readonly bookTitle = this.headerService.bookTitle;
@@ -46,6 +47,10 @@ export class ReaderHeaderComponent {
 
   onToggleFullscreen(): void {
     this.headerService.toggleFullscreen();
+  }
+
+  onToggleHeaderPinned(): void {
+    this.headerService.toggleHeaderPinned();
   }
 
   onShowHelp(): void {
