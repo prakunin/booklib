@@ -213,7 +213,7 @@ public class DuckDuckGoCoverService implements BookCoverProvider {
             JsonNode results = mapper.readTree(json).path("results");
             if (results.isArray()) {
                 for (JsonNode img : results) {
-                    String link = img.path("image").asText();
+                    String link = img.path("image").asString();
                     int w = img.path("width").asInt();
                     int h = img.path("height").asInt();
                     CoverImage dto = new CoverImage(link, w, h, 0);

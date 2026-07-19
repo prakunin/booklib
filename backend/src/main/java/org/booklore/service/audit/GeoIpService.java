@@ -64,8 +64,8 @@ public class GeoIpService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
                 JsonNode node = objectMapper.readTree(response.body());
-                if (node.has("countryCode") && !node.get("countryCode").asText().isBlank()) {
-                    return node.get("countryCode").asText();
+                if (node.has("countryCode") && !node.get("countryCode").asString().isBlank()) {
+                    return node.get("countryCode").asString();
                 }
             }
         } catch (InterruptedException _) {

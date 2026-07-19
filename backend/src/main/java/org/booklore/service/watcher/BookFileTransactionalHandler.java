@@ -51,6 +51,7 @@ public class BookFileTransactionalHandler {
     private final PendingDeletionPool pendingDeletionPool;
 
     @Transactional()
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat default for pre-existing libraries; no replacement exists
     public void handleNewBookFile(long libraryId, Path path) {
         LibraryEntity libraryEntity = libraryRepository.findById(libraryId).orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
 

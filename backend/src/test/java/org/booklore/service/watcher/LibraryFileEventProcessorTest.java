@@ -50,6 +50,7 @@ class LibraryFileEventProcessorTest {
     Path tempDir;
 
     @BeforeEach
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode; no replacement exists
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
         processor = new LibraryFileEventProcessor(

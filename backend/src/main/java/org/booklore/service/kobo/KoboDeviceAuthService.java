@@ -31,7 +31,7 @@ public class KoboDeviceAuthService {
         auth.setAccessToken(RandomStringUtils.secure().nextAlphanumeric(24));
         auth.setRefreshToken(RandomStringUtils.secure().nextAlphanumeric(24));
         auth.setTrackingId(UUID.randomUUID().toString());
-        auth.setUserKey(requestBody.get("UserKey").asText());
+        auth.setUserKey(requestBody.get("UserKey").asString());
 
         return ResponseEntity.ok()
                 .header("Content-Type", "application/json; charset=utf-8")

@@ -257,6 +257,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
         }
     }
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat default for pre-existing libraries; no replacement exists
     private void handleFolderCreate(LibraryEntity library, Path folderPath) {
         log.info("[FOLDER_CREATE] '{}'", folderPath);
 

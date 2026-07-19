@@ -397,7 +397,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                     startTime = chapterNode.get("start_time").asDouble();
                 } else if (chapterNode.has("start")) {
                     long start = chapterNode.get("start").asLong();
-                    String timeBase = chapterNode.has("time_base") ? chapterNode.get("time_base").asText() : "1/1000";
+                    String timeBase = chapterNode.has("time_base") ? chapterNode.get("time_base").asString() : "1/1000";
                     startTime = convertTimebaseToSeconds(start, timeBase);
                 }
 
@@ -405,7 +405,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                     endTime = chapterNode.get("end_time").asDouble();
                 } else if (chapterNode.has("end")) {
                     long end = chapterNode.get("end").asLong();
-                    String timeBase = chapterNode.has("time_base") ? chapterNode.get("time_base").asText() : "1/1000";
+                    String timeBase = chapterNode.has("time_base") ? chapterNode.get("time_base").asString() : "1/1000";
                     endTime = convertTimebaseToSeconds(end, timeBase);
                 }
 
@@ -416,7 +416,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                 String title = "Chapter " + (i + 1);
                 JsonNode tagsNode = chapterNode.get("tags");
                 if (tagsNode != null && tagsNode.has("title")) {
-                    title = tagsNode.get("title").asText();
+                    title = tagsNode.get("title").asString();
                 }
 
                 chapters.add(AudiobookMetadata.ChapterInfo.builder()

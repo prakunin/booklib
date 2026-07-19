@@ -381,7 +381,7 @@ public class LubimyCzytacParser implements BookParser {
             // Publish date
             if (root.has("datePublished")) {
                 try {
-                    String dateStr = root.get("datePublished").asText();
+                    String dateStr = root.get("datePublished").asString();
                     LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE);
                     metadata.setPublishedDate(date);
                 } catch (Exception e) {
@@ -399,12 +399,12 @@ public class LubimyCzytacParser implements BookParser {
                         // Multiple authors
                         for (JsonNode author : authorNode) {
                             if (author.has("name")) {
-                                authors.add(author.get("name").asText());
+                                authors.add(author.get("name").asString());
                             }
                         }
                     } else if (authorNode.isObject() && authorNode.has("name")) {
                         // Single author
-                        authors.add(authorNode.get("name").asText());
+                        authors.add(authorNode.get("name").asString());
                     }
 
                     if (!authors.isEmpty()) {
@@ -418,7 +418,7 @@ public class LubimyCzytacParser implements BookParser {
             // Genre/Category - extracted from genre URL
             if (root.has("genre")) {
                 try {
-                    String genreUrl = root.get("genre").asText();
+                    String genreUrl = root.get("genre").asString();
                     // Extract category name from URL like "https://lubimyczytac.pl/ksiazki/k/69/poradniki"
                     // Get the last segment after the final slash
                     String[] urlParts = genreUrl.split("/");

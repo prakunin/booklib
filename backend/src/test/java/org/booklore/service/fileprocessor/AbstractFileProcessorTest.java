@@ -63,6 +63,7 @@ class AbstractFileProcessorTest {
     // ========== getBookFolderForCoverFallback ==========
 
     @Test
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode; no replacement exists
     void getBookFolderForCoverFallback_folderBased_returnsFullPath() {
         var libraryFile = buildLibraryFile(tempDir, "audiobooks", "MyAudiobook", true, LibraryOrganizationMode.AUTO_DETECT);
         var result = processor.exposedGetBookFolderForCoverFallback(libraryFile);
@@ -77,6 +78,7 @@ class AbstractFileProcessorTest {
     }
 
     @Test
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode; no replacement exists
     void getBookFolderForCoverFallback_autoDetectNotFolderBased_returnsNull() {
         var libraryFile = buildLibraryFile(tempDir, "books", "book.epub", false, LibraryOrganizationMode.AUTO_DETECT);
         var result = processor.exposedGetBookFolderForCoverFallback(libraryFile);

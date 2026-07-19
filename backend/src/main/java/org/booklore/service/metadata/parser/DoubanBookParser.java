@@ -171,13 +171,13 @@ public class DoubanBookParser implements BookParser {
 
             for (JsonNode item : itemsNode) {
                 try {
-                    String title = item.get("title").asText();
-                    String url = item.get("url").asText();
-                    String coverUrl = item.get("cover_url").asText();
+                    String title = item.get("title").asString();
+                    String url = item.get("url").asString();
+                    String coverUrl = item.get("cover_url").asString();
                     String doubanId = extractDoubanIdFromUrl(url);
 
                     // Extract abstract information
-                    String abstractText = item.get("abstract").asText();
+                    String abstractText = item.get("abstract").asString();
                     List<String> authors = List.of();
                     String publisher = null;
                     String pubDate = null;

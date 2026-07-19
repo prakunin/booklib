@@ -113,6 +113,7 @@ public class LibraryFileHelper {
         return allFiles;
     }
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat default for pre-existing libraries; no replacement exists
     public List<LibraryFile> getLibraryFiles(LibraryEntity libraryEntity) throws IOException {
         LibraryOrganizationMode mode = libraryEntity.getOrganizationMode() != null
                 ? libraryEntity.getOrganizationMode() : LibraryOrganizationMode.AUTO_DETECT;

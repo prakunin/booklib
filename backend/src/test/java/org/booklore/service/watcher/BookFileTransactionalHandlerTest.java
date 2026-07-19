@@ -53,6 +53,7 @@ class BookFileTransactionalHandlerTest {
     private LibraryPathEntity libraryPath;
 
     @BeforeEach
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode; no replacement exists
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
         handler = new BookFileTransactionalHandler(

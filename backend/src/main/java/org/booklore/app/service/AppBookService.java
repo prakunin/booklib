@@ -267,7 +267,7 @@ public class AppBookService {
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
         Root<BookEntity> root = query.from(BookEntity.class);
         var libraryId = root.get("library").get("id");
-        query.multiselect(libraryId, cb.countDistinct(root.get("id")));
+        query.select(cb.tuple(libraryId, cb.countDistinct(root.get("id"))));
         query.where(spec.toPredicate(root, query, cb));
         query.groupBy(libraryId);
         return entityManager.createQuery(query).getResultList().stream()

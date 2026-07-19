@@ -28,6 +28,7 @@ public class BookGroupingService {
             Map<String, List<LibraryFile>> newBookGroups
     ) {}
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode with distinct fuzzy-matching behavior; no replacement exists
     public Map<String, List<LibraryFile>> groupForInitialScan(List<LibraryFile> newFiles, LibraryEntity libraryEntity) {
         LibraryOrganizationMode mode = getOrganizationMode(libraryEntity);
 
@@ -38,6 +39,7 @@ public class BookGroupingService {
         };
     }
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode with distinct fuzzy-matching behavior; no replacement exists
     public GroupingResult groupForRescan(List<LibraryFile> newFiles, LibraryEntity libraryEntity) {
         LibraryOrganizationMode mode = getOrganizationMode(libraryEntity);
 
@@ -144,6 +146,7 @@ public class BookGroupingService {
         return null;
     }
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode with distinct fuzzy-matching behavior; no replacement exists
     private BookEntity findMatchingBook(LibraryFile file, LibraryOrganizationMode mode) {
         BookEntity filelessMatch = switch (mode) {
             case BOOK_PER_FILE, BOOK_PER_FOLDER -> findExactFilelessMatch(file, file.getLibraryEntity());
@@ -344,6 +347,7 @@ public class BookGroupingService {
         return BookFileGroupingUtils.calculateSimilarity(fileKey, bookKey) >= 0.85;
     }
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat default for pre-existing libraries; no replacement exists
     private LibraryOrganizationMode getOrganizationMode(LibraryEntity library) {
         LibraryOrganizationMode mode = library.getOrganizationMode();
         return mode != null ? mode : LibraryOrganizationMode.AUTO_DETECT;

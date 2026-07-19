@@ -69,7 +69,7 @@ public class VersionService {
                     .body(String.class);
 
             JsonNode root = objectMapper.readTree(response);
-            return root.path("tag_name").asText("unknown");
+            return root.path("tag_name").asString("unknown");
 
         } catch (Exception _) {
             log.warn("Failed to fetch latest release version");
@@ -98,13 +98,13 @@ public class VersionService {
             }
 
             for (JsonNode release : releases) {
-                String tag = release.path("tag_name").asText(null);
+                String tag = release.path("tag_name").asString(null);
                 if (tag == null || !isVersionGreater(tag, currentVersion)) {
                     continue;
                 }
                 String url = "https://github.com/" + GITHUB_REPO + "/releases/tag/" + tag;
-                LocalDateTime published = LocalDateTime.parse(release.path("published_at").asText(), DateTimeFormatter.ISO_DATE_TIME);
-                updates.add(new ReleaseNote(tag, release.path("name").asText(tag), release.path("body").asText(""), url, published));
+                LocalDateTime published = LocalDateTime.parse(release.path("published_at").asString(), DateTimeFormatter.ISO_DATE_TIME);
+                updates.add(new ReleaseNote(tag, release.path("name").asString(tag), release.path("body").asString(""), url, published));
             }
 
             log.info("Returning {} newer releases", updates.size());

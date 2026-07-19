@@ -3,6 +3,7 @@ package org.booklore.service.metadata.extractor;
 import org.booklore.model.dto.BookMetadata;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.springframework.stereotype.Component;
 
 import javax.xml.stream.XMLInputFactory;
@@ -89,8 +90,8 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                         } else if ("binary".equals(localName) && coverBinaryId == null) {
                             String id = reader.getAttributeValue(null, "id");
                             String contentType = reader.getAttributeValue(null, "content-type");
-                            if (StringUtils.containsIgnoreCase(id, "cover")
-                                    && StringUtils.startsWithIgnoreCase(contentType, "image/")) {
+                            if (Strings.CI.contains(id, "cover")
+                                    && Strings.CI.startsWith(contentType, "image/")) {
                                 coverBinaryId = id;
                             }
                         }

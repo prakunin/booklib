@@ -304,7 +304,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
         if (primaryEdge != null && primaryEdge.isObject()) {
             JsonNode node = primaryEdge.get("node");
             if (node != null) {
-                String name = node.path("name").asText(null);
+                String name = node.path("name").asString(null);
                 if (name != null) {
                     authors.add(name);
                 }
@@ -315,7 +315,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
         if (secondaryEdges != null && secondaryEdges.isArray()) {
             for (int i = 0; i < secondaryEdges.size(); i++) {
                 JsonNode node = secondaryEdges.get(i).path("node");
-                String name = node.path("name").asText(null);
+                String name = node.path("name").asString(null);
                 if (name != null) {
                     authors.add(name);
                 }
@@ -356,14 +356,14 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
             }
 
             try {
-                String rawBody = reviewNode.path("text").asText(null);
+                String rawBody = reviewNode.path("text").asString(null);
                 String plainBody = rawBody != null ? Jsoup.parse(rawBody).text() : null;
                 if (plainBody == null || plainBody.trim().isEmpty()) {
                     continue;
                 }
 
                 JsonNode creator = reviewNode.get("creator");
-                String reviewerName = creator != null ? creator.path("name").asText(null) : null;
+                String reviewerName = creator != null ? creator.path("name").asString(null) : null;
                 Integer followersCount = null;
                 Integer textReviewsCount = null;
                 if (creator != null) {
@@ -382,7 +382,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
                         .metadataProvider(MetadataProvider.GoodReads)
                         .date(updatedAtNode.isIntegralNumber() ? Instant.ofEpochMilli(updatedAtNode.asLong()) : null)
                         .body(plainBody.trim())
-                        .rating(Float.valueOf(reviewNode.path("rating").asText("0")))
+                        .rating(Float.valueOf(reviewNode.path("rating").asString("0")))
                         .spoiler(reviewNode.path("spoilerStatus").asBoolean(false))
                         .reviewerName(reviewerName != null ? reviewerName.trim() : null)
                         .followersCount(followersCount)
@@ -403,33 +403,33 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
         if (bookSeries != null && bookSeries.isArray() && bookSeries.size() > 0) {
             JsonNode first = bookSeries.get(0);
             JsonNode series = first.path("series");
-            String seriesName = series.path("title").asText(null);
+            String seriesName = series.path("title").asString(null);
             if (seriesName != null) {
                 builder.seriesName(seriesName);
             }
-            builder.seriesNumber(parseNumber(first.path("userPosition").asText(null), Float::parseFloat));
+            builder.seriesNumber(parseNumber(first.path("userPosition").asString(null), Float::parseFloat));
         }
     }
 
     private void extractBookDetails(JsonNode bookNode, BookMetadata.BookMetadataBuilder builder) {
-        TitleInfo titleInfo = parseTitleInfo(bookNode.path("title").asText(null));
+        TitleInfo titleInfo = parseTitleInfo(bookNode.path("title").asString(null));
         builder.title(titleInfo.title())
                 .subtitle(titleInfo.subtitle())
-                .description(normalizeNull(bookNode.path("description").asText(null)))
-                .thumbnailUrl(normalizeNull(bookNode.path("imageUrl").asText(null)))
+                .description(normalizeNull(bookNode.path("description").asString(null)))
+                .thumbnailUrl(normalizeNull(bookNode.path("imageUrl").asString(null)))
                 .categories(extractGenres(bookNode));
 
         JsonNode detailsJson = bookNode.get("details");
         if (detailsJson != null && detailsJson.isObject()) {
-            builder.pageCount(parseNumber(detailsJson.path("numPages").asText(null), Integer::parseInt))
+            builder.pageCount(parseNumber(detailsJson.path("numPages").asString(null), Integer::parseInt))
                     .publishedDate(convertToLocalDate(detailsJson.path("publicationTime")))
-                    .publisher(normalizeNull(detailsJson.path("publisher").asText(null)))
-                    .isbn10(normalizeNull(detailsJson.path("isbn").asText(null)))
-                    .isbn13(normalizeNull(detailsJson.path("isbn13").asText(null)));
+                    .publisher(normalizeNull(detailsJson.path("publisher").asString(null)))
+                    .isbn10(normalizeNull(detailsJson.path("isbn").asString(null)))
+                    .isbn13(normalizeNull(detailsJson.path("isbn13").asString(null)));
 
             JsonNode languageJson = detailsJson.get("language");
             if (languageJson != null && languageJson.isObject()) {
-                builder.language(LanguageNormalizer.normalize(normalizeNull(languageJson.path("name").asText(null))));
+                builder.language(LanguageNormalizer.normalize(normalizeNull(languageJson.path("name").asString(null))));
             }
         }
     }
@@ -442,8 +442,8 @@ return;
 
         JsonNode statsJson = work.get("stats");
         if (statsJson != null && statsJson.isObject()) {
-            builder.goodreadsRating(parseNumber(statsJson.path("averageRating").asText(null), Double::parseDouble))
-                    .goodreadsReviewCount(parseNumber(statsJson.path("ratingsCount").asText(null), Integer::parseInt));
+            builder.goodreadsRating(parseNumber(statsJson.path("averageRating").asString(null), Double::parseDouble))
+                    .goodreadsReviewCount(parseNumber(statsJson.path("ratingsCount").asString(null), Integer::parseInt));
         }
     }
 
@@ -454,7 +454,7 @@ return;
             if (bookGenresArray != null && bookGenresArray.isArray()) {
                 for (int i = 0; i < bookGenresArray.size(); i++) {
                     JsonNode genreJson = bookGenresArray.get(i).path("genre");
-                    genres.add(genreJson.path("name").asText());
+                    genres.add(genreJson.path("name").asString());
                 }
             }
             return genres;
@@ -499,7 +499,7 @@ return;
             if (publicationTimeNode.isNumber()) {
                 millis = publicationTimeNode.asLong();
             } else {
-                String text = publicationTimeNode.asText(null);
+                String text = publicationTimeNode.asString(null);
                 if (text == null || text.isBlank() || "null".equals(text)) {
                     return null;
                 }

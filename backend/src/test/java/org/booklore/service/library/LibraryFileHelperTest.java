@@ -365,6 +365,7 @@ class LibraryFileHelperTest {
     }
 
     @Test
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode; no replacement exists
     void autoDetect_collapsesAudiobookSubfolderSameAsOtherModes() throws IOException {
         Path audioDir = Files.createDirectories(tempDir.resolve("HP Book 1"));
         for (int i = 1; i <= 5; i++) {
@@ -406,6 +407,7 @@ class LibraryFileHelperTest {
     }
 
     @Test
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode; no replacement exists
     void autoDetect_singleAudioFileStaysIndividual() throws IOException {
         Path dir = Files.createDirectories(tempDir.resolve("Book"));
         Files.write(dir.resolve("book.m4b"), new byte[]{1});

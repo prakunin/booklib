@@ -279,7 +279,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                                 JsonNode jsonRoot = objectMapper.readTree(content);
                                 JsonNode valueNode = jsonRoot.get("#value#");
                                 if (valueNode != null && !valueNode.isNull()) {
-                                    safeParseInt(valueNode.asText(), builderMeta::pageCount);
+                                    safeParseInt(valueNode.asString(), builderMeta::pageCount);
                                 }
                             } catch (Exception e) {
                                 log.debug("Failed to parse calibre:user_metadata:#pagecount: {}", e.getMessage());
@@ -518,11 +518,11 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
 
 
                 if ("#moods".equals(fieldName) || "#extra_tags".equals(fieldName)) {
-                    String value = valueNode.isArray() ? valueNode.toString() : valueNode.asText().trim();
+                    String value = valueNode.isArray() ? valueNode.toString() : valueNode.asString().trim();
                     if (value.isEmpty() || "null".equals(value)) continue;
                     extractSetField(value, "#moods".equals(fieldName) ? moodsSet : tagsSet);
                 } else {
-                    String value = valueNode.asText().trim();
+                    String value = valueNode.asString().trim();
                     if (value.isEmpty() || "null".equals(value)) continue;
                     BiConsumer<BookMetadata.BookMetadataBuilder, String> mapper = CALIBRE_FIELD_MAPPINGS.get(fieldName);
                     if (mapper != null) {
