@@ -243,6 +243,8 @@ class KoboReadingStateBuilderTest {
 
         @Test
         @DisplayName("Should build web reader bookmark without a fallback location when no KoboSpan resolves")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void buildBookmarkFromProgress_WebReaderLocation() {
             UserBookProgressEntity progress = new UserBookProgressEntity();
             progress.setEpubProgress("epubcfi(/6/4!/4/2/6/1:1)");
@@ -265,6 +267,8 @@ class KoboReadingStateBuilderTest {
 
         @Test
         @DisplayName("Should build web reader bookmark with resolved KoboSpan location")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void buildBookmarkFromProgress_WebReaderResolvedKoboSpanLocation() {
             UserBookProgressEntity progress = new UserBookProgressEntity();
             progress.setEpubProgress("epubcfi(/6/4!/4/2/6/1:1)");
@@ -297,6 +301,8 @@ class KoboReadingStateBuilderTest {
 
         @Test
         @DisplayName("Should prefer web reader bookmark when Kobo bookmark timestamp is older")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void buildBookmarkFromProgress_PrefersWebReaderWhenKoboTimestampIsOlder() {
             UserBookProgressEntity progress = new UserBookProgressEntity();
             progress.setEpubProgress("epubcfi(/6/4!/4/2/6/1:1)");
@@ -322,6 +328,8 @@ class KoboReadingStateBuilderTest {
 
         @Test
         @DisplayName("Should keep inbound Kobo bookmark when mirrored EPUB progress has the same timestamp")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void buildBookmarkFromProgress_PrefersKoboWhenTimestampsAreEqual() {
             UserBookProgressEntity progress = new UserBookProgressEntity();
             progress.setEpubProgressPercent(54.6f);
@@ -349,6 +357,8 @@ class KoboReadingStateBuilderTest {
 
         @Test
         @DisplayName("Should prefer web reader bookmark when newer progress has href and percent but no CFI")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void buildBookmarkFromProgress_UsesWebReaderWithoutCfi() {
             UserBookProgressEntity progress = new UserBookProgressEntity();
             progress.setEpubProgressHref("OPS/chapter3.xhtml");

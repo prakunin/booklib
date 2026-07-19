@@ -122,6 +122,8 @@ public class KoboBookmarkLocationResolver {
         return bookFile.getBookType() == BookFileType.EPUB && !bookFile.isFixedLayout();
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private String resolveHref(UserBookProgressEntity progress,
                                UserBookFileProgressEntity fileProgress) {
         return Optional.ofNullable(fileProgress)
@@ -133,6 +135,8 @@ public class KoboBookmarkLocationResolver {
                         .orElse(null));
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private String resolveCfi(UserBookProgressEntity progress,
                               UserBookFileProgressEntity fileProgress) {
         return Optional.ofNullable(fileProgress)
@@ -144,6 +148,8 @@ public class KoboBookmarkLocationResolver {
                         .orElse(null));
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private Float resolveGlobalProgressPercent(UserBookProgressEntity progress,
                                                UserBookFileProgressEntity fileProgress) {
         Float fileProgressPercent = Optional.ofNullable(fileProgress)

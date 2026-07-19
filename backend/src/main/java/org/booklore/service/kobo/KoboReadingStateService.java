@@ -166,6 +166,8 @@ public class KoboReadingStateService {
         }
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private Optional<KoboReadingState> constructReadingStateFromProgress(String entitlementId) {
         try {
             Long bookId = Long.parseLong(entitlementId);
@@ -261,6 +263,8 @@ public class KoboReadingStateService {
         }
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private boolean crossPopulateEpubFieldsFromKobo(UserBookProgressEntity progress,
                                                     KoboReadingState.CurrentBookmark bookmark,
                                                     BookEntity book,

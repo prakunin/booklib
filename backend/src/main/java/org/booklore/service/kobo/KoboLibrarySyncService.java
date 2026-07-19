@@ -224,6 +224,8 @@ public class KoboLibrarySyncService {
         return receivedTime != null && (sentTime == null || receivedTime.isAfter(sentTime));
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private boolean needsProgressSync(UserBookProgressEntity progress) {
         if (needsKoboProgressSync(progress)) {
             return true;

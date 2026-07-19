@@ -588,6 +588,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should prefer href-only web reader bookmark over existing state when two-way sync is on")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateNewEntitlements_prefersHrefOnlyWebReaderBookmark() {
             BookEntity book = createEpubBookEntity(1L);
             book.setAddedOn(Instant.parse("2025-01-01T00:00:00Z"));
@@ -642,6 +644,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should keep stored Kobo bookmark when mirrored EPUB progress is not newer")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateNewEntitlements_preservesStoredKoboBookmarkWhenKoboIsFreshest() {
             BookEntity book = createEpubBookEntity(1L);
             book.setAddedOn(Instant.parse("2025-01-01T00:00:00Z"));
@@ -809,6 +813,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should use synced EPUB file progress when book has multiple files")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateChangedReadingStates_usesSyncedEpubFileProgress() {
             BookEntity book = new BookEntity();
             book.setId(1L);
@@ -893,6 +899,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should include epub progress in bookmark when two-way sync ON")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateChangedReadingStates_twoWaySync() {
             BookEntity book = new BookEntity();
             book.setId(1L);
@@ -926,6 +934,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should NOT include epub progress in bookmark when two-way sync OFF")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateChangedReadingStates_twoWaySyncOff() {
             BookEntity book = new BookEntity();
             book.setId(1L);

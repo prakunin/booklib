@@ -54,6 +54,8 @@ public class KoboReadingStateBuilder {
         return buildBookmarkFromKoboProgress(progress, fileProgress, defaultTime);
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     public boolean shouldUseWebReaderProgress(UserBookProgressEntity progress) {
         if (!koboSettingsService.getCurrentUserSettings().isTwoWayProgressSync()) {
             return false;
@@ -70,6 +72,8 @@ public class KoboReadingStateBuilder {
         return progress.getLastReadTime().isAfter(progress.getKoboProgressReceivedTime());
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private KoboReadingState.CurrentBookmark buildBookmarkFromWebReaderProgress(UserBookProgressEntity progress,
                                                                                 UserBookFileProgressEntity fileProgress,
                                                                                 OffsetDateTime defaultTime,

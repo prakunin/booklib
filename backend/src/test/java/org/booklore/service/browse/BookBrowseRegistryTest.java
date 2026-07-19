@@ -124,6 +124,8 @@ class BookBrowseRegistryTest {
         return bookEntity;
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void progress(BookEntity book, BookLoreUserEntity forUser, Integer personalRating,
                           ReadStatus status, Float epubPercent, Float pdfPercent) {
         UserBookProgressEntity p = UserBookProgressEntity.builder()

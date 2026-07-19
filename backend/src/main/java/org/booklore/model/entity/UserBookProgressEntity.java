@@ -30,31 +30,59 @@ public class UserBookProgressEntity {
     @Column(name = "last_read_time")
     private Instant lastReadTime;
 
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.entity.UserBookFileProgressEntity}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy columns.
     @Column(name = "pdf_progress")
     private Integer pdfProgress;
 
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.entity.UserBookFileProgressEntity}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy columns.
     @Column(name = "pdf_progress_percent")
     private Float pdfProgressPercent;
 
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.entity.UserBookFileProgressEntity}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy columns.
     @Column(name = "epub_progress", length = 1000)
     private String epubProgress;
 
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.entity.UserBookFileProgressEntity}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy columns.
     @Column(name = "epub_progress_href", length = 1000)
     private String epubProgressHref;
 
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.entity.UserBookFileProgressEntity}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy columns.
     @Column(name = "epub_progress_percent")
     private Float epubProgressPercent;
 
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.entity.UserBookFileProgressEntity}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy columns.
     @Column(name = "cbx_progress")
     private Integer cbxProgress;
 
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.entity.UserBookFileProgressEntity}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy columns.
     @Column(name = "cbx_progress_percent")
     private Float cbxProgressPercent;
 

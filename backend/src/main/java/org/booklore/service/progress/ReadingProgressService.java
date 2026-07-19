@@ -111,6 +111,8 @@ public class ReadingProgressService {
         }
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void setBookProgress(Book book, UserBookProgressEntity progress) {
         if (progress.getKoboProgressPercent() != null) {
             book.setKoboProgress(KoboProgress.builder()
@@ -204,6 +206,8 @@ public class ReadingProgressService {
      * it (see calculateReadStatus) and would otherwise show a stale status until the next refetch.
      */
     @Transactional
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     public BookStatusUpdateResponse updateReadProgress(ReadProgressRequest request) {
         BookEntity book = bookRepository.findByIdWithBookFiles(request.getBookId())
                 .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(request.getBookId()));
@@ -328,6 +332,8 @@ public class ReadingProgressService {
         userBookFileProgressRepository.save(entity);
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void saveToUserBookFileProgressFromLegacy(BookLoreUserEntity user, BookFileEntity bookFile,
                                                        UserBookProgressEntity progress, Instant now) {
         UserBookFileProgressEntity entity = userBookFileProgressRepository
@@ -364,6 +370,8 @@ public class ReadingProgressService {
         userBookFileProgressRepository.save(entity);
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void updateProgressFromFileProgress(UserBookProgressEntity progress, BookFileType bookType,
                                                  BookFileProgress fileProgress) {
         switch (bookType) {
@@ -389,6 +397,8 @@ public class ReadingProgressService {
         }
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private Float updateProgressByBookType(UserBookProgressEntity progress, BookFileType bookType, ReadProgressRequest request) {
         return switch (bookType) {
             case EPUB, FB2, MOBI, AZW3 -> updateEbookProgress(progress, request.getEpubProgress());
@@ -398,6 +408,8 @@ public class ReadingProgressService {
         };
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private Float updateEbookProgress(UserBookProgressEntity progress, EpubProgress epubProgress) {
         if (epubProgress == null) return null;
 
@@ -408,6 +420,8 @@ public class ReadingProgressService {
         return Math.round(percentage * 10f) / 10f;
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private Float updatePdfProgress(UserBookProgressEntity progress, PdfProgress pdfProgress) {
         if (pdfProgress == null) return null;
 
@@ -416,6 +430,8 @@ public class ReadingProgressService {
         return Math.round(percentage * 10f) / 10f;
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private Float updateCbxProgress(UserBookProgressEntity progress, CbxProgress cbxProgress) {
         if (cbxProgress == null) return null;
 
@@ -433,6 +449,8 @@ public class ReadingProgressService {
         return Math.round(percentage * 10f) / 10f;
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void setProgressPercent(UserBookProgressEntity progress, BookFileType type, Float percentage) {
         switch (type) {
             case EPUB, FB2, MOBI, AZW3 -> progress.setEpubProgressPercent(percentage);

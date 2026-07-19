@@ -95,6 +95,8 @@ public class KoreaderService {
     }
 
     @Transactional
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     public void syncProgressToKoreader(long bookId, float percentage, long userId) {
         try {
             koreaderUserRepository.findByBookLoreUserId(userId)
@@ -135,6 +137,8 @@ public class KoreaderService {
         }
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void saveToFileProgress(BookLoreUserEntity user, BookEntity book, UserBookProgressEntity progress) {
         try {
             BookFileEntity primaryFile = book.getPrimaryBookFile();
@@ -171,6 +175,8 @@ public class KoreaderService {
         }
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void updateProgressData(UserBookProgressEntity userProgress, KoreaderProgress koProgress, boolean syncWithWebReader, BookEntity book) {
         userProgress.setKoreaderProgress(koProgress.getProgress());
         userProgress.setKoreaderProgressPercent(koProgress.getPercentage());

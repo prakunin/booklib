@@ -45,6 +45,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
+// Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+@SuppressWarnings("java:S1874")
 class KoboReadingStateServiceTest {
 
     @Mock

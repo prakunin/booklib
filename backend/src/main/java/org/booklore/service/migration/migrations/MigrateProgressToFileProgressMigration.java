@@ -85,12 +85,16 @@ public class MigrateProgressToFileProgressMigration implements Migration {
                 getKey(), migratedCount, skippedCount);
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private boolean hasAnyProgress(UserBookProgressEntity progress) {
         return progress.getPdfProgress() != null ||
                 progress.getEpubProgress() != null ||
                 progress.getCbxProgress() != null;
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private Optional<BookFileEntity> findBookFileForProgress(UserBookProgressEntity progress) {
         if (progress.getBook() == null || progress.getBook().getBookFiles() == null) {
             return Optional.empty();
@@ -131,6 +135,8 @@ public class MigrateProgressToFileProgressMigration implements Migration {
         return Optional.empty();
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private UserBookFileProgressEntity createFileProgress(UserBookProgressEntity progress, BookFileEntity bookFile) {
         UserBookFileProgressEntity fileProgress = new UserBookFileProgressEntity();
         fileProgress.setUser(progress.getUser());

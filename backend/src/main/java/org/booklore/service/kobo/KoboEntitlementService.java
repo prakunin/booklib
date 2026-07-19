@@ -214,6 +214,8 @@ public class KoboEntitlementService {
                 .build();
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private ChangedReadingState buildChangedReadingState(UserBookProgressEntity progress,
                                                          UserBookFileProgressEntity fileProgress,
                                                          String timestamp,
@@ -243,6 +245,8 @@ public class KoboEntitlementService {
                 .build();
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private KoboReadingState getReadingStateForBook(BookEntity book) {
         OffsetDateTime now = getCurrentUtc();
         String entitlementId = String.valueOf(book.getId());
