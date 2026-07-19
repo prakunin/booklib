@@ -379,7 +379,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
     private void safeParseDouble(String value, DoubleConsumer consumer) {
         try {
             consumer.accept(Double.parseDouble(value));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.debug("Failed to parse double from value: {}", value);
         }
     }
@@ -387,7 +387,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
     private void safeParseInt(String value, IntConsumer consumer) {
         try {
             consumer.accept(Integer.parseInt(value));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.debug("Failed to parse int from value: {}", value);
         }
     }
@@ -435,7 +435,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             return (value == null || value.isBlank())
                     ? null
                     : Integer.parseInt(value.trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }
@@ -445,7 +445,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             return (value == null || value.isBlank())
                     ? null
                     : Float.parseFloat(value.trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }
@@ -474,7 +474,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         }
         try {
             return LocalDate.of(y, m, d);
-        } catch (Exception e) {
+        } catch (Exception _) {
             return null;
         }
     }
@@ -541,7 +541,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes)) {
             BufferedImage img = ImageIO.read(bais);
             return img != null;
-        } catch (IOException e) {
+        } catch (IOException _) {
             return false;
         }
     }
@@ -585,7 +585,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
                             possibleCoverImages.add(entryNames.get(index - 1));
                         }
                     }
-                } catch (Exception e) {
+                } catch (Exception _) {
                     // Do nothing
                 }
             }
@@ -645,7 +645,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
                     .filter(CbxMetadataExtractor::isComicInfoName)
                     .findFirst()
                     .orElse(null);
-        } catch (Exception e) {
+        } catch (Exception _) {
             log.warn("Could not find comic info entry for archive {}", cbxPath.getFileName());
             return null;
         }

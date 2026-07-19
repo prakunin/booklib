@@ -654,14 +654,14 @@ export class Paginator extends HTMLElement {
             const h = innerHeight
             detail.data = Promise.resolve(detail.data).then(data => data
                 // unprefix as most of the props are (only) supported unprefixed
-                .replace(/(?<=[{\s;])-epub-/gi, '')
+                .replaceAll(/(?<=[{\s;])-epub-/gi, '')
                 // replace vw and vh as they cause problems with layout
-                .replace(/(\d*\.?\d+)vw/gi, (_, d) => parseFloat(d) * w / 100 + 'px')
-                .replace(/(\d*\.?\d+)vh/gi, (_, d) => parseFloat(d) * h / 100 + 'px')
+                .replaceAll(/(\d*\.?\d+)vw/gi, (_, d) => Number.parseFloat(d) * w / 100 + 'px')
+                .replaceAll(/(\d*\.?\d+)vh/gi, (_, d) => Number.parseFloat(d) * h / 100 + 'px')
                 // `page-break-*` unsupported in columns; replace with `column-break-*`
-                .replace(/page-break-(after|before|inside)\s*:/gi, (_, x) =>
+                .replaceAll(/page-break-(after|before|inside)\s*:/gi, (_, x) =>
                     `-webkit-column-break-${x}:`)
-                .replace(/break-(after|before|inside)\s*:\s*(avoid-)?page/gi, (_, x, y) =>
+                .replaceAll(/break-(after|before|inside)\s*:\s*(avoid-)?page/gi, (_, x, y) =>
                     `break-${x}: ${y ?? ''}column`))
         })
     }
@@ -690,12 +690,12 @@ export class Paginator extends HTMLElement {
         const size = vertical ? height : width
 
         const style = getComputedStyle(this.#top)
-        const maxInlineSize = parseFloat(style.getPropertyValue('--_max-inline-size'))
-        const maxColumnCount = parseInt(style.getPropertyValue('--_max-column-count-spread'))
-        const margin = parseFloat(style.getPropertyValue('--_margin'))
+        const maxInlineSize = Number.parseFloat(style.getPropertyValue('--_max-inline-size'))
+        const maxColumnCount = Number.parseInt(style.getPropertyValue('--_max-column-count-spread'))
+        const margin = Number.parseFloat(style.getPropertyValue('--_margin'))
         this.#margin = margin
 
-        const g = parseFloat(style.getPropertyValue('--_gap')) / 100
+        const g = Number.parseFloat(style.getPropertyValue('--_gap')) / 100
         // The gap will be a percentage of the #container, not the whole view.
         // This means the outer padding will be bigger than the column gap. Let
         // `a` be the gap percentage. The actual percentage for the column gap
@@ -812,7 +812,7 @@ export class Paginator extends HTMLElement {
         const d = velocity * (this.#rtl ? -size : size)
         const page = Math.floor(
             Math.max(min, Math.min(max, (start + end) / 2
-                + (isNaN(d) ? 0 : d))) / size)
+                + (Number.isNaN(d) ? 0 : d))) / size)
 
         this.#scrollToPage(page, 'snap').then(() => {
             const dir = page <= 0 ? -1 : page >= pages - 1 ? 1 : null

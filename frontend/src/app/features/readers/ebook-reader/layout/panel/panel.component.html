@@ -1,7 +1,7 @@
 <ng-container *transloco="let t; prefix: 'readerEbook.panel'">
 @if (isOpen()) {
-  <div class="sidebar-overlay" role="button" tabindex="0" (click)="onOverlayClick()" (keydown.enter)="onOverlayClick()" [class.closing]="closing()">
-    <aside class="sidebar" role="button" tabindex="0" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" [class.closing]="closing()">
+  <div class="sidebar-overlay" tabindex="0" (click)="onOverlayClick()" (keydown.escape)="onOverlayClick()" [class.closing]="closing()">
+    <aside class="sidebar" tabindex="0" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()" [class.closing]="closing()">
       <!-- Header -->
       <header class="sidebar-header">
         <h2 class="sidebar-title">
@@ -79,17 +79,19 @@
                 </div>
                 <ul class="item-list search-results">
                   @for (result of searchState().results; track result.cfi) {
-                    <li class="reader-list-item search-result-item" role="button" tabindex="0" (click)="onSearchResultClick(result.cfi)" (keydown.enter)="onSearchResultClick(result.cfi)">
-                      <div class="item-content">
-                        <span class="search-excerpt">
-                          <span class="excerpt-context">{{ result.excerpt.pre }}</span>
-                          <mark class="excerpt-match">{{ result.excerpt.match }}</mark>
-                          <span class="excerpt-context">{{ result.excerpt.post }}</span>
-                        </span>
-                        @if (result.sectionLabel) {
-                          <span class="item-chapter">{{ result.sectionLabel }}</span>
-                        }
-                      </div>
+                    <li>
+                      <button type="button" class="reader-list-item search-result-item" (click)="onSearchResultClick(result.cfi)">
+                        <div class="item-content">
+                          <span class="search-excerpt">
+                            <span class="excerpt-context">{{ result.excerpt.pre }}</span>
+                            <mark class="excerpt-match">{{ result.excerpt.match }}</mark>
+                            <span class="excerpt-context">{{ result.excerpt.post }}</span>
+                          </span>
+                          @if (result.sectionLabel) {
+                            <span class="item-chapter">{{ result.sectionLabel }}</span>
+                          }
+                        </div>
+                      </button>
                     </li>
                   }
                 </ul>
@@ -133,18 +135,20 @@
               @if (filteredNotes().length > 0) {
                 <ul class="item-list">
                   @for (note of filteredNotes(); track note.id) {
-                    <li class="reader-list-item note-item" role="button" tabindex="0" (click)="onNoteClick(note.cfi)" (keydown.enter)="onNoteClick(note.cfi)">
-                      <div class="note-bar" [style.background-color]="note.color"></div>
-                      <div class="item-content">
-                        <span class="note-text">{{ note.noteContent }}</span>
-                        @if (note.selectedText) {
-                          <span class="note-selected-text">"{{ note.selectedText }}"</span>
-                        }
-                        @if (note.chapterTitle) {
-                          <span class="item-chapter">{{ note.chapterTitle }}</span>
-                        }
-                        <span class="item-meta">{{ note.createdAt | date: 'MMM d, y' }}</span>
-                      </div>
+                    <li class="reader-list-item note-item">
+                      <button type="button" class="reader-list-item-main" (click)="onNoteClick(note.cfi)">
+                        <div class="note-bar" [style.background-color]="note.color"></div>
+                        <div class="item-content">
+                          <span class="note-text">{{ note.noteContent }}</span>
+                          @if (note.selectedText) {
+                            <span class="note-selected-text">"{{ note.selectedText }}"</span>
+                          }
+                          @if (note.chapterTitle) {
+                            <span class="item-chapter">{{ note.chapterTitle }}</span>
+                          }
+                          <span class="item-meta">{{ note.createdAt | date: 'MMM d, y' }}</span>
+                        </div>
+                      </button>
                       <div class="action-buttons">
                         <button class="edit-btn" (click)="onEditNote($event, note)" [attr.aria-label]="t('editNote')">
                           <app-reader-icon name="edit" [size]="16"></app-reader-icon>

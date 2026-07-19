@@ -774,7 +774,7 @@ class FileServiceTest {
                     File probe = File.createTempFile("probe", ".tmp", ImageIO.getCacheDirectory());
                     Files.deleteIfExists(probe.toPath());
                     return false;
-                } catch (IOException expected) {
+                } catch (IOException _) {
                     return true;
                 }
             }
@@ -1501,7 +1501,7 @@ class FileServiceTest {
             @Test
             @DisplayName("throws IOException when ImageIO cannot read bytes")
             @Timeout(5)
-            void downloadImageFromUrl_invalidImageData_throwsException() throws IOException {
+            void downloadImageFromUrl_invalidImageData_throwsException() {
                 String imageUrl = "http://1.1.1.1/image.jpg";
                 byte[] invalidBytes = "not an image".getBytes();
                 ResponseEntity<byte[]> responseEntity = ResponseEntity.ok(invalidBytes);
@@ -1833,7 +1833,8 @@ class FileServiceTest {
                     .forEach(p -> {
                         try {
                             Files.delete(p);
-                        } catch (IOException ignored) {
+                        } catch (IOException _) {
+                            // best-effort cleanup
                         }
                     });
 

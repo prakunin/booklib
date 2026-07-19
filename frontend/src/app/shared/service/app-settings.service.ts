@@ -18,19 +18,19 @@ export interface PublicAppSettings {
 
 @Injectable({providedIn: 'root'})
 export class AppSettingsService {
-  private http = inject(HttpClient);
-  private queryClient = inject(QueryClient);
-  private authService = inject(AuthService);
+  private readonly http = inject(HttpClient);
+  private readonly queryClient = inject(QueryClient);
+  private readonly authService = inject(AuthService);
   private readonly token = this.authService.token;
 
   private readonly apiUrl = `${API_CONFIG.BASE_URL}/api/v1/settings`;
   private readonly publicApiUrl = `${API_CONFIG.BASE_URL}/api/v1/public-settings`;
 
-  private publicSettingsQuery = injectQuery(() => ({
+  private readonly publicSettingsQuery = injectQuery(() => ({
     ...this.getPublicSettingsQueryOptions(),
   }));
 
-  private appSettingsQuery = injectQuery(() => ({
+  private readonly appSettingsQuery = injectQuery(() => ({
     ...this.getAppSettingsQueryOptions(),
     enabled: !!this.token(),
   }));
@@ -84,8 +84,7 @@ export class AppSettingsService {
     const current = this.publicAppSettings();
 
     if (
-      !current ||
-      current.oidcEnabled !== updatedPublicSettings.oidcEnabled ||
+      current?.oidcEnabled !== updatedPublicSettings.oidcEnabled ||
       current.remoteAuthEnabled !== updatedPublicSettings.remoteAuthEnabled ||
       current.oidcForceOnlyMode !== updatedPublicSettings.oidcForceOnlyMode ||
       JSON.stringify(current.passwordPolicy) !== JSON.stringify(updatedPublicSettings.passwordPolicy) ||

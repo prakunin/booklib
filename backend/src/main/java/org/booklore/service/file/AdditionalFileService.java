@@ -94,7 +94,7 @@ public class AdditionalFileService {
         }
     }
 
-    public ResponseEntity<StreamingResponseBody> downloadAdditionalFile(Long bookId, Long fileId) throws IOException {
+    public ResponseEntity<StreamingResponseBody> downloadAdditionalFile(Long bookId, Long fileId) {
         Optional<BookFileEntity> fileOpt = additionalFileRepository.findByIdAndBookIdWithBookAndLibraryPath(fileId, bookId);
         if (fileOpt.isEmpty()) {
             return ResponseEntity.notFound().build();

@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.booklore.model.enums.AuditAction;
 import org.booklore.service.audit.AuditService;
 import org.booklore.util.RequestUtils;
@@ -76,7 +77,7 @@ public class AuthenticationService {
 
     @PostConstruct
     void initDummyHash() {
-        this.dummyPasswordHash = passwordEncoder.encode("_dummy_placeholder_for_timing_equalization_");
+        this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     public BookLoreUser getAuthenticatedUser() {
@@ -197,7 +198,6 @@ public class AuthenticationService {
     }
 
     public ResponseEntity<AccessTokenDto> loginUser(BookLoreUserEntity user, Long customRefreshTokenExpirationMs) {
-        String accessToken = jwtUtils.generateAccessToken(user);
         String refreshToken = jwtUtils.generateRefreshToken(user);
 
         long expirationMs = customRefreshTokenExpirationMs != null ? customRefreshTokenExpirationMs : jwtUtils.getRefreshTokenExpirationMs();

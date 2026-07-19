@@ -37,9 +37,9 @@ export class ReaderSettingsDialogComponent implements OnInit {
     {name: 'orange', value: '#FFD580', label: 'Orange'}
   ];
 
-  private customFontService = inject(EpubCustomFontService);
-  private renderer = inject(Renderer2);
-  private document = inject(DOCUMENT);
+  private readonly customFontService = inject(EpubCustomFontService);
+  private readonly renderer = inject(Renderer2);
+  private readonly document = inject(DOCUMENT);
 
   ngOnInit() {
     this.customFontService.injectCustomFontsStylesheet(this.renderer, this.document);

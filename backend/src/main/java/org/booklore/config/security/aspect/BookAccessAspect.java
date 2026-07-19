@@ -71,8 +71,8 @@ public class BookAccessAspect {
         for (int i = 0; i < paramNames.length; i++) {
             if (Objects.equals(paramNames[i], targetParamName)) {
                 Object arg = args[i];
-                if (arg instanceof Long) {
-                    return (Long) arg;
+                if (arg instanceof Long longId) {
+                    return longId;
                 } else if (arg instanceof String str && NUMERIC_PATTERN.matcher(str).matches()) {
                     return Long.valueOf(str);
                 }

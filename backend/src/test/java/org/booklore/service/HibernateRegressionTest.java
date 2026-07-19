@@ -314,10 +314,7 @@ class HibernateRegressionTest {
 
             Assertions.assertThrows(
                     DataIntegrityViolationException.class,
-                    () -> {
-                        libraryRepository.saveAndFlush(library);
-                        entityManager.flush();
-                    },
+                    () -> libraryRepository.saveAndFlush(library),
                     "Should fail because library_id is NOT NULL but no back-reference was set"
             );
         }

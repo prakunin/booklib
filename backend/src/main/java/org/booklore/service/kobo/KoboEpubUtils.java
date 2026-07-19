@@ -32,7 +32,7 @@ class KoboEpubUtils {
         try {
             String decodedPath = URI.create(normalizedPath).getPath();
             return decodedPath != null ? decodedPath : normalizedPath;
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return normalizedPath;
         }
     }

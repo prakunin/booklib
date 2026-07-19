@@ -10,7 +10,6 @@ import org.booklore.service.library.LibraryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -47,10 +46,8 @@ public class LibraryController {
     }
 
     @Operation(summary = "Get a library by ID", description = "Retrieve details of a specific library by its ID.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Library details returned successfully"),
-            @ApiResponse(responseCode = "404", description = "Library not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Library details returned successfully")
+    @ApiResponse(responseCode = "404", description = "Library not found")
     @GetMapping("/{libraryId}")
     @CheckLibraryAccess(libraryIdParam = "libraryId")
     public ResponseEntity<Library> getLibrary(@Parameter(description = "ID of the library") @PathVariable long libraryId) {

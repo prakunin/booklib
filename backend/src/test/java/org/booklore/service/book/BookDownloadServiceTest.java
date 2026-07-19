@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +26,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class BookDownloadServiceTest {
+class BookDownloadServiceTest {
 
     @Mock private BookRepository bookRepository;
 
@@ -43,7 +44,7 @@ public class BookDownloadServiceTest {
     private MockedStatic<Files> mockFiles;
 
     @BeforeEach
-    public void setup() throws Exception {
+    void setup() {
         mockFiles = mockStatic(Files.class);
     }
 
@@ -53,7 +54,7 @@ public class BookDownloadServiceTest {
     }
 
     @Test
-    public void downloadBook_includesContentDispositionAscii() {
+    void downloadBook_includesContentDispositionAscii() {
         String expected = "attachment; filename=\"example.epub\"";
 
         BookEntity bookEntity = getSampleBook("example.epub");
@@ -70,18 +71,12 @@ public class BookDownloadServiceTest {
     }
 
     @Test
-    public void downloadBook_includesContentDispositionUTF8() {
+    void contentDispositionIncludesUtf8FilenameParameter() throws Exception {
         String expected = "attachment; filename=\"_xample.epub\"; filename*=UTF-8''%C9%87xample.epub";
 
-        BookEntity bookEntity = getSampleBook("ɇxample.epub");
-        when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(bookEntity));
-
-        mockFiles.when(() -> Files.exists(bookEntity.getFullFilePath())).thenReturn(true);
-        mockFiles.when(() -> Files.isDirectory(bookEntity.getFullFilePath())).thenReturn(false);
-
-        String actual = bookDownloadService.downloadBook(1L)
-                .getHeaders()
-                .getFirst("Content-Disposition");
+        Method method = BookDownloadService.class.getDeclaredMethod("getContentDisposition", String.class);
+        method.setAccessible(true);
+        String actual = (String) method.invoke(bookDownloadService, "ɇxample.epub");
 
         assertEquals(expected, actual);
     }

@@ -304,7 +304,7 @@ export class TopItemsChartComponent implements OnInit {
         const bestPct = best.statusBreakdown[ReadStatus.READ] / best.count;
         const currPct = curr.statusBreakdown[ReadStatus.READ] / curr.count;
         return currPct > bestPct ? curr : best;
-      });
+      }, withReads[0]);
       const readPct = Math.round((mostRead.statusBreakdown[ReadStatus.READ] / mostRead.count) * 100);
       if (readPct > 0) {
         this.insights.push({
@@ -353,7 +353,7 @@ export class TopItemsChartComponent implements OnInit {
       const bookStatus = book.readStatus || ReadStatus.UNSET;
 
       for (const item of items) {
-        if (item && item.trim()) {
+        if (item?.trim()) {
           const normalizedName = item.trim();
           let entry = itemMap.get(normalizedName);
 

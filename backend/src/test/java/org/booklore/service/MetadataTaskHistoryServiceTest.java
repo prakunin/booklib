@@ -214,7 +214,7 @@ class MetadataTaskHistoryServiceTest {
                 .filter(n -> n.getTaskId().equals("task2"))
                 .findFirst().orElseThrow();
         assertThat(n2.getTotal()).isEqualTo(1);
-        assertThat(n2.getCompleted()).isEqualTo(0);
+        assertThat(n2.getCompleted()).isZero();
         assertThat(n2.getMessage()).contains("Metadata fetch completed! 1 books need review.");
 
         verify(jobRepository).findAllWithProposals();

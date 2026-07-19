@@ -63,7 +63,11 @@ public class AppSeriesService {
 
         // Build WHERE clause fragments
         String libraryClause = buildLibraryClause(accessibleLibraryIds, libraryId);
-        String searchClause = (search != null && !search.trim().isEmpty())
+        final String searchParam = "searchPattern";
+        String searchPattern = (search != null && !search.trim().isEmpty())
+                ? "%" + search.trim().toLowerCase() + "%"
+                : null;
+        String searchClause = searchPattern != null
                 ? " AND LOWER(m.seriesName) LIKE :searchPattern"
                 : "";
 
@@ -91,8 +95,8 @@ public class AppSeriesService {
         var aggregateQ = entityManager.createQuery(aggregateQuery, Tuple.class);
         aggregateQ.setParameter("userId", userId);
         setLibraryParams(aggregateQ, accessibleLibraryIds, libraryId);
-        if (!searchClause.isEmpty()) {
-            aggregateQ.setParameter("searchPattern", "%" + search.trim().toLowerCase() + "%");
+        if (searchPattern != null) {
+            aggregateQ.setParameter(searchParam, searchPattern);
         }
         aggregateQ.setFirstResult(pageNum * pageSize);
         aggregateQ.setMaxResults(pageSize);
@@ -109,18 +113,6 @@ public class AppSeriesService {
                 + searchClause;
 
         if (inProgressOnly) {
-            // For in-progress, we need the HAVING filter in the count — use a subquery approach
-            String countWithHaving = "SELECT COUNT(*) FROM ("
-                    + "SELECT m.seriesName FROM BookEntity b JOIN b.metadata m"
-                    + " LEFT JOIN b.userBookProgress p ON p.user.id = :userId"
-                    + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                    + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
-                    + " AND m.seriesName IS NOT NULL"
-                    + libraryClause
-                    + searchClause
-                    + " GROUP BY m.seriesName"
-                    + " HAVING SUM(CASE WHEN p.readStatus IN (org.booklore.model.enums.ReadStatus.READING, org.booklore.model.enums.ReadStatus.RE_READING) THEN 1 ELSE 0 END) > 0"
-                    + ")";
             // JPQL doesn't support subqueries in FROM — count via result list size instead
             String countAlt = "SELECT m.seriesName FROM BookEntity b JOIN b.metadata m"
                     + " LEFT JOIN b.userBookProgress p ON p.user.id = :userId"
@@ -134,8 +126,8 @@ public class AppSeriesService {
             var countQ = entityManager.createQuery(countAlt, String.class);
             countQ.setParameter("userId", userId);
             setLibraryParams(countQ, accessibleLibraryIds, libraryId);
-            if (!searchClause.isEmpty()) {
-                countQ.setParameter("searchPattern", "%" + search.trim().toLowerCase() + "%");
+            if (searchPattern != null) {
+                countQ.setParameter(searchParam, searchPattern);
             }
             long totalElements = countQ.getResultList().size();
             return buildSeriesPage(aggregateResults, userId, accessibleLibraryIds, libraryId, inProgressOnly, pageNum, pageSize, totalElements);
@@ -146,8 +138,8 @@ public class AppSeriesService {
             countQ.setParameter("userId", userId);
         }
         setLibraryParams(countQ, accessibleLibraryIds, libraryId);
-        if (!searchClause.isEmpty()) {
-            countQ.setParameter("searchPattern", "%" + search.trim().toLowerCase() + "%");
+        if (searchPattern != null) {
+            countQ.setParameter(searchParam, searchPattern);
         }
         long totalElements = countQ.getSingleResult();
 

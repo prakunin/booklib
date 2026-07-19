@@ -36,20 +36,20 @@ export function invalidateAppDerivedQueries(queryClient: QueryClient): void {
   );
   const timer = setTimeout(() => {
     pendingDerivedInvalidations.delete(queryClient);
-    void queryClient.invalidateQueries({queryKey: APP_FILTER_OPTIONS_QUERY_PREFIX});
-    void queryClient.invalidateQueries({queryKey: APP_CATALOG_SUMMARY_QUERY_KEY});
-    void queryClient.invalidateQueries({queryKey: APP_BOOK_SUMMARIES_QUERY_PREFIX});
+    queryClient.invalidateQueries({queryKey: APP_FILTER_OPTIONS_QUERY_PREFIX});
+    queryClient.invalidateQueries({queryKey: APP_CATALOG_SUMMARY_QUERY_KEY});
+    queryClient.invalidateQueries({queryKey: APP_BOOK_SUMMARIES_QUERY_PREFIX});
   }, delay);
   pendingDerivedInvalidations.set(queryClient, {timer, firstRequestedAt});
 }
 
 export function invalidateAppBooksQueries(queryClient: QueryClient): void {
-  void queryClient.invalidateQueries({queryKey: APP_BOOKS_QUERY_PREFIX});
+  queryClient.invalidateQueries({queryKey: APP_BOOKS_QUERY_PREFIX});
   invalidateAppDerivedQueries(queryClient);
 }
 
 export function invalidateLegacyBooksQuery(queryClient: QueryClient): void {
-  void queryClient.invalidateQueries({queryKey: BOOKS_QUERY_KEY, exact: true});
+  queryClient.invalidateQueries({queryKey: BOOKS_QUERY_KEY, exact: true});
 }
 
 // --- Full invalidation (refetches from server) ---
@@ -66,7 +66,7 @@ export function invalidateBookQueries(queryClient: QueryClient, bookIds: Iterabl
 
 export function invalidateBookDetailQueries(queryClient: QueryClient, bookIds: Iterable<number>): void {
   for (const bookId of new Set(bookIds)) {
-    void queryClient.invalidateQueries({queryKey: bookDetailQueryPrefix(bookId)});
+    queryClient.invalidateQueries({queryKey: bookDetailQueryPrefix(bookId)});
   }
 }
 
@@ -91,8 +91,7 @@ export function removeBooksFromCache(queryClient: QueryClient, bookIds: Iterable
 
 // --- Surgical patches (updates cache directly, no list refetch) ---
 
-export function addBookToCache(queryClient: QueryClient, book: Book): void {
-  void book;
+export function addBookToCache(queryClient: QueryClient, _book: Book): void {
   invalidateLegacyBooksQuery(queryClient);
 }
 
@@ -110,8 +109,7 @@ export function patchBookMetadataInCache(queryClient: QueryClient, bookId: numbe
   invalidateAppBooksQueries(queryClient);
 }
 
-export function patchBookInCacheWith(queryClient: QueryClient, bookId: number, updater: (book: Book) => Book): void {
-  void updater;
+export function patchBookInCacheWith(queryClient: QueryClient, bookId: number, _updater: (book: Book) => Book): void {
   invalidateLegacyBooksQuery(queryClient);
   invalidateBookDetailQueries(queryClient, [bookId]);
   invalidateAppBooksQueries(queryClient);
@@ -126,7 +124,7 @@ export function patchBookFieldsInCache(queryClient: QueryClient, updates: {bookI
   // depends on a changed field, so e.g. a status tab drops a book that no longer matches.
   // Views that don't filter/sort by the changed field keep the cheap in-place patch.
   const changedFields = withServerDerivedFields(new Set(updates.flatMap(u => Object.keys(u.fields))));
-  void queryClient.invalidateQueries({
+  queryClient.invalidateQueries({
     queryKey: APP_BOOKS_QUERY_PREFIX,
     predicate: query => appBooksViewDependsOn(query.queryKey, changedFields),
   });

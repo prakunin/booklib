@@ -66,8 +66,8 @@ class StorageInfoServiceTest {
 
             when(libraryPathRepository.findAllPaths()).thenReturn(List.of(
                     "/books/fb2.Flibusta.Net",
-                    "/books/Библиотека Остросюжетной Мистики (БОМ)",
-                    "/books/Винчестер. Лучшие вестерны"));
+                    "/books/mystery-library",
+                    "/books/western-library"));
 
             when(pathProbe.fileStore(any())).thenReturn(Optional.of(libraryStore));
             when(pathProbe.fileStore(Path.of("/app/data"))).thenReturn(Optional.of(dataStore));
@@ -81,8 +81,8 @@ class StorageInfoServiceTest {
                     .singleElement()
                     .satisfies(fs -> assertThat(fs.getPaths()).containsExactlyInAnyOrder(
                             "/books/fb2.Flibusta.Net",
-                            "/books/Библиотека Остросюжетной Мистики (БОМ)",
-                            "/books/Винчестер. Лучшие вестерны"));
+                            "/books/mystery-library",
+                            "/books/western-library"));
             assertThat(filesystems)
                     .filteredOn(fs -> fs.getUsableBytes() == 524L)
                     .singleElement()

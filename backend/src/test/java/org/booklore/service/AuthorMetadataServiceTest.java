@@ -148,7 +148,7 @@ class AuthorMetadataServiceTest {
         assertThat(author.getAsin()).isEqualTo("B000APZGGS");
 
         verify(authorRepository).save(author);
-        verify(fileService).createAuthorThumbnailFromUrl(eq(1L), eq("https://example.com/king.jpg"));
+        verify(fileService).createAuthorThumbnailFromUrl(1L, "https://example.com/king.jpg");
         verify(auditService).log(eq(AuditAction.AUTHOR_METADATA_UPDATED), eq("Author"), eq(1L), anyString());
     }
 

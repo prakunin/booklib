@@ -48,7 +48,7 @@ class FileMoveHelperTest {
 
         @Test
         @DisplayName("waitForFileAccessible retries when file appears after delay (simulates SMB latency)")
-        void waitForFileAccessible_fileAppearsAfterDelay_eventuallySucceeds() throws Exception {
+        void waitForFileAccessible_fileAppearsAfterDelay_eventuallySucceeds() {
             Path filePath = tempDir.resolve("delayed-file.txt");
 
             ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
@@ -357,7 +357,7 @@ class FileMoveHelperTest {
 
                 assertTrue(Files.exists(nestedDir), "Should not delete dir with symlink");
                 assertTrue(Files.exists(realDir), "Real directory should still exist");
-            } catch (UnsupportedOperationException e) {
+            } catch (UnsupportedOperationException _) {
                 // Symlinks not supported on this system, skip test
             }
         }

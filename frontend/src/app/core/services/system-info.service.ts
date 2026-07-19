@@ -30,7 +30,7 @@ export interface SystemInfo {
 
 @Injectable({providedIn: 'root'})
 export class SystemInfoService {
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/admin/system-info`;
 
   query() {

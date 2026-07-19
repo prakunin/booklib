@@ -23,7 +23,7 @@ export interface BookReview {
 export class BookReviewService {
 
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/reviews`;
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
 
   getByBookId(bookId: number): Observable<BookReview[]> {
     return this.http.get<BookReview[]>(`${this.url}/book/${bookId}`);

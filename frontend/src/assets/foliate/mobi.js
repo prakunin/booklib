@@ -222,7 +222,10 @@ const countBitsSet = x => {
 
 const countUnsetEnd = x => {
     let count = 0
-    while ((x & 1) === 0) x = x >> 1, count++
+    while ((x & 1) === 0) {
+        x = x >> 1
+        count++
+    }
     return count
 }
 
@@ -688,10 +691,11 @@ class MOBI6 {
         const totalLength = recordBuffers.reduce((sum, buf) => sum + buf.byteLength, 0)
         // load all text records in an array
         const array = new Uint8Array(totalLength)
-        recordBuffers.reduce((offset, buf) => {
+        let offset = 0
+        recordBuffers.forEach(buf => {
             array.set(new Uint8Array(buf), offset)
-            return offset + buf.byteLength
-        }, 0)
+            offset += buf.byteLength
+        })
         // convert to string so we can use regex
         // note that `filepos` are byte offsets
         // so it needs to preserve each byte as a separate character
@@ -897,11 +901,11 @@ const kindleResourceRegex = /kindle:(flow|embed):(\w+)(?:\?mime=(\w+\/[-+.\w]+))
 const kindlePosRegex = /kindle:pos:fid:(\w+):off:(\w+)/
 const parseResourceURI = str => {
     const [resourceType, id, type] = str.match(kindleResourceRegex).slice(1)
-    return { resourceType, id: parseInt(id, 32), type }
+    return { resourceType, id: Number.parseInt(id, 32), type }
 }
 const parsePosURI = str => {
     const [fid, off] = str.match(kindlePosRegex).slice(1)
-    return { fid: parseInt(fid, 32), off: parseInt(off, 32) }
+    return { fid: Number.parseInt(fid, 32), off: Number.parseInt(off, 32) }
 }
 const makePosURI = (fid = 0, off = 0) =>
     `kindle:pos:fid:${fid.toString(32).toUpperCase().padStart(4, '0')
@@ -981,7 +985,7 @@ class KF8 {
             }))
         const fragData = await getIndexData(kf8.frag, loadRecord)
         const fragTable = fragData.table.map(({ name, tagMap }) => ({
-            insertOffset: parseInt(name),
+            insertOffset: Number.parseInt(name),
             selector: fragData.cncx[tagMap[2][0]],
             index: tagMap[4][0],
             offset: tagMap[6][0],
@@ -1003,14 +1007,14 @@ class KF8 {
         const pageSpreads = new Map()
         if (resources.RESC) {
             const buf = await this.mobi.loadRecord(resources.RESC)
-            const str = this.mobi.decode(buf.slice(16)).replace(/\0/g, '')
+            const str = this.mobi.decode(buf.slice(16)).replaceAll('\0', '')
             // the RESC record lacks the root `<package>` element
             // but seem to be otherwise valid XML
             const index = str.search(/\?>/)
             const xmlStr = `<package>${str.slice(index)}</package>`
             const opf = this.parser.parseFromString(xmlStr, MIME.XML)
             for (const $itemref of opf.querySelectorAll('spine > itemref')) {
-                const i = parseInt($itemref.getAttribute('skelid'))
+                const i = Number.parseInt($itemref.getAttribute('skelid'))
                 pageSpreads.set(i, getPageSpread(
                     $itemref.getAttribute('properties')?.split(' ') ?? []))
             }

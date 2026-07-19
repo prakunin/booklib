@@ -137,7 +137,7 @@ public class ContentRestrictionService {
                 .map(r -> {
                     try {
                         return Integer.parseInt(r.getValue());
-                    } catch (NumberFormatException e) {
+                    } catch (NumberFormatException _) {
                         return null;
                     }
                 })
@@ -180,13 +180,8 @@ public class ContentRestrictionService {
             }
         }
 
-        if (!excludedContentRatings.isEmpty() && metadata.getContentRating() != null) {
-            if (excludedContentRatings.contains(metadata.getContentRating().toLowerCase())) {
-                return true;
-            }
-        }
-
-        return false;
+        return !excludedContentRatings.isEmpty() && metadata.getContentRating() != null
+                && excludedContentRatings.contains(metadata.getContentRating().toLowerCase());
     }
 
     private boolean matchesAllowList(BookEntity book,

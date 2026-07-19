@@ -44,6 +44,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Parameter;
 import jakarta.persistence.Tuple;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -1346,7 +1347,7 @@ public class AppBookService {
             query.setParameter("shelfId", shelfId);
         }
         Set<String> parameterNames = query.getParameters().stream()
-                .map(parameter -> parameter.getName())
+                .map(Parameter::getName)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         BookLoreUser currentUser = authenticationService.getAuthenticatedUser();

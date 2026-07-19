@@ -49,7 +49,7 @@ public class VersionService {
         String latest = "unknown";
         try {
             latest = fetchLatestGitHubReleaseVersion();
-        } catch (Exception e) {
+        } catch (Exception _) {
             log.warn("Error fetching latest release version");
         }
 
@@ -71,7 +71,7 @@ public class VersionService {
             JsonNode root = objectMapper.readTree(response);
             return root.path("tag_name").asText("unknown");
 
-        } catch (Exception e) {
+        } catch (Exception _) {
             log.warn("Failed to fetch latest release version");
             return "unknown";
         }

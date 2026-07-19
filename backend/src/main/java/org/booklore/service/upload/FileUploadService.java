@@ -325,7 +325,7 @@ public class FileUploadService {
             try {
                 Path safeTempPath = requirePathWithinSystemTemp(tempPath);
                 Files.deleteIfExists(safeTempPath);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException _) {
                 log.warn("Skipping cleanup for suspicious temp file path: {}", tempPath);
             } catch (IOException e) {
                 log.warn("Failed to cleanup temp file: {}", tempPath, e);
@@ -336,7 +336,7 @@ public class FileUploadService {
     private Path resolvePathWithinRoot(Path rootPath, String relativePath) {
         try {
             return FileUtils.resolvePathWithinBase(rootPath, relativePath);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid upload target path");
         }
     }
@@ -358,7 +358,7 @@ public class FileUploadService {
             return normalized;
         } catch (APIException e) {
             throw e;
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid upload target path");
         }
     }
@@ -385,7 +385,7 @@ public class FileUploadService {
     private Path requirePathWithinRoot(Path candidatePath, Path rootPath, String errorMessage) {
         try {
             return FileUtils.requirePathWithinBase(candidatePath, rootPath);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException(errorMessage);
         }
     }

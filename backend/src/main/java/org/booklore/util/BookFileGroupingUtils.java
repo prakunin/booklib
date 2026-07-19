@@ -24,7 +24,7 @@ public class BookFileGroupingUtils {
 
     // Matches trailing author: " - J.R.R. Tolkien", " - George Orwell", " - J.K. Rowling"
     private static final Pattern TRAILING_AUTHOR_PATTERN = Pattern.compile(
-            "\\s*[-–—]\\s+(?:[A-Z](?:\\.[A-Z])*\\.\\s+)?[A-Z][a-z]+(?:\\s+[A-Z](?:\\.[A-Z])*\\.?)?(?:\\s+[A-Z][a-z]+)*\\s*$"
+            "\\s*[-–—]\\s+(?:[A-Z](?:\\.[A-Z])*\\.\\s+)?[A-Z][a-z]+(?:\\s+[A-Z](?:\\.[A-Z])*\\.?)?(?:\\s+[A-Z][a-z]+){0,10}\\s*$"
     );
 
     // Matches ", The" or ", A" or ", An" at end
@@ -65,7 +65,7 @@ public class BookFileGroupingUtils {
     private static final Pattern EDITION_PATTERN = Pattern.compile(
             "(?:tenth|first|second|third|\\d+(?:st|nd|rd|th)?)\\s*(?:anniversary|edition|ed\\.?)|" +
                     "(?:unabridged|abridged|complete|full\\s*cast|deluxe|special|collector)|" +
-                    "(?:audiobook|audio\\s*book|ebook|e-book)",
+                    "(?:audio\\s*book|e-?book)",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -163,7 +163,6 @@ public class BookFileGroupingUtils {
         // Process each folder
         for (Map.Entry<String, List<LibraryFile>> folderEntry : byFolder.entrySet()) {
             List<LibraryFile> filesInFolder = folderEntry.getValue();
-            String folderKey = folderEntry.getKey();
 
             if (filesInFolder.isEmpty()) {
                 continue;
@@ -209,14 +208,12 @@ public class BookFileGroupingUtils {
 
             // Check for series numbering (e.g., "Harry Potter Book 1")
             SeriesInfo seriesInfo = extractSeriesInfo(fileKey);
-            if (seriesInfo != null && seriesInfo.number != null) {
-                // Check if the base title (without number) matches folder
-                if (matchesFolderName(seriesInfo.baseTitle, folderKey)) {
-                    // This is a series entry - keep separate by number
-                    String seriesGroupKey = libraryPathId + ":" + fileSubPath + ":series:" + seriesInfo.baseTitle + ":" + seriesInfo.number;
-                    seriesEntries.computeIfAbsent(seriesGroupKey, k -> new ArrayList<>()).add(file);
-                    continue;
-                }
+            // Series entry with a base title matching the folder - keep separate by number
+            if (seriesInfo != null && seriesInfo.number != null
+                    && matchesFolderName(seriesInfo.baseTitle, folderKey)) {
+                String seriesGroupKey = libraryPathId + ":" + fileSubPath + ":series:" + seriesInfo.baseTitle + ":" + seriesInfo.number;
+                seriesEntries.computeIfAbsent(seriesGroupKey, k -> new ArrayList<>()).add(file);
+                continue;
             }
 
             // Check if file matches folder name

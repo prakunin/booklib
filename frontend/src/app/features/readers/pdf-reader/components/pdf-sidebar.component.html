@@ -1,7 +1,7 @@
 <ng-container *transloco="let t; prefix: 'readerPdf.sidebar'">
 @if (visible()) {
-  <div class="sidebar-overlay" role="button" tabindex="0" (click)="onOverlayClick()" (keydown.enter)="onOverlayClick()" [class.closing]="closing()">
-    <aside class="sidebar" role="button" tabindex="0" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" [class.closing]="closing()">
+  <div class="sidebar-overlay" tabindex="0" (click)="onOverlayClick()" (keydown.escape)="onOverlayClick()" [class.closing]="closing()">
+    <aside class="sidebar" tabindex="0" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()" [class.closing]="closing()">
 
       <!-- Sidebar Header -->
       <header class="sidebar-header">
@@ -47,14 +47,14 @@
         @switch (activeTab()) {
           @case ('contents') {
             @if (outline().length > 0) {
-              <ul class="chapter-list" role="tree">
+              <ul class="chapter-list">
                 @for (item of outline(); track item.title) {
                   <ng-container *ngTemplateOutlet="outlineItem; context: { $implicit: item, depth: 0 }"/>
                 }
               </ul>
 
               <ng-template #outlineItem let-item let-depth="depth">
-                <li role="treeitem" [attr.aria-selected]="false">
+                <li>
                   <button
                     class="chapter-row"
                     [style.--depth]="depth"
@@ -63,7 +63,7 @@
                     <span class="chapter-page">{{ t('page') }} {{ item.pageIndex + 1 }}</span>
                   </button>
                   @if (item.children?.length) {
-                    <ul class="subchapter-list" role="group">
+                    <ul class="subchapter-list">
                       @for (child of item.children; track child.title) {
                         <ng-container *ngTemplateOutlet="outlineItem; context: { $implicit: child, depth: depth + 1 }"/>
                       }
@@ -83,11 +83,13 @@
             @if (bookmarks().length > 0) {
               <ul class="item-list">
                 @for (bookmark of bookmarks(); track bookmark.id) {
-                  <li class="reader-list-item" role="button" tabindex="0" (click)="onBookmarkClick(bookmark)" (keydown.enter)="onBookmarkClick(bookmark)">
-                    <div class="item-content">
-                      <span class="item-title">{{ bookmark.title }}</span>
-                      <span class="item-meta">{{ t('page') }} {{ bookmark.pageNumber }}</span>
-                    </div>
+                  <li class="reader-list-item">
+                    <button type="button" class="reader-list-item-main" (click)="onBookmarkClick(bookmark)">
+                      <div class="item-content">
+                        <span class="item-title">{{ bookmark.title }}</span>
+                        <span class="item-meta">{{ t('page') }} {{ bookmark.pageNumber }}</span>
+                      </div>
+                    </button>
                     <button class="delete-btn" (click)="onDeleteBookmark($event, bookmark.id)" [attr.aria-label]="t('deleteBookmark')">
                       <app-reader-icon name="trash" [size]="16"></app-reader-icon>
                     </button>
@@ -107,18 +109,20 @@
             @if (annotations().length > 0) {
               <ul class="item-list">
                 @for (annotation of annotations(); track annotation.id) {
-                  <li class="reader-list-item highlight-item" role="button" tabindex="0" (click)="onAnnotationClick(annotation)" (keydown.enter)="onAnnotationClick(annotation)">
-                    @if (annotation.color) {
-                      <div class="highlight-bar" [style.background-color]="annotation.color"></div>
-                    }
-                    <div class="item-content">
-                      <div class="item-header">
-                        <span class="item-meta">{{ t('page') }} {{ annotation.pageIndex + 1 }} · {{ annotation.type }}</span>
-                      </div>
-                      @if (annotation.text) {
-                        <p class="highlight-text">"{{ annotation.text }}"</p>
+                  <li class="reader-list-item highlight-item">
+                    <button type="button" class="reader-list-item-main" (click)="onAnnotationClick(annotation)">
+                      @if (annotation.color) {
+                        <div class="highlight-bar" [style.background-color]="annotation.color"></div>
                       }
-                    </div>
+                      <div class="item-content">
+                        <div class="item-header">
+                          <span class="item-meta">{{ t('page') }} {{ annotation.pageIndex + 1 }} · {{ annotation.type }}</span>
+                        </div>
+                        @if (annotation.text) {
+                          <p class="highlight-text">"{{ annotation.text }}"</p>
+                        }
+                      </div>
+                    </button>
                     <button class="delete-btn" (click)="onDeleteAnnotation($event, annotation.id)" [attr.aria-label]="t('deleteAnnotation')">
                       <app-reader-icon name="trash" [size]="14"></app-reader-icon>
                     </button>

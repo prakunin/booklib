@@ -53,7 +53,7 @@ public class BookdropMonitoringService implements SmartLifecycle {
             try {
                 Files.createDirectories(bookdrop);
                 log.info("Created missing bookdrop folder: {}", bookdrop);
-            } catch (IOException e) {
+            } catch (IOException _) {
                 log.warn("Bookdrop folder is not available at '{}'. Bookdrop monitoring is disabled. " +
                         "Mount a volume at this path to enable it.", bookdrop);
                 this.disabled = true;
@@ -93,7 +93,7 @@ public class BookdropMonitoringService implements SmartLifecycle {
             watchThread.interrupt();
             try {
                 watchThread.join(5000);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 log.warn("Interrupted while waiting for watchThread to stop");
                 Thread.currentThread().interrupt();
             }
@@ -165,7 +165,7 @@ public class BookdropMonitoringService implements SmartLifecycle {
             if (paused) {
                 try {
                     Thread.sleep(1000);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException _) {
                     log.info("Bookdrop monitor thread interrupted during pause");
                     Thread.currentThread().interrupt();
                     return;
@@ -176,11 +176,11 @@ public class BookdropMonitoringService implements SmartLifecycle {
             WatchKey key;
             try {
                 key = watchService.take();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 log.info("Bookdrop monitor thread interrupted");
                 Thread.currentThread().interrupt();
                 return;
-            } catch (ClosedWatchServiceException e) {
+            } catch (ClosedWatchServiceException _) {
                 log.info("WatchService closed, stopping thread");
                 return;
             }

@@ -34,7 +34,7 @@ public class BookloreSyncTokenGenerator {
                         .build();
             }
         } catch (Exception _) {
-
+            // Malformed token, fall through to an empty sync token
         }
         return new BookloreSyncToken();
     }

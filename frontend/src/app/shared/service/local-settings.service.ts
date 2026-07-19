@@ -9,7 +9,7 @@ export interface LocalSettings {
   providedIn: "root",
 })
 export class LocalSettingsService {
-  private localStorage = inject(LocalStorageService);
+  private readonly localStorage = inject(LocalStorageService);
   public readonly storageName = "local_settings";
 
   public readonly defaultSettings: LocalSettings = {

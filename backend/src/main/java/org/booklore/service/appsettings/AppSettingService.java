@@ -257,6 +257,7 @@ public class AppSettingService {
             try {
                 builder.oidcSessionDurationHours(Integer.parseInt(sessionDurationStr));
             } catch (NumberFormatException _) {
+                // keep default when the configured value is not a valid number
             }
         }
 

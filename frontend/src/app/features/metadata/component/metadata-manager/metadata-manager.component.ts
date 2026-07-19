@@ -64,12 +64,12 @@ interface TabConfig {
   styleUrls: ['./metadata-manager.component.scss']
 })
 export class MetadataManagerComponent implements OnInit, OnDestroy {
-  private appBooksApi = inject(AppBooksApiService);
-  private bookMetadataManageService = inject(BookMetadataManageService);
-  private messageService = inject(MessageService);
-  private router = inject(Router);
-  private route = inject(ActivatedRoute);
-  private pageTitle = inject(PageTitleService);
+  private readonly appBooksApi = inject(AppBooksApiService);
+  private readonly bookMetadataManageService = inject(BookMetadataManageService);
+  private readonly messageService = inject(MessageService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly pageTitle = inject(PageTitleService);
   private readonly t = inject(TranslocoService);
 
   private routeSub!: Subscription;
@@ -119,7 +119,7 @@ export class MetadataManagerComponent implements OnInit, OnDestroy {
   currentRenameItem: MetadataItem | null = null;
   currentDeleteItem: MetadataItem | null = null;
 
-  private validTabs: MetadataType[] = ['authors', 'categories', 'moods', 'tags', 'series', 'publishers', 'languages'];
+  private readonly validTabs: MetadataType[] = ['authors', 'categories', 'moods', 'tags', 'series', 'publishers', 'languages'];
   private _activeTab: MetadataType = 'authors';
 
   get activeTab(): MetadataType {

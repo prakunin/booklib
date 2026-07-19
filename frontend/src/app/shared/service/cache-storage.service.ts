@@ -8,7 +8,7 @@ import {firstValueFrom} from "rxjs";
 export class CacheStorageService {
   private static readonly CACHE_NAME = "storage";
 
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
 
   async getCache(uri: string, noValidate: boolean = false): Promise<Response> {
     const cachedResponse = await this.attemptToGetAndValidateCache(uri, noValidate);
@@ -26,7 +26,6 @@ export class CacheStorageService {
     const res = new Response(httpResponse.body, {
       headers: headers,
       status: httpResponse.status,
-      statusText: httpResponse.statusText,
     });
 
     this.put(uri, res.clone());
@@ -130,7 +129,7 @@ export class CacheStorageService {
       const keys = await cache.keys();
       const responses = await Promise.all(keys.map((key) => cache.match(key.url)));
       return responses.reduce((total, response) =>
-        total + parseInt(response?.headers.get("content-length") || "0"), 0);
+        total + Number.parseInt(response?.headers.get("content-length") || "0"), 0);
     } catch {
       return 0;
     }

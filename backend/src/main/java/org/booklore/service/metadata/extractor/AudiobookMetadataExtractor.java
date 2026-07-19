@@ -120,6 +120,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                         builder.publishedDate(LocalDate.of(yearInt, 1, 1));
                     }
                 } catch (NumberFormatException _) {
+                    // ignore malformed year value
                 }
             }
 
@@ -146,6 +147,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                     String trackNum = trackNo.contains("/") ? trackNo.split("/")[0] : trackNo;
                     builder.seriesNumber((float) Integer.parseInt(trackNum.trim()));
                 } catch (NumberFormatException _) {
+                    // ignore malformed track number
                 }
             }
 
@@ -154,6 +156,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                 try {
                     builder.seriesTotal(Integer.parseInt(trackTotal.trim()));
                 } catch (NumberFormatException _) {
+                    // ignore malformed track total
                 }
             }
 
@@ -215,7 +218,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
         }
         try {
             return Integer.parseInt(NON_DIGIT_PATTERN.matcher(channels).replaceAll(""));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }
@@ -264,8 +267,8 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
 
             if (chapFrames instanceof List) {
                 frameList = (List<AbstractID3v2Frame>) chapFrames;
-            } else if (chapFrames instanceof AbstractID3v2Frame) {
-                frameList = List.of((AbstractID3v2Frame) chapFrames);
+            } else if (chapFrames instanceof AbstractID3v2Frame abstractid3v2frame) {
+                frameList = List.of(abstractid3v2frame);
             } else {
                 return null;
             }
@@ -310,16 +313,16 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
 
     private long getChapStartTime(FrameBodyCHAP chapBody) {
         Object startTime = chapBody.getObjectValue("StartTime");
-        if (startTime instanceof Number) {
-            return ((Number) startTime).longValue();
+        if (startTime instanceof Number number) {
+            return number.longValue();
         }
         return 0;
     }
 
     private long getChapEndTime(FrameBodyCHAP chapBody) {
         Object endTime = chapBody.getObjectValue("EndTime");
-        if (endTime instanceof Number) {
-            return ((Number) endTime).longValue();
+        if (endTime instanceof Number number) {
+            return number.longValue();
         }
         return 0;
     }
@@ -327,12 +330,11 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
     private String extractChapterTitle(FrameBodyCHAP chapBody, int index) {
         try {
             Object elementId = chapBody.getObjectValue("ElementID");
-            if (elementId instanceof String str && StringUtils.isNotBlank(str)) {
-                if (!CHAPTER_PATTERN.matcher(str).matches()) {
-                    return str;
-                }
+            if (elementId instanceof String str && StringUtils.isNotBlank(str) && !CHAPTER_PATTERN.matcher(str).matches()) {
+                return str;
             }
         } catch (Exception _) {
+            // fall back to generated chapter title
         }
 
         return "Chapter " + (index + 1);
@@ -428,6 +430,9 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
 
             return chapters;
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.debug("Failed to extract chapters with ffprobe from {}: {}", audioFile.getName(), e.getMessage());
             return null;
         }
@@ -454,7 +459,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                 double numerator = Double.parseDouble(parts[0]);
                 double denominator = Double.parseDouble(parts[1]);
                 return value * (numerator / denominator);
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 return value / 1000.0;
             }
         }

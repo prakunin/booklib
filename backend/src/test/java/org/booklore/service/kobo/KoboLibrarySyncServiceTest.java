@@ -1,8 +1,6 @@
 package org.booklore.service.kobo;
 
 import org.booklore.model.dto.KoboSyncSettings;
-import org.booklore.model.dto.kobo.ChangedReadingState;
-import org.booklore.model.dto.kobo.KoboReadingState;
 import org.booklore.model.entity.UserBookProgressEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.enums.ReadStatus;
@@ -22,7 +20,6 @@ import org.mockito.quality.Strictness;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;

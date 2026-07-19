@@ -543,7 +543,7 @@ class AudiobookMetadataExtractorTest {
                 assertThat(abMeta.getChapters()).hasSize(2);
                 assertThat(abMeta.getChapterCount()).isEqualTo(2);
                 assertThat(abMeta.getChapters().get(0).getTitle()).isEqualTo("Introduction");
-                assertThat(abMeta.getChapters().get(0).getStartTimeMs()).isEqualTo(0L);
+                assertThat(abMeta.getChapters().get(0).getStartTimeMs()).isZero();
                 assertThat(abMeta.getChapters().get(0).getEndTimeMs()).isEqualTo(60000L);
                 assertThat(abMeta.getChapters().get(0).getDurationMs()).isEqualTo(60000L);
                 assertThat(abMeta.getChapters().get(1).getTitle()).isEqualTo("Chapter 2");
@@ -612,7 +612,7 @@ class AudiobookMetadataExtractorTest {
 
                 assertThat(abMeta.getChapters()).hasSize(1);
                 assertThat(abMeta.getChapters().get(0).getTitle()).isEqualTo("Full Audiobook");
-                assertThat(abMeta.getChapters().get(0).getStartTimeMs()).isEqualTo(0L);
+                assertThat(abMeta.getChapters().get(0).getStartTimeMs()).isZero();
                 assertThat(abMeta.getChapters().get(0).getDurationMs()).isEqualTo(300000L);
             }
         }

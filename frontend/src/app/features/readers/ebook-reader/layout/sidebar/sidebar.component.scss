@@ -65,6 +65,13 @@ $sidebar-width: 300px;
   }
 }
 
+.book-cover-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  line-height: 0;
+}
+
 .book-meta {
   display: flex;
   flex-direction: column;
@@ -250,6 +257,21 @@ $sidebar-width: 300px;
       opacity: 1;
     }
   }
+}
+
+.reader-list-item-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  gap: 12px;
 }
 
 .highlight-item {

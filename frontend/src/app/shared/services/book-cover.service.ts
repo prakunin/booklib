@@ -25,8 +25,8 @@ export interface CoverFetchRequest {
 export class BookCoverService {
   private readonly baseUrl = `${API_CONFIG.BASE_URL}/api/v1/books`;
 
-  private http = inject(HttpClient);
-  private authService = inject(AuthService);
+  private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
 
   fetchBookCovers(request: CoverFetchRequest): Observable<CoverImage> {
     const token = this.authService.getInternalAccessToken();

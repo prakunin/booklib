@@ -5,6 +5,7 @@ import {ChartConfiguration, ChartData} from 'chart.js';
 import {BookService} from '../../../../../book/service/book.service';
 import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {sortStrings} from '../../../../../../shared/util/string-sort.util';
 
 @Component({
   selector: 'app-publication-era-chart',
@@ -110,7 +111,7 @@ export class PublicationEraChartComponent {
 
     if (decadeData.size === 0) return;
 
-    const decades = [...decadeData.keys()].sort();
+    const decades = sortStrings([...decadeData.keys()]);
     let bestDec = '';
     let bestAvg = 0;
     for (const [dec, avg] of decadeAvg) {

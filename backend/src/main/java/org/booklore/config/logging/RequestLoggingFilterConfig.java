@@ -32,8 +32,8 @@ public class RequestLoggingFilterConfig {
         filter.setMaxPayloadLength(10000);
         filter.setIncludeHeaders(true);
 
-        filter.setHeaderPredicate((header) -> !EXCLUDED_HEADERS.contains(header.toLowerCase()));
-        filter.setPathPredicate((path) -> !EXCLUDED_PATHS.contains(path));
+        filter.setHeaderPredicate(header -> !EXCLUDED_HEADERS.contains(header.toLowerCase()));
+        filter.setPathPredicate(path -> !EXCLUDED_PATHS.contains(path));
 
         return filter;
     }

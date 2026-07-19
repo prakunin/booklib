@@ -31,10 +31,10 @@ import {BookNote, BookNoteService, CreateBookNoteRequest} from '../../../../shar
 export class BookNotesComponent implements OnInit, OnChanges {
   @Input() bookId!: number;
 
-  private bookNoteService = inject(BookNoteService);
-  private confirmationService = inject(ConfirmationService);
-  private messageService = inject(MessageService);
-  private destroyRef = inject(DestroyRef);
+  private readonly bookNoteService = inject(BookNoteService);
+  private readonly confirmationService = inject(ConfirmationService);
+  private readonly messageService = inject(MessageService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly t = inject(TranslocoService);
 
   notes: BookNote[] = [];
@@ -62,7 +62,7 @@ export class BookNotesComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['bookId'] && changes['bookId'].currentValue) {
+    if (changes['bookId']?.currentValue) {
       this.loadNotes();
     }
   }
@@ -75,9 +75,11 @@ export class BookNotesComponent implements OnInit, OnChanges {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (notes) => {
-          this.notes = notes.sort((a, b) =>
+          const sortedNotes = [...notes];
+          sortedNotes.sort((a, b) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
           );
+          this.notes = sortedNotes;
           this.loading.set(false);
         },
         error: (error) => {

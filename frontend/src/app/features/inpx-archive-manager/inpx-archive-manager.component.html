@@ -24,14 +24,14 @@
       <p-table [value]="archives()" [scrollable]="true" scrollHeight="60vh" responsiveLayout="scroll">
         <ng-template #header>
           <tr>
-            <th>{{ t('archive') }}</th>
-            <th>{{ t('size') }}</th>
-            <th>{{ t('books') }}</th>
-            <th>{{ t('covers') }}</th>
-            <th>{{ t('added') }}</th>
-            <th>{{ t('lastScanned') }}</th>
-            <th>{{ t('status') }}</th>
-            <th></th>
+            <th scope="col">{{ t('archive') }}</th>
+            <th scope="col">{{ t('size') }}</th>
+            <th scope="col">{{ t('books') }}</th>
+            <th scope="col">{{ t('covers') }}</th>
+            <th scope="col">{{ t('added') }}</th>
+            <th scope="col">{{ t('lastScanned') }}</th>
+            <th scope="col">{{ t('status') }}</th>
+            <th scope="col"></th>
           </tr>
         </ng-template>
         <ng-template #body let-archive>

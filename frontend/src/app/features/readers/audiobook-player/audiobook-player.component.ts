@@ -56,15 +56,15 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
   @ViewChild('audioElement') audioElement!: ElementRef<HTMLAudioElement>;
 
   private readonly destroyRef = inject(DestroyRef);
-  private audiobookService = inject(AudiobookService);
-  private bookService = inject(BookService);
-  private bookMarkService = inject(BookMarkService);
-  private authService = inject(AuthService);
-  private route = inject(ActivatedRoute);
-  private location = inject(Location);
-  private messageService = inject(MessageService);
-  private audiobookSessionService = inject(AudiobookSessionService);
-  private pageTitle = inject(PageTitleService);
+  private readonly audiobookService = inject(AudiobookService);
+  private readonly bookService = inject(BookService);
+  private readonly bookMarkService = inject(BookMarkService);
+  private readonly authService = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly location = inject(Location);
+  private readonly messageService = inject(MessageService);
+  private readonly audiobookSessionService = inject(AudiobookSessionService);
+  private readonly pageTitle = inject(PageTitleService);
   private readonly t = inject(TranslocoService);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -239,6 +239,9 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
   private applyBookDetails(book: Book, info: AudiobookInfo): void {
     this.pageTitle.setBookPageTitle(book);
 
+    const requestedPositionMs = this.getRequestedPositionMs();
+    const requestedTrackIndex = this.getRequestedTrackIndex();
+
     if (book.audiobookProgress) {
       this.savedPosition = book.audiobookProgress.positionMs
         ? book.audiobookProgress.positionMs / 1000
@@ -266,11 +269,33 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
       }
     }
 
+    if (requestedPositionMs !== null) {
+      this.savedPosition = requestedPositionMs / 1000;
+      if (info.folderBased && requestedTrackIndex !== null && info.tracks?.[requestedTrackIndex]) {
+        this.currentTrackIndex = requestedTrackIndex;
+        this.loadTrack(requestedTrackIndex, false);
+        const track = info.tracks[requestedTrackIndex];
+        if (track?.durationMs) {
+          this.duration = track.durationMs / 1000;
+        }
+      }
+    }
+
     if (this.savedPosition > 0) {
       this.currentTime = this.savedPosition;
       this.updateCurrentChapter();
     }
     this.updateCurrentChapter();
+  }
+
+  private getRequestedPositionMs(): number | null {
+    const positionMs = Number.parseInt(this.route.snapshot.queryParamMap.get('positionMs') ?? '', 10);
+    return Number.isFinite(positionMs) && positionMs >= 0 ? positionMs : null;
+  }
+
+  private getRequestedTrackIndex(): number | null {
+    const trackIndex = Number.parseInt(this.route.snapshot.queryParamMap.get('trackIndex') ?? '', 10);
+    return Number.isFinite(trackIndex) && trackIndex >= 0 ? trackIndex : null;
   }
 
   private loadTrack(index: number, showLoading = true): void {
@@ -320,7 +345,7 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
     this.audioLoading = false;
     const audio = this.audioElement?.nativeElement;
     if (audio) {
-      if (audio.duration && isFinite(audio.duration)) {
+      if (audio.duration && Number.isFinite(audio.duration)) {
         this.duration = audio.duration;
       }
       audio.volume = this.volume;
@@ -571,7 +596,7 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
 
   seek(event: SliderChangeEvent): void {
     if (this.duration > 0 && event.value !== undefined) {
-      const seekTime = event.value as number;
+      const seekTime = event.value;
       this.isSeeking = true;
       this.currentTime = seekTime;
       this.updateCurrentChapter();
@@ -603,7 +628,7 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
   setVolume(event: SliderChangeEvent): void {
     const audio = this.audioElement?.nativeElement;
     if (event.value !== undefined) {
-      this.volume = event.value as number;
+      this.volume = event.value;
       this.isMuted = this.volume === 0;
       if (audio) {
         audio.volume = this.volume;
@@ -867,7 +892,7 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
   }
 
   formatTime(seconds: number): string {
-    if (!seconds || !isFinite(seconds)) return '0:00';
+    if (!seconds || !Number.isFinite(seconds)) return '0:00';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);

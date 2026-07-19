@@ -339,21 +339,21 @@ class SendEmailV2ServiceTest {
         JavaMailSenderImpl sender = sendEmailV2Service.setupMailSender(sslProvider);
         Properties props = sender.getJavaMailProperties();
 
-        assertThat(props.get("mail.transport.protocol")).isEqualTo("smtps");
-        // Regression for #1301: SMTPSSLTransport reads only mail.smtps.*,
-        // so auth/ssl/timeout properties must be visible under that prefix.
-        assertThat(props.get("mail.smtps.auth")).isEqualTo("true");
-        assertThat(props.get("mail.smtps.ssl.enable")).isEqualTo("true");
-        assertThat(props.get("mail.smtps.ssl.trust")).isEqualTo("smtp.gmail.com");
-        // Whitespace-separated, not comma-separated: Angus Mail's SocketFetcher
-        // passes the raw string to SSLSocket.setEnabledProtocols which splits on whitespace.
-        assertThat(props.get("mail.smtps.ssl.protocols")).isEqualTo("TLSv1.2 TLSv1.3");
-        assertThat(props.get("mail.smtps.connectiontimeout"))
-                .isEqualTo(expectedTimeout("mail.smtps.", "connectiontimeout"));
-        assertThat(props.get("mail.smtps.timeout"))
-                .isEqualTo(expectedTimeout("mail.smtps.", "timeout"));
-        assertThat(props.get("mail.smtps.writetimeout"))
-                .isEqualTo(expectedTimeout("mail.smtps.", "writetimeout"));
+        assertThat(props).containsEntry("mail.transport.protocol", "smtps")
+                // Regression for #1301: SMTPSSLTransport reads only mail.smtps.*,
+                // so auth/ssl/timeout properties must be visible under that prefix.
+                .containsEntry("mail.smtps.auth", "true")
+                .containsEntry("mail.smtps.ssl.enable", "true")
+                .containsEntry("mail.smtps.ssl.trust", "smtp.gmail.com")
+                // Whitespace-separated, not comma-separated: Angus Mail's SocketFetcher
+                // passes the raw string to SSLSocket.setEnabledProtocols which splits on whitespace.
+                .containsEntry("mail.smtps.ssl.protocols", "TLSv1.2 TLSv1.3")
+                .containsEntry("mail.smtps.connectiontimeout",
+                        expectedTimeout("mail.smtps.", "connectiontimeout"))
+                .containsEntry("mail.smtps.timeout",
+                        expectedTimeout("mail.smtps.", "timeout"))
+                .containsEntry("mail.smtps.writetimeout",
+                        expectedTimeout("mail.smtps.", "writetimeout"));
         // Guard against future regression that double-writes both prefixes.
         assertThat(props.get("mail.smtp.auth")).isNull();
     }
@@ -376,13 +376,13 @@ class SendEmailV2ServiceTest {
         JavaMailSenderImpl sender = sendEmailV2Service.setupMailSender(starttlsProvider);
         Properties props = sender.getJavaMailProperties();
 
-        assertThat(props.get("mail.transport.protocol")).isEqualTo("smtp");
-        assertThat(props.get("mail.smtp.auth")).isEqualTo("true");
-        assertThat(props.get("mail.smtp.starttls.enable")).isEqualTo("true");
-        assertThat(props.get("mail.smtp.starttls.required")).isEqualTo("true");
-        assertThat(props.get("mail.smtp.ssl.enable")).isEqualTo("false");
-        assertThat(props.get("mail.smtp.connectiontimeout"))
-                .isEqualTo(expectedTimeout("mail.smtp.", "connectiontimeout"));
+        assertThat(props).containsEntry("mail.transport.protocol", "smtp")
+                .containsEntry("mail.smtp.auth", "true")
+                .containsEntry("mail.smtp.starttls.enable", "true")
+                .containsEntry("mail.smtp.starttls.required", "true")
+                .containsEntry("mail.smtp.ssl.enable", "false")
+                .containsEntry("mail.smtp.connectiontimeout",
+                        expectedTimeout("mail.smtp.", "connectiontimeout"));
     }
 
     /**
@@ -403,10 +403,10 @@ class SendEmailV2ServiceTest {
         JavaMailSenderImpl sender = sendEmailV2Service.setupMailSender(plainProvider);
         Properties props = sender.getJavaMailProperties();
 
-        assertThat(props.get("mail.transport.protocol")).isEqualTo("smtp");
-        assertThat(props.get("mail.smtp.auth")).isEqualTo("false");
-        assertThat(props.get("mail.smtp.starttls.enable")).isEqualTo("false");
-        assertThat(props.get("mail.smtp.ssl.enable")).isEqualTo("false");
+        assertThat(props).containsEntry("mail.transport.protocol", "smtp")
+                .containsEntry("mail.smtp.auth", "false")
+                .containsEntry("mail.smtp.starttls.enable", "false")
+                .containsEntry("mail.smtp.ssl.enable", "false");
     }
 
     @Test

@@ -14,13 +14,13 @@ import {AppBooksApiService} from './app-books-api.service';
 @Injectable({providedIn: 'root'})
 export class LibraryService {
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/libraries`;
-  private http = inject(HttpClient);
-  private appBooksApi = inject(AppBooksApiService);
-  private authService = inject(AuthService);
-  private queryClient = inject(QueryClient);
+  private readonly http = inject(HttpClient);
+  private readonly appBooksApi = inject(AppBooksApiService);
+  private readonly authService = inject(AuthService);
+  private readonly queryClient = inject(QueryClient);
   private readonly token = this.authService.token;
 
-  private librariesQuery = injectQuery(() => ({
+  private readonly librariesQuery = injectQuery(() => ({
     ...this.getLibrariesQueryOptions(),
     enabled: !!this.token(),
   }));
@@ -75,7 +75,7 @@ export class LibraryService {
   createLibrary(lib: Library): Observable<Library> {
     return this.http.post<Library>(this.url, lib).pipe(
       tap(() => {
-        void this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
       })
     );
   }
@@ -83,8 +83,8 @@ export class LibraryService {
   updateLibrary(lib: Library, id?: number): Observable<Library> {
     return this.http.put<Library>(`${this.url}/${id}`, lib).pipe(
       tap(() => {
-        void this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
-        void this.queryClient.invalidateQueries({queryKey: BOOKS_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: BOOKS_QUERY_KEY, exact: true});
       })
     );
   }
@@ -92,8 +92,8 @@ export class LibraryService {
   deleteLibrary(id: number): Observable<void> {
     return this.http.delete<void>(`${this.url}/${id}`).pipe(
       tap(() => {
-        void this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
-        void this.queryClient.invalidateQueries({queryKey: BOOKS_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: BOOKS_QUERY_KEY, exact: true});
         this.queryClient.removeQueries({queryKey: libraryFormatCountsQueryKey(id), exact: true});
       })
     );
@@ -102,7 +102,7 @@ export class LibraryService {
   refreshLibrary(id: number): Observable<void> {
     return this.http.put<void>(`${this.url}/${id}/refresh`, {}).pipe(
       tap(() => {
-        void this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
       })
     );
   }
@@ -112,7 +112,7 @@ export class LibraryService {
       .patch<Library>(`${this.url}/${id}/file-naming-pattern`, {fileNamingPattern: pattern})
       .pipe(
         tap(() => {
-          void this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
+          this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
         })
       );
   }

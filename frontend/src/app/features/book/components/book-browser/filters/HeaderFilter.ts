@@ -3,14 +3,14 @@ import {Book} from '../../../model/book.model';
 export function normalizeSearchTerm(str: string): string {
   if (!str) return '';
   // Normalize Unicode combining characters (e.g., é -> e)
-  let s = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  s = s.replace(/ø/gi, 'o')
-       .replace(/ł/gi, 'l')
-       .replace(/æ/gi, 'ae')
-       .replace(/œ/gi, 'oe')
-       .replace(/ß/g, 'ss');
-  s = s.replace(/[!@$%^&*_=|~`<>?/";']/g, '');
-  s = s.replace(/\s+/g, ' ').trim();
+  let s = str.normalize('NFD').replaceAll(/[\u0300-\u036f]/g, '');
+  s = s.replaceAll(/ø/gi, 'o')
+       .replaceAll(/ł/gi, 'l')
+       .replaceAll(/æ/gi, 'ae')
+       .replaceAll(/œ/gi, 'oe')
+       .replaceAll('ß', 'ss');
+  s = s.replaceAll(/[!@$%^&*_=|~`<>?/";']/g, '');
+  s = s.replaceAll(/\s+/g, ' ').trim();
   return s.toLowerCase();
 }
 
@@ -39,4 +39,3 @@ export function filterBooksBySearchTerm(books: Book[], term: string): Book[] {
     return matchesTitle || matchesSeries || matchesAuthor || matchesCategory || matchesIsbn || matchesFileName;
   });
 }
-

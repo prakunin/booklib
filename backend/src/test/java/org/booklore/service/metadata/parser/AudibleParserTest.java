@@ -33,7 +33,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-public class AudibleParserTest {
+class AudibleParserTest {
     @Mock private AppSettingService mockAppSettingService;
 
     @Mock private HttpClient mockHttpClient;
@@ -78,7 +78,7 @@ public class AudibleParserTest {
 
         if (response != null) {
             when(httpResponse.body()).thenAnswer(
-                    (_) -> new ByteArrayInputStream(response.getBytes(StandardCharsets.UTF_8))
+                    _ -> new ByteArrayInputStream(response.getBytes(StandardCharsets.UTF_8))
             );
         }
 
@@ -91,7 +91,7 @@ public class AudibleParserTest {
                         argThat(r -> r != null && r.uri().toString().startsWith(urlPrefix)),
                         any()
                 )
-        ).thenAnswer((_) -> getMockResponse(statusCode, response));
+        ).thenAnswer(_ -> getMockResponse(statusCode, response));
     }
 
     private String readFixture(String fixtureName) throws IOException {
@@ -105,7 +105,7 @@ public class AudibleParserTest {
     }
 
     @BeforeEach
-    public void setup() throws Exception {
+    void setup() {
         audibleParser = new AudibleParser(
                 mockAppSettingService,
                 new ObjectMapper(),
@@ -116,7 +116,7 @@ public class AudibleParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_usesAsinFromBookWhenAvailable() throws Exception {
+    void fetchTopMetadata_usesAsinFromBookWhenAvailable() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.com/1.0/catalog/products/EXAMPLESKU",
                 200,
@@ -132,7 +132,7 @@ public class AudibleParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_useDomain() throws Exception {
+    void fetchTopMetadata_useDomain() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.co.jp/1.0/catalog/products/EXAMPLESKU",
                 200,
@@ -150,7 +150,7 @@ public class AudibleParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_removesExtraWhitespace() throws Exception {
+    void fetchTopMetadata_removesExtraWhitespace() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.com/1.0/catalog/products/EXAMPLESKU",
                 200,
@@ -166,7 +166,7 @@ public class AudibleParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_removesExtraCharactersFromBook() throws Exception {
+    void fetchTopMetadata_removesExtraCharactersFromBook() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.com/1.0/catalog/products/EXAMPLESKU",
                 200,
@@ -182,7 +182,7 @@ public class AudibleParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_removesExtraCharactersFromRequest() throws Exception {
+    void fetchTopMetadata_removesExtraCharactersFromRequest() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.com/1.0/catalog/products/EXAMPLESKU",
                 200,
@@ -200,7 +200,7 @@ public class AudibleParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_ignoresInvalidBookASIN() throws Exception {
+    void fetchTopMetadata_ignoresInvalidBookASIN() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.com/1.0/catalog/products?",
                 200,
@@ -217,7 +217,7 @@ public class AudibleParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_ignoresMissingBookASIN() throws Exception {
+    void fetchTopMetadata_ignoresMissingBookASIN() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.com/1.0/catalog/products/EXAMPLESKU",
                 200,
@@ -233,7 +233,7 @@ public class AudibleParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_parsesFields() throws Exception {
+    void fetchTopMetadata_parsesFields() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.com/1.0/catalog/products/1705047572",
                 200,
@@ -261,7 +261,7 @@ public class AudibleParserTest {
     }
 
     @Test
-    public void fetchMetadata_ignoresPodcasts() throws Exception {
+    void fetchMetadata_ignoresPodcasts() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.com/1.0/catalog/products",
                 200,

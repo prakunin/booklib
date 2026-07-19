@@ -20,8 +20,8 @@ export interface ReleaseNote {
   providedIn: 'root'
 })
 export class VersionService {
-  private http = inject(HttpClient);
-  private versionUrl = `${API_CONFIG.BASE_URL}/api/v1/version`;
+  private readonly http = inject(HttpClient);
+  private readonly versionUrl = `${API_CONFIG.BASE_URL}/api/v1/version`;
 
   getVersion(): Observable<AppVersion> {
     return this.http.get<AppVersion>(this.versionUrl, {

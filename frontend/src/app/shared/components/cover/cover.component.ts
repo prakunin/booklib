@@ -10,7 +10,7 @@ function hashString(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = 31 * hash + str.charCodeAt(i);
-    hash |= 0;
+    hash = Math.trunc(hash);
   }
   return hash;
 }

@@ -107,6 +107,7 @@ public class AppNotebookService {
                         .color(result.getColor())
                         .style(result.getStyle())
                         .chapterTitle(result.getChapterTitle())
+                        .cfi(result.getCfi())
                         .createdAt(result.getCreatedAt())
                         .updatedAt(result.getUpdatedAt())
                         .build();
@@ -124,6 +125,7 @@ public class AppNotebookService {
                         .note(result.getNoteContent())
                         .color(result.getColor())
                         .chapterTitle(result.getChapterTitle())
+                        .cfi(result.getCfi())
                         .createdAt(result.getCreatedAt())
                         .updatedAt(result.getUpdatedAt())
                         .build();
@@ -140,6 +142,10 @@ public class AppNotebookService {
                         .text(result.getTitle())
                         .note(result.getNotes())
                         .color(result.getColor())
+                        .cfi(result.getCfi())
+                        .positionMs(result.getPositionMs())
+                        .trackIndex(result.getTrackIndex())
+                        .pageNumber(result.getPageNumber())
                         .createdAt(result.getCreatedAt())
                         .updatedAt(result.getUpdatedAt())
                         .build();
@@ -190,6 +196,10 @@ public class AppNotebookService {
                 .color(p.getColor())
                 .style(p.getStyle())
                 .chapterTitle(p.getChapterTitle())
+                .cfi(p.getCfi())
+                .positionMs(p.getPositionMs())
+                .trackIndex(p.getTrackIndex())
+                .pageNumber(p.getPageNumber())
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
                 .build();

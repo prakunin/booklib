@@ -623,12 +623,12 @@
           <p-table [value]="groupMappings()" [tableStyle]="{'min-width': '100%'}" styleClass="p-datatable-sm">
             <ng-template #header>
               <tr>
-                <th>{{ t('groupMapping.colGroupClaim') }}</th>
-                <th>{{ t('groupMapping.colAdmin') }}</th>
-                <th>{{ t('groupMapping.colPermissions') }}</th>
-                <th>{{ t('groupMapping.colLibraries') }}</th>
-                <th>{{ t('groupMapping.colDescription') }}</th>
-                <th style="width: 7rem;"></th>
+                <th scope="col">{{ t('groupMapping.colGroupClaim') }}</th>
+                <th scope="col">{{ t('groupMapping.colAdmin') }}</th>
+                <th scope="col">{{ t('groupMapping.colPermissions') }}</th>
+                <th scope="col">{{ t('groupMapping.colLibraries') }}</th>
+                <th scope="col">{{ t('groupMapping.colDescription') }}</th>
+                <th scope="col" style="width: 7rem;"></th>
               </tr>
             </ng-template>
             <ng-template #body let-mapping>

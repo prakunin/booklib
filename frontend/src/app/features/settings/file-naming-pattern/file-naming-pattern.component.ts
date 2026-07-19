@@ -37,11 +37,11 @@ export class FileNamingPatternComponent {
 
   defaultErrorMessage = '';
 
-  private appSettingsService = inject(AppSettingsService);
-  private messageService = inject(MessageService);
-  private libraryService = inject(LibraryService);
-  private t = inject(TranslocoService);
-  private destroyRef = inject(DestroyRef);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly messageService = inject(MessageService);
+  private readonly libraryService = inject(LibraryService);
+  private readonly t = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly hasUserEditedDefaultPattern = signal(false);
   readonly defaultPattern = signal('');
@@ -103,7 +103,6 @@ export class FileNamingPatternComponent {
   }
 
   onLibraryPatternChange(_library: Library): void {
-    void _library;
     // Optionally add per-library validation here
   }
 

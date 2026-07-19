@@ -329,6 +329,6 @@ class ContentRestrictionSpecificationTest {
 
         var page = bookQueryService.getAllBooksByLibraryIdsPaged(List.of(library.getId()), user.getId(), PageRequest.of(0, 100));
 
-        assertThat(page.getContent().stream().map(Book::getId)).doesNotContain(foreign.getId());
+        assertThat(page.getContent().stream().map(Book::getId)).isNotEmpty().doesNotContain(foreign.getId());
     }
 }

@@ -320,7 +320,7 @@ class MetadataTaskServiceTest {
 
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().getTotal()).isEqualTo(2);
-            assertThat(result.getFirst().getCompleted()).isEqualTo(0);
+            assertThat(result.getFirst().getCompleted()).isZero();
         }
 
         @Test
@@ -347,7 +347,7 @@ class MetadataTaskServiceTest {
 
             List<MetadataBatchProgressNotification> result = service.getActiveTasks();
 
-            assertThat(result).allMatch(MetadataBatchProgressNotification::isReview);
+            assertThat(result).isNotEmpty().allMatch(MetadataBatchProgressNotification::isReview);
         }
     }
 }

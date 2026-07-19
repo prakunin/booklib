@@ -28,7 +28,7 @@ public abstract class BookdropFileMapper {
 
         try {
             return objectMapper.readValue(json, BookMetadata.class);
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             return null;
         }
     }

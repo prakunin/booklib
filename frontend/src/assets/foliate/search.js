@@ -1,7 +1,7 @@
 // length for context in excerpts
 const CONTEXT_LENGTH = 50
 
-const normalizeWhitespace = str => str.replace(/\s+/g, ' ')
+const normalizeWhitespace = str => str.replaceAll(/\s+/g, ' ')
 
 const makeExcerpt = (strs, { startIndex, startOffset, endIndex, endOffset }) => {
     const start = strs[startIndex]

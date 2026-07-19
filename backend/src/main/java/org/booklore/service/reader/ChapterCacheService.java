@@ -106,7 +106,7 @@ public class ChapterCacheService {
         Path pagePath = getCachedPage(cacheKey, pageNumber);
         try {
             return Files.exists(pagePath) && Files.size(pagePath) > 0;
-        } catch (IOException e) {
+        } catch (IOException _) {
             return false;
         }
     }

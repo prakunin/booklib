@@ -24,7 +24,8 @@ class ScalarControllerTest {
                 new ClassPathResource("static/scalar.html").getInputStream(),
                 StandardCharsets.UTF_8
         );
-        assertThat(html).contains("data-url=\"/api/openapi.json\"");
-        assertThat(html).contains("\"telemetry\":false");
+        assertThat(html)
+                .contains("data-url=\"/api/openapi.json\"")
+                .contains("\"telemetry\":false");
     }
 }

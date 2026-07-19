@@ -3,7 +3,6 @@ package org.booklore.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -73,10 +72,8 @@ public class KoboController {
     }
 
     @Operation(summary = "Get book thumbnail", description = "Retrieve the thumbnail image for a local book.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Thumbnail returned successfully"),
-            @ApiResponse(responseCode = "307", description = "Thumbnail is at another location"),
-    })
+    @ApiResponse(responseCode = "200", description = "Thumbnail returned successfully")
+    @ApiResponse(responseCode = "307", description = "Thumbnail is at another location")
 
     @GetMapping(
             value = {
@@ -91,7 +88,9 @@ public class KoboController {
             @Parameter(description = "Book ID") @PathVariable String imageId,
             @Parameter(description = "Width of the thumbnail") @PathVariable int width,
             @Parameter(description = "Height of the thumbnail") @PathVariable int height,
-            @Parameter(description = "Is greyscale") @PathVariable boolean isGreyscale
+            @Parameter(description = "Is greyscale") @PathVariable boolean isGreyscale,
+            @Parameter(description = "Ignored, sent by Kobo devices") @PathVariable(name = "version", required = false) String version,
+            @Parameter(description = "Ignored, sent by Kobo devices") @PathVariable(name = "quality", required = false) String quality
     ) {
         if (imageId.startsWith("BL-")) {
             return koboThumbnailService.getThumbnail(imageId);
@@ -216,10 +215,8 @@ public class KoboController {
     @ApiResponse(responseCode = "200", description = "The next book in a series to read.")
     @PostMapping("/v1/products/{bookId}/nextread")
     public ResponseEntity<?> getNextRead(@Parameter(description = "Book ID") @PathVariable String bookId) {
-        if (!StringUtils.isNumeric(bookId)) {
-            if (isForwardingToKoboStore()) {
-                return koboServerProxy.proxyCurrentRequest();
-            }
+        if (!StringUtils.isNumeric(bookId) && isForwardingToKoboStore()) {
+            return koboServerProxy.proxyCurrentRequest();
         }
 
         return ResponseEntity.ok().build();

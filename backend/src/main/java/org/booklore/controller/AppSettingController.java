@@ -3,7 +3,6 @@ package org.booklore.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.booklore.model.dto.settings.AppSettingKey;
@@ -38,10 +37,8 @@ public class AppSettingController {
     }
 
     @Operation(summary = "Update application settings", description = "Update one or more application settings.")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Settings updated successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid request")
-    })
+    @ApiResponse(responseCode = "200", description = "Settings updated successfully")
+    @ApiResponse(responseCode = "400", description = "Invalid request")
     @PreAuthorize("@securityUtil.isAdmin()")
     @PutMapping
     public void updateSettings(@Parameter(description = "List of settings to update") @RequestBody List<SettingRequest> settingRequests) throws JacksonException {

@@ -86,7 +86,7 @@ export class MagicShelfService {
 
     return this.http.post<MagicShelf>(this.url, payload).pipe(
       tap(() => {
-        void this.queryClient.invalidateQueries({queryKey: MAGIC_SHELVES_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: MAGIC_SHELVES_QUERY_KEY, exact: true});
       })
     );
   }
@@ -116,7 +116,7 @@ export class MagicShelfService {
   deleteShelf(id: number): Observable<void> {
     return this.http.delete<void>(`${this.url}/${id}`).pipe(
       tap(() => {
-        void this.queryClient.invalidateQueries({queryKey: MAGIC_SHELVES_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: MAGIC_SHELVES_QUERY_KEY, exact: true});
       })
     );
   }

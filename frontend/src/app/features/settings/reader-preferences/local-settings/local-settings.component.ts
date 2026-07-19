@@ -21,10 +21,10 @@ import {CacheStorageService} from "../../../../shared/service/cache-storage.serv
   styleUrl: "./local-settings.component.scss",
 })
 export class LocalSettingsComponent implements OnInit {
-  private localSettingsService = inject(LocalSettingsService);
-  private cacheStorageService = inject(CacheStorageService);
-  private messageService = inject(MessageService);
-  private confirmationService = inject(ConfirmationService);
+  private readonly localSettingsService = inject(LocalSettingsService);
+  private readonly cacheStorageService = inject(CacheStorageService);
+  private readonly messageService = inject(MessageService);
+  private readonly confirmationService = inject(ConfirmationService);
 
   protected settings: LocalSettings = this.localSettingsService.get();
 
@@ -32,8 +32,8 @@ export class LocalSettingsComponent implements OnInit {
   protected isClearingCacheStorage = signal(false);
   protected cacheStorageUsageMb = signal(0);
 
-  async ngOnInit(): Promise<void> {
-    await this.loadCacheStorageUsage();
+  ngOnInit(): void {
+    void this.loadCacheStorageUsage();
   }
 
   onSettingChange(): void {

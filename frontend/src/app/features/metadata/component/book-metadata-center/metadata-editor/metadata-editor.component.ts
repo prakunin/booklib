@@ -32,6 +32,7 @@ import {AppSettingsService} from '../../../../../shared/service/app-settings.ser
 import {MetadataProviderSpecificFields} from '../../../../../shared/model/app-settings.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {CdkDragDrop, CdkDropList, CdkDrag, moveItemInArray} from '@angular/cdk/drag-drop';
+import {sortStrings} from '../../../../../shared/util/string-sort.util';
 
 @Component({
   selector: "app-metadata-editor",
@@ -89,18 +90,18 @@ export class MetadataEditorComponent implements OnInit {
   @Input() disablePrevious = false;
   @Input() showNavigationButtons = false;
 
-  private messageService = inject(MessageService);
-  private bookService = inject(BookService);
-  private bookMetadataManageService = inject(BookMetadataManageService);
-  private taskHelperService = inject(TaskHelperService);
+  private readonly messageService = inject(MessageService);
+  private readonly bookService = inject(BookService);
+  private readonly bookMetadataManageService = inject(BookMetadataManageService);
+  private readonly taskHelperService = inject(TaskHelperService);
   protected urlHelper = inject(UrlHelperService);
-  private bookDialogHelperService = inject(BookDialogHelperService);
-  private bookNavigationService = inject(BookNavigationService);
-  private metadataHostService = inject(BookMetadataHostService);
-  private router = inject(Router);
-  private userService = inject(UserService);
-  private destroyRef = inject(DestroyRef);
-  private appSettingsService = inject(AppSettingsService);
+  private readonly bookDialogHelperService = inject(BookDialogHelperService);
+  private readonly bookNavigationService = inject(BookNavigationService);
+  private readonly metadataHostService = inject(BookMetadataHostService);
+  private readonly router = inject(Router);
+  private readonly userService = inject(UserService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly appSettingsService = inject(AppSettingsService);
   private readonly t = inject(TranslocoService);
   private readonly uniqueMetadata = computed(() => this.bookService.uniqueMetadata());
 
@@ -169,7 +170,7 @@ export class MetadataEditorComponent implements OnInit {
     audibleReviewCount: true,
   };
 
-  private syncProviderFieldsEffect!: EffectRef;
+  private readonly syncProviderFieldsEffect!: EffectRef;
   readonly navigationState = this.bookNavigationService.navigationState;
   readonly canNavigatePrevious = this.bookNavigationService.canNavigatePrevious;
   readonly canNavigateNext = this.bookNavigationService.canNavigateNext;
@@ -403,9 +404,9 @@ export class MetadataEditorComponent implements OnInit {
       title: metadata.title ?? null,
       subtitle: metadata.subtitle ?? null,
       authors: [...(metadata.authors ?? [])],
-      categories: [...(metadata.categories ?? [])].sort(),
-      moods: [...(metadata.moods ?? [])].sort(),
-      tags: [...(metadata.tags ?? [])].sort(),
+      categories: sortStrings(metadata.categories ?? []),
+      moods: sortStrings(metadata.moods ?? []),
+      tags: sortStrings(metadata.tags ?? []),
       publisher: metadata.publisher ?? null,
       publishedDate: metadata.publishedDate ?? null,
       isbn10: metadata.isbn10 ?? null,
@@ -497,7 +498,7 @@ export class MetadataEditorComponent implements OnInit {
     for (const field of ALL_COMIC_METADATA_FIELDS) {
       const value = comicMeta?.[field.fetchedKey as keyof ComicMetadata];
       if (field.type === 'array') {
-        comicPatch[field.controlName] = [...(value as string[] ?? [])].sort();
+        comicPatch[field.controlName] = sortStrings(value as string[] ?? []);
       } else if (field.type === 'boolean' || field.type === 'number') {
         comicPatch[field.controlName] = value ?? null;
       } else {
@@ -824,8 +825,8 @@ export class MetadataEditorComponent implements OnInit {
     const original = this.originalMetadata;
 
     const wasCleared = (key: keyof BookMetadata): boolean => {
-      const current = (metadata[key] as unknown) ?? null;
-      const prev = (original[key] as unknown) ?? null;
+      const current = (metadata[key]) ?? null;
+      const prev = (original[key]) ?? null;
 
       const isEmpty = (val: unknown): boolean =>
         val === null || val === "" || (Array.isArray(val) && val.length === 0);
@@ -920,7 +921,7 @@ export class MetadataEditorComponent implements OnInit {
   onUpload(event: FileUploadEvent): void {
     const response: HttpResponse<unknown> =
       event.originalEvent as HttpResponse<unknown>;
-    if (response && response.status === 200) {
+    if (response?.status === 200) {
       this.isUploading = false;
       this.bookService.handleBookMetadataUpdate(this.currentBookId);
     } else {
@@ -934,8 +935,7 @@ export class MetadataEditorComponent implements OnInit {
     }
   }
 
-  onUploadError($event: FileUploadErrorEvent) {
-    void $event;
+  onUploadError(_event: FileUploadErrorEvent) {
     this.isUploading = false;
     this.messageService.add({
       severity: "error",
@@ -1212,7 +1212,7 @@ export class MetadataEditorComponent implements OnInit {
   onAudiobookCoverUpload(event: FileUploadEvent): void {
     const response: HttpResponse<unknown> =
       event.originalEvent as HttpResponse<unknown>;
-    if (response && response.status === 200) {
+    if (response?.status === 200) {
       this.isUploading = false;
       this.bookService.handleBookMetadataUpdate(this.currentBookId);
     } else {

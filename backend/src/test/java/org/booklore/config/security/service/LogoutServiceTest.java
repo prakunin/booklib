@@ -128,7 +128,8 @@ class LogoutServiceTest {
         when(authenticationService.getAuthenticatedUser()).thenReturn(bookLoreUser);
         when(userRepository.findByUsername("missing")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> logoutService.logout(mockAuth(), null, null))
+        var auth = mockAuth();
+        assertThatThrownBy(() -> logoutService.logout(auth, null, null))
                 .isInstanceOf(APIException.class);
     }
 
@@ -181,10 +182,11 @@ class LogoutServiceTest {
         LogoutResponse response = logoutService.logout(mockAuth(), null, "https://myapp.com");
 
         String url = response.logoutUrl();
-        assertThat(url).startsWith("https://idp.example.com/logout");
-        assertThat(url).contains("client_id=my-client");
-        assertThat(url).contains("id_token_hint=id-token-hint-value");
-        assertThat(url).contains("post_logout_redirect_uri");
+        assertThat(url)
+                .startsWith("https://idp.example.com/logout")
+                .contains("client_id=my-client")
+                .contains("id_token_hint=id-token-hint-value")
+                .contains("post_logout_redirect_uri");
     }
 
     @Test

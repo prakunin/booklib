@@ -98,12 +98,12 @@ export const PAGE_COUNT_RANGES: readonly RangeConfig[] = [
 
 export const MATCH_SCORE_RANGES: readonly RangeConfig[] = [
   {id: 0, min: 0.95, max: 1.01, label: 'Outstanding (95–100%)', sortIndex: 0},
-  {id: 1, min: 0.90, max: 0.95, label: 'Excellent (90–94%)', sortIndex: 1},
-  {id: 2, min: 0.80, max: 0.90, label: 'Great (80–89%)', sortIndex: 2},
-  {id: 3, min: 0.70, max: 0.80, label: 'Good (70–79%)', sortIndex: 3},
-  {id: 4, min: 0.50, max: 0.70, label: 'Fair (50–69%)', sortIndex: 4},
-  {id: 5, min: 0.30, max: 0.50, label: 'Weak (30–49%)', sortIndex: 5},
-  {id: 6, min: 0.00, max: 0.30, label: 'Poor (0–29%)', sortIndex: 6}
+  {id: 1, min: 0.9, max: 0.95, label: 'Excellent (90–94%)', sortIndex: 1},
+  {id: 2, min: 0.8, max: 0.9, label: 'Great (80–89%)', sortIndex: 2},
+  {id: 3, min: 0.7, max: 0.8, label: 'Good (70–79%)', sortIndex: 3},
+  {id: 4, min: 0.5, max: 0.7, label: 'Fair (50–69%)', sortIndex: 4},
+  {id: 5, min: 0.3, max: 0.5, label: 'Weak (30–49%)', sortIndex: 5},
+  {id: 6, min: 0, max: 0.3, label: 'Poor (0–29%)', sortIndex: 6}
 ];
 
 export const AGE_RATING_OPTIONS: readonly RangeConfig[] = [

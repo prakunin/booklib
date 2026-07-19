@@ -228,10 +228,8 @@ public class FileMoveHelper {
     private boolean recursivelyDeleteEmptySubdirectories(File[] contents, Set<Path> libraryRoots) {
         boolean deletedAny = false;
         for (File file : contents) {
-            if (isNonSymlinkDirectory(file)) {
-                if (deleteIfEffectivelyEmpty(file.toPath(), libraryRoots)) {
-                    deletedAny = true;
-                }
+            if (isNonSymlinkDirectory(file) && deleteIfEffectivelyEmpty(file.toPath(), libraryRoots)) {
+                deletedAny = true;
             }
         }
         return deletedAny;
@@ -247,7 +245,7 @@ public class FileMoveHelper {
                 if (Files.isSameFile(root, currentDir)) {
                     return true;
                 }
-            } catch (IOException e) {
+            } catch (IOException _) {
                 log.warn("Failed to compare paths: {} and {}", root, currentDir);
             }
         }
@@ -270,7 +268,7 @@ public class FileMoveHelper {
             try {
                 Files.delete(file.toPath());
                 log.info("Deleted ignored file: {}", file.getAbsolutePath());
-            } catch (IOException e) {
+            } catch (IOException _) {
                 log.warn("Failed to delete ignored file: {}", file.getAbsolutePath());
             }
         }
@@ -312,7 +310,7 @@ public class FileMoveHelper {
     private void waitBeforeRetry() {
         try {
             Thread.sleep(RETRY_DELAY_MS);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }

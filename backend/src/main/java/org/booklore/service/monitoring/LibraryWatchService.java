@@ -84,7 +84,7 @@ public class LibraryWatchService implements SmartLifecycle {
                 WatchKey key;
                 try {
                     key = watchService.take();
-                } catch (ClosedWatchServiceException e) {
+                } catch (ClosedWatchServiceException _) {
                     log.warn("WatchService closed, stopping poll loop.");
                     break;
                 }
@@ -134,7 +134,7 @@ public class LibraryWatchService implements SmartLifecycle {
                     registrationExecutor.submit(() -> unregisterRecursive(directory));
                 }
             }
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             log.warn("Poll loop interrupted");
             Thread.currentThread().interrupt();
         }
@@ -309,7 +309,7 @@ public class LibraryWatchService implements SmartLifecycle {
             }
             try {
                 Thread.sleep(pollIntervalMs);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return false;
             }

@@ -274,9 +274,9 @@ class BackchannelLogoutServiceTest {
         backchannelLogoutService.handleLogoutToken("token");
 
         verify(notificationService).sendMessageToUser(
-                eq("wsuser"),
-                eq(Topic.SESSION_REVOKED),
-                eq(Map.of("reason", "backchannel_logout"))
+                "wsuser",
+                Topic.SESSION_REVOKED,
+                Map.of("reason", "backchannel_logout")
         );
     }
 

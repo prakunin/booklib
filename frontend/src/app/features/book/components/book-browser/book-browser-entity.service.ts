@@ -17,15 +17,15 @@ export interface EntityInfo {
 
 @Injectable({providedIn: 'root'})
 export class BookBrowserEntityService {
-  private libraryService = inject(LibraryService);
-  private shelfService = inject(ShelfService);
-  private magicShelfService = inject(MagicShelfService);
-  private bookRuleEvaluatorService = inject(BookRuleEvaluatorService);
+  private readonly libraryService = inject(LibraryService);
+  private readonly shelfService = inject(ShelfService);
+  private readonly magicShelfService = inject(MagicShelfService);
+  private readonly bookRuleEvaluatorService = inject(BookRuleEvaluatorService);
 
   getEntityInfo(paramMap: ParamMap): EntityInfo {
-    const libraryId = Number(paramMap.get('libraryId') || NaN);
-    const shelfId = Number(paramMap.get('shelfId') || NaN);
-    const magicShelfId = Number(paramMap.get('magicShelfId') || NaN);
+    const libraryId = Number(paramMap.get('libraryId') || Number.NaN);
+    const shelfId = Number(paramMap.get('shelfId') || Number.NaN);
+    const magicShelfId = Number(paramMap.get('magicShelfId') || Number.NaN);
 
     if (!Number.isNaN(libraryId)) {
       return {entityId: libraryId, entityType: EntityType.LIBRARY};
@@ -39,7 +39,7 @@ export class BookBrowserEntityService {
       return {entityId: magicShelfId, entityType: EntityType.MAGIC_SHELF};
     }
 
-    return {entityId: NaN, entityType: EntityType.ALL_BOOKS};
+    return {entityId: Number.NaN, entityType: EntityType.ALL_BOOKS};
   }
 
   getEntity(entityId: number, entityType: EntityType): Library | Shelf | MagicShelf | null {

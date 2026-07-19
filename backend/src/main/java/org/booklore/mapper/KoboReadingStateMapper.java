@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.regex.Pattern;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public abstract class KoboReadingStateMapper {
@@ -17,7 +16,6 @@ public abstract class KoboReadingStateMapper {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private final Pattern SURROUNDING_DOUBLE_QUOTES_PATTERN = Pattern.compile("^\"|\"$");
 
     @Mapping(target = "currentBookmarkJson", expression = "java(toJson(dto.getCurrentBookmark()))")
     @Mapping(target = "statisticsJson", expression = "java(toJson(dto.getStatistics()))")
@@ -56,6 +54,7 @@ public abstract class KoboReadingStateMapper {
 
     protected String cleanString(String value) {
         if (value == null) return null;
-        return SURROUNDING_DOUBLE_QUOTES_PATTERN.matcher(value).replaceAll("");
+        String result = value.startsWith("\"") ? value.substring(1) : value;
+        return result.endsWith("\"") ? result.substring(0, result.length() - 1) : result;
     }
 }

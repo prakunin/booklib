@@ -146,7 +146,7 @@ class KomgaServiceTest {
         assertThat(result.getTotalElements()).isEqualTo(50);
         assertThat(result.getTotalPages()).isEqualTo(1);
         assertThat(result.getSize()).isEqualTo(50);
-        assertThat(result.getNumber()).isEqualTo(0);
+        assertThat(result.getNumber()).isZero();
         verify(bookRepository, never()).findDistinctSeriesNamesGroupedByLibraryId(anyLong(), anyString());
         verify(bookRepository, never()).findBooksBySeriesNameGroupedByLibraryId(anyString(), anyLong(), anyString());
     }
@@ -181,7 +181,7 @@ class KomgaServiceTest {
         assertThat(result.getTotalElements()).isEqualTo(50);
         assertThat(result.getTotalPages()).isEqualTo(3);
         assertThat(result.getSize()).isEqualTo(20);
-        assertThat(result.getNumber()).isEqualTo(0);
+        assertThat(result.getNumber()).isZero();
         verify(bookRepository, never()).findDistinctSeriesNamesGroupedByLibraryId(anyLong(), anyString());
         verify(bookRepository, never()).findBooksBySeriesNameGroupedByLibraryId(anyString(), anyLong(), anyString());
     }
@@ -204,8 +204,7 @@ class KomgaServiceTest {
         List<KomgaPageDto> pages = komgaService.getBookPages(100L);
 
         // Then: Should return empty list without throwing NPE
-        assertThat(pages).isNotNull();
-        assertThat(pages).isEmpty();
+        assertThat(pages).isNotNull().isEmpty();
     }
 
     @Test
@@ -226,8 +225,7 @@ class KomgaServiceTest {
         List<KomgaPageDto> pages = komgaService.getBookPages(100L);
 
         // Then: Should return 5 pages
-        assertThat(pages).isNotNull();
-        assertThat(pages).hasSize(5);
+        assertThat(pages).isNotNull().hasSize(5);
         assertThat(pages.get(0).getNumber()).isEqualTo(1);
         assertThat(pages.get(4).getNumber()).isEqualTo(5);
     }
@@ -292,7 +290,7 @@ class KomgaServiceTest {
         pageBooks.addAll(seriesBBooks);
 
         when(bookRepository.findBooksBySeriesNamesGroupedByLibraryId(
-                eq(List.of("Series A", "Series B")), eq(1L), eq("Unknown Series"), eq(false)))
+                List.of("Series A", "Series B"), 1L, "Unknown Series", false))
                 .thenReturn(pageBooks);
         
         when(komgaMapper.getUnknownSeriesName()).thenReturn("Unknown Series");
@@ -311,7 +309,7 @@ class KomgaServiceTest {
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getTotalElements()).isEqualTo(3);
         assertThat(result.getTotalPages()).isEqualTo(2);
-        assertThat(result.getNumber()).isEqualTo(0);
+        assertThat(result.getNumber()).isZero();
         assertThat(result.getFirst()).isTrue();
         assertThat(result.getLast()).isFalse();
         

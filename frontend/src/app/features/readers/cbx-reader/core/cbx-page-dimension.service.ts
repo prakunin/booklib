@@ -16,10 +16,10 @@ export interface WebtoonDetectionResult {
 export class CbxPageDimensionService {
 
   private readonly baseUrl = `${API_CONFIG.BASE_URL}/api/v1/cbx`;
-  private http = inject(HttpClient);
-  private authService = inject(AuthService);
+  private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
 
-  private dimensionCache = new Map<string, CbxPageDimension[]>();
+  private readonly dimensionCache = new Map<string, CbxPageDimension[]>();
 
   private getToken(): string | null {
     return this.authService.getInternalAccessToken();
@@ -125,7 +125,7 @@ export class CbxPageDimensionService {
 
       // Aspect ratio scoring
       if (ratio >= 2.2) {
-        pageScore += 1.0;
+        pageScore += 1;
         highRatioCount++;
       } else if (ratio >= 1.8) {
         pageScore += 0.5;
@@ -179,7 +179,7 @@ export class CbxPageDimensionService {
     const highRatioPercent = highRatioCount / validCount;
     const isWebtoon = avgScore >= 0.7 && (
       highRatioPercent >= 0.4 ||
-      avgRatio >= 2.0 ||
+      avgRatio >= 2 ||
       (widthVariation < 0.15 && avgRatio > 1.8)
     );
 

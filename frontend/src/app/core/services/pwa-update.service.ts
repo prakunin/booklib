@@ -6,7 +6,7 @@ import { filter } from 'rxjs/operators';
     providedIn: 'root'
 })
 export class PwaUpdateService {
-    private swUpdate = inject(SwUpdate);
+    private readonly swUpdate = inject(SwUpdate);
 
     constructor() {
         if (this.swUpdate.isEnabled) {
@@ -16,14 +16,14 @@ export class PwaUpdateService {
                     console.info('New version available. Refreshing...');
                     const hash = evt.latestVersion.hash;
                     if (this.shouldReload(`version_${hash}`)) {
-                        window.location.reload();
+                        globalThis.location.reload();
                     }
                 });
 
             this.swUpdate.unrecoverable.subscribe(event => {
                 console.error('Service Worker entered unrecoverable state:', event.reason);
                 if (this.shouldReload(`unrecoverable_${event.reason}`)) {
-                    window.location.reload();
+                    globalThis.location.reload();
                 }
             });
         }
@@ -36,7 +36,7 @@ export class PwaUpdateService {
             const guardStr = sessionStorage.getItem(key);
             const guard = guardStr ? JSON.parse(guardStr) : null;
 
-            if (guard && guard.reason === reason && now - guard.timestamp < 10000) {
+            if (guard?.reason === reason && now - guard.timestamp < 10000) {
                 console.error(`PWA reload guard triggered for reason: ${reason}. Stopped reloading to avoid loop.`);
                 return false;
             }

@@ -1,24 +1,17 @@
 package org.booklore.service.reader;
 
 import org.booklore.exception.APIException;
-import org.booklore.exception.ApiError;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.repository.BookRepository;
-import org.booklore.util.FileUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayOutputStream;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
-import java.time.Instant;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -50,8 +43,9 @@ class PdfReaderServiceTest {
     @Test
     void testStreamPageImage_InvalidBookType_Throws() {
         when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(bookEntity));
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
         APIException ex = assertThrows(APIException.class, () ->
-                pdfReaderService.streamPageImage(1L, "../traversal", 1, new ByteArrayOutputStream())
+                pdfReaderService.streamPageImage(1L, "../traversal", 1, out)
         );
         assertTrue(ex.getMessage().contains("Invalid book type"), "Expected INVALID_INPUT, got: " + ex.getMessage());
     }

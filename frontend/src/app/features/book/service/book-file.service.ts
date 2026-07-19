@@ -19,12 +19,12 @@ export class BookFileService {
 
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/books`;
 
-  private http = inject(HttpClient);
-  private messageService = inject(MessageService);
-  private fileDownloadService = inject(FileDownloadService);
-  private queryClient = inject(QueryClient);
-  private cacheStorageService = inject(CacheStorageService);
-  private localSettingsService = inject(LocalSettingsService);
+  private readonly http = inject(HttpClient);
+  private readonly messageService = inject(MessageService);
+  private readonly fileDownloadService = inject(FileDownloadService);
+  private readonly queryClient = inject(QueryClient);
+  private readonly cacheStorageService = inject(CacheStorageService);
+  private readonly localSettingsService = inject(LocalSettingsService);
   private readonly t = inject(TranslocoService);
 
   getFileContent(bookId: number, bookType?: string): Observable<Blob> {
@@ -45,7 +45,7 @@ export class BookFileService {
   downloadAllFiles(book: Book): void {
     const downloadUrl = `${this.url}/${book.id}/download-all`;
     const filename = book.metadata?.title
-      ? `${book.metadata.title.replace(/[^a-zA-Z0-9\-_]/g, '_')}.zip`
+      ? `${book.metadata.title.replaceAll(/[^a-zA-Z0-9\-_]/g, '_')}.zip`
       : `book-${book.id}.zip`;
     this.fileDownloadService.downloadFile(downloadUrl, filename);
   }

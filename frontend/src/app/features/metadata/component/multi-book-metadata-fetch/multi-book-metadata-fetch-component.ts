@@ -33,12 +33,12 @@ export class MultiBookMetadataFetchComponent implements OnInit, OnChanges {
   metadataRefreshType: MetadataRefreshType = MetadataRefreshType.BOOKS;
   currentMetadataOptions!: MetadataRefreshOptions;
 
-  private dynamicDialogConfig = inject(DynamicDialogConfig);
-  private destroyRef = inject(DestroyRef);
+  private readonly dynamicDialogConfig = inject(DynamicDialogConfig);
+  private readonly destroyRef = inject(DestroyRef);
   dialogRef = inject(DynamicDialogRef);
-  private bookService = inject(BookService);
-  private appSettingsService = inject(AppSettingsService);
-  private messageService = inject(MessageService);
+  private readonly bookService = inject(BookService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly messageService = inject(MessageService);
   expanded = false;
 
   constructor() {

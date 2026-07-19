@@ -144,7 +144,7 @@ public class InpxImportService {
                     copyBounded(input, output);
                 }
                 Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException e) {
+            } catch (AtomicMoveNotSupportedException _) {
                 Files.move(temporary, target);
             } finally {
                 Files.deleteIfExists(temporary);
@@ -181,7 +181,7 @@ public class InpxImportService {
                 throw ApiError.GENERIC_BAD_REQUEST.createException("INPX index has no parent directory");
             }
             return normalizeDirectory(parent.toString(), false);
-        } catch (InvalidPathException e) {
+        } catch (InvalidPathException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid INPX path");
         }
     }
@@ -195,7 +195,7 @@ public class InpxImportService {
                                 : "Archive path must be a readable directory");
             }
             return path;
-        } catch (InvalidPathException e) {
+        } catch (InvalidPathException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid directory path");
         }
     }

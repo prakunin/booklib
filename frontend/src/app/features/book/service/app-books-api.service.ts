@@ -332,9 +332,9 @@ export class AppBooksApiService {
 
   /** Invalidate the books query to force a refresh from the server. */
   invalidate(): void {
-    void this.queryClient.invalidateQueries({queryKey: ['app-books']});
-    void this.queryClient.invalidateQueries({queryKey: ['app-filter-options']});
-    void this.queryClient.invalidateQueries({queryKey: ['app-catalog-summary']});
+    this.queryClient.invalidateQueries({queryKey: ['app-books']});
+    this.queryClient.invalidateQueries({queryKey: ['app-filter-options']});
+    this.queryClient.invalidateQueries({queryKey: ['app-catalog-summary']});
   }
 
   private filterOptionsQueryKey(): readonly unknown[] {

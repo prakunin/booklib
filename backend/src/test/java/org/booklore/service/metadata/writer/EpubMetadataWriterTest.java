@@ -231,9 +231,10 @@ class EpubMetadataWriterTest {
             // Should have meta refines elements instead
             String creatorId = creator.getAttribute("id");
             String opfContent2 = readOpfContent(epubFile);
-            assertThat(opfContent2).contains("refines=\"#" + creatorId + "\"");
-            assertThat(opfContent2).contains("property=\"file-as\"");
-            assertThat(opfContent2).contains("property=\"role\"");
+            assertThat(opfContent2)
+                    .contains("refines=\"#" + creatorId + "\"")
+                    .contains("property=\"file-as\"")
+                    .contains("property=\"role\"");
         }
 
         @Test
@@ -251,8 +252,9 @@ class EpubMetadataWriterTest {
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
-            assertThat(content).contains("scheme=\"marc:relators\"");
-            assertThat(content).contains(">aut<");
+            assertThat(content)
+                    .contains("scheme=\"marc:relators\"")
+                    .contains(">aut<");
         }
     }
 
@@ -275,11 +277,12 @@ class EpubMetadataWriterTest {
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
-            assertThat(content).contains("opf:file-as=");
-            assertThat(content).contains("opf:role=");
-            // Should NOT have meta refines for creators
-            assertThat(content).doesNotContain("property=\"file-as\"");
-            assertThat(content).doesNotContain("property=\"role\"");
+            assertThat(content)
+                    .contains("opf:file-as=")
+                    .contains("opf:role=")
+                    // Should NOT have meta refines for creators
+                    .doesNotContain("property=\"file-as\"")
+                    .doesNotContain("property=\"role\"");
         }
 
         @Test
@@ -302,14 +305,15 @@ class EpubMetadataWriterTest {
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
-            // EPUB2 should not have prefix attribute on package
-            assertThat(content).doesNotContain("prefix=");
-            // EPUB2 should not have property= metas for series
-            assertThat(content).doesNotContain("property=\"belongs-to-collection\"");
-            assertThat(content).doesNotContain("property=\"collection-type\"");
-            assertThat(content).doesNotContain("property=\"group-position\"");
-            // EPUB2 should not have property= metas for subtitles
-            assertThat(content).doesNotContain("property=\"title-type\"");
+            assertThat(content)
+                    // EPUB2 should not have prefix attribute on package
+                    .doesNotContain("prefix=")
+                    // EPUB2 should not have property= metas for series
+                    .doesNotContain("property=\"belongs-to-collection\"")
+                    .doesNotContain("property=\"collection-type\"")
+                    .doesNotContain("property=\"group-position\"")
+                    // EPUB2 should not have property= metas for subtitles
+                    .doesNotContain("property=\"title-type\"");
         }
     }
 
@@ -396,12 +400,13 @@ class EpubMetadataWriterTest {
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
-            assertThat(content).contains("property=\"belongs-to-collection\"");
-            assertThat(content).contains("The Dark Tower");
-            assertThat(content).contains("property=\"collection-type\"");
-            assertThat(content).contains("series");
-            assertThat(content).contains("property=\"group-position\"");
-            assertThat(content).contains(">3<");
+            assertThat(content)
+                    .contains("property=\"belongs-to-collection\"")
+                    .contains("The Dark Tower")
+                    .contains("property=\"collection-type\"")
+                    .contains("series")
+                    .contains("property=\"group-position\"")
+                    .contains(">3<");
         }
     }
 
@@ -427,14 +432,15 @@ class EpubMetadataWriterTest {
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
-            assertThat(content).contains("name=\"calibre:series\"");
-            assertThat(content).contains("content=\"Wheel of Time\"");
-            assertThat(content).contains("name=\"calibre:series_index\"");
-            assertThat(content).contains("content=\"5\"");
-            // Should NOT contain EPUB3 series constructs
-            assertThat(content).doesNotContain("belongs-to-collection");
-            assertThat(content).doesNotContain("collection-type");
-            assertThat(content).doesNotContain("group-position");
+            assertThat(content)
+                    .contains("name=\"calibre:series\"")
+                    .contains("content=\"Wheel of Time\"")
+                    .contains("name=\"calibre:series_index\"")
+                    .contains("content=\"5\"")
+                    // Should NOT contain EPUB3 series constructs
+                    .doesNotContain("belongs-to-collection")
+                    .doesNotContain("collection-type")
+                    .doesNotContain("group-position");
         }
     }
 
@@ -460,9 +466,10 @@ class EpubMetadataWriterTest {
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
-            assertThat(content).contains("A Great Subtitle");
-            assertThat(content).contains("property=\"title-type\"");
-            assertThat(content).contains(">subtitle<");
+            assertThat(content)
+                    .contains("A Great Subtitle")
+                    .contains("property=\"title-type\"")
+                    .contains(">subtitle<");
         }
     }
 
@@ -488,14 +495,15 @@ class EpubMetadataWriterTest {
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
-            // Title should remain unchanged (not appended with subtitle)
-            assertThat(content).contains(">Main Title<");
-            assertThat(content).doesNotContain("Main Title: A Great Subtitle");
-            // Subtitle should be stored via booklore:subtitle metadata
-            assertThat(content).contains("name=\"booklore:subtitle\"");
-            assertThat(content).contains("content=\"A Great Subtitle\"");
-            // Should NOT have EPUB3 title-type refinement
-            assertThat(content).doesNotContain("property=\"title-type\"");
+            assertThat(content)
+                    // Title should remain unchanged (not appended with subtitle)
+                    .contains(">Main Title<")
+                    .doesNotContain("Main Title: A Great Subtitle")
+                    // Subtitle should be stored via booklore:subtitle metadata
+                    .contains("name=\"booklore:subtitle\"")
+                    .contains("content=\"A Great Subtitle\"")
+                    // Should NOT have EPUB3 title-type refinement
+                    .doesNotContain("property=\"title-type\"");
         }
     }
 
@@ -520,10 +528,11 @@ class EpubMetadataWriterTest {
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
-            assertThat(content).contains("property=\"booklore:page_count\"");
-            assertThat(content).contains(">350<");
-            assertThat(content).contains("prefix=");
-            assertThat(content).contains("booklore:");
+            assertThat(content)
+                    .contains("property=\"booklore:page_count\"")
+                    .contains(">350<")
+                    .contains("prefix=")
+                    .contains("booklore:");
         }
     }
 
@@ -548,12 +557,13 @@ class EpubMetadataWriterTest {
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
-            assertThat(content).contains("name=\"booklore:page_count\"");
-            assertThat(content).contains("content=\"350\"");
-            // Should NOT have EPUB3 prefix attribute
-            assertThat(content).doesNotContain("prefix=");
-            // Should NOT use property= form
-            assertThat(content).doesNotContain("property=\"booklore:");
+            assertThat(content)
+                    .contains("name=\"booklore:page_count\"")
+                    .contains("content=\"350\"")
+                    // Should NOT have EPUB3 prefix attribute
+                    .doesNotContain("prefix=")
+                    // Should NOT use property= form
+                    .doesNotContain("property=\"booklore:");
         }
     }
 

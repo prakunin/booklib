@@ -42,9 +42,9 @@ export class MultiBookMetadataEditorComponent {
     enabled: this.bookIds.length > 0,
   }));
   filteredBooks = computed(() => (this.selectedBooksQuery.data() ?? []).filter(book => !!book.metadata));
-  private currentIndex = signal(0);
-  private currentBookId = computed(() => this.filteredBooks()[this.currentIndex()]?.id ?? null);
-  private bookDetailQuery = injectQuery(() => ({
+  private readonly currentIndex = signal(0);
+  private readonly currentBookId = computed(() => this.filteredBooks()[this.currentIndex()]?.id ?? null);
+  private readonly bookDetailQuery = injectQuery(() => ({
     ...this.bookService.bookDetailQueryOptions(this.currentBookId() ?? -1, true),
     enabled: this.currentBookId() != null,
   }));

@@ -123,7 +123,7 @@ public class BookMediaController {
             long contentLength = image.contentLength();
             builder.lastModified(lastModified);
             builder.eTag("\"" + Long.toHexString(contentLength) + "-" + Long.toHexString(lastModified) + "\"");
-        } catch (IOException e) {
+        } catch (IOException _) {
             // Cache-Control still lets cache-busted author image URLs stay browser-cacheable.
         }
 

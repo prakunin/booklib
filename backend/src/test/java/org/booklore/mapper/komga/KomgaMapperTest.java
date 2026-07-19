@@ -82,7 +82,7 @@ class KomgaMapperTest {
         // Then: Should not throw NPE and pageCount should default to 0
         assertThat(dto).isNotNull();
         assertThat(dto.getMedia()).isNotNull();
-        assertThat(dto.getMedia().getPagesCount()).isEqualTo(0);
+        assertThat(dto.getMedia().getPagesCount()).isZero();
     }
 
     @Test
@@ -113,7 +113,7 @@ class KomgaMapperTest {
         // Then: Should not throw NPE and pageCount should default to 0
         assertThat(dto).isNotNull();
         assertThat(dto.getMedia()).isNotNull();
-        assertThat(dto.getMedia().getPagesCount()).isEqualTo(0);
+        assertThat(dto.getMedia().getPagesCount()).isZero();
     }
 
     @Test
@@ -240,8 +240,8 @@ class KomgaMapperTest {
         // Then: Empty fields should have default values (not null)
         assertThat(seriesDto).isNotNull();
         assertThat(seriesDto.getMetadata()).isNotNull();
-        assertThat(seriesDto.getMetadata().getSummary()).isEqualTo("");
+        assertThat(seriesDto.getMetadata().getSummary()).isEmpty();
         assertThat(seriesDto.getMetadata().getLanguage()).isEqualTo("en");
-        assertThat(seriesDto.getMetadata().getPublisher()).isEqualTo("");
+        assertThat(seriesDto.getMetadata().getPublisher()).isEmpty();
     }
 }

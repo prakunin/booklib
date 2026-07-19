@@ -374,7 +374,8 @@ public class AudioMetadataService {
         if (value != null && !value.isEmpty()) {
           return value;
         }
-      } catch (Exception e) {
+      } catch (Exception _) {
+        // ignore and try the next key
       }
     }
     return null;
@@ -386,7 +387,7 @@ public class AudioMetadataService {
     if (channels.toLowerCase(Locale.ROOT).contains("mono")) return 1;
     try {
       return Integer.parseInt(NON_DIGIT_PATTERN.matcher(channels).replaceAll(""));
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       return null;
     }
   }

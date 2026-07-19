@@ -110,7 +110,7 @@ public class OidcAuthService {
             try {
                 long durationMs = Long.parseLong(durationStr) * 3_600_000L;
                 response = authenticationService.loginUser(user, durationMs);
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 log.warn("Invalid OIDC session duration setting: {}", durationStr);
                 response = authenticationService.loginUser(user);
             }
@@ -152,7 +152,7 @@ public class OidcAuthService {
                 log.warn("OIDC redirect URI origin mismatch: redirect={}, request={}", redirectOrigin, requestOrigin);
                 throw ApiError.OIDC_INVALID_REDIRECT_URI.createException();
             }
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw ApiError.OIDC_INVALID_REDIRECT_URI.createException();
         }
     }
@@ -224,7 +224,7 @@ public class OidcAuthService {
         String sessionId = null;
         try {
             sessionId = claims.getStringClaim("sid");
-        } catch (ParseException e) {
+        } catch (ParseException _) {
             log.debug("No 'sid' claim in ID token");
         }
 

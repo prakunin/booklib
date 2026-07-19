@@ -30,7 +30,7 @@ export function applyModifier(value: string, modifier: string, fieldName: string
 }
 
 function resolveModifierPlaceholders(block: string, values: Record<string, string>): string {
-  return block.replace(MODIFIER_PLACEHOLDER_REGEX, (_, fieldName: string, modifier?: string) => {
+  return block.replaceAll(MODIFIER_PLACEHOLDER_REGEX, (_, fieldName: string, modifier?: string) => {
     const val = values[fieldName] ?? '';
     return modifier ? applyModifier(val, modifier, fieldName) : val;
   });
@@ -43,7 +43,7 @@ function checkAllPlaceholdersPresent(block: string, values: Record<string, strin
 
 export function replacePlaceholders(pattern: string, values: Record<string, string>): string {
   // Handle optional blocks with else clause: <primary|fallback>
-  pattern = pattern.replace(/<([^<>]+)>/g, (_, blockContent: string) => {
+  pattern = pattern.replaceAll(/<([^<>]+)>/g, (_, blockContent: string) => {
     const pipeIndex = blockContent.indexOf('|');
     const primary = pipeIndex >= 0 ? blockContent.substring(0, pipeIndex) : blockContent;
     const fallback = pipeIndex >= 0 ? blockContent.substring(pipeIndex + 1) : null;

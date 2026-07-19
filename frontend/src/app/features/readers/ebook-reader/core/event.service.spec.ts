@@ -462,7 +462,7 @@ describe('ReaderEventService', () => {
     expect(postMessageSpy).toHaveBeenCalledWith(expect.objectContaining({
       type: 'iframe-click',
       target: undefined,
-    }), '*');
+    }), window.location.origin);
 
     const selectedRange: RangeLike = {
       toString: () => 'Highlighted text',

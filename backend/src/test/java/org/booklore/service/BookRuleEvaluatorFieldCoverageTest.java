@@ -184,8 +184,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.LIBRARY, RuleOperator.EQUALS, library.getId()));
-            assertThat(ids).contains(book1.getId());
-            assertThat(ids).doesNotContain(book2.getId());
+            assertThat(ids)
+                    .contains(book1.getId())
+                    .doesNotContain(book2.getId());
         }
 
         @Test
@@ -196,8 +197,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.LIBRARY, RuleOperator.NOT_EQUALS, library.getId()));
-            assertThat(ids).contains(book2.getId());
-            assertThat(ids).doesNotContain(book1.getId());
+            assertThat(ids)
+                    .contains(book2.getId())
+                    .doesNotContain(book1.getId());
         }
 
         @Test
@@ -230,8 +232,9 @@ class BookRuleEvaluatorFieldCoverageTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SHELF, RuleOperator.EQUALS,
                     List.of(String.valueOf(shelf.getId()))));
-            assertThat(ids).contains(onShelf.getId());
-            assertThat(ids).doesNotContain(offShelf.getId());
+            assertThat(ids)
+                    .contains(onShelf.getId())
+                    .doesNotContain(offShelf.getId());
         }
 
         @Test
@@ -248,8 +251,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SHELF, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noShelf.getId());
-            assertThat(ids).doesNotContain(onShelf.getId());
+            assertThat(ids)
+                    .contains(noShelf.getId())
+                    .doesNotContain(onShelf.getId());
         }
 
         @Test
@@ -266,8 +270,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SHELF, RuleOperator.IS_NOT_EMPTY, null));
-            assertThat(ids).contains(onShelf.getId());
-            assertThat(ids).doesNotContain(noShelf.getId());
+            assertThat(ids)
+                    .contains(onShelf.getId())
+                    .doesNotContain(noShelf.getId());
         }
 
         @Test
@@ -291,8 +296,9 @@ class BookRuleEvaluatorFieldCoverageTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SHELF, RuleOperator.INCLUDES_ANY,
                     List.of(String.valueOf(shelf1.getId()))));
-            assertThat(ids).contains(onShelf1.getId());
-            assertThat(ids).doesNotContain(onShelf2.getId(), noShelf.getId());
+            assertThat(ids)
+                    .contains(onShelf1.getId())
+                    .doesNotContain(onShelf2.getId(), noShelf.getId());
         }
 
         @Test
@@ -314,8 +320,9 @@ class BookRuleEvaluatorFieldCoverageTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SHELF, RuleOperator.EXCLUDES_ALL,
                     List.of(String.valueOf(shelf1.getId()))));
-            assertThat(ids).contains(onOther.getId());
-            assertThat(ids).doesNotContain(onExcluded.getId());
+            assertThat(ids)
+                    .contains(onOther.getId())
+                    .doesNotContain(onExcluded.getId());
         }
     }
 
@@ -367,8 +374,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             ));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).containsExactlyInAnyOrder(bookOnBoth.getId(), bookOnShelf1.getId(), bookOnShelf2.getId());
-            assertThat(ids).doesNotContain(bookOnNeither.getId());
+            assertThat(ids)
+                    .containsExactlyInAnyOrder(bookOnBoth.getId(), bookOnShelf1.getId(), bookOnShelf2.getId())
+                    .doesNotContain(bookOnNeither.getId());
         }
 
         @Test
@@ -430,8 +438,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             ));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).containsExactly(onIncludeOnly.getId());
-            assertThat(ids).doesNotContain(onBoth.getId(), onExcludeOnly.getId(), onNeither.getId());
+            assertThat(ids)
+                    .containsExactly(onIncludeOnly.getId())
+                    .doesNotContain(onBoth.getId(), onExcludeOnly.getId(), onNeither.getId());
         }
 
         @Test
@@ -461,8 +470,9 @@ class BookRuleEvaluatorFieldCoverageTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SHELF, RuleOperator.INCLUDES_ALL,
                     List.of(String.valueOf(shelf1.getId()), String.valueOf(shelf2.getId()))));
-            assertThat(ids).containsExactlyInAnyOrder(onAll.getId(), onFirstTwo.getId());
-            assertThat(ids).doesNotContain(onFirstOnly.getId(), onNone.getId());
+            assertThat(ids)
+                    .containsExactlyInAnyOrder(onAll.getId(), onFirstTwo.getId())
+                    .doesNotContain(onFirstOnly.getId(), onNone.getId());
         }
 
         @Test
@@ -492,8 +502,9 @@ class BookRuleEvaluatorFieldCoverageTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SHELF, RuleOperator.INCLUDES_ANY,
                     List.of(String.valueOf(shelf1.getId()), String.valueOf(shelf2.getId()))));
-            assertThat(ids).containsExactlyInAnyOrder(onFirst.getId(), onSecond.getId());
-            assertThat(ids).doesNotContain(onThird.getId(), onNone.getId());
+            assertThat(ids)
+                    .containsExactlyInAnyOrder(onFirst.getId(), onSecond.getId())
+                    .doesNotContain(onThird.getId(), onNone.getId());
         }
 
         @Test
@@ -527,8 +538,9 @@ class BookRuleEvaluatorFieldCoverageTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SHELF, RuleOperator.EXCLUDES_ALL,
                     List.of(String.valueOf(shelf1.getId()), String.valueOf(shelf2.getId()))));
-            assertThat(ids).contains(onKeep.getId(), onNone.getId());
-            assertThat(ids).doesNotContain(onExcluded1.getId(), onExcluded2.getId(), onBothExcluded.getId());
+            assertThat(ids)
+                    .contains(onKeep.getId(), onNone.getId())
+                    .doesNotContain(onExcluded1.getId(), onExcluded2.getId(), onBothExcluded.getId());
         }
 
         @Test
@@ -560,8 +572,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             group.setRules(List.of(shelfEq, titleContains));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).containsExactly(matchesBoth.getId());
-            assertThat(ids).doesNotContain(matchesShelfOnly.getId(), matchesTitleOnly.getId());
+            assertThat(ids)
+                    .containsExactly(matchesBoth.getId())
+                    .doesNotContain(matchesShelfOnly.getId(), matchesTitleOnly.getId());
         }
 
         @Test
@@ -620,8 +633,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             ));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).containsExactly(onShelf1.getId());
-            assertThat(ids).doesNotContain(onShelf2.getId(), onBoth.getId());
+            assertThat(ids)
+                    .containsExactly(onShelf1.getId())
+                    .doesNotContain(onShelf2.getId(), onBoth.getId());
         }
 
         @Test
@@ -657,9 +671,10 @@ class BookRuleEvaluatorFieldCoverageTest {
             ));
 
             List<Long> pagedIds = findMatchingIdsPaged(group, 20);
-            assertThat(pagedIds).hasSize(20);
-            assertThat(pagedIds).containsExactlyInAnyOrderElementsOf(expectedIds);
-            assertThat(pagedIds).doesNotContain(unrelated.getId());
+            assertThat(pagedIds)
+                    .hasSize(20)
+                    .containsExactlyInAnyOrderElementsOf(expectedIds)
+                    .doesNotContain(unrelated.getId());
 
             List<Long> allIds = findMatchingIds(group);
             assertThat(allIds).hasSize(20);
@@ -706,17 +721,19 @@ class BookRuleEvaluatorFieldCoverageTest {
             ));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).containsExactlyInAnyOrder(shouldAppear.getId(), shouldAppear2.getId());
-            assertThat(ids).doesNotContain(
-                    shouldNotAppear.getId(),
-                    excludeOnly.getId(),
-                    excludeAndExtra.getId(),
-                    noShelf.getId()
-            );
+            assertThat(ids)
+                    .containsExactlyInAnyOrder(shouldAppear.getId(), shouldAppear2.getId())
+                    .doesNotContain(
+                            shouldNotAppear.getId(),
+                            excludeOnly.getId(),
+                            excludeAndExtra.getId(),
+                            noShelf.getId()
+                    );
 
             List<Long> pagedIds = findMatchingIdsPaged(group, 50);
-            assertThat(pagedIds).hasSize(2);
-            assertThat(pagedIds).containsExactlyInAnyOrder(shouldAppear.getId(), shouldAppear2.getId());
+            assertThat(pagedIds)
+                    .hasSize(2)
+                    .containsExactlyInAnyOrder(shouldAppear.getId(), shouldAppear2.getId());
         }
 
         @Test
@@ -754,8 +771,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             assertThat(pagedIds).hasSize(50);
 
             List<Long> allIds = findMatchingIds(group);
-            assertThat(allIds).hasSize(50);
-            assertThat(allIds).doesNotContain(outsideBook.getId());
+            assertThat(allIds)
+                    .hasSize(50)
+                    .doesNotContain(outsideBook.getId());
         }
     }
 
@@ -774,8 +792,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SUBTITLE, RuleOperator.CONTAINS, "journey"));
-            assertThat(ids).contains(with.getId());
-            assertThat(ids).doesNotContain(without.getId());
+            assertThat(ids)
+                    .contains(with.getId())
+                    .doesNotContain(without.getId());
         }
 
         @Test
@@ -801,8 +820,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SUBTITLE, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noSub.getId());
-            assertThat(ids).doesNotContain(withSub.getId());
+            assertThat(ids)
+                    .contains(noSub.getId())
+                    .doesNotContain(withSub.getId());
         }
     }
 
@@ -821,8 +841,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.DESCRIPTION, RuleOperator.CONTAINS, "adventure"));
-            assertThat(ids).contains(match.getId());
-            assertThat(ids).doesNotContain(noMatch.getId());
+            assertThat(ids)
+                    .contains(match.getId())
+                    .doesNotContain(noMatch.getId());
         }
 
         @Test
@@ -838,8 +859,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.DESCRIPTION, RuleOperator.DOES_NOT_CONTAIN, "space"));
-            assertThat(ids).contains(romance.getId());
-            assertThat(ids).doesNotContain(scifi.getId());
+            assertThat(ids)
+                    .contains(romance.getId())
+                    .doesNotContain(scifi.getId());
         }
     }
 
@@ -858,8 +880,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHER, RuleOperator.EQUALS, "penguin random house"));
-            assertThat(ids).contains(penguin.getId());
-            assertThat(ids).doesNotContain(harper.getId());
+            assertThat(ids)
+                    .contains(penguin.getId())
+                    .doesNotContain(harper.getId());
         }
 
         @Test
@@ -875,8 +898,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHER, RuleOperator.STARTS_WITH, "penguin"));
-            assertThat(ids).contains(penguin.getId());
-            assertThat(ids).doesNotContain(harper.getId());
+            assertThat(ids)
+                    .contains(penguin.getId())
+                    .doesNotContain(harper.getId());
         }
 
         @Test
@@ -907,8 +931,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.LANGUAGE, RuleOperator.EQUALS, "en"));
-            assertThat(ids).contains(english.getId());
-            assertThat(ids).doesNotContain(french.getId());
+            assertThat(ids)
+                    .contains(english.getId())
+                    .doesNotContain(french.getId());
         }
 
         @Test
@@ -924,8 +949,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.LANGUAGE, RuleOperator.NOT_EQUALS, "en"));
-            assertThat(ids).contains(french.getId());
-            assertThat(ids).doesNotContain(english.getId());
+            assertThat(ids)
+                    .contains(french.getId())
+                    .doesNotContain(english.getId());
         }
     }
 
@@ -944,8 +970,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.NARRATOR, RuleOperator.CONTAINS, "fry"));
-            assertThat(ids).contains(book1.getId());
-            assertThat(ids).doesNotContain(book2.getId());
+            assertThat(ids)
+                    .contains(book1.getId())
+                    .doesNotContain(book2.getId());
         }
 
         @Test
@@ -976,8 +1003,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ISBN13, RuleOperator.EQUALS, "9781234567890"));
-            assertThat(ids).contains(book.getId());
-            assertThat(ids).doesNotContain(other.getId());
+            assertThat(ids)
+                    .contains(book.getId())
+                    .doesNotContain(other.getId());
         }
 
         @Test
@@ -1008,8 +1036,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.CONTENT_RATING, RuleOperator.EQUALS, "mature"));
-            assertThat(ids).contains(mature.getId());
-            assertThat(ids).doesNotContain(teen.getId());
+            assertThat(ids)
+                    .contains(mature.getId())
+                    .doesNotContain(teen.getId());
         }
     }
 
@@ -1028,8 +1057,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_NAME, RuleOperator.CONTAINS, "potter"));
-            assertThat(ids).contains(hp.getId());
-            assertThat(ids).doesNotContain(lotr.getId());
+            assertThat(ids)
+                    .contains(hp.getId())
+                    .doesNotContain(lotr.getId());
         }
 
         @Test
@@ -1045,8 +1075,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_NAME, RuleOperator.STARTS_WITH, "harry"));
-            assertThat(ids).contains(hp.getId());
-            assertThat(ids).doesNotContain(lotr.getId());
+            assertThat(ids)
+                    .contains(hp.getId())
+                    .doesNotContain(lotr.getId());
         }
 
         @Test
@@ -1060,8 +1091,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_NAME, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noSeries.getId());
-            assertThat(ids).doesNotContain(hasSeries.getId());
+            assertThat(ids)
+                    .contains(noSeries.getId())
+                    .doesNotContain(hasSeries.getId());
         }
     }
 
@@ -1082,8 +1114,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.LAST_READ_TIME, RuleOperator.WITHIN_LAST, 7, null, "days"));
-            assertThat(ids).contains(recent.getId());
-            assertThat(ids).doesNotContain(old.getId());
+            assertThat(ids)
+                    .contains(recent.getId())
+                    .doesNotContain(old.getId());
         }
 
         @Test
@@ -1101,8 +1134,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.LAST_READ_TIME, RuleOperator.OLDER_THAN, 30, null, "days"));
-            assertThat(ids).contains(old.getId());
-            assertThat(ids).doesNotContain(recent.getId());
+            assertThat(ids)
+                    .contains(old.getId())
+                    .doesNotContain(recent.getId());
         }
     }
 
@@ -1121,8 +1155,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.WITHIN_LAST, 2, null, "weeks"));
-            assertThat(ids).contains(recent.getId());
-            assertThat(ids).doesNotContain(old.getId());
+            assertThat(ids)
+                    .contains(recent.getId())
+                    .doesNotContain(old.getId());
         }
 
         @Test
@@ -1138,8 +1173,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.OLDER_THAN, 2, null, "weeks"));
-            assertThat(ids).contains(old.getId());
-            assertThat(ids).doesNotContain(recent.getId());
+            assertThat(ids)
+                    .contains(old.getId())
+                    .doesNotContain(recent.getId());
         }
     }
 
@@ -1158,8 +1194,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHED_DATE, RuleOperator.EQUALS, "2023-06-15"));
-            assertThat(ids).contains(book.getId());
-            assertThat(ids).doesNotContain(other.getId());
+            assertThat(ids)
+                    .contains(book.getId())
+                    .doesNotContain(other.getId());
         }
 
         @Test
@@ -1173,8 +1210,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHED_DATE, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noDate.getId());
-            assertThat(ids).doesNotContain(withDate.getId());
+            assertThat(ids)
+                    .contains(noDate.getId())
+                    .doesNotContain(withDate.getId());
         }
     }
 
@@ -1197,8 +1235,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.CATEGORIES, RuleOperator.CONTAINS, "fiction"));
-            assertThat(ids).contains(fiction.getId());
-            assertThat(ids).doesNotContain(history.getId());
+            assertThat(ids)
+                    .contains(fiction.getId())
+                    .doesNotContain(history.getId());
         }
 
         @Test
@@ -1214,8 +1253,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.CATEGORIES, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noCats.getId());
-            assertThat(ids).doesNotContain(withCats.getId());
+            assertThat(ids)
+                    .contains(noCats.getId())
+                    .doesNotContain(withCats.getId());
         }
     }
 
@@ -1238,8 +1278,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.MOODS, RuleOperator.INCLUDES_ANY, List.of("Dark")));
-            assertThat(ids).contains(darkBook.getId());
-            assertThat(ids).doesNotContain(lightBook.getId());
+            assertThat(ids)
+                    .contains(darkBook.getId())
+                    .doesNotContain(lightBook.getId());
         }
 
         @Test
@@ -1255,8 +1296,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.MOODS, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noMoods.getId());
-            assertThat(ids).doesNotContain(withMoods.getId());
+            assertThat(ids)
+                    .contains(noMoods.getId())
+                    .doesNotContain(withMoods.getId());
         }
     }
 
@@ -1281,8 +1323,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.TAGS, RuleOperator.INCLUDES_ALL, List.of("Tag1 FC", "Tag2 FC")));
-            assertThat(ids).contains(bookBoth.getId());
-            assertThat(ids).doesNotContain(bookOne.getId());
+            assertThat(ids)
+                    .contains(bookBoth.getId())
+                    .doesNotContain(bookOne.getId());
         }
 
         @Test
@@ -1298,8 +1341,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.TAGS, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noTags.getId());
-            assertThat(ids).doesNotContain(withTags.getId());
+            assertThat(ids)
+                    .contains(noTags.getId())
+                    .doesNotContain(withTags.getId());
         }
     }
 
@@ -1318,8 +1362,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.IS_PHYSICAL, RuleOperator.EQUALS, "true"));
-            assertThat(ids).contains(physical.getId());
-            assertThat(ids).doesNotContain(digital.getId());
+            assertThat(ids)
+                    .contains(physical.getId())
+                    .doesNotContain(digital.getId());
         }
 
         @Test
@@ -1335,8 +1380,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.IS_PHYSICAL, RuleOperator.NOT_EQUALS, "true"));
-            assertThat(ids).contains(digital.getId());
-            assertThat(ids).doesNotContain(physical.getId());
+            assertThat(ids)
+                    .contains(digital.getId())
+                    .doesNotContain(physical.getId());
         }
     }
 
@@ -1355,8 +1401,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ABRIDGED, RuleOperator.EQUALS, "true"));
-            assertThat(ids).contains(abridged.getId());
-            assertThat(ids).doesNotContain(full.getId());
+            assertThat(ids)
+                    .contains(abridged.getId())
+                    .doesNotContain(full.getId());
         }
 
         @Test
@@ -1372,8 +1419,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ABRIDGED, RuleOperator.EQUALS, "false"));
-            assertThat(ids).contains(full.getId());
-            assertThat(ids).doesNotContain(abridged.getId());
+            assertThat(ids)
+                    .contains(full.getId())
+                    .doesNotContain(abridged.getId());
         }
     }
 
@@ -1394,8 +1442,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.DATE_FINISHED, RuleOperator.THIS_PERIOD, "year"));
-            assertThat(ids).contains(thisYear.getId());
-            assertThat(ids).doesNotContain(lastYear.getId());
+            assertThat(ids)
+                    .contains(thisYear.getId())
+                    .doesNotContain(lastYear.getId());
         }
     }
 
@@ -1419,8 +1468,9 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.TITLE, RuleOperator.ENDS_WITH, "rings"));
-            assertThat(ids).contains(book.getId());
-            assertThat(ids).doesNotContain(other.getId());
+            assertThat(ids)
+                    .contains(book.getId())
+                    .doesNotContain(other.getId());
         }
     }
 }

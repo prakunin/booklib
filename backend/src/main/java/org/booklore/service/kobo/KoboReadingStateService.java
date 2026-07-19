@@ -86,7 +86,7 @@ public class KoboReadingStateService {
         return dtos.stream()
                 .map(dto -> {
                     String entitlementId = dto.getEntitlementId() == null ?
-                            null : dto.getEntitlementId().replaceAll("^\"|\"$", "");
+                            null : dto.getEntitlementId().replaceAll("^\"", "").replaceAll("\"$", "");
                     Optional<KoboReadingStateEntity> existingOpt =
                             repository.findByEntitlementIdAndUserId(entitlementId, userId);
                     log.debug("Kobo reading state lookup: entitlementId={}, foundExisting={}",
@@ -161,7 +161,7 @@ public class KoboReadingStateService {
                     .filter(readingStateBuilder::shouldUseWebReaderProgress)
                     .ifPresent(progress -> state.setCurrentBookmark(
                             readingStateBuilder.buildBookmarkFromProgress(progress, fileProgress)));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             // Not a valid book ID, skip overlay
         }
     }
@@ -178,7 +178,7 @@ public class KoboReadingStateService {
                             entitlementId,
                             progress,
                             findSyncedEpubFileProgress(user.getId(), bookId).orElse(null)));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.warn("Invalid entitlement ID format when constructing reading state: {}", entitlementId);
             return Optional.empty();
         }
@@ -256,7 +256,7 @@ public class KoboReadingStateService {
                 koreaderService.syncProgressToKoreader(book.getId(), progress.getKoboProgressPercent(), userId);
                 hardcoverSyncService.syncProgressToHardcover(book.getId(), progress.getKoboProgressPercent(), userId);
             }
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.warn("Invalid entitlement ID format: {}", readingState.getEntitlementId());
         }
     }
@@ -346,20 +346,14 @@ public class KoboReadingStateService {
             if (isBlank(state.getLastModified())) {
                 state.setLastModified(requestTimestamp);
             }
-            if (state.getStatusInfo() != null) {
-                if (isBlank(state.getStatusInfo().getLastModified())) {
-                    state.getStatusInfo().setLastModified(requestTimestamp);
-                }
+            if (state.getStatusInfo() != null && isBlank(state.getStatusInfo().getLastModified())) {
+                state.getStatusInfo().setLastModified(requestTimestamp);
             }
-            if (state.getStatistics() != null) {
-                if (isBlank(state.getStatistics().getLastModified())) {
-                    state.getStatistics().setLastModified(requestTimestamp);
-                }
+            if (state.getStatistics() != null && isBlank(state.getStatistics().getLastModified())) {
+                state.getStatistics().setLastModified(requestTimestamp);
             }
-            if (state.getCurrentBookmark() != null) {
-                if (isBlank(state.getCurrentBookmark().getLastModified())) {
-                    state.getCurrentBookmark().setLastModified(requestTimestamp);
-                }
+            if (state.getCurrentBookmark() != null && isBlank(state.getCurrentBookmark().getLastModified())) {
+                state.getCurrentBookmark().setLastModified(requestTimestamp);
             }
         });
     }
@@ -394,16 +388,19 @@ public class KoboReadingStateService {
             Instant instant = Instant.parse(trimmed).truncatedTo(ChronoUnit.SECONDS);
             return KOBO_TIMESTAMP_FORMAT.format(instant);
         } catch (Exception _) {
+            // not an ISO instant, try the next format
         }
         try {
             OffsetDateTime offsetDateTime = OffsetDateTime.parse(trimmed);
             return KOBO_TIMESTAMP_FORMAT.format(offsetDateTime.toInstant().truncatedTo(ChronoUnit.SECONDS));
         } catch (Exception _) {
+            // not an offset date-time, try the next format
         }
         try {
             LocalDateTime localDateTime = LocalDateTime.parse(trimmed, LOCAL_TIMESTAMP_FORMAT);
             return KOBO_TIMESTAMP_FORMAT.format(localDateTime.toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS));
         } catch (Exception _) {
+            // not a local date-time, fall back to the original value
         }
         return value;
     }
@@ -509,15 +506,18 @@ public class KoboReadingStateService {
         try {
             return Instant.parse(trimmed);
         } catch (Exception _) {
+            // not an ISO instant, try the next format
         }
         try {
             return OffsetDateTime.parse(trimmed).toInstant();
         } catch (Exception _) {
+            // not an offset date-time, try the next format
         }
         try {
             LocalDateTime localDateTime = LocalDateTime.parse(trimmed, LOCAL_TIMESTAMP_FORMAT);
             return localDateTime.toInstant(ZoneOffset.UTC);
         } catch (Exception _) {
+            // not a local date-time, give up
         }
         return null;
     }

@@ -26,9 +26,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.dto.BookLoreUser;
-import org.booklore.model.enums.PermissionType;
-import org.booklore.model.websocket.LogNotification;
-import org.booklore.model.websocket.Topic;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -1048,7 +1045,9 @@ class BookCoverServiceTest {
             try {
                 when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0})); // JPEG
                 when(file.getBytes()).thenReturn(new byte[]{1, 2, 3});
-            } catch (Exception _) {}
+            } catch (Exception _) {
+                // mock stubbing declares checked exceptions that are never thrown here
+            }
 
             service.updateCoverFromFileForBooks(Set.of(1L, 2L), file);
 
@@ -1064,7 +1063,8 @@ class BookCoverServiceTest {
             MultipartFile file = mock(MultipartFile.class);
             when(file.isEmpty()).thenReturn(true);
 
-            assertThatThrownBy(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
+            Set<Long> bookIds = Set.of(1L);
+            assertThatThrownBy(() -> service.updateCoverFromFileForBooks(bookIds, file))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("empty");
         }
@@ -1079,7 +1079,8 @@ class BookCoverServiceTest {
             when(file.getSize()).thenReturn(1024L);
             when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{1, 2, 3}));
 
-            assertThatThrownBy(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
+            Set<Long> bookIds = Set.of(1L);
+            assertThatThrownBy(() -> service.updateCoverFromFileForBooks(bookIds, file))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("JPEG and PNG");
         }
@@ -1093,7 +1094,8 @@ class BookCoverServiceTest {
             when(file.isEmpty()).thenReturn(false);
             when(file.getSize()).thenReturn(6L * 1024 * 1024);
 
-            assertThatThrownBy(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
+            Set<Long> bookIds = Set.of(1L);
+            assertThatThrownBy(() -> service.updateCoverFromFileForBooks(bookIds, file))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("exceeds");
         }
@@ -1109,7 +1111,9 @@ class BookCoverServiceTest {
             try {
                 when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0}));
                 when(file.getBytes()).thenReturn(new byte[]{1, 2, 3});
-            } catch (Exception _) {}
+            } catch (Exception _) {
+                // mock stubbing declares checked exceptions that are never thrown here
+            }
 
             when(bookQueryService.findAllWithMetadataByIds(any())).thenReturn(List.of());
 
@@ -1127,7 +1131,9 @@ class BookCoverServiceTest {
             try {
                 when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}));
                 when(file.getBytes()).thenReturn(new byte[]{1, 2, 3});
-            } catch (Exception _) {}
+            } catch (Exception _) {
+                // mock stubbing declares checked exceptions that are never thrown here
+            }
 
             when(bookQueryService.findAllWithMetadataByIds(any())).thenReturn(List.of());
 
@@ -1144,7 +1150,8 @@ class BookCoverServiceTest {
             when(file.getSize()).thenReturn(1024L);
             when(file.getInputStream()).thenThrow(new IOException("Test error"));
 
-            assertThatThrownBy(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
+            Set<Long> bookIds = Set.of(1L);
+            assertThatThrownBy(() -> service.updateCoverFromFileForBooks(bookIds, file))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Failed to read");
         }
@@ -1610,7 +1617,7 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.EPUB)).thenReturn(processor);
-            when(processor.extractCover(eq(book), eq(epubFile))).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(processor.extractCover(book, epubFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
             when(fileService.saveCoverImageFromBytes(anyLong(), any())).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
@@ -1630,7 +1637,7 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.PDF)).thenReturn(processor);
-            when(processor.extractCover(eq(book), eq(pdfFile))).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(processor.extractCover(book, pdfFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
             when(fileService.saveCoverImageFromBytes(anyLong(), any())).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);
@@ -1649,7 +1656,7 @@ class BookCoverServiceTest {
 
             BookFileProcessor processor = mock(BookFileProcessor.class);
             when(processorRegistry.getProcessorOrThrow(BookFileType.EPUB)).thenReturn(processor);
-            when(processor.extractCover(eq(book), eq(epubFile))).thenReturn(CoverExtraction.found(COVER_BYTES));
+            when(processor.extractCover(book, epubFile)).thenReturn(CoverExtraction.found(COVER_BYTES));
             when(fileService.saveCoverImageFromBytes(anyLong(), any())).thenReturn(CoverSaveOutcome.SAVED);
 
             service.regenerateCover(1L);

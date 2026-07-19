@@ -1,6 +1,5 @@
 package org.booklore.service.browse;
 
-import org.booklore.service.browse.BookSpecifications;
 import org.booklore.browse.FacetLogic;
 import org.booklore.exception.ApiError;
 import org.booklore.model.entity.BookEntity;
@@ -102,7 +101,7 @@ public class BookFacetRegistry {
     private static long parseMagicShelfId(String value) {
         try {
             return Long.parseLong(value.substring(MAGIC_SHELF_PREFIX.length()));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw ApiError.INVALID_FACET.createException("Invalid magic shelf id: " + value);
         }
     }

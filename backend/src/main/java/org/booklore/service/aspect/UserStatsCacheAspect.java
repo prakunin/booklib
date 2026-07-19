@@ -68,7 +68,7 @@ public class UserStatsCacheAspect {
     private static String stableArgsKey(Object[] args) {
         try {
             return CACHE_KEY_MAPPER.writeValueAsString(args);
-        } catch (JsonProcessingException e) {
+        } catch (JsonProcessingException _) {
             return Arrays.deepToString(args);
         }
     }

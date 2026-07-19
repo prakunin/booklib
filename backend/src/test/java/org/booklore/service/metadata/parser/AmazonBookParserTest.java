@@ -29,7 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class AmazonBookParserTest {
+class AmazonBookParserTest {
     @Mock private AppSettingService mockAppSettingService;
 
     @InjectMocks
@@ -107,7 +107,7 @@ public class AmazonBookParserTest {
     }
 
     @BeforeEach
-    public void setup() throws Exception {
+    void setup() {
         when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettings( "com"));
 
         mockJsoup = mockStatic(Jsoup.class);
@@ -119,7 +119,7 @@ public class AmazonBookParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_usesAsinFromBookWhenAvailable() throws Exception {
+    void fetchTopMetadata_usesAsinFromBookWhenAvailable() throws Exception {
         mockJsoupConnect("https://www.amazon.com/dp/EXAMPLESKU", "<html />");
 
         Book book = getBook("EXAMPLESKU");
@@ -131,7 +131,7 @@ public class AmazonBookParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_useDomain() throws Exception {
+    void fetchTopMetadata_useDomain() throws Exception {
         mockJsoupConnect("https://www.amazon.co.jp/dp/EXAMPLESKU", "<html />");
         when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettings( "co.jp"));
 
@@ -144,7 +144,7 @@ public class AmazonBookParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_removesExtraWhitespace() throws Exception {
+    void fetchTopMetadata_removesExtraWhitespace() throws Exception {
         mockJsoupConnect("https://www.amazon.com/dp/EXAMPLESKU", "<html />");
 
         Book book = getBook("  EXAMPLESKU  ");
@@ -156,7 +156,7 @@ public class AmazonBookParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_removesExtraCharacters() throws Exception {
+    void fetchTopMetadata_removesExtraCharacters() throws Exception {
         mockJsoupConnect("https://www.amazon.com/dp/EXAMPLESKU", "<html />");
 
         Book book = getBook("@EXAMPLESKU!!");
@@ -168,7 +168,7 @@ public class AmazonBookParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_ignoresInvalidBookASINUsesLink() throws Exception {
+    void fetchTopMetadata_ignoresInvalidBookASINUsesLink() throws Exception {
         mockAmazonIDSearch("Example");
         mockJsoupConnect("https://www.amazon.com/dp/SEARCHASIN", "<html />");
 
@@ -182,7 +182,7 @@ public class AmazonBookParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_ignoresMissingBookASINUsesLink() throws Exception {
+    void fetchTopMetadata_ignoresMissingBookASINUsesLink() throws Exception {
         mockAmazonIDSearch("Example");
         mockJsoupConnect("https://www.amazon.com/dp/SEARCHASIN", "<html />");
 
@@ -195,7 +195,7 @@ public class AmazonBookParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_cleansLineBreaks() throws Exception {
+    void fetchTopMetadata_cleansLineBreaks() throws Exception {
         String fakePageHtml = """
         <html><body>
         <div class="product-description">

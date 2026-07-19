@@ -177,7 +177,7 @@ public class CoverImageGenerator {
                 new Palette(new Color(50, 55, 40), new Color(80, 90, 65), new Color(65, 72, 52),
                         new Color(215, 205, 170), new Color(252, 250, 245), new Color(220, 215, 200), new Color(185, 180, 150))
         };
-        return palettes[Math.abs(title.hashCode()) % palettes.length];
+        return palettes[Math.floorMod(title.hashCode(), palettes.length)];
     }
 
     private static void renderBaseGradient(Graphics2D g, Palette p, int w, int h) {
@@ -386,19 +386,19 @@ public class CoverImageGenerator {
 
         int ds = 14;
         Path2D diamond = new Path2D.Float();
-        diamond.moveTo(cx, cy - ds);
-        diamond.lineTo(cx + ds, cy);
-        diamond.lineTo(cx, cy + ds);
-        diamond.lineTo(cx - ds, cy);
+        diamond.moveTo(cx, (double) cy - ds);
+        diamond.lineTo((double) cx + ds, cy);
+        diamond.lineTo(cx, (double) cy + ds);
+        diamond.lineTo((double) cx - ds, cy);
         diamond.closePath();
         g.draw(diamond);
 
         int is = 6;
         Path2D inner = new Path2D.Float();
-        inner.moveTo(cx, cy - is);
-        inner.lineTo(cx + is, cy);
-        inner.lineTo(cx, cy + is);
-        inner.lineTo(cx - is, cy);
+        inner.moveTo(cx, (double) cy - is);
+        inner.lineTo((double) cx + is, cy);
+        inner.lineTo(cx, (double) cy + is);
+        inner.lineTo((double) cx - is, cy);
         inner.closePath();
         g.fill(inner);
 
@@ -560,7 +560,7 @@ public class CoverImageGenerator {
     }
 
     private static void renderVignette(Graphics2D g, int w, int h) {
-        float r = (float) (Math.sqrt(w * w + h * h) / 2 * 1.12);
+        float r = (float) (Math.sqrt((double) (w * w) + h * h) / 2 * 1.12);
         g.setPaint(new RadialGradientPaint(w / 2f, h / 2f, r,
                 new float[]{0f, (float) PHI_INV, (float) (PHI_INV + PHI_SQ_INV * 0.25), 0.9f, 1f},
                 new Color[]{alpha(Color.BLACK, 0), alpha(Color.BLACK, 0), alpha(Color.BLACK, 15),
@@ -864,13 +864,13 @@ public class CoverImageGenerator {
             throw new RuntimeException("JPEG encoding failed", e);
         } finally {
             if (writer != null) writer.dispose();
-            if (ios != null) try { ios.close(); } catch (IOException _) {}
+            if (ios != null) try { ios.close(); } catch (IOException _) { /* nothing to recover on close */ }
         }
     }
 
     private void cleanup(Graphics2D g, BufferedImage... images) {
-        if (g != null) try { g.dispose(); } catch (Exception _) {}
+        if (g != null) try { g.dispose(); } catch (Exception _) { /* best-effort cleanup */ }
         for (BufferedImage img : images)
-            if (img != null) try { img.flush(); } catch (Exception _) {}
+            if (img != null) try { img.flush(); } catch (Exception _) { /* best-effort cleanup */ }
     }
 }

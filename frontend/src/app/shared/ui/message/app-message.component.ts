@@ -111,14 +111,14 @@ export class AppMessageComponent {
   protected readonly fieldMessages = computed<readonly string[]>(() => {
     this.activeLang();
     const state = this.fieldState();
-    if (!state || !state.touched()) return [];
+    if (!state?.touched()) return [];
     return state.errors().map(error => appFieldErrorMessage(error, this.translateFallbackError));
   });
   protected readonly fieldText = computed(() => this.fieldMessages().join(' '));
 
   protected readonly summaryIssues = computed<readonly ValidationError.WithFieldTree[]>(() => {
     const state = this.fieldState();
-    if (!state || !state.touched()) return [];
+    if (!state?.touched()) return [];
     return state.errorSummary();
   });
   protected readonly summaryCount = computed(() => this.summaryIssues().length);

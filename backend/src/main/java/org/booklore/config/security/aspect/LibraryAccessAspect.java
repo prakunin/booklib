@@ -56,8 +56,8 @@ public class LibraryAccessAspect {
         for (int i = 0; i < paramNames.length; i++) {
             if (Objects.equals(paramNames[i], targetParam)) {
                 Object arg = args[i];
-                if (arg instanceof Long) {
-                    return (Long) arg;
+                if (arg instanceof Long longValue) {
+                    return longValue;
                 } else if (arg instanceof String str && NUMERIC_PATTERN.matcher(str).matches()) {
                     return Long.parseLong(str);
                 }

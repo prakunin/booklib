@@ -59,8 +59,8 @@ class BookdropMonitoringServiceTest {
         
         monitoringService.stop();
 
-        verify(eventHandler).enqueueFile(eq(validFile), eq(StandardWatchEventKinds.ENTRY_CREATE));
-        verify(eventHandler).enqueueFile(eq(validFileInSubdir), eq(StandardWatchEventKinds.ENTRY_CREATE));
+        verify(eventHandler).enqueueFile(validFile, StandardWatchEventKinds.ENTRY_CREATE);
+        verify(eventHandler).enqueueFile(validFileInSubdir, StandardWatchEventKinds.ENTRY_CREATE);
 
         verify(eventHandler, never()).enqueueFile(eq(invalidFile), any());
         verify(eventHandler, never()).enqueueFile(eq(hiddenFile), any());
@@ -82,7 +82,7 @@ class BookdropMonitoringServiceTest {
 
         monitoringService.stop();
 
-        verify(eventHandler, never()).enqueueFile(eq(alreadyTracked), eq(StandardWatchEventKinds.ENTRY_CREATE));
-        verify(eventHandler).enqueueFile(eq(newFile), eq(StandardWatchEventKinds.ENTRY_CREATE));
+        verify(eventHandler, never()).enqueueFile(alreadyTracked, StandardWatchEventKinds.ENTRY_CREATE);
+        verify(eventHandler).enqueueFile(newFile, StandardWatchEventKinds.ENTRY_CREATE);
     }
 }

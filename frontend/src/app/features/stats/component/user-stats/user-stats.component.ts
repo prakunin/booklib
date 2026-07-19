@@ -73,8 +73,8 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
   styleUrls: ['./user-stats.component.scss']
 })
 export class UserStatsComponent {
-  private userService = inject(UserService);
-  private chartConfigService = inject(UserChartConfigService);
+  private readonly userService = inject(UserService);
+  private readonly chartConfigService = inject(UserChartConfigService);
   private readonly chartTheme = inject(StatsChartThemeService);
   private readonly bookService = inject(BookService);
 

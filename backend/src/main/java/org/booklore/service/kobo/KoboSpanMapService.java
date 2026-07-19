@@ -55,7 +55,7 @@ public class KoboSpanMapService {
         }
         try {
             koboSpanMapRepository.save(entity);
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException _) {
             log.debug("Kobo span map already stored by a concurrent request for file {}", bookFile.getId());
         }
     }

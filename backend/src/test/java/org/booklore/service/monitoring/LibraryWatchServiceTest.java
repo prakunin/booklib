@@ -2,7 +2,6 @@ package org.booklore.service.monitoring;
 
 import org.booklore.model.dto.Library;
 import org.booklore.model.dto.LibraryPath;
-import org.booklore.model.enums.BookFileExtension;
 import org.booklore.service.watcher.LibraryFileEventProcessor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +26,7 @@ class LibraryWatchServiceTest {
     LibraryFileEventProcessor processor;
 
     @BeforeEach
-    void setup() throws Exception {
+    void setup() {
         processor = mock(LibraryFileEventProcessor.class);
         service = new LibraryWatchService(processor);
         service.start();
@@ -37,7 +36,9 @@ class LibraryWatchServiceTest {
     void teardown() {
         try {
             service.stop();
-        } catch (Exception _) {}
+        } catch (Exception _) {
+            // best-effort teardown
+        }
     }
 
     @Test

@@ -28,7 +28,7 @@ public class BookSpecifications {
                 .map(s -> {
                     try {
                         return Integer.parseInt(s.trim());
-                    } catch (NumberFormatException e) {
+                    } catch (NumberFormatException _) {
                         invalid.add(s.trim());
                         return null;
                     }
@@ -48,7 +48,7 @@ public class BookSpecifications {
                 .map(s -> {
                     try {
                         return Long.parseLong(s.trim());
-                    } catch (NumberFormatException e) {
+                    } catch (NumberFormatException _) {
                         invalid.add(s.trim());
                         return null;
                     }
@@ -263,7 +263,7 @@ public class BookSpecifications {
                         String trimmed = s.trim().toUpperCase();
                         try {
                             return BookFileType.valueOf(trimmed);
-                        } catch (IllegalArgumentException e) {
+                        } catch (IllegalArgumentException _) {
                             unknown.add(s.trim());
                             return null;
                         }
@@ -315,7 +315,7 @@ public class BookSpecifications {
                         String trimmed = s.trim().toUpperCase();
                         try {
                             return ReadStatus.valueOf(trimmed);
-                        } catch (IllegalArgumentException e) {
+                        } catch (IllegalArgumentException _) {
                             unknown.add(s.trim());
                             return null;
                         }
@@ -563,7 +563,7 @@ public class BookSpecifications {
         return (root, query, cb) -> {
             Subquery<Long> subquery = query.subquery(Long.class);
             Root<BookEntity> subRoot = subquery.correlate(root);
-            Join<BookEntity, ShelfEntity> shelvesJoin = subRoot.join("shelves", JoinType.INNER);
+            subRoot.join("shelves", JoinType.INNER);
             subquery.select(cb.literal(1L));
             return cb.not(cb.exists(subquery));
         };

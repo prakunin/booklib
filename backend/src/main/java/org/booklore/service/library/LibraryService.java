@@ -230,7 +230,7 @@ public class LibraryService {
                         .libraryId(libraryId)
                         .build();
                 libraryProcessingService.rescanLibrary(context);
-            } catch (InvalidDataAccessApiUsageException e) {
+            } catch (InvalidDataAccessApiUsageException _) {
                 log.debug("InvalidDataAccessApiUsageException - Library id: {}", libraryId);
             } catch (IOException e) {
                 log.error("Error while parsing library books", e);
@@ -441,7 +441,7 @@ public class LibraryService {
         }
         try {
             return Path.of(value).toAbsolutePath().normalize();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException(message);
         }
     }
@@ -454,7 +454,7 @@ public class LibraryService {
             if (!containsIndex) {
                 throw ApiError.GENERIC_BAD_REQUEST.createException("INPX index does not contain any .inp catalogs");
             }
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("INPX index is empty or invalid");
         }
     }
@@ -492,7 +492,7 @@ public class LibraryService {
             }
             try {
                 libraryProcessingService.processLibrary(libraryId);
-            } catch (InvalidDataAccessApiUsageException e) {
+            } catch (InvalidDataAccessApiUsageException _) {
                 log.debug("InvalidDataAccessApiUsageException - Library id: {}", libraryId);
             } finally {
                 scanningLibraries.remove(libraryId);

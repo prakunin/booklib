@@ -141,6 +141,9 @@ public class KoboServerProxy {
             return new ResponseEntity<>(responseBody, responseHeaders, HttpStatus.valueOf(response.statusCode()));
 
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.error("Failed to proxy request to Kobo", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to proxy request to Kobo", e);
         }

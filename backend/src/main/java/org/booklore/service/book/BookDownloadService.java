@@ -297,6 +297,9 @@ public class BookDownloadService {
             log.info("Successfully streamed {} ({} bytes) to client", fileToSend.getName(), fileToSend.length());
 
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.error("Failed to download kobo book {}: {}", bookId, e.getMessage(), e);
             throw ApiError.FAILED_TO_DOWNLOAD_FILE.createException(bookId);
         } finally {

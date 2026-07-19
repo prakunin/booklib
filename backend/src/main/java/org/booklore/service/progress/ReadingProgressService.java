@@ -179,7 +179,7 @@ public class ReadingProgressService {
         if (value == null) return null;
         try {
             return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }
@@ -188,7 +188,7 @@ public class ReadingProgressService {
         if (value == null) return null;
         try {
             return Long.parseLong(value);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }
@@ -457,17 +457,16 @@ public class ReadingProgressService {
 
         // Only allow automatic status changes that represent progress upgrades
         // Don't downgrade from manually set or higher progress statuses
-        if (newStatus == ReadStatus.UNREAD) {
-            // Preserve any status that indicates the user has engaged with the book
-            if (currentStatus == ReadStatus.READING ||
+        // Preserve any status that indicates the user has engaged with the book
+        if (newStatus == ReadStatus.UNREAD &&
+                (currentStatus == ReadStatus.READING ||
                 currentStatus == ReadStatus.RE_READING ||
                 currentStatus == ReadStatus.READ ||
                 currentStatus == ReadStatus.PARTIALLY_READ ||
                 currentStatus == ReadStatus.PAUSED ||
                 currentStatus == ReadStatus.ABANDONED ||
-                currentStatus == ReadStatus.WONT_READ) {
-                return currentStatus;
-            }
+                currentStatus == ReadStatus.WONT_READ)) {
+            return currentStatus;
         }
 
         return newStatus;

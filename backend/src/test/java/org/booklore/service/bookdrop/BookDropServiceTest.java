@@ -135,7 +135,7 @@ class BookDropServiceTest {
                               if (!path.equals(tempDir)) { // Don't delete the tempDir itself
                                   Files.deleteIfExists(path);
                               }
-                          } catch (IOException e) {
+                          } catch (IOException _) {
                               // Ignore cleanup failures in tearDown
                           }
                       });
@@ -161,7 +161,6 @@ class BookDropServiceTest {
     void getFilesByStatus_WhenStatusIsPending_ShouldReturnPendingFiles() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<BookdropFileEntity> entityPage = new PageImpl<>(List.of(bookdropFileEntity));
-        Page<BookdropFile> expectedPage = new PageImpl<>(List.of(bookdropFile));
 
         when(bookdropFileRepository.findAllByStatus(BookdropFileEntity.Status.PENDING_REVIEW, pageable))
                 .thenReturn(entityPage);

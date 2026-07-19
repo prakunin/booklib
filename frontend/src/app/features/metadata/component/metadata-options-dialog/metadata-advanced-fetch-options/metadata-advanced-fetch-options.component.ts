@@ -81,12 +81,12 @@ export class MetadataAdvancedFetchOptionsComponent implements OnChanges {
   bulkP3: string | null = null;
   bulkP4: string | null = null;
 
-  private messageService = inject(MessageService);
+  private readonly messageService = inject(MessageService);
   private readonly t = inject(TranslocoService);
 
   private justSubmitted = false;
 
-  private providerSpecificFieldsList = [
+  private readonly providerSpecificFieldsList = [
     // Amazon
     'asin', 'amazonRating', 'amazonReviewCount',
 
@@ -291,7 +291,7 @@ export class MetadataAdvancedFetchOptionsComponent implements OnChanges {
       'tags': 'Tags (Hardcover)'
     };
 
-    return fieldLabels[field] || field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
+    return fieldLabels[field] || field.replaceAll(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
   }
 
   isProviderSpecificField(field: keyof FieldOptions): boolean {

@@ -38,9 +38,9 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
   styleUrls: ['./login.component.scss']
 })
 export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('usernameInput', {read: ElementRef}) private usernameInput?: ElementRef<HTMLInputElement>;
-  @ViewChild('passwordInput') private passwordInput?: Password;
-  @ViewChild('loginForm') private loginForm?: NgForm;
+  @ViewChild('usernameInput', {read: ElementRef}) private readonly usernameInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('passwordInput') private readonly passwordInput?: Password;
+  @ViewChild('loginForm') private readonly loginForm?: NgForm;
 
   username = '';
   password = '';
@@ -51,15 +51,15 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   isOidcLoginInProgress = false;
   showLocalLogin = true;
   private oidcOnlyAutoRedirect = false;
-  private authService = inject(AuthService);
-  private oidcService = inject(OidcService);
-  private appSettingsService = inject(AppSettingsService);
-  private router = inject(Router);
-  private route = inject(ActivatedRoute);
-  private translocoService = inject(TranslocoService);
-  private autofillMonitor = inject(AutofillMonitor);
-  private changeDetectorRef = inject(ChangeDetectorRef);
-  private destroyRef = inject(DestroyRef);
+  private readonly authService = inject(AuthService);
+  private readonly oidcService = inject(OidcService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly translocoService = inject(TranslocoService);
+  private readonly autofillMonitor = inject(AutofillMonitor);
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
+  private readonly destroyRef = inject(DestroyRef);
   private monitoredInputs: HTMLInputElement[] = [];
 
   private readonly initPublicSettingsEffect = effect(() => {
@@ -135,7 +135,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private handleAutoRedirect(): void {
     const countStr = sessionStorage.getItem('oidc_redirect_count');
-    const count = countStr ? parseInt(countStr, 10) : 0;
+    const count = countStr ? Number.parseInt(countStr, 10) : 0;
 
     if (count >= LoginComponent.MAX_REDIRECT_COUNT) {
       sessionStorage.removeItem('oidc_redirect_count');
@@ -225,7 +225,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
         details.scopes
       );
 
-      window.location.href = authUrl;
+      globalThis.location.href = authUrl;
     } catch (error) {
       console.error('OIDC login initiation failed:', error);
       sessionStorage.removeItem('oidc_redirect_count');

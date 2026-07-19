@@ -29,7 +29,7 @@ class KoreaderUserControllerTest {
 
     @BeforeEach
     void setUp() {
-        try (AutoCloseable mocks = MockitoAnnotations.openMocks(this)) {
+        try (var _ = MockitoAnnotations.openMocks(this)) {
             user = new KoreaderUser(1L, "testuser", true, true);
         } catch (Exception e) {
             throw new RuntimeException(e);

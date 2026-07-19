@@ -16,9 +16,9 @@ export class BookMetadataManageService {
 
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/books`;
 
-  private http = inject(HttpClient);
-  private messageService = inject(MessageService);
-  private queryClient = inject(QueryClient);
+  private readonly http = inject(HttpClient);
+  private readonly messageService = inject(MessageService);
+  private readonly queryClient = inject(QueryClient);
   private readonly t = inject(TranslocoService);
 
   updateBookMetadata(bookId: number | undefined, wrapper: MetadataUpdateWrapper, mergeCategories: boolean, replaceMode: 'REPLACE_ALL' | 'REPLACE_WHEN_PROVIDED' = 'REPLACE_ALL'): Observable<BookMetadata> {

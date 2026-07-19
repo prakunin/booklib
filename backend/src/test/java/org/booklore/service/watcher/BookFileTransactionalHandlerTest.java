@@ -1,7 +1,6 @@
 package org.booklore.service.watcher;
 
 import org.booklore.model.entity.*;
-import org.booklore.model.enums.BookFileExtension;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.LibraryOrganizationMode;
 import org.booklore.repository.BookAdditionalFileRepository;
@@ -24,7 +23,6 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -86,7 +84,7 @@ class BookFileTransactionalHandlerTest {
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(library));
         when(bookFilePersistenceService.findMatchingLibraryPath(eq(library), any(Path.class))).thenReturn("/library");
-        when(bookFilePersistenceService.getLibraryPathEntityForFile(eq(library), eq("/library"))).thenReturn(libraryPath);
+        when(bookFilePersistenceService.getLibraryPathEntityForFile(library, "/library")).thenReturn(libraryPath);
     }
 
     @AfterEach
@@ -207,7 +205,7 @@ class BookFileTransactionalHandlerTest {
 
             handler.handleNewBookFile(1L, Path.of("/library/sub/test.epub"));
 
-            verify(pendingDeletionPool).recoverBook(eq(match), eq(libraryPath), eq("sub"), eq("test.epub"), eq("hash123"));
+            verify(pendingDeletionPool).recoverBook(match, libraryPath, "sub", "test.epub", "hash123");
             verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
         }
 
@@ -574,7 +572,7 @@ class BookFileTransactionalHandlerTest {
 
             handler.handleNewFolderAudiobook(1L, Path.of("/library/sub/audiobook"));
 
-            verify(pendingDeletionPool).recoverBook(eq(match), eq(libraryPath), eq("sub"), eq("audiobook"), eq("folderhash"));
+            verify(pendingDeletionPool).recoverBook(match, libraryPath, "sub", "audiobook", "folderhash");
             verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
         }
 

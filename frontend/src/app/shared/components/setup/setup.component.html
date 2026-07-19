@@ -39,7 +39,7 @@
               formControlName="username"
               [placeholder]="t('usernamePlaceholder')"
               class="form-input"
-              autocomplete="username"
+              autocomplete="on"
             />
             @if (setupForm.get('username')?.invalid && setupForm.get('username')?.touched) {
               <small class="field-error">
@@ -62,7 +62,7 @@
               formControlName="name"
               [placeholder]="t('fullNamePlaceholder')"
               class="form-input"
-              autocomplete="name"
+              autocomplete="on"
             />
             @if (setupForm.get('name')?.invalid && setupForm.get('name')?.touched) {
               <small class="field-error">

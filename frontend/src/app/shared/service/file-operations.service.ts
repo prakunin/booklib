@@ -18,7 +18,7 @@ export interface FileMoveRequest {
 export class FileOperationsService {
   private readonly baseUrl = `${API_CONFIG.BASE_URL}/api/v1/files`;
 
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
 
   moveFiles(request: FileMoveRequest): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/move`, request);

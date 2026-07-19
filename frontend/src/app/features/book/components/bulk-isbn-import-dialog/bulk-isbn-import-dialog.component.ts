@@ -60,12 +60,12 @@ type ImportPhase = 'upload' | 'processing' | 'summary';
   styleUrl: './bulk-isbn-import-dialog.component.scss',
 })
 export class BulkIsbnImportDialogComponent {
-  private dynamicDialogRef = inject(DynamicDialogRef);
-  private dialogConfig = inject(DynamicDialogConfig);
-  private bookService = inject(BookService);
-  private appBooksApi = inject(AppBooksApiService);
-  private bookMetadataService = inject(BookMetadataService);
-  private libraryService = inject(LibraryService);
+  private readonly dynamicDialogRef = inject(DynamicDialogRef);
+  private readonly dialogConfig = inject(DynamicDialogConfig);
+  private readonly bookService = inject(BookService);
+  private readonly appBooksApi = inject(AppBooksApiService);
+  private readonly bookMetadataService = inject(BookMetadataService);
+  private readonly libraryService = inject(LibraryService);
 
   selectedLibraryId: number | null = null;
 
@@ -205,7 +205,7 @@ export class BulkIsbnImportDialogComponent {
 
       this.processedCount++;
 
-      if (!this.cancelled && entry !== this.entries[this.entries.length - 1]) {
+      if (!this.cancelled && entry !== this.entries.at(-1)) {
         await this.delay(DELAY_BETWEEN_REQUESTS_MS);
       }
     }
@@ -295,7 +295,7 @@ export class BulkIsbnImportDialogComponent {
       else delimiter = ',';
     }
 
-    const headerFields = lines[0].split(delimiter).map(f => f.trim().replace(/^["']|["']$/g, '').toLowerCase());
+    const headerFields = lines[0].split(delimiter).map(f => f.trim().replaceAll(/^["']|["']$/g, '').toLowerCase());
     let isbnColIndex = headerFields.findIndex(h => h === 'isbn' || h === 'isbn13' || h === 'isbn10');
 
     let startLine: number;
@@ -313,7 +313,7 @@ export class BulkIsbnImportDialogComponent {
 
       const fields = line.split(delimiter);
       if (fields.length > isbnColIndex) {
-        const value = fields[isbnColIndex].trim().replace(/^["']|["']$/g, '');
+        const value = fields[isbnColIndex].trim().replaceAll(/^["']|["']$/g, '');
         if (value) result.push(value);
       }
     }
@@ -322,7 +322,7 @@ export class BulkIsbnImportDialogComponent {
 
   private normalizeIsbn(raw: string): string {
     // Strip hyphens, spaces, surrounding whitespace; preserve trailing X
-    return raw.trim().replace(/[-\s]/g, '').toUpperCase();
+    return raw.trim().replaceAll(/[-\s]/g, '').toUpperCase();
   }
 
   private isValidIsbn(isbn: string): boolean {

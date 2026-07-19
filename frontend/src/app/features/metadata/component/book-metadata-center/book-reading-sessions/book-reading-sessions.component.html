@@ -20,12 +20,12 @@
       class="p-datatable-sm">
       <ng-template pTemplate="header">
         <tr>
-          <th>{{ t('headerSession') }}</th>
-          <th>{{ t('headerType') }}</th>
-          <th>{{ t('headerDuration') }}</th>
-          <th>{{ t('headerProgress') }}</th>
-          <th>{{ t('headerProgressDelta') }}</th>
-          <th>{{ t('headerLocation') }}</th>
+          <th scope="col">{{ t('headerSession') }}</th>
+          <th scope="col">{{ t('headerType') }}</th>
+          <th scope="col">{{ t('headerDuration') }}</th>
+          <th scope="col">{{ t('headerProgress') }}</th>
+          <th scope="col">{{ t('headerProgressDelta') }}</th>
+          <th scope="col">{{ t('headerLocation') }}</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-session>

@@ -171,7 +171,7 @@ export class ReadingHeatmapChartComponent {
           if (!point?.v) return readStatsChartThemeColors().grid;
 
           const intensity = point.v / this.maxBookCount;
-          const alpha = Math.max(0.2, Math.min(1.0, intensity * 0.8 + 0.2));
+          const alpha = Math.max(0.2, Math.min(1, intensity * 0.8 + 0.2));
           return `rgba(239, 71, 111, ${alpha})`;
         },
         borderWidth: 1,

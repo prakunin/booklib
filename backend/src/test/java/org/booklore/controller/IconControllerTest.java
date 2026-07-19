@@ -31,7 +31,7 @@ class IconControllerTest {
         var response = controller.getSvgIconContent("book", null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getHeaders().getContentType().toString()).isEqualTo("image/svg+xml");
+        assertThat(response.getHeaders().getContentType()).hasToString("image/svg+xml");
         assertThat(response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL)).isEqualTo("max-age=600, private");
         assertThat(response.getHeaders().getETag()).matches("\"[0-9a-f]{64}\"");
         assertThat(response.getBody()).isEqualTo("<svg><path d=\"M0 0\"/></svg>");

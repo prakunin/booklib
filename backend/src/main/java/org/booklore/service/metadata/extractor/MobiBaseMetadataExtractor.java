@@ -230,14 +230,14 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         int textLength = readInt(raf);
         int recordCount = readShort(raf);
         int recordSize = readShort(raf);
-        int encryptionType = readShort(raf);
+        readShort(raf);
         raf.skipBytes(2);
 
         log.debug("PalmDOC: compression={}, textLength={}, recordCount={}, recordSize={}",
                   compression, textLength, recordCount, recordSize);
 
         // Check for MOBI header
-        raf.seek(record0.offset + 16);
+        raf.seek((long) record0.offset + 16);
         byte[] identifier = new byte[4];
         raf.readFully(identifier);
         String identifierStr = new String(identifier, StandardCharsets.US_ASCII);
@@ -250,7 +250,7 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         }
 
         // Read MOBI header
-        raf.seek(record0.offset + 20);
+        raf.seek((long) record0.offset + 20);
         int headerLength = readInt(raf);
         int mobiType = readInt(raf);
         int textEncoding = readInt(raf);
@@ -271,7 +271,7 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         header.charset = charset;
 
         // Skip to full name offset/length
-        raf.seek(record0.offset + 16 + 68);
+        raf.seek((long) record0.offset + 16 + 68);
         int fullNameOffset = readInt(raf);
         int fullNameLength = readInt(raf);
 
@@ -279,7 +279,7 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
 
         // Read title
         if (fullNameLength > 0 && fullNameLength < 10000) {
-            raf.seek(record0.offset + fullNameOffset);
+            raf.seek((long) record0.offset + fullNameOffset);
             byte[] titleBytes = new byte[fullNameLength];
             raf.readFully(titleBytes);
             header.title = new String(titleBytes, charset).trim();
@@ -287,19 +287,19 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         }
 
         // Read first image index
-        raf.seek(record0.offset + 16 + 92);
+        raf.seek((long) record0.offset + 16 + 92);
         header.firstImageIndex = readInt(raf);
 
         log.debug("First image index: {}", header.firstImageIndex);
 
         // Check for EXTH header
-        raf.seek(record0.offset + 16 + 112);
+        raf.seek((long) record0.offset + 16 + 112);
         int exthFlags = readInt(raf);
 
         log.debug("EXTH flags: 0x{}", Integer.toHexString(exthFlags));
 
         if ((exthFlags & 0x40) != 0) {
-            long exthOffset = record0.offset + 16 + headerLength;
+            long exthOffset = (long) record0.offset + 16 + headerLength;
             raf.seek(exthOffset);
 
             byte[] exthIdentifier = new byte[4];
@@ -322,8 +322,6 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
     }
 
     protected void readExthRecords(RandomAccessFile raf, MobiHeader header, Charset charset) throws IOException {
-        long exthStart = raf.getFilePointer() - 4;
-
         int headerLength = readInt(raf);
         int recordCount = readInt(raf);
 
@@ -371,14 +369,13 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         raf.readFully(data);
 
         // Check for image magic bytes
-        if (data.length > 4) {
-            if ((data[0] == (byte) 0xFF && data[1] == (byte) 0xD8) || // JPEG
-                (data[0] == (byte) 0x89 && data[1] == (byte) 0x50 &&
-                 data[2] == (byte) 0x4E && data[3] == (byte) 0x47) || // PNG
-                (data[0] == (byte) 0x47 && data[1] == (byte) 0x49 &&
-                 data[2] == (byte) 0x46)) { // GIF
-                return data;
-            }
+        if (data.length > 4 &&
+            ((data[0] == (byte) 0xFF && data[1] == (byte) 0xD8) || // JPEG
+             (data[0] == (byte) 0x89 && data[1] == (byte) 0x50 &&
+              data[2] == (byte) 0x4E && data[3] == (byte) 0x47) || // PNG
+             (data[0] == (byte) 0x47 && data[1] == (byte) 0x49 &&
+              data[2] == (byte) 0x46))) { // GIF
+            return data;
         }
 
         return null;

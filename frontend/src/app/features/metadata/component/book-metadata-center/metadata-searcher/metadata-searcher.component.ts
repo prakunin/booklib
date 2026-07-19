@@ -57,12 +57,12 @@ export class MetadataSearcherComponent implements OnDestroy, OnChanges {
   readonly selectedFetchedMetadata = signal<BookMetadata | null>(null);
   detailLoading = signal(false);
 
-  private formBuilder = inject(FormBuilder);
-  private bookMetadataService = inject(BookMetadataService);
-  private appSettingsService = inject(AppSettingsService);
+  private readonly formBuilder = inject(FormBuilder);
+  private readonly bookMetadataService = inject(BookMetadataService);
+  private readonly appSettingsService = inject(AppSettingsService);
 
-  private subscription: Subscription = new Subscription();
-  private cancelRequest$ = new Subject<void>();
+  private readonly subscription: Subscription = new Subscription();
+  private readonly cancelRequest$ = new Subject<void>();
   
   // Signals for state
   allFetchedMetadata: WritableSignal<BookMetadata[]> = signal([]);
@@ -72,7 +72,7 @@ export class MetadataSearcherComponent implements OnDestroy, OnChanges {
   providerCompletionStatus = signal<Map<string, boolean>>(new Map());
   selectedProviderFilters = signal<Set<string>>(new Set(['all']));
 
-  private syncSettingsEffect = effect(() => {
+  private readonly syncSettingsEffect = effect(() => {
     const settings = this.appSettingsService.appSettings();
     if (!settings) return;
 
@@ -451,7 +451,7 @@ export class MetadataSearcherComponent implements OnDestroy, OnChanges {
 
   sanitizeHtml(htmlString: string | null | undefined): string {
     if (!htmlString) return '';
-    return htmlString.replace(/<\/?[^>]+(>|$)/g, '').trim();
+    return htmlString.replaceAll(/<\/?[^>]+(>|$)/g, '').trim();
   }
 
   truncateText(text: string | null, length: number): string {

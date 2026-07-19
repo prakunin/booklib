@@ -82,7 +82,7 @@ public class SecurityConfig {
             HttpSecurity http,
             QueryParameterJwtFilter queryParameterJwtFilter,
             OpdsBasicAuthRateLimitFilter opdsBasicAuthRateLimitFilter
-    ) throws Exception {
+    ) {
         List<String> unauthenticatedEndpoints = new ArrayList<>(Arrays.asList(COMMON_UNAUTHENTICATED_ENDPOINTS));
         http
                 .securityMatcher("/api/v1/opds/**", "/api/v2/opds/**")
@@ -111,7 +111,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
-    public SecurityFilterChain komgaBasicAuthSecurityChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain komgaBasicAuthSecurityChain(HttpSecurity http) {
         http
                 .securityMatcher("/komga/api/v1/**", "/komga/api/v2/**")
                 .csrf(AbstractHttpConfigurer::disable)
@@ -133,7 +133,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(3)
-    public SecurityFilterChain koreaderSecurityChain(HttpSecurity http, KoreaderAuthFilter koreaderAuthFilter) throws Exception {
+    public SecurityFilterChain koreaderSecurityChain(HttpSecurity http, KoreaderAuthFilter koreaderAuthFilter) {
         http
                 .securityMatcher("/api/koreader/**")
                 .csrf(AbstractHttpConfigurer::disable)
@@ -146,7 +146,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(3)
-    public SecurityFilterChain koboSecurityChain(HttpSecurity http, KoboAuthFilter koboAuthFilter) throws Exception {
+    public SecurityFilterChain koboSecurityChain(HttpSecurity http, KoboAuthFilter koboAuthFilter) {
         http
                 .securityMatcher("/api/kobo/**")
                 .csrf(AbstractHttpConfigurer::disable)
@@ -162,7 +162,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(4)
-    public SecurityFilterChain coverJwtApiSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) throws Exception {
+    public SecurityFilterChain coverJwtApiSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) {
         http
                 .securityMatcher("/api/v1/media/**")
                 .csrf(AbstractHttpConfigurer::disable)
@@ -183,7 +183,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(5)
-    public SecurityFilterChain customFontSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) throws Exception {
+    public SecurityFilterChain customFontSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) {
         http
                 .securityMatcher("/api/v1/custom-fonts/*/file")
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -204,7 +204,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(6)
-    public SecurityFilterChain epubStreamingSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) throws Exception {
+    public SecurityFilterChain epubStreamingSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) {
         http
                 .securityMatcher("/api/v1/epub/*/file/**")
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -225,7 +225,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(7)
-    public SecurityFilterChain audiobookStreamingSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) throws Exception {
+    public SecurityFilterChain audiobookStreamingSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) {
         http
                 .securityMatcher("/api/v1/audiobooks/*/stream/**", "/api/v1/audiobooks/*/track/*/stream/**", "/api/v1/audiobooks/*/cover")
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -246,7 +246,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(8)
-    public SecurityFilterChain bookDownloadSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) throws Exception {
+    public SecurityFilterChain bookDownloadSecurityChain(HttpSecurity http, QueryParameterJwtFilter queryParameterJwtFilter) {
         http
                 .securityMatcher("/api/v1/books/*/download", "/api/v1/books/*/download-all", "/api/v1/books/*/files/*/download")
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -267,7 +267,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(9)
-    public SecurityFilterChain wsSecurityChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain wsSecurityChain(HttpSecurity http) {
         http
                 .securityMatcher("/ws/**")
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -287,7 +287,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(10)
-    public SecurityFilterChain jwtApiSecurityChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain jwtApiSecurityChain(HttpSecurity http) {
         var parser = new PathPatternParser();
         final List<PathPattern> matchPatterns = Stream.of(
                 "/api/**",
@@ -338,7 +338,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(11)
-    public SecurityFilterChain staticResourcesSecurityChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain staticResourcesSecurityChain(HttpSecurity http) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -353,7 +353,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
+    public AuthenticationManager authenticationManager(HttpSecurity http) {
         AuthenticationManagerBuilder auth = http.getSharedObject(AuthenticationManagerBuilder.class);
         auth.userDetailsService(opdsUserDetailsService).passwordEncoder(passwordEncoder());
         return auth.build();

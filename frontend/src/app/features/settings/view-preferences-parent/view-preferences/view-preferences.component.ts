@@ -40,7 +40,7 @@ import {CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, moveItemInArray} from 
   styleUrl: './view-preferences.component.scss'
 })
 export class ViewPreferencesComponent implements OnInit {
-  private t = inject(TranslocoService);
+  private readonly t = inject(TranslocoService);
 
   private readonly sortOptionDefs: {field: string; translationKey: string}[] = [
     {field: 'title', translationKey: 'sortTitle'},
@@ -127,11 +127,11 @@ export class ViewPreferencesComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
 
-  private libraryService = inject(LibraryService);
-  private shelfService = inject(ShelfService);
-  private magicShelfService = inject(MagicShelfService);
-  private userService = inject(UserService);
-  private messageService = inject(MessageService);
+  private readonly libraryService = inject(LibraryService);
+  private readonly shelfService = inject(ShelfService);
+  private readonly magicShelfService = inject(MagicShelfService);
+  private readonly userService = inject(UserService);
+  private readonly messageService = inject(MessageService);
   private readonly currentUser = this.userService.currentUser;
   private hasInitializedPreferences = false;
 
@@ -374,7 +374,7 @@ export class ViewPreferencesComponent implements OnInit {
           sortDir: o.sortCriteria[0]?.direction ?? o.sortDir,
           sortCriteria: [...o.sortCriteria],
           view: o.view,
-          coverSize: existing?.coverSize ?? 1.0,
+          coverSize: existing?.coverSize ?? 1,
           seriesCollapsed: existing?.seriesCollapsed ?? false,
           overlayBookType: existing?.overlayBookType ?? true
         }

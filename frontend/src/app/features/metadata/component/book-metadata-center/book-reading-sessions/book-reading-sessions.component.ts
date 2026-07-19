@@ -153,7 +153,7 @@ export class BookReadingSessionsComponent implements OnInit, OnChanges {
 
   isPageNumber(location: string | undefined): boolean {
     if (!location) return false;
-    return !isNaN(Number(location)) && location.trim() !== '';
+    return !Number.isNaN(Number(location)) && location.trim() !== '';
   }
 
   formatLocation(session: ReadingSessionResponse): string {

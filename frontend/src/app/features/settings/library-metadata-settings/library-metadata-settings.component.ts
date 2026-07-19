@@ -24,12 +24,12 @@ import {SidecarService} from '../../metadata/service/sidecar.service';
   styleUrls: ['./library-metadata-settings.component.scss']
 })
 export class LibraryMetadataSettingsComponent {
-  private libraryService = inject(LibraryService);
-  private appSettingsService = inject(AppSettingsService);
-  private messageService = inject(MessageService);
-  private sidecarService = inject(SidecarService);
-  private t = inject(TranslocoService);
-  private destroyRef = inject(DestroyRef);
+  private readonly libraryService = inject(LibraryService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly messageService = inject(MessageService);
+  private readonly sidecarService = inject(SidecarService);
+  private readonly t = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
 
   defaultMetadataOptions: MetadataRefreshOptions = this.getDefaultMetadataOptions();
   libraryMetadataOptions: Record<number, MetadataRefreshOptions> = {};
@@ -145,7 +145,7 @@ export class LibraryMetadataSettingsComponent {
 
   private updateLibrariesUsingDefaults() {
     Object.keys(this.libraryMetadataOptions).forEach(libraryIdStr => {
-      const libraryId = parseInt(libraryIdStr, 10);
+      const libraryId = Number.parseInt(libraryIdStr, 10);
       if (!this.hasLibrarySpecificOptionsInSettings(libraryId)) {
         delete this.libraryMetadataOptions[libraryId];
       }
@@ -171,10 +171,9 @@ export class LibraryMetadataSettingsComponent {
     }
   }
 
-  private updateLibraryOptionsFromSettings(appSettings: AppSettings) {
-    void appSettings;
+  private updateLibraryOptionsFromSettings(_appSettings: AppSettings) {
     Object.keys(this.libraryMetadataOptions).forEach(libraryIdStr => {
-      const libraryId = parseInt(libraryIdStr, 10);
+      const libraryId = Number.parseInt(libraryIdStr, 10);
       if (!this.hasLibrarySpecificOptions(libraryId)) {
         this.libraryMetadataOptions[libraryId] = {...this.defaultMetadataOptions};
       }

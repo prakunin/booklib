@@ -3,7 +3,6 @@ package org.booklore.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,11 +24,9 @@ public class ContentRestrictionController {
     private final ContentRestrictionService contentRestrictionService;
 
     @Operation(summary = "Get user content restrictions", description = "Retrieve all content restrictions for a specific user")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Content restrictions retrieved successfully"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - requires admin or own user"),
-            @ApiResponse(responseCode = "404", description = "User not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Content restrictions retrieved successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden - requires admin or own user")
+    @ApiResponse(responseCode = "404", description = "User not found")
     @GetMapping
     @PreAuthorize("@securityUtil.isAdmin() or @securityUtil.isSelf(#userId)")
     public ResponseEntity<List<ContentRestriction>> getUserRestrictions(
@@ -38,12 +35,10 @@ public class ContentRestrictionController {
     }
 
     @Operation(summary = "Add content restriction", description = "Add a new content restriction for a user")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Content restriction created successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request or restriction already exists"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - requires admin"),
-            @ApiResponse(responseCode = "404", description = "User not found")
-    })
+    @ApiResponse(responseCode = "201", description = "Content restriction created successfully")
+    @ApiResponse(responseCode = "400", description = "Invalid request or restriction already exists")
+    @ApiResponse(responseCode = "403", description = "Forbidden - requires admin")
+    @ApiResponse(responseCode = "404", description = "User not found")
     @PostMapping
     @PreAuthorize("@securityUtil.isAdmin()")
     public ResponseEntity<ContentRestriction> addRestriction(
@@ -54,11 +49,9 @@ public class ContentRestrictionController {
     }
 
     @Operation(summary = "Update all content restrictions", description = "Replace all content restrictions for a user")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Content restrictions updated successfully"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - requires admin"),
-            @ApiResponse(responseCode = "404", description = "User not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Content restrictions updated successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden - requires admin")
+    @ApiResponse(responseCode = "404", description = "User not found")
     @PutMapping
     @PreAuthorize("@securityUtil.isAdmin()")
     public ResponseEntity<List<ContentRestriction>> updateRestrictions(
@@ -68,11 +61,9 @@ public class ContentRestrictionController {
     }
 
     @Operation(summary = "Delete content restriction", description = "Delete a specific content restriction")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Content restriction deleted successfully"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - requires admin"),
-            @ApiResponse(responseCode = "404", description = "Content restriction not found")
-    })
+    @ApiResponse(responseCode = "204", description = "Content restriction deleted successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden - requires admin")
+    @ApiResponse(responseCode = "404", description = "Content restriction not found")
     @DeleteMapping("/{restrictionId}")
     @PreAuthorize("@securityUtil.isAdmin()")
     public ResponseEntity<Void> deleteRestriction(
@@ -83,10 +74,8 @@ public class ContentRestrictionController {
     }
 
     @Operation(summary = "Delete all user content restrictions", description = "Delete all content restrictions for a user")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "All content restrictions deleted successfully"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - requires admin")
-    })
+    @ApiResponse(responseCode = "204", description = "All content restrictions deleted successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden - requires admin")
     @DeleteMapping
     @PreAuthorize("@securityUtil.isAdmin()")
     public ResponseEntity<Void> deleteAllRestrictions(

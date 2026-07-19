@@ -125,7 +125,7 @@ export class SeriesCollapseFilter {
         sortKey: 'addedOn',
         sortDir: 'DESC',
         view: 'GRID',
-        coverSize: 1.0,
+        coverSize: 1,
         seriesCollapsed: false
       },
       overrides: []

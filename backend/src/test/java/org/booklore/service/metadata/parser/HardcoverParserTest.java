@@ -85,7 +85,7 @@ class HardcoverParserTest {
             when(hardcoverBookSearchService.searchBooks("Some Book"))
                     .thenReturn(List.of(hit));
 
-            List<BookMetadata> results = parser.fetchMetadata(book, request);
+            parser.fetchMetadata(book, request);
 
             verify(hardcoverBookSearchService).searchBooks("Some Book Unknown Author");
             verify(hardcoverBookSearchService).searchBooks("Some Book");
@@ -133,7 +133,7 @@ class HardcoverParserTest {
             when(hardcoverBookSearchService.searchBookByIsbn("9780316769488"))
                     .thenReturn(List.of(hit));
 
-            List<BookMetadata> results = parser.fetchMetadata(book, request);
+            parser.fetchMetadata(book, request);
 
             verify(hardcoverBookSearchService).searchBookByIsbn("9780316769488");
             verify(hardcoverBookSearchService, never()).searchBooks(contains("title"));
@@ -292,7 +292,7 @@ class HardcoverParserTest {
             when(hardcoverBookSearchService.searchBooks("The Prince"))
                     .thenReturn(List.of(hit));
 
-            List<BookMetadata> results = parser.fetchMetadata(book, request);
+            parser.fetchMetadata(book, request);
 
             verify(hardcoverBookSearchService).searchBooks("The Prince");
         }

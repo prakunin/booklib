@@ -8,7 +8,7 @@ const STORAGE_KEY = 'appLocale';
 
 @Injectable({providedIn: 'root'})
 export class AppLocaleService {
-  private translocoService = inject(TranslocoService);
+  private readonly translocoService = inject(TranslocoService);
 
   getDisplayLocale(): string {
     const locale = localStorage.getItem(STORAGE_KEY);

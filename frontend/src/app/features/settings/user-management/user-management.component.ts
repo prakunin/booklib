@@ -52,13 +52,13 @@ export interface UserWithEditing extends User {
 })
 export class UserManagementComponent implements OnInit {
   ref: DynamicDialogRef | undefined | null;
-  private dialogLauncherService = inject(DialogLauncherService);
-  private userService = inject(UserService);
-  private libraryService = inject(LibraryService);
-  private messageService = inject(MessageService);
-  private t = inject(TranslocoService);
-  private destroyRef = inject(DestroyRef);
-  private appSettingsService = inject(AppSettingsService);
+  private readonly dialogLauncherService = inject(DialogLauncherService);
+  private readonly userService = inject(UserService);
+  private readonly libraryService = inject(LibraryService);
+  private readonly messageService = inject(MessageService);
+  private readonly t = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly appSettingsService = inject(AppSettingsService);
   get allLibraries() { return this.libraryService.libraries(); }
 
   get passwordPolicy() {
@@ -94,7 +94,7 @@ export class UserManagementComponent implements OnInit {
         this.users.set(data.map((user: UserWithEditing) => ({
           ...user,
           isEditing: false,
-          selectedLibraryIds: user.assignedLibraries?.map((lib) => lib.id!).filter(id => id !== undefined) as number[] || [],
+          selectedLibraryIds: user.assignedLibraries?.map((lib) => lib.id!).filter(id => id !== undefined) || [],
           libraryNames:
             user.assignedLibraries?.map((lib) => lib.name).join(', ') || '',
         })));

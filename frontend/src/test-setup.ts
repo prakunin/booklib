@@ -3,7 +3,7 @@ import {vi} from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import 'vitest-canvas-mock';
 import {TestBed} from '@angular/core/testing';
-import {BrowserDynamicTestingModule, platformBrowserDynamicTesting} from '@angular/platform-browser-dynamic/testing';
+import {BrowserTestingModule, platformBrowserTesting} from '@angular/platform-browser/testing';
 
 declare global {
   var __ANGULAR_TESTBED_INITIALIZED__: boolean | undefined;
@@ -48,7 +48,7 @@ Object.defineProperty(globalThis, 'matchMedia', {
   value: matchMediaMock,
 });
 
-Object.defineProperty(window, 'matchMedia', {
+Object.defineProperty(globalThis, 'matchMedia', {
   writable: true,
   configurable: true,
   enumerable: true,
@@ -100,24 +100,24 @@ if (!window.scrollTo) {
   window.scrollTo = () => undefined;
 }
 
-if (!window.HTMLElement.prototype.scrollIntoView) {
-  window.HTMLElement.prototype.scrollIntoView = () => undefined;
+if (!globalThis.HTMLElement.prototype.scrollIntoView) {
+  globalThis.HTMLElement.prototype.scrollIntoView = () => undefined;
 }
 
-if (!window.URL.createObjectURL) {
-  window.URL.createObjectURL = () => 'blob:mock-url';
+if (!globalThis.URL.createObjectURL) {
+  globalThis.URL.createObjectURL = () => 'blob:mock-url';
 }
 
-if (!window.URL.revokeObjectURL) {
-  window.URL.revokeObjectURL = () => undefined;
+if (!globalThis.URL.revokeObjectURL) {
+  globalThis.URL.revokeObjectURL = () => undefined;
 }
 
 // Only initialize if not already initialized
 if (!globalThis.__ANGULAR_TESTBED_INITIALIZED__) {
   globalThis.__ANGULAR_TESTBED_INITIALIZED__ = true;
   TestBed.initTestEnvironment(
-    BrowserDynamicTestingModule,
-    platformBrowserDynamicTesting(),
+    BrowserTestingModule,
+    platformBrowserTesting(),
     {teardown: {destroyAfterEach: true}}
   );
 }

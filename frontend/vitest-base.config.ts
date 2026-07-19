@@ -9,6 +9,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     isolate: true,
+    include: ['src/**/*.spec.ts'],
+    exclude: ['src/**/._*.spec.ts', 'src/**/.__*.spec.ts'],
+    testTimeout: 15000,
     reporters: [
       ['default', {summary: false}],
       ['junit', {outputFile: 'test-results/vitest-results.xml'}]
@@ -18,7 +21,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'json', 'json-summary', 'lcov'],
       reportsDirectory: 'coverage/booklib',
       include: ['src/app/**/*.ts', 'src/main.ts'],
-      exclude: ['src/app/**/*.spec.ts', 'src/app/**/*.module.ts', 'src/**/*.d.ts'],
+      exclude: ['src/app/**/*.spec.ts', 'src/app/**/*.module.ts', 'src/**/*.d.ts', 'src/**/._*', 'src/**/.__*'],
       thresholds: shouldEnforceCoverageGate ? {
         statements: 90,
         branches: 90,

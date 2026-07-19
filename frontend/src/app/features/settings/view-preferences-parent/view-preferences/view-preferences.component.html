@@ -117,11 +117,11 @@
           <p-table [value]="overrides" [tableStyle]="{'width': '100%'}">
             <ng-template pTemplate="header">
               <tr>
-                <th style="min-width: 150px; max-width: 220px;">{{ t('tableType') }}</th>
-                <th style="min-width: 220px; max-width: 280px;">{{ t('tableName') }}</th>
-                <th style="min-width: 160px;">{{ t('tableSortConfig') }}</th>
-                <th style="min-width: 125px;">{{ t('tableViewMode') }}</th>
-                <th style="width: 75px; text-align: center;">{{ t('tableActions') }}</th>
+                <th scope="col" style="min-width: 150px; max-width: 220px;">{{ t('tableType') }}</th>
+                <th scope="col" style="min-width: 220px; max-width: 280px;">{{ t('tableName') }}</th>
+                <th scope="col" style="min-width: 160px;">{{ t('tableSortConfig') }}</th>
+                <th scope="col" style="min-width: 125px;">{{ t('tableViewMode') }}</th>
+                <th scope="col" style="width: 75px; text-align: center;">{{ t('tableActions') }}</th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-override let-rowIndex="rowIndex">

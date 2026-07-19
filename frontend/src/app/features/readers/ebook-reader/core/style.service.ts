@@ -14,8 +14,8 @@ interface ReaderRenderer {
   providedIn: 'root'
 })
 export class ReaderStyleService {
-  private epubCustomFontService = inject(EpubCustomFontService);
-  private document = inject(DOCUMENT);
+  private readonly epubCustomFontService = inject(EpubCustomFontService);
+  private readonly document = inject(DOCUMENT);
 
   generateCSS(state: ReaderState): string {
     const {lineHeight, justify, hyphenate, fontSize, theme, fontFamily} = state;
@@ -25,7 +25,6 @@ export class ReaderStyleService {
       || (state.backgroundSaturation ?? 100) !== 100
       || (state.backgroundTransparency ?? 0) !== 0;
     const userStylesheet = '';
-    const overrideFont = false;
     const mediaActiveClass = 'media-active';
 
     let fontFaceRule = '';
@@ -191,7 +190,6 @@ export class ReaderStyleService {
           text-align: ${justify ? 'justify' : 'start'} !important;
           hyphens: ${hyphenate ? 'auto' : 'none'};
       }
-      ${overrideFont ? '' : ''}
       ${userStylesheet}
       ::selection {
           background-color: rgba(128, 128, 128, 0.3);
@@ -224,9 +222,9 @@ export class ReaderStyleService {
     if (!/^[0-9a-f]{6}$/i.test(normalized)) return null;
 
     return {
-      r: parseInt(normalized.slice(0, 2), 16),
-      g: parseInt(normalized.slice(2, 4), 16),
-      b: parseInt(normalized.slice(4, 6), 16),
+      r: Number.parseInt(normalized.slice(0, 2), 16),
+      g: Number.parseInt(normalized.slice(2, 4), 16),
+      b: Number.parseInt(normalized.slice(4, 6), 16),
     };
   }
 
@@ -287,12 +285,12 @@ export class ReaderStyleService {
 
   private parseCustomFontId(fontFamily: string): number | null {
     if (fontFamily.startsWith('custom:')) {
-      const id = parseInt(fontFamily.substring(7), 10);
-      return !isNaN(id) ? id : null;
+      const id = Number.parseInt(fontFamily.substring(7), 10);
+      return !Number.isNaN(id) ? id : null;
     }
 
-    const id = parseInt(fontFamily, 10);
-    return !isNaN(id) && id.toString() === fontFamily ? id : null;
+    const id = Number.parseInt(fontFamily, 10);
+    return !Number.isNaN(id) && id.toString() === fontFamily ? id : null;
   }
 
   applyStylesToRenderer(renderer: ReaderRenderer | null | undefined, state: ReaderState): void {

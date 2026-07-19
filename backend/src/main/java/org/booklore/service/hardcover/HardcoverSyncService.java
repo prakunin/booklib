@@ -245,7 +245,7 @@ public class HardcoverSyncService {
         if (hardcoverBookId != null && !hardcoverBookId.isBlank()) {
             try {
                 return resolveByBookId(Integer.parseInt(hardcoverBookId), isbn13, isbn10);
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 log.warn("Invalid Hardcover book ID format: {}", hardcoverBookId);
                 return null;
             }
@@ -812,13 +812,13 @@ public class HardcoverSyncService {
      */
     private static Integer extractInteger(Object obj) {
         if (obj == null) return null;
-        if (obj instanceof Number) {
-            return ((Number) obj).intValue();
+        if (obj instanceof Number number) {
+            return number.intValue();
         }
-        if (obj instanceof String) {
+        if (obj instanceof String string) {
             try {
-                return Integer.parseInt((String) obj);
-            } catch (NumberFormatException e) {
+                return Integer.parseInt(string);
+            } catch (NumberFormatException _) {
                 return null;
             }
         }
@@ -827,13 +827,13 @@ public class HardcoverSyncService {
 
     private static Float extractFloat(Object obj) {
         if (obj == null) return null;
-        if (obj instanceof Number) {
-            return ((Number) obj).floatValue();
+        if (obj instanceof Number number) {
+            return number.floatValue();
         }
-        if (obj instanceof String) {
+        if (obj instanceof String string) {
             try {
-                return Float.parseFloat((String) obj);
-            } catch (NumberFormatException e) {
+                return Float.parseFloat(string);
+            } catch (NumberFormatException _) {
                 return null;
             }
         }

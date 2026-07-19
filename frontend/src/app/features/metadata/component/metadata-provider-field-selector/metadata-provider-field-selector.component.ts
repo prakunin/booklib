@@ -15,8 +15,8 @@ import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 export class MetadataProviderFieldSelectorComponent {
   @Input() selectedFields: string[] = [];
 
-  private appSettingsService = inject(AppSettingsService);
-  private t = inject(TranslocoService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly t = inject(TranslocoService);
 
   providerGroups: { labelKey: string, fields: string[] }[] = [
     {labelKey: 'amazon', fields: ['asin', 'amazonRating', 'amazonReviewCount']},

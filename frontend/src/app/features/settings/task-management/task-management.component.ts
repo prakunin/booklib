@@ -46,9 +46,9 @@ import {NgClass} from '@angular/common';
 })
 export class TaskManagementComponent implements OnInit {
   // Services
-  private messageService = inject(MessageService);
-  private taskService = inject(TaskService);
-  private t = inject(TranslocoService);
+  private readonly messageService = inject(MessageService);
+  private readonly taskService = inject(TaskService);
+  private readonly t = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
 
   // State
@@ -418,29 +418,29 @@ export class TaskManagementComponent implements OnInit {
 
     if (field.includes('-')) {
       const [start, end] = field.split('-').map(Number);
-      return !isNaN(start) && !isNaN(end) && start >= min && end <= max && start <= end;
+      return !Number.isNaN(start) && !Number.isNaN(end) && start >= min && end <= max && start <= end;
     }
 
     if (field.includes('/')) {
       const [range, step] = field.split('/');
       const stepNum = Number(step);
-      if (isNaN(stepNum) || stepNum <= 0) return false;
+      if (Number.isNaN(stepNum) || stepNum <= 0) return false;
 
       if (range === '*') return true;
       if (range.includes('-')) {
         const [start, end] = range.split('-').map(Number);
-        return !isNaN(start) && !isNaN(end) && start >= min && end <= max;
+        return !Number.isNaN(start) && !Number.isNaN(end) && start >= min && end <= max;
       }
       return false;
     }
 
     if (field.includes(',')) {
       const values = field.split(',').map(Number);
-      return values.every(val => !isNaN(val) && val >= min && val <= max);
+      return values.every(val => !Number.isNaN(val) && val >= min && val <= max);
     }
 
     const num = Number(field);
-    return !isNaN(num) && num >= min && num <= max;
+    return !Number.isNaN(num) && num >= min && num <= max;
   }
 
   // ============================================================================
@@ -449,7 +449,7 @@ export class TaskManagementComponent implements OnInit {
 
   getTaskDisplayName(type: string): string {
     const taskInfo = this.taskInfos.find(t => t.taskType === type);
-    return taskInfo?.name || type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    return taskInfo?.name || type.replaceAll('_', ' ').toLowerCase().replaceAll(/\b\w/g, l => l.toUpperCase());
   }
 
   getTaskDescription(type: string): string {

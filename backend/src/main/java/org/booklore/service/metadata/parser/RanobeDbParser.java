@@ -36,6 +36,7 @@ import java.util.stream.IntStream;
 public class RanobeDbParser implements BookParser {
     private static final String RANOBEDB_URL = "https://ranobedb.org/api/v0/";
     private static final String RANOBEDB_IMAGE_URL = "https://images.ranobedb.org/";
+    private static final String FETCH_ERROR_MESSAGE = "Error fetching metadata from Ranobedb Search API";
 
     private final ObjectMapper objectMapper;
     private final AppSettingService appSettingService;
@@ -146,8 +147,11 @@ public class RanobeDbParser implements BookParser {
           } else {
               log.error("Ranobedb Search API returned status code {}", response.statusCode());
           }
-      } catch (IOException | InterruptedException e) {
-          log.error("Error fetching metadata from Ranobedb Search API", e);
+      } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          log.error(FETCH_ERROR_MESSAGE, e);
+      } catch (IOException e) {
+          log.error(FETCH_ERROR_MESSAGE, e);
       }
       return Collections.emptyList();
     }
@@ -161,7 +165,7 @@ public class RanobeDbParser implements BookParser {
         return null;
     }
 
-    private List<BookMetadata> parseRanobeDbApiResponse(String responseBody, Boolean fetchTop) throws IOException {
+    private List<BookMetadata> parseRanobeDbApiResponse(String responseBody, Boolean fetchTop) {
         RanobedbSearchResponse searchResponse = objectMapper.readValue(responseBody, RanobedbSearchResponse.class);
         if (searchResponse.getBooks() == null) {
             return Collections.emptyList();
@@ -205,7 +209,7 @@ public class RanobeDbParser implements BookParser {
 
                 RanobedbBookResponse.TitleEntry englishTitleEntry = book.getTitles().stream()
                         .filter(titleEntry -> "en".equalsIgnoreCase(titleEntry.getLang()))
-                        .filter(titleEntry -> titleEntry.getOfficial())
+                        .filter(RanobedbBookResponse.TitleEntry::getOfficial)
                         .findFirst()
                         .orElse(null);
 
@@ -269,10 +273,13 @@ public class RanobeDbParser implements BookParser {
             } else {
                 log.error("Ranobedb Get Book API returned status code {}", response.statusCode());
             }
-        } catch (IOException | InterruptedException e) {
-            log.error("Error fetching metadata from Ranobedb Search API", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error(FETCH_ERROR_MESSAGE, e);
+        } catch (IOException e) {
+            log.error(FETCH_ERROR_MESSAGE, e);
         }
-        
+
         return null;
     }
 
@@ -287,7 +294,7 @@ public class RanobeDbParser implements BookParser {
                     (int)((dateInt / 100) % 100),
                     (int)(dateInt % 100)
             );
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             log.debug("Could not parse date: {}", dateInt);
             return null;
         }

@@ -1,6 +1,7 @@
 package org.booklore.service.system;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -34,6 +35,7 @@ public class TimeoutGuard {
 
     private final int timeoutSeconds;
 
+    @Autowired
     public TimeoutGuard() {
         this(DEFAULT_TIMEOUT_SECONDS);
     }
@@ -56,7 +58,7 @@ public class TimeoutGuard {
         Thread.ofVirtual().start(task);
         try {
             return Optional.ofNullable(task.get(timeoutSeconds, TimeUnit.SECONDS));
-        } catch (TimeoutException e) {
+        } catch (TimeoutException _) {
             log.warn("Timed out after {}s waiting for {}", timeoutSeconds, description);
             return Optional.empty();
         } catch (ExecutionException e) {
@@ -66,7 +68,7 @@ public class TimeoutGuard {
             }
             log.debug("{} failed: {}", description, cause != null ? cause.getMessage() : e.getMessage());
             return Optional.empty();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return Optional.empty();
         }

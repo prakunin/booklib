@@ -1,6 +1,7 @@
 import {Injectable} from '@angular/core';
 import {FormGroup} from '@angular/forms';
 import {BookMetadata} from '../../features/book/model/book.model';
+import {sortStrings} from '../util/string-sort.util';
 
 @Injectable({
   providedIn: 'root'
@@ -79,13 +80,13 @@ export class MetadataUtilsService {
     let val2: string | undefined = undefined;
 
     if (Array.isArray(field1)) {
-      val1 = field1.length > 0 ? JSON.stringify([...field1].sort()) : undefined;
+      val1 = field1.length > 0 ? JSON.stringify(sortStrings(field1.map(String))) : undefined;
     } else if (field1 != null && field1 !== '') {
       val1 = String(field1);
     }
 
     if (Array.isArray(field2)) {
-      val2 = field2.length > 0 ? JSON.stringify([...field2].sort()) : undefined;
+      val2 = field2.length > 0 ? JSON.stringify(sortStrings(field2.map(String))) : undefined;
     } else if (field2 != null && field2 !== '') {
       val2 = String(field2);
     }
@@ -138,7 +139,7 @@ export class MetadataUtilsService {
       const value = metadata[key];
 
       if (field.type === 'array') {
-        patchData[field.controlName] = [...(value as string[] ?? [])].sort();
+        patchData[field.controlName] = sortStrings(value as string[] ?? []);
       } else {
         patchData[field.controlName] = value ?? null;
       }

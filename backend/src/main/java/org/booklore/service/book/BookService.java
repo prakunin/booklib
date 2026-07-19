@@ -349,7 +349,7 @@ public class BookService {
         try {
             byte[] bytes = new ClassPathResource("static/images/missing-cover.jpg").getInputStream().readAllBytes();
             return new ByteArrayResource(bytes);
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw ApiError.INTERNAL_SERVER_ERROR.createException("Failed to load missing cover image");
         }
     }
@@ -517,7 +517,7 @@ public class BookService {
                         isLibraryRoot = true;
                         break;
                     }
-                } catch (IOException e) {
+                } catch (IOException _) {
                     log.warn("Failed to compare paths: {} and {}", root, dir);
                 }
             }
@@ -546,7 +546,7 @@ public class BookService {
                     try {
                         Files.delete(file.toPath());
                         log.info("Deleted ignored file: {}", file.getAbsolutePath());
-                    } catch (IOException e) {
+                    } catch (IOException _) {
                         log.warn("Failed to delete ignored file: {}", file.getAbsolutePath());
                     }
                 }

@@ -32,8 +32,8 @@ export class SortService {
       const bIsNumeric = /^\d+$/.test(bChunk);
 
       if (aIsNumeric && bIsNumeric) {
-        const aNum = parseInt(aChunk, 10);
-        const bNum = parseInt(bChunk, 10);
+        const aNum = Number.parseInt(aChunk, 10);
+        const bNum = Number.parseInt(bChunk, 10);
         if (aNum !== bNum) {
           return aNum - bNum;
         }

@@ -118,7 +118,7 @@ public final class ContentRestrictionSpecification {
                 .map(r -> {
                     try {
                         return Integer.parseInt(r.getValue());
-                    } catch (NumberFormatException e) {
+                    } catch (NumberFormatException _) {
                         return null;
                     }
                 })

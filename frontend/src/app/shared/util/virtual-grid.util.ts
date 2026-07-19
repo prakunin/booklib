@@ -33,7 +33,7 @@ function getScrollContentWidth(element: HTMLElement | null): number {
   }
 
   const style = getComputedStyle(element);
-  const horizontalPadding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  const horizontalPadding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
   return Math.max(0, element.clientWidth - horizontalPadding);
 }
 

@@ -660,8 +660,9 @@ class Fb2MetadataExtractorTest {
         void malformedXmlThrowsRatherThanClaimingThereIsNoCover() throws IOException {
             Path file = tempDir.resolve("bad.fb2");
             Files.writeString(file, "not xml");
+            File fb2File = file.toFile();
 
-            assertThatThrownBy(() -> extractor.extractCover(file.toFile()))
+            assertThatThrownBy(() -> extractor.extractCover(fb2File))
                     .isInstanceOf(CoverExtractionException.class)
                     .hasMessageContaining("bad.fb2");
         }
@@ -681,8 +682,9 @@ class Fb2MetadataExtractorTest {
             // shape a half-written or half-transferred file has.
             Path file = tempDir.resolve("truncated.fb2");
             Files.writeString(file, full.substring(0, full.length() / 2), StandardCharsets.UTF_8);
+            File fb2File = file.toFile();
 
-            assertThatThrownBy(() -> extractor.extractCover(file.toFile()))
+            assertThatThrownBy(() -> extractor.extractCover(fb2File))
                     .isInstanceOf(CoverExtractionException.class)
                     .hasMessageContaining("truncated.fb2");
         }
@@ -714,8 +716,9 @@ class Fb2MetadataExtractorTest {
             // Named .gz, so getInputStream wraps it in a GZIPInputStream that will reject the bytes.
             Path file = tempDir.resolve("broken.fb2.gz");
             Files.write(file, new byte[]{0x00, 0x01, 0x02, 0x03});
+            File fb2File = file.toFile();
 
-            assertThatThrownBy(() -> extractor.extractCover(file.toFile()))
+            assertThatThrownBy(() -> extractor.extractCover(fb2File))
                     .isInstanceOf(CoverExtractionException.class);
         }
 

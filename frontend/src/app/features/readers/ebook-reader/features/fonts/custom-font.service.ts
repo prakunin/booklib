@@ -8,10 +8,10 @@ import {map, switchMap, tap, catchError} from 'rxjs/operators';
   providedIn: 'root'
 })
 export class EpubCustomFontService {
-  private customFontService = inject(CustomFontService);
+  private readonly customFontService = inject(CustomFontService);
 
   private customFonts: CustomFont[] = [];
-  private customFontBlobUrls = new Map<number, string>();
+  private readonly customFontBlobUrls = new Map<number, string>();
 
   loadAndCacheFonts(): Observable<CustomFont[]> {
     return from(this.customFontService.ensureFonts()).pipe(
@@ -72,13 +72,13 @@ export class EpubCustomFontService {
   }
 
   sanitizeFontName(fontName: string): string {
-    return fontName.replace(/\.(ttf|otf|woff|woff2)$/i, '').replace(/["'()]/g, '').replace(/\s+/g, '-');
+    return fontName.replace(/\.(ttf|otf|woff|woff2)$/i, '').replaceAll(/["'()]/g, '').replaceAll(/\s+/g, '-');
   }
 
   getFontFamilyForPreview(fontValue: string): string {
     if (fontValue.startsWith('custom:')) {
-      const id = parseInt(fontValue.substring(7), 10);
-      if (!isNaN(id)) {
+      const id = Number.parseInt(fontValue.substring(7), 10);
+      if (!Number.isNaN(id)) {
         const customFont = this.getCustomFontById(id);
         if (customFont) {
           return `"${this.sanitizeFontName(customFont.fontName)}", sans-serif`;

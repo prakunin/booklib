@@ -185,7 +185,7 @@ class AppBookServiceFilterOptionsTest {
         AppFilterOptions result = service.getFilterOptions(null, null, 7L);
 
         assertNotNull(result);
-        verify(magicShelfBookService).toSpecification(eq(userId), eq(7L));
+        verify(magicShelfBookService).toSpecification(userId, 7L);
         verify(entityManager, never()).createQuery(any(CriteriaQuery.class));
     }
 
@@ -198,13 +198,13 @@ class AppBookServiceFilterOptionsTest {
         AppFilterOptions result = service.getFilterOptions(null, null, 7L);
 
         assertNotNull(result);
-        verify(magicShelfBookService).toSpecification(eq(userId), eq(7L));
+        verify(magicShelfBookService).toSpecification(userId, 7L);
     }
 
     @Test
     void getFilterOptions_withMagicShelfId_serviceThrows_propagatesException() {
         mockAdminUser();
-        when(magicShelfBookService.toSpecification(eq(userId), eq(7L)))
+        when(magicShelfBookService.toSpecification(userId, 7L))
                 .thenThrow(new RuntimeException("Magic shelf not found"));
 
         assertThrows(RuntimeException.class, () -> service.getFilterOptions(null, null, 7L));
@@ -367,7 +367,7 @@ class AppBookServiceFilterOptionsTest {
     @SuppressWarnings("unchecked")
     private void mockMagicShelfSpec(Long magicShelfId, List<Long> bookIds) {
         Specification<BookEntity> mockSpec = mock(Specification.class);
-        when(magicShelfBookService.toSpecification(eq(userId), eq(magicShelfId)))
+        when(magicShelfBookService.toSpecification(userId, magicShelfId))
                 .thenReturn(mockSpec);
 
         Predicate mockPredicate = mock(Predicate.class);

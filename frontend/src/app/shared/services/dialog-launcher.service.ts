@@ -33,7 +33,7 @@ export class DialogLauncherService {
   private readonly messageService = inject(MessageService);
   private readonly t = inject(TranslocoService);
 
-  private defaultDialogOptions = {
+  private readonly defaultDialogOptions = {
     baseZIndex: 10,
     closable: true,
     dismissableMask: true,

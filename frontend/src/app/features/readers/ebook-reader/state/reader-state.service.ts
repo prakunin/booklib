@@ -36,9 +36,9 @@ interface LegacyViewerSetting {
   providedIn: 'root'
 })
 export class ReaderStateService {
-  private bookService = inject(BookService);
-  private userService = inject(UserService);
-  private epubCustomFontService = inject(EpubCustomFontService);
+  private readonly bookService = inject(BookService);
+  private readonly userService = inject(UserService);
+  private readonly epubCustomFontService = inject(EpubCustomFontService);
 
   private readonly BASE_FONTS = [
     {name: 'Publisher\'s', value: null},
@@ -129,8 +129,8 @@ export class ReaderStateService {
           if (settings.fontFamily.startsWith('custom:')) {
             newState.fontFamily = settings.fontFamily;
           } else {
-            const numericId = parseInt(settings.fontFamily, 10);
-            if (!isNaN(numericId) && numericId.toString() === settings.fontFamily) {
+            const numericId = Number.parseInt(settings.fontFamily, 10);
+            if (!Number.isNaN(numericId) && numericId.toString() === settings.fontFamily) {
               newState.fontFamily = `custom:${numericId}`;
             } else {
               newState.fontFamily = settings.fontFamily;
@@ -218,7 +218,7 @@ export class ReaderStateService {
   setFontFamily(font: string | null): void {
     if (font === null) {
       this.updateState({fontFamily: null});
-    } else if (!font.includes(':') && !isNaN(parseInt(font, 10)) && parseInt(font, 10).toString() === font) {
+    } else if (!font.includes(':') && !Number.isNaN(Number.parseInt(font, 10)) && Number.parseInt(font, 10).toString() === font) {
       this.updateState({fontFamily: `custom:${font}`});
     } else {
       this.updateState({fontFamily: font});

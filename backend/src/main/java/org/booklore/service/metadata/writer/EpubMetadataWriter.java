@@ -879,7 +879,7 @@ public class EpubMetadataWriter implements MetadataWriter {
         if (value == null || value.isBlank()) return true;
         try {
             return Double.parseDouble(value) <= 0;
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return false;
         }
     }

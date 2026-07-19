@@ -10,8 +10,8 @@ import {TranslocoService} from '@jsverse/transloco';
   providedIn: 'root'
 })
 export class TaskHelperService {
-  private taskService = inject(TaskService);
-  private messageService = inject(MessageService);
+  private readonly taskService = inject(TaskService);
+  private readonly messageService = inject(MessageService);
   private readonly t = inject(TranslocoService);
 
   refreshMetadataTask(options: MetadataRefreshRequest) {

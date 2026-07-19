@@ -26,6 +26,7 @@ import {LocalStorageService} from '../../../../shared/service/local-storage.serv
 import {ScalePreference} from '../../../../shared/util/scale-preference.util';
 import {LayoutService} from '../../../../shared/layout/layout.service';
 import {createGridDensity} from '../../../../shared/util/grid-density.util';
+import {sortStrings} from '../../../../shared/util/string-sort.util';
 
 type SortDirection = 'asc' | 'desc';
 
@@ -86,17 +87,17 @@ export class AuthorBrowserComponent implements OnInit {
   private static readonly MIN_SCALE = 0.7;
   private static readonly MAX_SCALE = 1.3;
 
-  private authorService = inject(AuthorService);
-  private bookService = inject(BookService);
-  private messageService = inject(MessageService);
-  private pageTitle = inject(PageTitleService);
-  private scrollService = inject(RouteScrollPositionService);
-  private t = inject(TranslocoService);
-  private router = inject(Router);
-  private activatedRoute = inject(ActivatedRoute);
-  private destroyRef = inject(DestroyRef);
-  private localStorageService = inject(LocalStorageService);
-  private layoutService = inject(LayoutService);
+  private readonly authorService = inject(AuthorService);
+  private readonly bookService = inject(BookService);
+  private readonly messageService = inject(MessageService);
+  private readonly pageTitle = inject(PageTitleService);
+  private readonly scrollService = inject(RouteScrollPositionService);
+  private readonly t = inject(TranslocoService);
+  private readonly router = inject(Router);
+  private readonly activatedRoute = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly localStorageService = inject(LocalStorageService);
+  private readonly layoutService = inject(LayoutService);
   protected userService = inject(UserService);
   protected selectionService = inject(AuthorSelectionService);
 
@@ -123,10 +124,10 @@ export class AuthorBrowserComponent implements OnInit {
   });
   private readonly scaleFactor = this.scalePreference.scaleFactor;
 
-  readonly screenWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  readonly screenWidth = signal(globalThis.window !== undefined ? globalThis.window.innerWidth : 1024);
   thumbnailCacheBusters = new Map<number, number>();
-  private selectedAuthors = this.selectionService.selectedAuthors;
-  private allAuthorsState = signal<AuthorSummary[] | null>(null);
+  private readonly selectedAuthors = this.selectionService.selectedAuthors;
+  private readonly allAuthorsState = signal<AuthorSummary[] | null>(null);
 
   loading = computed(() => this.allAuthorsState() === null || this.bookService.isBooksLoading());
   // Authors are enriched from the whole catalog client-side (library names, per-author counts),
@@ -138,7 +139,7 @@ export class AuthorBrowserComponent implements OnInit {
   sortBy = signal('name');
   sortDirection = signal<SortDirection>('asc');
   filters = signal<AuthorFilters>({...DEFAULT_AUTHOR_FILTERS});
-  private enrichedAuthors = computed(() => {
+  private readonly enrichedAuthors = computed(() => {
     const authors = this.allAuthorsState();
     if (!authors) {
       return [];
@@ -158,7 +159,7 @@ export class AuthorBrowserComponent implements OnInit {
 
     return [
       {label: allLabel, value: 'all'},
-      ...[...librarySet].sort().map(library => ({label: library, value: library}))
+      ...sortStrings([...librarySet]).map(library => ({label: library, value: library}))
     ];
   });
   genreOptions = computed<FilterOption[]>(() => {
@@ -173,7 +174,7 @@ export class AuthorBrowserComponent implements OnInit {
 
     return [
       {label: allLabel, value: 'all'},
-      ...[...genreSet].sort().map(category => ({label: category, value: category}))
+      ...sortStrings([...genreSet]).map(category => ({label: category, value: category}))
     ];
   });
   activeFilterCount = computed(() => {
@@ -500,8 +501,8 @@ export class AuthorBrowserComponent implements OnInit {
       return {
         ...author,
         libraryIds,
-        libraryNames: [...libraryNameSet].sort(),
-        categories: [...categorySet].sort(),
+        libraryNames: sortStrings([...libraryNameSet]),
+        categories: sortStrings([...categorySet]),
         readStatus,
         hasSeries: seriesSet.size > 0,
         seriesCount: seriesSet.size,

@@ -178,7 +178,7 @@ export class CompletionRaceChartComponent implements OnInit, OnDestroy {
         progress: s.progress,
         date: s.date.toLocaleDateString()
       }));
-      const totalDays = sessionPoints.length > 0 ? sessionPoints[sessionPoints.length - 1].dayNumber : 0;
+      const totalDays = sessionPoints.length > 0 ? sessionPoints.at(-1)!.dayNumber : 0;
       races.push({bookId, bookTitle: value.title, sessions: sessionPoints, totalDays});
     });
 
@@ -186,8 +186,8 @@ export class CompletionRaceChartComponent implements OnInit, OnDestroy {
 
     if (races.length > 0) {
       const days = races.map(r => r.totalDays).sort((a, b) => a - b);
-      const fastest = races.reduce((a, b) => a.totalDays <= b.totalDays ? a : b);
-      const slowest = races.reduce((a, b) => a.totalDays >= b.totalDays ? a : b);
+      const fastest = races.reduce((a, b) => a.totalDays <= b.totalDays ? a : b, races[0]);
+      const slowest = races.reduce((a, b) => a.totalDays >= b.totalDays ? a : b, races[0]);
       this.avgDaysToFinish = Math.round(days.reduce((a, b) => a + b, 0) / days.length);
       this.medianDaysToFinish = days.length % 2 === 0
         ? Math.round((days[days.length / 2 - 1] + days[days.length / 2]) / 2)

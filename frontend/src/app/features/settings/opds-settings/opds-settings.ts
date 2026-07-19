@@ -49,12 +49,12 @@ export class OpdsSettings implements OnInit {
   komgaApiEnabled = false;
   komgaGroupUnknown = true;
 
-  private opdsService = inject(OpdsService);
-  private confirmationService = inject(ConfirmationService);
-  private messageService = inject(MessageService);
-  private userService = inject(UserService);
-  private appSettingsService = inject(AppSettingsService);
-  private t = inject(TranslocoService);
+  private readonly opdsService = inject(OpdsService);
+  private readonly confirmationService = inject(ConfirmationService);
+  private readonly messageService = inject(MessageService);
+  private readonly userService = inject(UserService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly t = inject(TranslocoService);
 
   users: WritableSignal<OpdsUserV2[]> = signal([]);
   loading = signal(false);

@@ -120,10 +120,11 @@ class HardcoverMoodFilterTest {
 
         Set<String> result = HardcoverMoodFilter.filterMoodsWithCounts(cachedTags);
 
-        // Top moods should be included
-        assertThat(result).contains("sad", "dark", "emotional");
-        // Low-vote moods should be filtered
-        assertThat(result).doesNotContain("hopeful", "scary");
+        assertThat(result)
+                // Top moods should be included
+                .contains("sad", "dark", "emotional")
+                // Low-vote moods should be filtered
+                .doesNotContain("hopeful", "scary");
     }
 
     @Test
@@ -172,8 +173,9 @@ class HardcoverMoodFilterTest {
 
         Set<String> result = HardcoverMoodFilter.filterMoodsWithCounts(cachedTags);
 
-        assertThat(result).containsExactlyInAnyOrder("sad", "dark");
-        assertThat(result).doesNotContain("mysterious");
+        assertThat(result)
+                .containsExactlyInAnyOrder("sad", "dark")
+                .doesNotContain("mysterious");
     }
 
     @Test
@@ -203,8 +205,9 @@ class HardcoverMoodFilterTest {
 
         Set<String> result = HardcoverMoodFilter.filterGenresWithCounts(cachedTags);
 
-        assertThat(result).containsExactlyInAnyOrder("Fiction", "War", "Classics");
-        assertThat(result).doesNotContain("Comics");
+        assertThat(result)
+                .containsExactlyInAnyOrder("Fiction", "War", "Classics")
+                .doesNotContain("Comics");
     }
 
     @Test
@@ -219,8 +222,9 @@ class HardcoverMoodFilterTest {
 
         Set<String> result = HardcoverMoodFilter.filterTagsWithCounts(cachedTags);
 
-        assertThat(result).contains("Loveable Characters", "Strong Character Development");
-        assertThat(result).doesNotContain("Plot driven");
+        assertThat(result)
+                .contains("Loveable Characters", "Strong Character Development")
+                .doesNotContain("Plot driven");
     }
 
     @Test

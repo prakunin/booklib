@@ -237,8 +237,9 @@ class LibraryFileHelperTest {
 
         List<LibraryFile> files = libraryFileHelper.getLibraryFiles(createLibrary(tempDir));
 
-        assertThat(files).hasSize(3);
-        assertThat(files).noneMatch(LibraryFile::isFolderBased);
+        assertThat(files)
+                .hasSize(3)
+                .noneMatch(LibraryFile::isFolderBased);
     }
 
     @Test
@@ -256,9 +257,10 @@ class LibraryFileHelperTest {
 
         List<LibraryFile> files = libraryFileHelper.getLibraryFiles(createLibrary(tempDir));
 
-        assertThat(files).hasSize(2);
-        assertThat(files).allMatch(LibraryFile::isFolderBased);
-        assertThat(files).allMatch(f -> f.getBookFileType() == BookFileType.AUDIOBOOK);
+        assertThat(files)
+                .hasSize(2)
+                .allMatch(LibraryFile::isFolderBased)
+                .allMatch(f -> f.getBookFileType() == BookFileType.AUDIOBOOK);
     }
 
     @Test
@@ -293,9 +295,10 @@ class LibraryFileHelperTest {
 
         List<LibraryFile> files = libraryFileHelper.getLibraryFiles(createLibrary(tempDir));
 
-        assertThat(files).hasSize(4);
-        assertThat(files).noneMatch(LibraryFile::isFolderBased);
-        assertThat(files).allMatch(f -> f.getFileSubPath() == null || f.getFileSubPath().isEmpty());
+        assertThat(files)
+                .hasSize(4)
+                .noneMatch(LibraryFile::isFolderBased)
+                .allMatch(f -> f.getFileSubPath() == null || f.getFileSubPath().isEmpty());
     }
 
     @Test
@@ -410,8 +413,9 @@ class LibraryFileHelperTest {
 
         List<LibraryFile> files = libraryFileHelper.getLibraryFiles(createLibraryWithMode(tempDir, LibraryOrganizationMode.AUTO_DETECT));
 
-        assertThat(files).hasSize(2);
-        assertThat(files).noneMatch(LibraryFile::isFolderBased);
+        assertThat(files)
+                .hasSize(2)
+                .noneMatch(LibraryFile::isFolderBased);
     }
 
     @Test
@@ -434,7 +438,7 @@ class LibraryFileHelperTest {
 
         List<Long> actual = libraryFileHelper.detectDeletedBookIds(Collections.emptyList(), List.of(book));
 
-        assertThat(actual).hasSize(0);
+        assertThat(actual).isEmpty();
     }
 
     @Test
@@ -447,7 +451,7 @@ class LibraryFileHelperTest {
 
         List<Long> actual = libraryFileHelper.detectDeletedBookIds(Collections.emptyList(), List.of(book));
 
-        assertThat(actual).hasSize(0);
+        assertThat(actual).isEmpty();
     }
 
     @Test
@@ -482,7 +486,7 @@ class LibraryFileHelperTest {
                 List.of(book)
         );
 
-        assertThat(actual).hasSize(0);
+        assertThat(actual).isEmpty();
     }
 
     @Test
@@ -709,7 +713,7 @@ class LibraryFileHelperTest {
                 List.of(additionalFile)
         );
 
-        assertThat(actual).hasSize(0);
+        assertThat(actual).isEmpty();
     }
 
     @Test

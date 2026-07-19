@@ -211,7 +211,7 @@ public class UserService {
         UserSettingKey settingKey;
         try {
             settingKey = UserSettingKey.fromDbKey(key);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw ApiError.INVALID_INPUT.createException("Unknown setting key: " + key);
         }
 
@@ -234,7 +234,7 @@ public class UserService {
                 serializedValue = value.toString();
             }
             setting.setSettingValue(serializedValue);
-        } catch (Exception e) {
+        } catch (Exception _) {
             throw ApiError.INVALID_INPUT.createException("Could not serialize setting value.");
         }
 

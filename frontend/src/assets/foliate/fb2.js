@@ -1,5 +1,5 @@
 const normalizeWhitespace = str => str ? str
-    .replace(/[\t\n\f\r ]+/g, ' ')
+    .replaceAll(/[\t\n\f\r ]+/g, ' ')
     .replace(/^[\t\n\f\r ]+/, '')
     .replace(/[\t\n\f\r ]+$/, '') : ''
 const getElementText = el => normalizeWhitespace(el?.textContent)

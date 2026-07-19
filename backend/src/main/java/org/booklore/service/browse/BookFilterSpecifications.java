@@ -1,7 +1,6 @@
 package org.booklore.service.browse;
 
 import lombok.RequiredArgsConstructor;
-import org.booklore.service.browse.BookSpecifications;
 import org.booklore.browse.FacetLogic;
 import org.booklore.exception.ApiError;
 import org.booklore.model.dto.BookLoreUser;

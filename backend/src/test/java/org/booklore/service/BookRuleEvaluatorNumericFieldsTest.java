@@ -170,8 +170,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.LESS_THAN, "50"));
-            assertThat(ids).contains(low.getId());
-            assertThat(ids).doesNotContain(high.getId());
+            assertThat(ids).contains(low.getId()).doesNotContain(high.getId());
         }
 
         @Test
@@ -187,8 +186,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.GREATER_THAN, "50"));
-            assertThat(ids).contains(high.getId());
-            assertThat(ids).doesNotContain(low.getId());
+            assertThat(ids).contains(high.getId()).doesNotContain(low.getId());
         }
 
         @Test
@@ -204,8 +202,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.GREATER_THAN_EQUAL_TO, "50"));
-            assertThat(ids).contains(exact.getId());
-            assertThat(ids).doesNotContain(below.getId());
+            assertThat(ids).contains(exact.getId()).doesNotContain(below.getId());
         }
 
         @Test
@@ -221,8 +218,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.LESS_THAN_EQUAL_TO, "50"));
-            assertThat(ids).contains(exact.getId());
-            assertThat(ids).doesNotContain(above.getId());
+            assertThat(ids).contains(exact.getId()).doesNotContain(above.getId());
         }
 
         @Test
@@ -238,8 +234,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.IN_BETWEEN, null, "40", "70"));
-            assertThat(ids).contains(inRange.getId());
-            assertThat(ids).doesNotContain(outOfRange.getId());
+            assertThat(ids).contains(inRange.getId()).doesNotContain(outOfRange.getId());
         }
 
         @Test
@@ -255,8 +250,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PAGE_COUNT, RuleOperator.GREATER_THAN, "300"));
-            assertThat(ids).contains(longBook.getId());
-            assertThat(ids).doesNotContain(shortBook.getId());
+            assertThat(ids).contains(longBook.getId()).doesNotContain(shortBook.getId());
         }
 
         @Test
@@ -287,8 +281,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.GREATER_THAN, 50));
-            assertThat(ids).contains(high.getId());
-            assertThat(ids).doesNotContain(low.getId());
+            assertThat(ids).contains(high.getId()).doesNotContain(low.getId());
         }
 
         @Test
@@ -304,8 +297,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.LESS_THAN, 50));
-            assertThat(ids).contains(low.getId());
-            assertThat(ids).doesNotContain(high.getId());
+            assertThat(ids).contains(low.getId()).doesNotContain(high.getId());
         }
 
         @Test
@@ -321,8 +313,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.EQUALS, 75));
-            assertThat(ids).contains(exact.getId());
-            assertThat(ids).doesNotContain(other.getId());
+            assertThat(ids).contains(exact.getId()).doesNotContain(other.getId());
         }
 
         @Test
@@ -342,18 +333,17 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.IN_BETWEEN, null, 40, 80));
-            assertThat(ids).contains(inRange.getId());
-            assertThat(ids).doesNotContain(tooLow.getId(), tooHigh.getId());
+            assertThat(ids).contains(inRange.getId()).doesNotContain(tooLow.getId(), tooHigh.getId());
         }
 
         @Test
         void nullScore_doesNotMatchComparison() {
-            BookEntity noScore = createBook("No Score");
+            createBook("No Score");
             em.flush();
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_SCORE, RuleOperator.GREATER_THAN, 0));
-            assertThat(ids).doesNotContain(noScore.getId());
+            assertThat(ids).isEmpty();
         }
     }
 
@@ -372,8 +362,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AMAZON_RATING, RuleOperator.GREATER_THAN, 3.5));
-            assertThat(ids).contains(highRated.getId());
-            assertThat(ids).doesNotContain(lowRated.getId());
+            assertThat(ids).contains(highRated.getId()).doesNotContain(lowRated.getId());
         }
 
         @Test
@@ -389,8 +378,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.GOODREADS_RATING, RuleOperator.LESS_THAN_EQUAL_TO, 3.0));
-            assertThat(ids).contains(rated3.getId());
-            assertThat(ids).doesNotContain(rated5.getId());
+            assertThat(ids).contains(rated3.getId()).doesNotContain(rated5.getId());
         }
 
         @Test
@@ -410,8 +398,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.HARDCOVER_RATING, RuleOperator.IN_BETWEEN, null, 3.0, 4.0));
-            assertThat(ids).contains(mid.getId());
-            assertThat(ids).doesNotContain(low.getId(), high.getId());
+            assertThat(ids).contains(mid.getId()).doesNotContain(low.getId(), high.getId());
         }
 
         @Test
@@ -427,8 +414,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AMAZON_REVIEW_COUNT, RuleOperator.GREATER_THAN, 1000));
-            assertThat(ids).contains(popular.getId());
-            assertThat(ids).doesNotContain(niche.getId());
+            assertThat(ids).contains(popular.getId()).doesNotContain(niche.getId());
         }
 
         @Test
@@ -444,8 +430,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.GOODREADS_REVIEW_COUNT, RuleOperator.LESS_THAN, 100));
-            assertThat(ids).contains(obscure.getId());
-            assertThat(ids).doesNotContain(popular.getId());
+            assertThat(ids).contains(obscure.getId()).doesNotContain(popular.getId());
         }
 
         @Test
@@ -473,8 +458,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.LUBIMYCZYTAC_RATING, RuleOperator.EQUALS, 4.0));
-            assertThat(ids).contains(rated.getId());
-            assertThat(ids).doesNotContain(other.getId());
+            assertThat(ids).contains(rated.getId()).doesNotContain(other.getId());
         }
 
         @Test
@@ -490,8 +474,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.RANOBEDB_RATING, RuleOperator.LESS_THAN, 3.0));
-            assertThat(ids).contains(low.getId());
-            assertThat(ids).doesNotContain(high.getId());
+            assertThat(ids).contains(low.getId()).doesNotContain(high.getId());
         }
     }
 
@@ -512,8 +495,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PERSONAL_RATING, RuleOperator.GREATER_THAN, 3));
-            assertThat(ids).contains(highRated.getId());
-            assertThat(ids).doesNotContain(lowRated.getId());
+            assertThat(ids).contains(highRated.getId()).doesNotContain(lowRated.getId());
         }
 
         @Test
@@ -531,8 +513,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PERSONAL_RATING, RuleOperator.EQUALS, 4));
-            assertThat(ids).contains(rated4.getId());
-            assertThat(ids).doesNotContain(rated2.getId());
+            assertThat(ids).contains(rated4.getId()).doesNotContain(rated2.getId());
         }
 
         @Test
@@ -555,8 +536,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PERSONAL_RATING, RuleOperator.IN_BETWEEN, null, 2, 4));
-            assertThat(ids).contains(rated3.getId());
-            assertThat(ids).doesNotContain(rated1.getId(), rated5.getId());
+            assertThat(ids).contains(rated3.getId()).doesNotContain(rated1.getId(), rated5.getId());
         }
 
         @Test
@@ -588,8 +568,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AGE_RATING, RuleOperator.GREATER_THAN, 12));
-            assertThat(ids).contains(mature.getId());
-            assertThat(ids).doesNotContain(kids.getId());
+            assertThat(ids).contains(mature.getId()).doesNotContain(kids.getId());
         }
 
         @Test
@@ -605,8 +584,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AGE_RATING, RuleOperator.LESS_THAN_EQUAL_TO, 13));
-            assertThat(ids).contains(teens.getId());
-            assertThat(ids).doesNotContain(adult.getId());
+            assertThat(ids).contains(teens.getId()).doesNotContain(adult.getId());
         }
     }
 
@@ -625,8 +603,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PAGE_COUNT, RuleOperator.GREATER_THAN_EQUAL_TO, 300));
-            assertThat(ids).contains(exact.getId());
-            assertThat(ids).doesNotContain(below.getId());
+            assertThat(ids).contains(exact.getId()).doesNotContain(below.getId());
         }
 
         @Test
@@ -642,8 +619,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PAGE_COUNT, RuleOperator.LESS_THAN_EQUAL_TO, 200));
-            assertThat(ids).contains(exact.getId());
-            assertThat(ids).doesNotContain(above.getId());
+            assertThat(ids).contains(exact.getId()).doesNotContain(above.getId());
         }
 
         @Test
@@ -663,8 +639,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PAGE_COUNT, RuleOperator.IN_BETWEEN, null, 100, 500));
-            assertThat(ids).contains(medium.getId());
-            assertThat(ids).doesNotContain(short_.getId(), long_.getId());
+            assertThat(ids).contains(medium.getId()).doesNotContain(short_.getId(), long_.getId());
         }
     }
 
@@ -685,8 +660,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_NUMBER, RuleOperator.GREATER_THAN, 3));
-            assertThat(ids).contains(book5.getId());
-            assertThat(ids).doesNotContain(book1.getId());
+            assertThat(ids).contains(book5.getId()).doesNotContain(book1.getId());
         }
 
         @Test
@@ -704,8 +678,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_NUMBER, RuleOperator.EQUALS, 2));
-            assertThat(ids).contains(book2.getId());
-            assertThat(ids).doesNotContain(book3.getId());
+            assertThat(ids).contains(book2.getId()).doesNotContain(book3.getId());
         }
     }
 
@@ -738,8 +711,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUDIOBOOK_DURATION, RuleOperator.GREATER_THAN, 7200));
-            assertThat(ids).contains(longBook.getId());
-            assertThat(ids).doesNotContain(shortBook.getId());
+            assertThat(ids).contains(longBook.getId()).doesNotContain(shortBook.getId());
         }
 
         @Test
@@ -769,8 +741,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUDIOBOOK_DURATION, RuleOperator.LESS_THAN, 3600));
-            assertThat(ids).contains(shortBook.getId());
-            assertThat(ids).doesNotContain(longBook.getId());
+            assertThat(ids).contains(shortBook.getId()).doesNotContain(longBook.getId());
         }
 
         @Test
@@ -799,8 +770,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUDIOBOOK_DURATION, RuleOperator.IN_BETWEEN, null, 3600, 36000));
-            assertThat(ids).contains(midBook.getId());
-            assertThat(ids).doesNotContain(shortBook.getId(), longBook.getId());
+            assertThat(ids).contains(midBook.getId()).doesNotContain(shortBook.getId(), longBook.getId());
         }
     }
 
@@ -819,8 +789,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.HARDCOVER_REVIEW_COUNT, RuleOperator.GREATER_THAN_EQUAL_TO, 100));
-            assertThat(ids).contains(exact.getId());
-            assertThat(ids).doesNotContain(below.getId());
+            assertThat(ids).contains(exact.getId()).doesNotContain(below.getId());
         }
     }
 
@@ -839,8 +808,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUDIBLE_REVIEW_COUNT, RuleOperator.LESS_THAN_EQUAL_TO, 50));
-            assertThat(ids).contains(few.getId());
-            assertThat(ids).doesNotContain(many.getId());
+            assertThat(ids).contains(few.getId()).doesNotContain(many.getId());
         }
     }
 
@@ -861,8 +829,7 @@ class BookRuleEvaluatorNumericFieldsTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_TOTAL, RuleOperator.GREATER_THAN, 10));
-            assertThat(ids).contains(longSeries.getId());
-            assertThat(ids).doesNotContain(shortSeries.getId());
+            assertThat(ids).contains(longSeries.getId()).doesNotContain(shortSeries.getId());
         }
     }
 }

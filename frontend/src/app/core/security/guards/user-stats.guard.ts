@@ -1,10 +1,8 @@
 import {inject} from '@angular/core';
-import {ActivatedRouteSnapshot, CanActivateFn, Router, RouterStateSnapshot} from '@angular/router';
+import {CanActivateFn, Router} from '@angular/router';
 import {UserService} from '../../../features/settings/user-management/user.service';
 
-export const UserStatsGuard: CanActivateFn = (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
-  void route;
-  void state;
+export const UserStatsGuard: CanActivateFn = () => {
   const userService = inject(UserService);
   const router = inject(Router);
   const user = userService.currentUser();

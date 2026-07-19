@@ -332,8 +332,9 @@ class FileUploadServiceTest {
         service.uploadFileBookDrop(file);
 
         File[] files = tempDir.toFile().listFiles();
-        assertThat(files).isNotNull();
-        assertThat(files).hasSize(1);
+        assertThat(files)
+                .isNotNull()
+                .hasSize(1);
         String savedName = files[0].getName();
         
         assertThat(savedName.length()).isLessThan(longName.length());

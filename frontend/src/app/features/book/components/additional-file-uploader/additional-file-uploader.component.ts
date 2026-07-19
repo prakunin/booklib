@@ -42,12 +42,12 @@ interface UploadingFile {
 })
 export class AdditionalFileUploaderComponent implements OnInit, OnDestroy {
   private readonly t = inject(TranslocoService);
-  private dialogRef = inject(DynamicDialogRef);
-  private config = inject(DynamicDialogConfig);
-  private bookFileService = inject(BookFileService);
-  private appSettingsService = inject(AppSettingsService);
-  private messageService = inject(MessageService);
-  private cdr = inject(ChangeDetectorRef);
+  private readonly dialogRef = inject(DynamicDialogRef);
+  private readonly config = inject(DynamicDialogConfig);
+  private readonly bookFileService = inject(BookFileService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly messageService = inject(MessageService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   book!: Book;
   files: UploadingFile[] = [];
@@ -60,8 +60,8 @@ export class AdditionalFileUploaderComponent implements OnInit, OnDestroy {
 
   fileTypeOptions: FileTypeOption[] = [];
 
-  @ViewChild(FileUpload) private fileUpload!: FileUpload;
-  private destroy$ = new Subject<void>();
+  @ViewChild(FileUpload) private readonly fileUpload!: FileUpload;
+  private readonly destroy$ = new Subject<void>();
 
   ngOnInit(): void {
     this.book = this.config.data.book;
@@ -149,8 +149,7 @@ export class AdditionalFileUploaderComponent implements OnInit, OnDestroy {
     uploadCallback();
   }
 
-  uploadFiles(event: FileUploadHandlerEvent): void {
-    void event;
+  uploadFiles(_event: FileUploadHandlerEvent): void {
     const filesToUpload = this.files.filter(f => f.status === 'Pending');
 
     if (filesToUpload.length === 0) return;

@@ -120,7 +120,7 @@ public class TaskHistoryService {
                 .filter(task -> {
                     try {
                         return task.getType() != null;
-                    } catch (Exception e) {
+                    } catch (Exception _) {
                         log.warn("Skipping task with invalid type: taskId={}", task.getId());
                         return false;
                     }

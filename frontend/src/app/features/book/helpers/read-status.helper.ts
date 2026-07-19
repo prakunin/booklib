@@ -80,7 +80,6 @@ export class ReadStatusHelper {
   }
 
   shouldShowStatusIcon(_readStatus: ReadStatus | undefined): boolean {
-    void _readStatus;
     return true;
   }
 }

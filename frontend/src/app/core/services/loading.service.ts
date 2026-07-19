@@ -48,7 +48,7 @@ export class LoadingService {
   }
 
   hide(loader: HTMLElement): void {
-    if (loader && loader.parentNode) {
+    if (loader?.parentNode) {
       loader.parentNode.removeChild(loader);
 
       const index = this.activeLoaders.indexOf(loader);
@@ -64,7 +64,7 @@ export class LoadingService {
 
   hideAll(): void {
     this.activeLoaders.forEach(loader => {
-      if (loader && loader.parentNode) {
+      if (loader?.parentNode) {
         loader.parentNode.removeChild(loader);
       }
     });

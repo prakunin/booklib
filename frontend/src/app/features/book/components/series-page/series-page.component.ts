@@ -101,26 +101,26 @@ export class SeriesPageComponent implements AfterViewChecked {
   private readonly DESKTOP_SERIES_GRID_GAP = 21;
   private readonly MOBILE_SERIES_GRID_GAP = 8;
   private readonly MOBILE_GRID_COLUMNS = 2;
-  private route = inject(ActivatedRoute);
-  private bookService = inject(BookService);
-  private bookMetadataManageService = inject(BookMetadataManageService);
-  private metadataCenterViewMode: "route" | "dialog" = "route";
+  private readonly route = inject(ActivatedRoute);
+  private readonly bookService = inject(BookService);
+  private readonly bookMetadataManageService = inject(BookMetadataManageService);
+  private readonly metadataCenterViewMode: "route" | "dialog" = "route";
   private dialogRef?: DynamicDialogRef | null;
-  private router = inject(Router);
+  private readonly router = inject(Router);
   protected userService = inject(UserService);
-  private bookMenuService = inject(BookMenuService);
+  private readonly bookMenuService = inject(BookMenuService);
   protected confirmationService = inject(ConfirmationService);
-  private loadingService = inject(LoadingService);
-  private dialogHelperService = inject(BookDialogHelperService);
+  private readonly loadingService = inject(LoadingService);
+  private readonly dialogHelperService = inject(BookDialogHelperService);
   protected taskHelperService = inject(TaskHelperService);
-  private messageService = inject(MessageService);
+  private readonly messageService = inject(MessageService);
   protected bookCardOverlayPreferenceService = inject(BookCardOverlayPreferenceService);
   protected appSettingsService = inject(AppSettingsService);
   private readonly t = inject(TranslocoService);
   protected urlHelper = inject(UrlHelperService);
-  private authorService = inject(AuthorService);
-  private layoutService = inject(LayoutService);
-  private appBooksApi = inject(AppBooksApiService);
+  private readonly authorService = inject(AuthorService);
+  private readonly layoutService = inject(LayoutService);
+  private readonly appBooksApi = inject(AppBooksApiService);
 
   private readonly descriptionContentRef = viewChild<ElementRef<HTMLElement>>('descriptionContent');
   private readonly seriesGridElement = viewChild<ElementRef<HTMLElement>>('seriesGrid');
@@ -143,7 +143,7 @@ export class SeriesPageComponent implements AfterViewChecked {
   protected readonly seriesCardsUseSquareCovers = false;
   protected readonly onSeriesBookCardSelect = this.handleBookSelect.bind(this);
 
-  private seriesParam = toSignal(this.route.paramMap.pipe(
+  private readonly seriesParam = toSignal(this.route.paramMap.pipe(
     map((params) => params.get("seriesName") || ""),
   ), {initialValue: ""});
 
@@ -186,8 +186,8 @@ export class SeriesPageComponent implements AfterViewChecked {
   );
 
   coverBook = computed(() => this.filteredBooks()[0] ?? null);
-  private firstBookId = computed(() => this.coverBook()?.id ?? null);
-  private firstBookDetailQuery = injectQuery(() => ({
+  private readonly firstBookId = computed(() => this.coverBook()?.id ?? null);
+  private readonly firstBookDetailQuery = injectQuery(() => ({
     ...this.bookService.bookDetailQueryOptions(this.firstBookId() ?? -1, true),
     enabled: this.firstBookId() != null,
   }));
@@ -199,8 +199,8 @@ export class SeriesPageComponent implements AfterViewChecked {
       .map((book) => book.metadata?.publishedDate)
       .filter((date): date is string => !!date)
       .map((date) => {
-        const match = date.match(/\d{4}/);
-        return match ? parseInt(match[0], 10) : null;
+        const match = /\d{4}/.exec(date);
+        return match ? Number.parseInt(match[0], 10) : null;
       })
       .filter((year): year is number => year !== null);
 
@@ -417,7 +417,7 @@ export class SeriesPageComponent implements AfterViewChecked {
 
   private getElementContentWidth(element: HTMLElement): number {
     const style = getComputedStyle(element);
-    const horizontalPadding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    const horizontalPadding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
     return Math.max(0, Math.round(element.clientWidth - horizontalPadding));
   }
 
@@ -595,7 +595,7 @@ export class SeriesPageComponent implements AfterViewChecked {
   }
 
   formatDuration(totalSeconds: number): string {
-    if (!totalSeconds || !isFinite(totalSeconds)) return '0:00';
+    if (!totalSeconds || !Number.isFinite(totalSeconds)) return '0:00';
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     if (h > 0) {

@@ -480,7 +480,7 @@ export class MagicShelfComponent implements OnInit {
   messageService = inject(MessageService);
   config = inject(DynamicDialogConfig);
   userService = inject(UserService);
-  private iconPicker = inject(IconPickerService);
+  private readonly iconPicker = inject(IconPickerService);
 
   selectedIcon: IconSelection | null = null;
   private formInitializedFromShelf = false;
@@ -757,10 +757,7 @@ export class MagicShelfComponent implements OnInit {
     this.iconPicker.open().subscribe(icon => {
       if (icon) {
         this.selectedIcon = icon;
-        const iconValue = icon.type === 'CUSTOM_SVG'
-          ? icon.value
-          : icon.value;
-        this.form.get('icon')?.setValue(iconValue);
+        this.form.get('icon')?.setValue(icon.value);
       }
     });
   }

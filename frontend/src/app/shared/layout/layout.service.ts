@@ -122,7 +122,7 @@ export class LayoutService {
 
   isSidebarExpanded(key: string, defaultExpanded: boolean): boolean {
     const value = this.sidebarExpandedState()[key];
-    return value === undefined ? defaultExpanded : value;
+    return value ?? defaultExpanded;
   }
 
   setSidebarExpanded(key: string, expanded: boolean): void {

@@ -197,7 +197,7 @@ class BookReviewServiceTest {
             .bookReviews(Collections.singletonList(freshReview))
             .build());
         when(metadataRefreshService.fetchMetadataForBook(
-            eq(Collections.singletonList(MetadataProvider.Amazon)), eq(bookEntity)))
+            Collections.singletonList(MetadataProvider.Amazon), bookEntity))
             .thenReturn(metadataMap);
 
         List<BookReview> result = service.getByBookId(bookId);
@@ -233,7 +233,7 @@ class BookReviewServiceTest {
             .bookReviews(Collections.singletonList(freshReview))
             .build());
         when(metadataRefreshService.fetchMetadataForBook(
-            eq(Collections.singletonList(MetadataProvider.GoodReads)), eq(bookEntity)))
+            Collections.singletonList(MetadataProvider.GoodReads), bookEntity))
             .thenReturn(metadataMap);
 
         List<BookReview> result = service.getByBookId(bookId);
@@ -291,7 +291,7 @@ class BookReviewServiceTest {
         service.fetchBookReviews(bookEntity);
 
         verify(metadataRefreshService).fetchMetadataForBook(
-            eq(Collections.singletonList(MetadataProvider.Amazon)), eq(bookEntity));
+            Collections.singletonList(MetadataProvider.Amazon), bookEntity);
     }
 
     @Test

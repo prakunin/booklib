@@ -268,13 +268,14 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
             if (volume.getCountOfIssues() != null && volume.getCountOfIssues() >= requestedIssue) {
                 score += 20;
             }
-        } catch (NumberFormatException _) {}
+        } catch (NumberFormatException _) {
+            // ignore unparseable issue number
+        }
 
         Set<String> majorPublishers = Set.of("Marvel", "DC Comics", "Image Comics", "Dark Horse Comics", "IDW Publishing", "Dynamite Entertainment", "BOOM! Studios", "Valiant Entertainment");
-        if (volume.getPublisher() != null && volume.getPublisher().getName() != null) {
-            if (majorPublishers.stream().anyMatch(p -> volume.getPublisher().getName().contains(p))) {
-                score += 10;
-            }
+        if (volume.getPublisher() != null && volume.getPublisher().getName() != null
+                && majorPublishers.stream().anyMatch(p -> volume.getPublisher().getName().contains(p))) {
+            score += 10;
         }
 
         if (volume.getStartYear() != null) {
@@ -283,7 +284,9 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                 if (year >= 2000) score += 5;
                 if (year >= 2010) score += 5;
                 if (year >= 2020) score += 5;
-            } catch (NumberFormatException _) {}
+            } catch (NumberFormatException _) {
+                // ignore unparseable start year
+            }
         }
 
         return score;
@@ -294,7 +297,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         try {
             int volYear = Integer.parseInt(volume.getStartYear());
             return Math.abs(volYear - targetYear) <= 1;
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return false;
         }
     }
@@ -415,7 +418,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         int id;
         try {
             id = Integer.parseInt(idStr);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.warn("Invalid comicvineId format: {}", comicvineId);
             return null;
         }
@@ -547,7 +550,9 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                          response.statusCode(), retriesLeft);
                 try {
                     Thread.sleep(2000);
-                } catch (InterruptedException _) {}
+                } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
+                }
                 return sendRequestWithRetry(uri, responseType, retriesLeft - 1);
             } else {
                 log.error("Comicvine API returned status code {}. Body: {}", response.statusCode(), response.body());
@@ -557,7 +562,9 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                 log.warn("IOException during ComicVine request. Retrying... ({} retries left)", retriesLeft, e);
                 try {
                     Thread.sleep(1000);
-                } catch (InterruptedException _) {}
+                } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
+                }
                 return sendRequestWithRetry(uri, responseType, retriesLeft - 1);
             } else {
                 log.error("Error fetching data from Comicvine API after retries", e);
@@ -586,7 +593,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                         resetDelayMs = 3600000;
                     }
                 }
-            } catch (Exception e) {
+            } catch (Exception _) {
                 log.warn("Could not parse Retry-After header '{}', using default 1 hour delay", retryAfterHeaders.getFirst());
             }
         }
@@ -881,7 +888,9 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                     year = y;
                     yearString = yearMatcher.group(0);
                 }
-            } catch (NumberFormatException _) {}
+            } catch (NumberFormatException _) {
+                // ignore unparseable year
+            }
         }
 
         String cleaned = term;
@@ -943,7 +952,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
             double reqNum = Double.parseDouble(requested);
             double retNum = Double.parseDouble(returned);
             return Math.abs(reqNum - retNum) < 0.0001;
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return requested.equalsIgnoreCase(returned);
         }
     }
@@ -963,7 +972,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                     double denominator = Double.parseDouble(parts[1]);
                     return String.valueOf(numerator / denominator);
                 }
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 log.warn("Could not parse fractional issue number '{}'", issueNumber);
                 return issueNumber;
             }
@@ -980,7 +989,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
             } else {
                 return String.valueOf(Integer.parseInt(issueNumber));
             }
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.debug("Non-numeric issue number '{}', using as-is", issueNumber);
             return issueNumber;
         }
@@ -990,7 +999,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         if (dateStr == null || dateStr.isEmpty()) return null;
         try {
             return LocalDate.parse(dateStr, DATE_FORMATTER);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             log.warn("Invalid date '{}'", dateStr);
             return null;
         }
@@ -1000,7 +1009,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         if (numStr == null || numStr.isEmpty()) return null;
         try {
             return Float.valueOf(numStr);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }

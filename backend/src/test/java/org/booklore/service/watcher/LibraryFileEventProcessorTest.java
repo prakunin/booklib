@@ -70,7 +70,7 @@ class LibraryFileEventProcessorTest {
         when(libraryRepository.findByIdWithPaths(1L)).thenReturn(Optional.of(library));
         when(bookFilePersistenceService.findMatchingLibraryPath(eq(library), any(Path.class)))
                 .thenReturn(tempDir.toString());
-        when(bookFilePersistenceService.getLibraryPathEntityForFile(eq(library), eq(tempDir.toString())))
+        when(bookFilePersistenceService.getLibraryPathEntityForFile(library, tempDir.toString()))
                 .thenReturn(libraryPath);
 
         // Start the event processing thread (normally done by SmartLifecycle)
@@ -197,7 +197,7 @@ class LibraryFileEventProcessorTest {
 
             Thread.sleep(8000);
 
-            verify(bookFileTransactionalHandler).handleNewFolderAudiobook(eq(1L), eq(folder));
+            verify(bookFileTransactionalHandler).handleNewFolderAudiobook(1L, folder);
             verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
             verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
         }
@@ -215,7 +215,7 @@ class LibraryFileEventProcessorTest {
 
             Thread.sleep(8000);
 
-            verify(bookFileTransactionalHandler).handleNewFolderAudiobook(eq(1L), eq(folder));
+            verify(bookFileTransactionalHandler).handleNewFolderAudiobook(1L, folder);
             verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
             verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
         }
@@ -287,7 +287,7 @@ class LibraryFileEventProcessorTest {
             } finally {
                 try (var stream = Files.walk(outsideFolder)) {
                     stream.sorted(Comparator.reverseOrder()).forEach(p -> {
-                        try { Files.deleteIfExists(p); } catch (IOException _) {}
+                        try { Files.deleteIfExists(p); } catch (IOException _) { /* best-effort cleanup */ }
                     });
                 }
             }

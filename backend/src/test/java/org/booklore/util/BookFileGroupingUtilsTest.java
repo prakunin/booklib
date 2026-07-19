@@ -41,8 +41,8 @@ class BookFileGroupingUtilsTest {
 
     @Test
     void extractGroupingKey_shouldHandleNullAndEmpty() {
-        assertThat(BookFileGroupingUtils.extractGroupingKey(null)).isEqualTo("");
-        assertThat(BookFileGroupingUtils.extractGroupingKey("")).isEqualTo("");
+        assertThat(BookFileGroupingUtils.extractGroupingKey(null)).isEmpty();
+        assertThat(BookFileGroupingUtils.extractGroupingKey("")).isEmpty();
     }
 
     @Test
@@ -245,10 +245,10 @@ class BookFileGroupingUtilsTest {
 
     @Test
     void calculateSimilarity_shouldHandleNullAndEmptyStrings() {
-        assertThat(BookFileGroupingUtils.calculateSimilarity(null, "test")).isEqualTo(0);
-        assertThat(BookFileGroupingUtils.calculateSimilarity("test", null)).isEqualTo(0);
-        assertThat(BookFileGroupingUtils.calculateSimilarity("", "test")).isEqualTo(0);
-        assertThat(BookFileGroupingUtils.calculateSimilarity("test", "")).isEqualTo(0);
+        assertThat(BookFileGroupingUtils.calculateSimilarity(null, "test")).isZero();
+        assertThat(BookFileGroupingUtils.calculateSimilarity("test", null)).isZero();
+        assertThat(BookFileGroupingUtils.calculateSimilarity("", "test")).isZero();
+        assertThat(BookFileGroupingUtils.calculateSimilarity("test", "")).isZero();
     }
 
     // ========== Folder-Centric Grouping Tests ==========

@@ -131,14 +131,15 @@ public class KomgaMapper {
                     .toList();
         }
         
+        Float seriesNumber = nullIfEmptyInCleanMode(metadata.getSeriesNumber(), 1.0F);
         return KomgaBookMetadataDto.builder()
                 .title(nullIfEmptyInCleanMode(metadata.getTitle(), ""))
                 .titleLock(metadata.getTitleLocked())
                 .summary(nullIfEmptyInCleanMode(metadata.getDescription(), ""))
                 .summaryLock(metadata.getDescriptionLocked())
-                .number(nullIfEmptyInCleanMode(metadata.getSeriesNumber(), 1.0F).toString())
+                .number(seriesNumber != null ? seriesNumber.toString() : null)
                 .numberLock(metadata.getSeriesNumberLocked())
-                .numberSort(nullIfEmptyInCleanMode(metadata.getSeriesNumber(), 1.0F))
+                .numberSort(seriesNumber)
                 .numberSortLock(metadata.getSeriesNumberLocked())
                 .releaseDate(metadata.getPublishedDate() != null 
                            ? metadata.getPublishedDate().format(DATE_FORMATTER) 
@@ -251,10 +252,16 @@ public class KomgaMapper {
         boolean groupUnknown = appSettingService.getAppSettings().isKomgaGroupUnknown();
         BookMetadataEntity metadata = book.getMetadata();
         BookFileEntity bookFile = book.getPrimaryBookFile();
-        String bookSeriesName = metadata != null && metadata.getSeriesName() != null 
-            ? metadata.getSeriesName() 
-                : (groupUnknown ? UNKNOWN_SERIES : (metadata.getTitle() != null ? metadata.getTitle() : bookFile.getFileName() ));
-        return bookSeriesName;
+        if (metadata != null && metadata.getSeriesName() != null) {
+            return metadata.getSeriesName();
+        }
+        if (groupUnknown) {
+            return UNKNOWN_SERIES;
+        }
+        if (metadata != null && metadata.getTitle() != null) {
+            return metadata.getTitle();
+        }
+        return bookFile.getFileName();
     }
 
     public String getUnknownSeriesName() {

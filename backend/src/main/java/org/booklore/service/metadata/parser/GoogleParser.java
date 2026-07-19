@@ -2,6 +2,7 @@ package org.booklore.service.metadata.parser;
 
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.dto.Book;
+import org.booklore.model.dto.BookFile;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.request.FetchMetadataRequest;
 import org.booklore.model.dto.response.GoogleBooksApiResponse;
@@ -165,7 +166,7 @@ public class GoogleParser implements BookParser {
         } catch (IOException e) {
             log.error("IO error while fetching metadata from Google Books API: {}", e.getMessage());
             return List.of();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             log.error("Request to Google Books API was interrupted");
             Thread.currentThread().interrupt();
             return List.of();
@@ -229,7 +230,7 @@ public class GoogleParser implements BookParser {
         return hasAuthor || hasIsbn || hasDescription || hasPublisher || hasGoogleId;
     }
 
-    private List<BookMetadata> parseGoogleBooksApiResponse(String responseBody) throws IOException {
+    private List<BookMetadata> parseGoogleBooksApiResponse(String responseBody) {
         GoogleBooksApiResponse googleBooksApiResponse = objectMapper.readValue(responseBody, GoogleBooksApiResponse.class);
         if (googleBooksApiResponse != null && googleBooksApiResponse.getItems() != null) {
             return googleBooksApiResponse.getItems().stream()
@@ -376,7 +377,7 @@ public class GoogleParser implements BookParser {
         }
         try {
             return Float.parseFloat(numberStr);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }
@@ -491,7 +492,7 @@ public class GoogleParser implements BookParser {
         String searchTerm = Optional.ofNullable(request.getTitle())
                 .filter(title -> !title.isEmpty())
                 .orElseGet(() -> Optional.ofNullable(book.getPrimaryFile())
-                        .map(pf -> pf.getFileName())
+                        .map(BookFile::getFileName)
                         .filter(fileName -> !fileName.isEmpty())
                         .map(BookUtils::cleanFileName)
                         .orElse(null));
@@ -595,7 +596,7 @@ public class GoogleParser implements BookParser {
         if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
             try {
                 Thread.sleep(MIN_REQUEST_INTERVAL_MS - timeSinceLastRequest);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
             }
         }

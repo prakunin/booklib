@@ -37,14 +37,14 @@ import {DEFAULT_PASSWORD_POLICY, passwordPolicyValidator} from '../../../../shar
 export class CreateUserDialogComponent implements OnInit {
   userForm!: FormGroup;
 
-  private fb = inject(FormBuilder);
-  private libraryService = inject(LibraryService);
-  private userService = inject(UserService);
-  private messageService = inject(MessageService);
-  private ref = inject(DynamicDialogRef);
-  private t = inject(TranslocoService);
-  private destroyRef = inject(DestroyRef);
-  private appSettingsService = inject(AppSettingsService);
+  private readonly fb = inject(FormBuilder);
+  private readonly libraryService = inject(LibraryService);
+  private readonly userService = inject(UserService);
+  private readonly messageService = inject(MessageService);
+  private readonly ref = inject(DynamicDialogRef);
+  private readonly t = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly appSettingsService = inject(AppSettingsService);
 
   get passwordPolicy() {
     return this.appSettingsService.appSettings()?.passwordPolicy ?? DEFAULT_PASSWORD_POLICY;
@@ -115,7 +115,6 @@ export class CreateUserDialogComponent implements OnInit {
     }
     // Detele confirmPassword from form, it's not necessary to keep once validation has passed
     const {confirmPassword, ...formValue} = this.userForm.value;
-    void confirmPassword;
 
     const userData = {
       ...formValue,

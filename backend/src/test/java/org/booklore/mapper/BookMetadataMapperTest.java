@@ -14,7 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-public class BookMetadataMapperTest {
+class BookMetadataMapperTest {
 
     @Mock
     private AuthorMapper authorMapper;

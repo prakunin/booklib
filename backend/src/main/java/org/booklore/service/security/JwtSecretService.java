@@ -12,6 +12,8 @@ import java.util.concurrent.locks.ReentrantLock;
 @Service
 public class JwtSecretService {
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final JwtSecretRepository jwtSecretRepository;
     private volatile String cachedSecret;
     private final ReentrantLock lock = new ReentrantLock();
@@ -45,7 +47,7 @@ public class JwtSecretService {
 
     private String generateRandomSecret() {
         byte[] randomBytes = new byte[32];
-        new SecureRandom().nextBytes(randomBytes);
+        SECURE_RANDOM.nextBytes(randomBytes);
         return Base64.getEncoder().encodeToString(randomBytes);
     }
 }

@@ -35,9 +35,9 @@ export class AuthorMatchComponent implements OnInit {
   @Input({required: true}) authorName!: string;
   @Output() authorMatched = new EventEmitter<AuthorDetails>();
 
-  private authorService = inject(AuthorService);
-  private messageService = inject(MessageService);
-  private t = inject(TranslocoService);
+  private readonly authorService = inject(AuthorService);
+  private readonly messageService = inject(MessageService);
+  private readonly t = inject(TranslocoService);
 
   searchQuery = signal('');
   asinQuery = signal('');

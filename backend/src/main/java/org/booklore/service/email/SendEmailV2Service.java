@@ -239,6 +239,7 @@ public class SendEmailV2Service {
     }
 
     private String extractUserFriendlyMessage(Exception e) {
+        String fallbackMessage = "An unexpected error occurred: " + e.getMessage();
         Throwable cause = e;
         while (cause != null) {
             if (cause instanceof IOException) {
@@ -249,7 +250,7 @@ public class SendEmailV2Service {
         if (e instanceof MessagingException) {
             return "The email could not be sent due to a mail server error. Please verify your email provider settings.";
         }
-        return "An unexpected error occurred: " + e.getMessage();
+        return fallbackMessage;
     }
 
     private enum ConnectionType {

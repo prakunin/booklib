@@ -85,27 +85,27 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   private static readonly INITIAL_CHAPTER_RESTORE_RETRY_MS = 100;
   private static readonly INITIAL_CHAPTER_RESTORE_MAX_ATTEMPTS = 15;
   private static readonly PINCH_PERCENT_HYSTERESIS = 0.65;
-  private loaderService = inject(ReaderLoaderService);
-  private styleService = inject(ReaderStyleService);
-  private bookService = inject(BookService);
-  private bookFileService = inject(BookFileService);
-  private route = inject(ActivatedRoute);
-  private epubCustomFontService = inject(EpubCustomFontService);
-  private annotationService = inject(ReaderAnnotationHttpService);
-  private progressService = inject(ReaderProgressService);
-  private selectionService = inject(ReaderSelectionService);
-  private headerService = inject(ReaderHeaderService);
-  private noteService = inject(ReaderNoteService);
-  private wakeLockService = inject(WakeLockService);
-  private messageService = inject(MessageService);
-  private fullscreenService = inject(ReaderFullscreenService);
+  private readonly loaderService = inject(ReaderLoaderService);
+  private readonly styleService = inject(ReaderStyleService);
+  private readonly bookService = inject(BookService);
+  private readonly bookFileService = inject(BookFileService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly epubCustomFontService = inject(EpubCustomFontService);
+  private readonly annotationService = inject(ReaderAnnotationHttpService);
+  private readonly progressService = inject(ReaderProgressService);
+  private readonly selectionService = inject(ReaderSelectionService);
+  private readonly headerService = inject(ReaderHeaderService);
+  private readonly noteService = inject(ReaderNoteService);
+  private readonly wakeLockService = inject(WakeLockService);
+  private readonly messageService = inject(MessageService);
+  private readonly fullscreenService = inject(ReaderFullscreenService);
 
   public sidebarService = inject(ReaderSidebarService);
   public leftSidebarService = inject(ReaderLeftSidebarService);
   public viewManager = inject(ReaderViewManagerService);
   public stateService = inject(ReaderStateService);
 
-  @ViewChild('readerRoot', {static: true}) private readerRoot?: ElementRef<HTMLElement>;
+  @ViewChild('readerRoot', {static: true}) private readonly readerRoot?: ElementRef<HTMLElement>;
 
   protected bookId!: number;
   protected altBookType?: string;
@@ -125,7 +125,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   private pinchStableZoomPercent: number | null = null;
   private pinchOverlayTimeout?: ReturnType<typeof setTimeout>;
   private touchListenerCleanups: (() => void)[] = [];
-  private pinchListenerTargets = new WeakSet<EventTarget>();
+  private readonly pinchListenerTargets = new WeakSet<EventTarget>();
   private readonly readerTouchStartListener: EventListener = event => this.onReaderTouchStart(event as TouchEvent);
   private readonly readerTouchMoveListener: EventListener = event => this.onReaderTouchMove(event as TouchEvent);
   private readonly readerTouchEndListener: EventListener = event => this.onReaderTouchEnd(event as TouchEvent);
@@ -138,7 +138,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   showMetadata = signal(false);
   forceNavbarVisible = signal(false);
   headerVisible = signal(false);
-  private sectionBoundaryControlsVisible = signal(false);
+  private readonly sectionBoundaryControlsVisible = signal(false);
   book = signal<Book | null>(null);
   sectionFractions = signal<number[]>([]);
   isFullscreen = signal(false);
@@ -429,6 +429,11 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
 
   private restoreSavedPosition(book: Book): Observable<void> {
     this.pendingInitialChapterRestore = null;
+
+    const requestedCfi = this.route.snapshot.queryParamMap.get('cfi');
+    if (requestedCfi) {
+      return this.viewManager.goTo(requestedCfi);
+    }
 
     const progress = book.epubProgress;
 

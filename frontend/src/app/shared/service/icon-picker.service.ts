@@ -5,7 +5,7 @@ import {IconSelection} from '../icons/icon-selection';
 
 @Injectable({providedIn: 'root'})
 export class IconPickerService {
-  private dialogLauncherService = inject(DialogLauncherService);
+  private readonly dialogLauncherService = inject(DialogLauncherService);
 
   open(): Observable<IconSelection> {
     return from(this.dialogLauncherService.openIconPickerDialog()).pipe(

@@ -62,9 +62,10 @@ class ArchivedBookContentServiceTest {
         Path first = service.resolve(file);
         Path second = service.resolve(file);
 
-        assertThat(first).isEqualTo(second);
-        assertThat(first).hasContent("<FictionBook>cached</FictionBook>");
-        assertThat(first).startsWith(tempDir.resolve("data/cache/inpx/7/9"));
+        assertThat(first)
+                .isEqualTo(second)
+                .hasContent("<FictionBook>cached</FictionBook>")
+                .startsWith(tempDir.resolve("data/cache/inpx/7/9"));
         assertThat(archive).exists();
     }
 

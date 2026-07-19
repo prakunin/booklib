@@ -42,7 +42,7 @@ public class KoboCompatibilityService {
         try {
             KoboSettings koboSettings = appSettingService.getAppSettings().getKoboSettings();
             return koboSettings != null && koboSettings.isConvertCbxToEpub();
-        } catch (Exception e) {
+        } catch (Exception _) {
             return false;
         }
     }
@@ -63,7 +63,7 @@ public class KoboCompatibilityService {
             long limitKb = (long) koboSettings.getConversionLimitInMbForCbx() * 1024;
             
             return fileSizeKb <= limitKb;
-        } catch (Exception e) {
+        } catch (Exception _) {
             return false;
         }
     }

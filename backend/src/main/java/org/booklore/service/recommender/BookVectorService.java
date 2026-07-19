@@ -78,8 +78,7 @@ public class BookVectorService {
         double[] vector = new double[VECTOR_DIMENSION];
 
         for (Map.Entry<String, Double> entry : features.entrySet()) {
-            int hash = Math.abs(entry.getKey().hashCode());
-            int index = hash % VECTOR_DIMENSION;
+            int index = Math.floorMod(entry.getKey().hashCode(), VECTOR_DIMENSION);
             vector[index] += entry.getValue();
         }
 

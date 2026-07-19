@@ -37,7 +37,7 @@ export function createQueryClientHarness(): QueryClientHarness {
 }
 
 export function flushSignalAndQueryEffects(): void {
-  TestBed.flushEffects();
+  TestBed.tick();
 }
 
 /**
@@ -50,11 +50,11 @@ export function flushSignalAndQueryEffects(): void {
 export async function flushQueryAsync(rounds = 5): Promise<void> {
   const appRef = TestBed.inject(ApplicationRef);
   for (let i = 0; i < rounds; i++) {
-    TestBed.flushEffects();
+    TestBed.tick();
     appRef.tick();
     await Promise.resolve();
     await new Promise(resolve => setTimeout(resolve, 0));
   }
-  TestBed.flushEffects();
+  TestBed.tick();
   appRef.tick();
 }

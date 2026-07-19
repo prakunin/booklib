@@ -5,7 +5,6 @@ import org.booklore.model.dto.inpx.InpxBookDto;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
-import org.booklore.model.entity.CategoryEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
 import org.booklore.model.enums.BookFileType;
@@ -140,7 +139,7 @@ class InpxBatchWriterTest {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
         when(authorRepository.findByName("Strugatsky Arkady"))
                 .thenReturn(Optional.of(AuthorEntity.builder().id(42L).name("Strugatsky Arkady").build()));
-        when(entityManager.getReference(eq(AuthorEntity.class), eq(42L)))
+        when(entityManager.getReference(AuthorEntity.class, 42L))
                 .thenReturn(AuthorEntity.builder().id(42L).name("Strugatsky Arkady").build());
 
         writer.persist(List.of(book("fb2-1.zip", "a", "A", "Strugatsky Arkady", null)), 7L, 3L, caches);
@@ -162,7 +161,7 @@ class InpxBatchWriterTest {
                     saved.setId(99L);
                     return saved;
                 });
-        when(entityManager.getReference(eq(AuthorEntity.class), eq(99L)))
+        when(entityManager.getReference(AuthorEntity.class, 99L))
                 .thenReturn(AuthorEntity.builder().id(99L).name("New Author").build());
 
         writer.persist(List.of(book("fb2-1.zip", "a", "A", "New Author", null)), 7L, 3L, caches);
@@ -215,7 +214,7 @@ class InpxBatchWriterTest {
         // (not CONCAT(...) of them) so MariaDB can use idx_book_file_archive_source instead of
         // scanning every book_file row for the library on every batch.
         verify(bookFileRepository).findExistingArchiveEntries(
-                eq(7L), eq(Set.of("fb2-1.zip", "fb2-2.zip")), eq(Set.of("a.fb2", "b.fb2")));
+                7L, Set.of("fb2-1.zip", "fb2-2.zip"), Set.of("a.fb2", "b.fb2"));
     }
 
     @Test
@@ -247,7 +246,7 @@ class InpxBatchWriterTest {
             saved.setId(99L);
             return saved;
         });
-        when(entityManager.getReference(eq(AuthorEntity.class), eq(99L)))
+        when(entityManager.getReference(AuthorEntity.class, 99L))
                 .thenReturn(AuthorEntity.builder().id(99L).name("New Author").build());
 
         writer.persist(List.of(
@@ -267,7 +266,7 @@ class InpxBatchWriterTest {
             saved.setId(99L);
             return saved;
         });
-        when(entityManager.getReference(eq(AuthorEntity.class), eq(99L)))
+        when(entityManager.getReference(AuthorEntity.class, 99L))
                 .thenReturn(AuthorEntity.builder().id(99L).name("New Author").build());
 
         TransactionSynchronizationManager.initSynchronization();
@@ -295,7 +294,7 @@ class InpxBatchWriterTest {
             saved.setId(99L);
             return saved;
         });
-        when(entityManager.getReference(eq(AuthorEntity.class), eq(99L)))
+        when(entityManager.getReference(AuthorEntity.class, 99L))
                 .thenReturn(AuthorEntity.builder().id(99L).name("New Author").build());
 
         TransactionSynchronizationManager.initSynchronization();
@@ -321,7 +320,7 @@ class InpxBatchWriterTest {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
         when(authorRepository.findByName("Padded Author"))
                 .thenReturn(Optional.of(AuthorEntity.builder().id(11L).name("Padded Author").build()));
-        when(entityManager.getReference(eq(AuthorEntity.class), eq(11L)))
+        when(entityManager.getReference(AuthorEntity.class, 11L))
                 .thenReturn(AuthorEntity.builder().id(11L).name("Padded Author").build());
 
         writer.persist(List.of(book("fb2-1.zip", "a", "A", "  Padded Author  ", null)), 7L, 3L, caches);

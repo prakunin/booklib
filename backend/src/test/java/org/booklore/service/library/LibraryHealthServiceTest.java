@@ -99,8 +99,9 @@ class LibraryHealthServiceTest {
         libraryHealthService.checkAndBroadcast();
 
         Map<Long, Boolean> health = libraryHealthService.getCurrentHealth();
-        assertThat(health).containsEntry(1L, true);
-        assertThat(health).containsEntry(2L, false);
+        assertThat(health)
+                .containsEntry(1L, true)
+                .containsEntry(2L, false);
     }
 
     @Test

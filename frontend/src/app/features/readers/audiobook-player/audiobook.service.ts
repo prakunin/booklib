@@ -16,9 +16,9 @@ export class AudiobookService {
   private readonly baseUrl = `${API_CONFIG.BASE_URL}/api/v1/audiobooks`;
   private readonly booksUrl = `${API_CONFIG.BASE_URL}/api/v1/books`;
 
-  private http = inject(HttpClient);
-  private authService = inject(AuthService);
-  private queryClient = inject(QueryClient);
+  private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
+  private readonly queryClient = inject(QueryClient);
 
   getAudiobookInfo(bookId: number, bookType?: string): Observable<AudiobookInfo> {
     const params: Record<string, string> = {};

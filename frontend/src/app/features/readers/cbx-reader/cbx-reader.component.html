@@ -1,4 +1,4 @@
-<div #readerRoot class="comic-reader-container" tabindex="0"
+<div #readerRoot class="comic-reader-container" role="application"
   [class.rtl-reading]="readingDirection() === CbxReadingDirection.RTL"
   [class.fullscreen-mode]="isFullscreen()" [class.slideshow-active]="isSlideshowActive()">
   <app-cbx-header [isCurrentPageBookmarked]="isCurrentPageBookmarked()"
@@ -65,8 +65,7 @@
     @if (!isLoading()) {
     @if (pages().length > 0) {
     @if (scrollMode() === CbxScrollMode.PAGINATED) {
-    <div class="pages-wrapper" role="button" tabindex="0" (click)="onImageClick()" (keydown.enter)="onImageClick()"
-      (dblclick)="onImageDoubleClick()">
+    <div class="pages-wrapper" tabindex="-1" (click)="onImageClick()" (keydown.enter)="onImageClick()" (dblclick)="onImageDoubleClick()">
       @if (isPageTransitioning() && previousImageUrls().length > 0) {
       <div class="previous-page-layer" [class.single-page-layer]="isPreviousSinglePageLayer()">
         @for (url of previousImageUrls(); track url) {
@@ -97,8 +96,7 @@
     </div>
     }
     } @else if (scrollMode() === CbxScrollMode.LONG_STRIP) {
-    <div class="long-strip-wrapper" role="button" tabindex="0" (click)="onImageClick()"
-      (keydown.enter)="onImageClick()">
+    <div class="long-strip-wrapper" tabindex="-1" (click)="onImageClick()" (keydown.enter)="onImageClick()">
       <div class="strip-width-constrain" [style.width]="cbxQuickSettingsState().stripMaxWidthPercent + '%'">
         @for (item of longStripImages(); track item.page) {
         <img [src]="item.src" alt="Page {{ item.page + 1 }}" class="long-strip-image" [attr.data-page]="item.page"
@@ -125,11 +123,12 @@
     <div class="infinite-scroll-wrapper">
       <div class="strip-width-constrain" [style.width]="cbxQuickSettingsState().stripMaxWidthPercent + '%'">
         @for (pageIdx of infiniteScrollPages(); track pageIdx) {
-        <img [src]="getPageImageUrl(pageIdx)" alt="Page {{ pageIdx + 1 }}" class="page-image"
-          [attr.data-page]="pageIdx" role="button" tabindex="0" draggable="false"
-          [attr.loading]="pageIdx === currentPage() ? 'eager' : 'lazy'" decoding="async"
-          (click)="onImageClick()" (keydown.enter)="onImageClick()" (dblclick)="onImageDoubleClick()"
-          (load)="onPageImageLoad($event, pageIdx)" />
+        <button type="button" class="page-image-trigger" (click)="onImageClick()" (dblclick)="onImageDoubleClick()">
+          <img [src]="getPageImageUrl(pageIdx)" alt="Page {{ pageIdx + 1 }}" class="page-image"
+            [attr.data-page]="pageIdx" draggable="false"
+            [attr.loading]="pageIdx === currentPage() ? 'eager' : 'lazy'" decoding="async"
+            (load)="onPageImageLoad($event, pageIdx)" />
+        </button>
         }
         @if (isLoadingMore()) {
         <div class="loading-more">
@@ -158,17 +157,14 @@
     @if (clickToPaginate()) {
     <div class="click-overlay is-visible" [class.rtl-overlay]="readingDirection() === CbxReadingDirection.RTL"
       [class.magnifier-disabled]="isMagnifierActive()">
-      <div class="click-zone click-zone-prev" role="button" tabindex="0" (click)="onClickZonePrev($event)"
-        (keydown.enter)="onClickZonePrev($event)">
+      <button type="button" class="click-zone click-zone-prev" (click)="onClickZonePrev($event)">
         <span class="zone-arrow">&#9664;</span>
-      </div>
-      <div class="click-zone click-zone-menu" role="button" tabindex="0" (click)="onClickZoneMenu($event)"
-        (keydown.enter)="onClickZoneMenu($event)">
-      </div>
-      <div class="click-zone click-zone-next" role="button" tabindex="0" (click)="onClickZoneNext($event)"
-        (keydown.enter)="onClickZoneNext($event)">
+      </button>
+      <button type="button" class="click-zone click-zone-menu" (click)="onClickZoneMenu($event)">
+      </button>
+      <button type="button" class="click-zone click-zone-next" (click)="onClickZoneNext($event)">
         <span class="zone-arrow">&#9654;</span>
-      </div>
+      </button>
     </div>
     }
     } @else {

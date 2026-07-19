@@ -35,7 +35,8 @@ class SecurityConfigCorsTest {
         MockEnvironment env = new MockEnvironment()
                 .withProperty("app.cors.allowed-origins", "*");
 
-        assertThatThrownBy(() -> new SecurityConfig(null, null, null, env).corsConfigurationSource())
+        SecurityConfig securityConfig = new SecurityConfig(null, null, null, env);
+        assertThatThrownBy(securityConfig::corsConfigurationSource)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("CORS cannot allow '*'");
     }

@@ -226,7 +226,7 @@ class AdditionalFileServiceTest {
     }
 
     @Test
-    void downloadAdditionalFile_WhenFileNotFound_ShouldReturnNotFound() throws IOException {
+    void downloadAdditionalFile_WhenFileNotFound_ShouldReturnNotFound() {
         Long bookId = 100L;
         Long fileId = 1L;
         when(additionalFileRepository.findByIdAndBookIdWithBookAndLibraryPath(fileId, bookId)).thenReturn(Optional.empty());
@@ -239,7 +239,7 @@ class AdditionalFileServiceTest {
     }
 
     @Test
-    void downloadAdditionalFile_WhenPhysicalFileNotExists_ShouldReturnNotFound() throws IOException {
+    void downloadAdditionalFile_WhenPhysicalFileNotExists_ShouldReturnNotFound() {
         Long bookId = 100L;
         Long fileId = 1L;
 
@@ -267,7 +267,7 @@ class AdditionalFileServiceTest {
     }
 
     @Test
-    void downloadAdditionalFile_WhenFileExists_ShouldReturnFileResource() throws Exception {
+    void downloadAdditionalFile_WhenFileExists_ShouldReturnFileResource() {
         Long bookId = 100L;
         Long fileId = 1L;
         BookFileEntity primaryFile = createBookFile(2L, "primary.epub");

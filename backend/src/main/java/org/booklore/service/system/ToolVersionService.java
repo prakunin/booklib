@@ -61,9 +61,8 @@ public class ToolVersionService {
     }
 
     private Optional<String> version(String binaryName, String versionFlag) {
-        Optional<String> cached = cache.get(binaryName);
-        if (cached != null) {
-            return cached;
+        if (cache.containsKey(binaryName)) {
+            return cache.get(binaryName);
         }
         if (permanentlyRejected.contains(binaryName)) {
             return Optional.empty();

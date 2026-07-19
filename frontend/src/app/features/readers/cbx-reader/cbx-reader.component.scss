@@ -276,6 +276,10 @@
         border-radius: 4px;
       }
 
+      .page-image-trigger {
+        display: contents;
+      }
+
       &.fit-width {
         overflow-y: auto;
         align-items: flex-start;
@@ -866,7 +870,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 0;
+    color: inherit;
     cursor: pointer;
+    font: inherit;
+    padding: 0;
   }
 
   .click-zone-prev {

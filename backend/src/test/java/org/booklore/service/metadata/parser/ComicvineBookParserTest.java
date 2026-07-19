@@ -19,7 +19,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +33,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class ComicvineBookParserTest {
+class ComicvineBookParserTest {
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -102,12 +101,12 @@ public class ComicvineBookParserTest {
     }
 
     @BeforeEach
-    public void setup() throws Exception {
+    void setup() {
         lenient().when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettings());
     }
 
     @Test
-    public void volumeSearchCacheHasMaximumSizeAndTtl() {
+    void volumeSearchCacheHasMaximumSizeAndTtl() {
         var eviction = comicvineBookParser.volumeCache().policy().eviction();
         var expiration = comicvineBookParser.volumeCache().policy().expireAfterWrite();
 
@@ -118,7 +117,7 @@ public class ComicvineBookParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_getsTitle() throws IOException, InterruptedException {
+    void fetchTopMetadata_getsTitle() throws IOException, InterruptedException {
         mockResponse(
                 "/search/",
                 200,
@@ -137,7 +136,7 @@ public class ComicvineBookParserTest {
     }
 
     @Test
-    public void fetchTopMetadata_parsesSeriesInfoFromTitle() throws IOException, InterruptedException {
+    void fetchTopMetadata_parsesSeriesInfoFromTitle() throws IOException, InterruptedException {
         // The parser first tries /search/ endpoint for volumes
         mockResponse(
                 "/search/?api_key=example&format=json&resources=volume&query=The%20Example",

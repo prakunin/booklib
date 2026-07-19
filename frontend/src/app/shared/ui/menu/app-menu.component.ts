@@ -19,17 +19,11 @@ const withStyleClass = (existing: string | undefined, styleClass: string): strin
 
 const withoutIconFields = (item: MenuItem): MenuItem => {
   const { icon, iconClass, iconStyle, ...rest } = item;
-  void icon;
-  void iconClass;
-  void iconStyle;
   return rest;
 };
 
 const withoutActionFields = (item: MenuItem): MenuItem => {
   const { command, routerLink, url, ...rest } = item;
-  void command;
-  void routerLink;
-  void url;
   return rest;
 };
 

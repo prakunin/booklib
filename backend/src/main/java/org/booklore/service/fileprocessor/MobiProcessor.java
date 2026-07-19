@@ -49,7 +49,7 @@ public class MobiProcessor extends AbstractFileProcessor implements BookFileProc
 
     @Override
     public BookEntity processNewFile(LibraryFile libraryFile) {
-        BookFileType fileType = determineFileType(libraryFile.getFileName());
+        BookFileType fileType = determineFileType();
         BookEntity bookEntity = bookCreatorService.createShellBook(libraryFile, fileType);
         setBookMetadata(bookEntity);
         boolean coverGenerated = generateCover(bookEntity);
@@ -113,8 +113,7 @@ public class MobiProcessor extends AbstractFileProcessor implements BookFileProc
         return List.of(BookFileType.MOBI);
     }
 
-    private BookFileType determineFileType(String fileName) {
-        String lowerCase = fileName.toLowerCase();
+    private BookFileType determineFileType() {
         return BookFileType.MOBI;
     }
 

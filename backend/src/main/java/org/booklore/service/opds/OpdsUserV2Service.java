@@ -29,6 +29,8 @@ import java.util.List;
 @Transactional
 public class OpdsUserV2Service {
 
+    private static final String AUDIT_ENTITY_TYPE = "OpdsUser";
+
     private final OpdsUserV2Repository opdsUserV2Repository;
     private final AuthenticationService authenticationService;
     private final UserRepository userRepository;
@@ -44,25 +46,26 @@ public class OpdsUserV2Service {
     }
 
     public OpdsUserV2 createOpdsUser(OpdsUserV2CreateRequest request) {
+        validateCreateRequest(request);
+        String username = request.getUsername();
         try {
-            validateCreateRequest(request);
             BookLoreUser bookLoreUser = authenticationService.getAuthenticatedUser();
             BookLoreUserEntity userEntity = userRepository.findById(bookLoreUser.getId())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with ID: " + bookLoreUser.getId()));
 
             OpdsUserV2Entity opdsUserV2 = OpdsUserV2Entity.builder()
                     .user(userEntity)
-                    .username(request.getUsername())
+                    .username(username)
                     .passwordHash(passwordEncoder.encode(request.getPassword()))
                     .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : OpdsSortOrder.RECENT)
                     .build();
 
             OpdsUserV2 result = mapper.toDto(opdsUserV2Repository.save(opdsUserV2));
-            auditService.log(AuditAction.OPDS_USER_CREATED, "OpdsUser", result.getId(), "Created OPDS user: " + request.getUsername());
+            auditService.log(AuditAction.OPDS_USER_CREATED, AUDIT_ENTITY_TYPE, result.getId(), "Created OPDS user: " + username);
             return result;
         } catch (DataIntegrityViolationException e) {
             if (e.getMostSpecificCause().getMessage().contains("uq_username")) {
-                throw new DataIntegrityViolationException("Username '" + request.getUsername() + "' is already taken");
+                throw new DataIntegrityViolationException("Username '" + username + "' is already taken");
             }
             throw e;
         }
@@ -91,7 +94,7 @@ public class OpdsUserV2Service {
         }
         String username = user.getUsername();
         opdsUserV2Repository.delete(user);
-        auditService.log(AuditAction.OPDS_USER_DELETED, "OpdsUser", userId, "Deleted OPDS user: " + username);
+        auditService.log(AuditAction.OPDS_USER_DELETED, AUDIT_ENTITY_TYPE, userId, "Deleted OPDS user: " + username);
     }
 
     public OpdsUserV2 updateOpdsUser(Long userId, OpdsUserV2UpdateRequest request) {
@@ -105,7 +108,7 @@ public class OpdsUserV2Service {
         
         user.setSortOrder(request.sortOrder());
         OpdsUserV2 result = mapper.toDto(opdsUserV2Repository.save(user));
-        auditService.log(AuditAction.OPDS_USER_UPDATED, "OpdsUser", userId, "Updated OPDS user: " + user.getUsername());
+        auditService.log(AuditAction.OPDS_USER_UPDATED, AUDIT_ENTITY_TYPE, userId, "Updated OPDS user: " + user.getUsername());
         return result;
     }
 

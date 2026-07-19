@@ -27,14 +27,14 @@ const PATH_STATUS_COLOR: Record<PathStatus, TagColor> = {
   styleUrl: './system-info.component.scss',
 })
 export class SystemInfoComponent {
-  private systemInfoService = inject(SystemInfoService);
-  private messageService = inject(MessageService);
-  private t = inject(TranslocoService);
+  private readonly systemInfoService = inject(SystemInfoService);
+  private readonly messageService = inject(MessageService);
+  private readonly t = inject(TranslocoService);
 
   /** Lets tests drive the view directly, bypassing the live query. */
   snapshot = input<SystemInfo>();
 
-  private query = this.systemInfoService.query();
+  private readonly query = this.systemInfoService.query();
 
   protected data = computed<SystemInfo | undefined>(() => this.snapshot() ?? this.query.data());
   protected loading = computed(() => !this.snapshot() && this.query.isFetching());
@@ -44,7 +44,7 @@ export class SystemInfoComponent {
   protected stale = computed(() => this.error() && !!this.data());
 
   protected refresh(): void {
-    void this.query.refetch();
+    this.query.refetch();
   }
 
   protected copy(): void {

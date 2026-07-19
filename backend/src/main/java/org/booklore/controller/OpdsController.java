@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,10 +44,8 @@ public class OpdsController {
     private final OpdsBookService opdsBookService;
 
     @Operation(summary = "Download book file", description = "Download the book file by its ID. Optionally specify a fileId to download a specific format.")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Book file downloaded successfully"),
-        @ApiResponse(responseCode = "404", description = "Book not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Book file downloaded successfully")
+    @ApiResponse(responseCode = "404", description = "Book not found")
     @GetMapping("/{bookId}/download")
     public ResponseEntity<StreamingResponseBody> downloadBook(
             @Parameter(description = "ID of the book to download") @PathVariable("bookId") Long bookId,
@@ -61,10 +58,8 @@ public class OpdsController {
     }
 
     @Operation(summary = "Get book cover image", description = "Retrieve the cover image for a book by its ID.")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Cover image returned successfully"),
-        @ApiResponse(responseCode = "404", description = "Book or cover not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Cover image returned successfully")
+    @ApiResponse(responseCode = "404", description = "Book or cover not found")
     @GetMapping("/{bookId}/cover")
     public ResponseEntity<Resource> getBookCover(@Parameter(description = "ID of the book") @PathVariable long bookId) {
         opdsBookService.validateBookContentAccess(bookId, getOpdsUserId());

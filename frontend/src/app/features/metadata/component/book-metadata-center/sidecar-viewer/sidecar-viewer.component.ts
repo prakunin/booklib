@@ -33,10 +33,10 @@ export class SidecarViewerComponent implements OnDestroy {
     this.loadSidecarData(value.id);
   }
 
-  private sidecarService = inject(SidecarService);
-  private messageService = inject(MessageService);
+  private readonly sidecarService = inject(SidecarService);
+  private readonly messageService = inject(MessageService);
   private readonly t = inject(TranslocoService);
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   sidecarContent: SidecarMetadata | null = null;
   syncStatus: SidecarSyncStatus = 'NOT_APPLICABLE';

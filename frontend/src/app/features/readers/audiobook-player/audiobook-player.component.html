@@ -305,44 +305,42 @@
           @if (audiobookInfo.folderBased && audiobookInfo.tracks) {
             <ul class="track-list">
               @for (track of audiobookInfo.tracks; track track.index) {
-                <li
-                  class="track-item"
-                  [class.active]="track.index === currentTrackIndex"
-                  (click)="selectTrack(track)"
-                  (keydown.enter)="selectTrack(track)"
-                  role="button"
-                  tabindex="0"
-                >
-                  <span class="track-index">{{ track.index + 1 }}</span>
-                  <div class="track-details">
-                    <span class="track-name">{{ track.title }}</span>
-                    <span class="track-duration">{{ formatDuration(track.durationMs) }}</span>
-                  </div>
-                  @if (track.index === currentTrackIndex && isPlaying) {
-                    <i class="pi pi-volume-up playing-indicator"></i>
-                  }
+                <li>
+                  <button
+                    type="button"
+                    class="track-item"
+                    [class.active]="track.index === currentTrackIndex"
+                    (click)="selectTrack(track)">
+                    <span class="track-index">{{ track.index + 1 }}</span>
+                    <div class="track-details">
+                      <span class="track-name">{{ track.title }}</span>
+                      <span class="track-duration">{{ formatDuration(track.durationMs) }}</span>
+                    </div>
+                    @if (track.index === currentTrackIndex && isPlaying) {
+                      <i class="pi pi-volume-up playing-indicator"></i>
+                    }
+                  </button>
                 </li>
               }
             </ul>
           } @else if (audiobookInfo.chapters) {
             <ul class="track-list">
               @for (chapter of audiobookInfo.chapters; track chapter.index) {
-                <li
-                  class="track-item"
-                  [class.active]="currentChapter?.index === chapter.index"
-                  (click)="selectChapter(chapter)"
-                  (keydown.enter)="selectChapter(chapter)"
-                  role="button"
-                  tabindex="0"
-                >
-                  <span class="track-index">{{ chapter.index + 1 }}</span>
-                  <div class="track-details">
-                    <span class="track-name">{{ chapter.title }}</span>
-                    <span class="track-duration">{{ formatDuration(chapter.durationMs) }}</span>
-                  </div>
-                  @if (currentChapter?.index === chapter.index && isPlaying) {
-                    <i class="pi pi-volume-up playing-indicator"></i>
-                  }
+                <li>
+                  <button
+                    type="button"
+                    class="track-item"
+                    [class.active]="currentChapter?.index === chapter.index"
+                    (click)="selectChapter(chapter)">
+                    <span class="track-index">{{ chapter.index + 1 }}</span>
+                    <div class="track-details">
+                      <span class="track-name">{{ chapter.title }}</span>
+                      <span class="track-duration">{{ formatDuration(chapter.durationMs) }}</span>
+                    </div>
+                    @if (currentChapter?.index === chapter.index && isPlaying) {
+                      <i class="pi pi-volume-up playing-indicator"></i>
+                    }
+                  </button>
                 </li>
               }
             </ul>
@@ -374,18 +372,17 @@
           } @else {
             <ul class="track-list">
               @for (bookmark of bookmarks; track bookmark.id) {
-                <li
-                  class="track-item bookmark-item"
-                  (click)="goToBookmark(bookmark)"
-                  (keydown.enter)="goToBookmark(bookmark)"
-                  role="button"
-                  tabindex="0"
-                >
-                  <i class="pi pi-bookmark-fill bookmark-icon"></i>
-                  <div class="track-details">
-                    <span class="track-name">{{ bookmark.title }}</span>
-                    <span class="track-duration">{{ formatBookmarkPosition(bookmark) }}</span>
-                  </div>
+                <li class="track-item bookmark-item">
+                  <button
+                    type="button"
+                    class="track-item-main"
+                    (click)="goToBookmark(bookmark)">
+                    <i class="pi pi-bookmark-fill bookmark-icon"></i>
+                    <div class="track-details">
+                      <span class="track-name">{{ bookmark.title }}</span>
+                      <span class="track-duration">{{ formatBookmarkPosition(bookmark) }}</span>
+                    </div>
+                  </button>
                   <p-button
                     icon="pi pi-trash"
                     [rounded]="true"

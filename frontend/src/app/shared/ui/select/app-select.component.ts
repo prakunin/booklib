@@ -196,7 +196,7 @@ export class AppSelectComponent<T> extends AppSelectBaseDirective<T> implements 
     this.touched.set(true);
 
     if (values.length) {
-      this.value.set(values[values.length - 1]);
+      this.value.set(values.at(-1)!);
       return;
     }
 

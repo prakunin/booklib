@@ -55,7 +55,7 @@ public final class NetworkAddressValidator {
                 byte[] ipv4Bytes = new byte[4];
                 System.arraycopy(addr, 12, ipv4Bytes, 0, 4);
                 return isInternalAddress(InetAddress.getByAddress(ipv4Bytes));
-            } catch (UnknownHostException e) {
+            } catch (UnknownHostException _) {
                 return false;
             }
         }

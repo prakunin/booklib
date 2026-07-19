@@ -102,7 +102,7 @@ public class KoboLibrarySyncService {
                 shouldContinueSync = shouldContinueSync || changedPage.hasNext();
             }
 
-            Page<KoboSnapshotBookEntity> removedPage = Page.empty();
+            Page<KoboSnapshotBookEntity> removedPage;
             if (changedPage.isLast() && maxRemaining > 0) {
                 removedPage = koboLibrarySnapshotService.getRemovedBooks(prevSnapshot.get().getId(), currSnapshot.getId(), user.getId(), PageRequest.of(0, maxRemaining));
                 removedAll.addAll(removedPage.getContent());

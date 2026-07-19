@@ -125,7 +125,7 @@ public class InpxParser {
                 throw ApiError.GENERIC_BAD_REQUEST.createException("INPX path must reference a readable .inpx file");
             }
             return path;
-        } catch (InvalidPathException e) {
+        } catch (InvalidPathException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid INPX path");
         }
     }
@@ -216,7 +216,7 @@ public class InpxParser {
         }
         try {
             return Double.valueOf(value.strip().replace(',', '.'));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }

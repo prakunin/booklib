@@ -96,14 +96,14 @@ public class PdfProcessor extends AbstractFileProcessor implements BookFileProce
         try (PdfDocument doc = PdfDocument.open(pdfFile.toPath())) {
             coverImage = renderFirstPage(doc);
             return fileService.saveCoverImages(coverImage, bookEntity.getId());
-        } catch (OutOfMemoryError e) {
+        } catch (OutOfMemoryError _) {
             // Note: Catching OOM is generally discouraged, but for batch processing
             // of potentially large/corrupted PDFs, we prefer graceful degradation
             // over crashing the entire service.
             log.error("Out of memory (heap space exhausted) while generating cover for '{}'. Skipping cover generation.", bookFile.getFileName());
             System.gc(); // Hint to JVM to reclaim memory
             return false;
-        } catch (NegativeArraySizeException e) {
+        } catch (NegativeArraySizeException _) {
             // This can appear on corrupted PDF, or PDF with such large images that the
             // initial memory buffer is already bigger than the entire JVM heap, therefore
             // it leads to NegativeArrayException (basically run out of memory, and overflows)
@@ -142,11 +142,11 @@ public class PdfProcessor extends AbstractFileProcessor implements BookFileProce
                 return CoverExtraction.readFailed();
             }
             return CoverExtraction.found(encoded.toByteArray());
-        } catch (OutOfMemoryError e) {
+        } catch (OutOfMemoryError _) {
             log.error("Out of memory (heap space exhausted) while extracting cover for '{}'.", bookFile.getFileName());
             System.gc(); // Hint to JVM to reclaim memory
             return CoverExtraction.readFailed();
-        } catch (NegativeArraySizeException e) {
+        } catch (NegativeArraySizeException _) {
             log.warn("Corrupted PDF structure for '{}'.", bookFile.getFileName());
             return CoverExtraction.readFailed();
         } catch (Exception e) {

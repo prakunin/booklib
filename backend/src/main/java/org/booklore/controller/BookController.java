@@ -33,7 +33,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -41,7 +40,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import org.springframework.core.io.Resource;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -116,10 +114,8 @@ public class BookController {
     }
 
     @Operation(summary = "Get a book by ID", description = "Retrieve details of a specific book by its ID.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Book details returned successfully"),
-            @ApiResponse(responseCode = "404", description = "Book not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Book details returned successfully")
+    @ApiResponse(responseCode = "404", description = "Book not found")
     @GetMapping("/{bookId}")
     @CheckBookAccess(bookIdParam = "bookId")
     public ResponseEntity<Book> getBook(
@@ -129,12 +125,10 @@ public class BookController {
     }
 
     @Operation(summary = "Create a physical book", description = "Create a physical book without digital files. Requires library management permission or admin.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Physical book created successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request"),
-            @ApiResponse(responseCode = "403", description = "Forbidden"),
-            @ApiResponse(responseCode = "404", description = "Library not found")
-    })
+    @ApiResponse(responseCode = "201", description = "Physical book created successfully")
+    @ApiResponse(responseCode = "400", description = "Invalid request")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
+    @ApiResponse(responseCode = "404", description = "Library not found")
     @PostMapping("/physical")
     @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
     public ResponseEntity<Book> createPhysicalBook(
@@ -143,10 +137,8 @@ public class BookController {
     }
 
     @Operation(summary = "Delete books", description = "Delete one or more books by their IDs. Requires admin or delete permission.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Books deleted successfully"),
-            @ApiResponse(responseCode = "403", description = "Forbidden")
-    })
+    @ApiResponse(responseCode = "200", description = "Books deleted successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
     @PreAuthorize("@securityUtil.canDeleteBook() or @securityUtil.isAdmin()")
     @DeleteMapping
     public ResponseEntity<BookDeletionResponse> deleteBooks(
@@ -182,10 +174,8 @@ public class BookController {
     }
 
     @Operation(summary = "Get book content", description = "Retrieve the binary content of a book for reading. Supports HTTP Range requests for partial content streaming.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Full book content returned"),
-            @ApiResponse(responseCode = "206", description = "Partial content returned for Range request")
-    })
+    @ApiResponse(responseCode = "200", description = "Full book content returned")
+    @ApiResponse(responseCode = "206", description = "Partial content returned for Range request")
     @GetMapping("/{bookId}/content")
     @CheckBookAccess(bookIdParam = "bookId")
     public ResponseEntity<Resource> getBookContent(
@@ -212,7 +202,7 @@ public class BookController {
             requestedTimestamp = ZonedDateTime.parse(ifModifiedSince, DateTimeFormatter.RFC_1123_DATE_TIME)
                     .toInstant()
                     .toEpochMilli();
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             return false;
         }
         return (lastModified / 1000) <= (requestedTimestamp / 1000);
@@ -226,10 +216,8 @@ public class BookController {
     }
 
     @Operation(summary = "Replace book content", description = "Overwrite the primary PDF file for a book with the uploaded content. Used by the document viewer to persist annotation changes.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Book content replaced successfully"),
-            @ApiResponse(responseCode = "404", description = "Book not found")
-    })
+    @ApiResponse(responseCode = "204", description = "Book content replaced successfully")
+    @ApiResponse(responseCode = "404", description = "Book not found")
     @PutMapping("/{bookId}/content")
     @PreAuthorize("@securityUtil.canEditMetadata() or @securityUtil.isAdmin()")
     @CheckBookAccess(bookIdParam = "bookId")
@@ -242,10 +230,8 @@ public class BookController {
     }
 
     @Operation(summary = "Download book", description = "Download the book file. Requires download permission or admin.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Book downloaded successfully"),
-            @ApiResponse(responseCode = "403", description = "Forbidden")
-    })
+    @ApiResponse(responseCode = "200", description = "Book downloaded successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
     @GetMapping("/{bookId}/download")
     @PreAuthorize("@securityUtil.canDownload() or @securityUtil.isAdmin()")
     @CheckBookAccess(bookIdParam = "bookId")
@@ -254,11 +240,9 @@ public class BookController {
     }
 
     @Operation(summary = "Download all book files", description = "Download all files for a book as a ZIP archive. For single-file books, downloads the file directly. Requires download permission or admin.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Files downloaded successfully"),
-            @ApiResponse(responseCode = "403", description = "Forbidden"),
-            @ApiResponse(responseCode = "404", description = "Book not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Files downloaded successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
+    @ApiResponse(responseCode = "404", description = "Book not found")
     @GetMapping("/{bookId}/download-all")
     @PreAuthorize("@securityUtil.canDownload() or @securityUtil.isAdmin()")
     @CheckBookAccess(bookIdParam = "bookId")
@@ -323,10 +307,8 @@ public class BookController {
     }
 
     @Operation(summary = "Reset reading progress", description = "Reset the reading progress for one or more books.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Progress reset successfully"),
-            @ApiResponse(responseCode = "400", description = "No book IDs provided")
-    })
+    @ApiResponse(responseCode = "200", description = "Progress reset successfully")
+    @ApiResponse(responseCode = "400", description = "No book IDs provided")
     @PostMapping("/reset-progress")
     public ResponseEntity<List<BookStatusUpdateResponse>> resetProgress(
             @Parameter(description = "List of book IDs to reset progress for") @RequestBody @Size(max = 500) List<Long> bookIds,
@@ -346,10 +328,8 @@ public class BookController {
     }
 
     @Operation(summary = "Reset personal rating", description = "Reset the personal rating for one or more books.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Personal rating reset successfully"),
-            @ApiResponse(responseCode = "400", description = "No book IDs provided")
-    })
+    @ApiResponse(responseCode = "200", description = "Personal rating reset successfully")
+    @ApiResponse(responseCode = "400", description = "No book IDs provided")
     @PostMapping("/reset-personal-rating")
     public ResponseEntity<List<PersonalRatingUpdateResponse>> resetPersonalRating(
             @Parameter(description = "List of book IDs to reset personal rating for") @RequestBody @Size(max = 500) List<Long> bookIds) {
@@ -370,10 +350,8 @@ public class BookController {
     }
 
     @Operation(summary = "Toggle physical book flag", description = "Mark or unmark a book as a physical book.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Physical flag updated successfully"),
-            @ApiResponse(responseCode = "404", description = "Book not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Physical flag updated successfully")
+    @ApiResponse(responseCode = "404", description = "Book not found")
     @PatchMapping("/{bookId}/physical")
     @CheckBookAccess(bookIdParam = "bookId")
     @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
@@ -384,12 +362,10 @@ public class BookController {
     }
 
     @Operation(summary = "Attach book files", description = "Attach book files from single-file source books to a target book as alternative formats.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Book files attached successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request - books must be in same library, sources must have exactly one file each"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - requires library management permission"),
-            @ApiResponse(responseCode = "404", description = "Book not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Book files attached successfully")
+    @ApiResponse(responseCode = "400", description = "Invalid request - books must be in same library, sources must have exactly one file each")
+    @ApiResponse(responseCode = "403", description = "Forbidden - requires library management permission")
+    @ApiResponse(responseCode = "404", description = "Book not found")
     @PostMapping("/{targetBookId}/attach-file")
     @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
     public ResponseEntity<AttachBookFileResponse> attachBookFiles(

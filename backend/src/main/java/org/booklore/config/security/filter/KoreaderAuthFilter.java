@@ -19,8 +19,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import jakarta.annotation.PostConstruct;
+
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @Component
@@ -29,11 +32,18 @@ import java.util.List;
 public class KoreaderAuthFilter extends OncePerRequestFilter {
 
     private static final String AUTH_PATH = "koreader";
-    private static final String DUMMY_PASSWORD_HASH = "$2a$10$7EqJtq98hPqEX7fNZaFWoOhiKehw2iG15o3fG2h51Y1cf22.BjNqC";
 
     private final KoreaderUserRepository koreaderUserRepository;
     private final KoreaderCredentialService koreaderCredentialService;
     private final AuthRateLimitService authRateLimitService;
+
+    // Timing-equalization decoy for unknown users; random per process so it can't be precomputed.
+    private String dummyPasswordHash;
+
+    @PostConstruct
+    void initDummyHash() {
+        this.dummyPasswordHash = koreaderCredentialService.hashRawPassword(UUID.randomUUID().toString());
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
@@ -54,7 +64,7 @@ public class KoreaderAuthFilter extends OncePerRequestFilter {
 
         var user = koreaderUserRepository.findByUsername(username).orElse(null);
         if (user == null) {
-            koreaderCredentialService.matches(key, DUMMY_PASSWORD_HASH);
+            koreaderCredentialService.matches(key, dummyPasswordHash);
             log.info("KOReader user not found");
             recordFailedAttempt(ip, username);
             chain.doFilter(request, response);

@@ -234,8 +234,7 @@ class BookReviewUpdateServiceTest {
             Set<String> keptNames = new HashSet<>();
             entity.getReviews().forEach(r -> keptNames.add(r.getReviewerName()));
 
-            assertThat(keptNames).contains("r0", "r1", "r2", "r3", "r4");
-            assertThat(keptNames).doesNotContain("r6");
+            assertThat(keptNames).contains("r0", "r1", "r2", "r3", "r4").doesNotContain("r6");
         }
 
         @Test

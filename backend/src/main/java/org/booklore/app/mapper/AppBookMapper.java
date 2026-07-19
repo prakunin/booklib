@@ -304,7 +304,7 @@ public interface AppBookMapper {
         if (value == null) return null;
         try {
             return Long.parseLong(value);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }
@@ -313,7 +313,7 @@ public interface AppBookMapper {
         if (value == null) return null;
         try {
             return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }
@@ -378,7 +378,7 @@ public interface AppBookMapper {
                         if (lastDot > 0) {
                             extension = fileName.substring(lastDot + 1);
                         }
-                    } catch (Exception e) {
+                    } catch (Exception _) {
                         // Handle case where extension cannot be extracted
                     }
 

@@ -63,7 +63,7 @@ interface GrimmoryWindowState {
 
 @Injectable()
 export class EmbedPdfBookService {
-  private zone = inject(NgZone);
+  private readonly zone = inject(NgZone);
 
   private container: EmbedPdfContainer | null = null;
   private registry: PluginRegistry | null = null;
@@ -89,7 +89,7 @@ export class EmbedPdfBookService {
 
 
   private getMutableWindow(): Window & typeof globalThis & GrimmoryWindowState {
-    return window as Window & typeof globalThis & GrimmoryWindowState;
+    return globalThis as Window & typeof globalThis & GrimmoryWindowState;
   }
 
   pageChange$ = new Subject<PageChangeEvent>();
@@ -567,8 +567,8 @@ export class EmbedPdfBookService {
 
     if (currentDpr !== targetDpr) {
       const w = this.getMutableWindow();
-      w.__grimmoryOrigDprDescriptor = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
-      Object.defineProperty(window, 'devicePixelRatio', {
+      w.__grimmoryOrigDprDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'devicePixelRatio');
+      Object.defineProperty(globalThis, 'devicePixelRatio', {
         get: () => targetDpr,
         configurable: true,
       });
@@ -603,11 +603,11 @@ export class EmbedPdfBookService {
     w.__grimmoryShimsApplied = true;
 
     // --- Blob shim ---
-    const OrigBlob = window.Blob;
+    const OrigBlob = globalThis.Blob;
     w.__grimmoryOrigBlob = OrigBlob;
     const PatchedBlob = function (parts: BlobPart[], opts?: BlobPropertyBag): Blob {
       if (parts?.length >= 1 && typeof parts[0] === 'string') {
-        const src = parts[0] as string;
+        const src = parts[0];
         if (src.includes('wasmInit') && src.includes('runner.prepare()')) {
           let patched = src;
           patched = patched.replace(
@@ -631,7 +631,7 @@ export class EmbedPdfBookService {
     w.Blob = PatchedBlob;
 
     // --- Worker shim ---
-    const OrigWorker = window.Worker;
+    const OrigWorker = globalThis.Worker;
     w.__grimmoryOrigWorker = OrigWorker;
     const PatchedWorker = function (url: string | URL, opts?: WorkerOptions): Worker {
       const worker = new OrigWorker(url, opts);
@@ -663,11 +663,11 @@ export class EmbedPdfBookService {
     const w = this.getMutableWindow();
     if (!w.__grimmoryShimsApplied) return;
     if (w.__grimmoryOrigBlob) {
-      window.Blob = w.__grimmoryOrigBlob;
+      globalThis.Blob = w.__grimmoryOrigBlob;
       delete w.__grimmoryOrigBlob;
     }
     if (w.__grimmoryOrigWorker) {
-      window.Worker = w.__grimmoryOrigWorker;
+      globalThis.Worker = w.__grimmoryOrigWorker;
       delete w.__grimmoryOrigWorker;
     }
     delete w.__grimmoryShimsApplied;
@@ -704,10 +704,10 @@ export class EmbedPdfBookService {
   private restoreDevicePixelRatio(): void {
     const w = this.getMutableWindow();
     if (w.__grimmoryOrigDprDescriptor) {
-      Object.defineProperty(window, 'devicePixelRatio', w.__grimmoryOrigDprDescriptor);
+      Object.defineProperty(globalThis, 'devicePixelRatio', w.__grimmoryOrigDprDescriptor);
       delete w.__grimmoryOrigDprDescriptor;
-    } else if (Object.getOwnPropertyDescriptor(window, 'devicePixelRatio')?.configurable) {
-      Reflect.deleteProperty(window, 'devicePixelRatio');
+    } else if (Object.getOwnPropertyDescriptor(globalThis, 'devicePixelRatio')?.configurable) {
+      Reflect.deleteProperty(globalThis, 'devicePixelRatio');
     }
   }
 

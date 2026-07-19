@@ -38,7 +38,7 @@ export function readStripWidthPercent(
       raw = localStorage.getItem(LEGACY_STRIP_WIDTH_BOOK_PREFIX + bookId);
     }
     if (raw == null) return 100;
-    return clampStripMaxWidthPercent(parseInt(raw, 10));
+    return clampStripMaxWidthPercent(Number.parseInt(raw, 10));
   } catch {
     return 100;
   }

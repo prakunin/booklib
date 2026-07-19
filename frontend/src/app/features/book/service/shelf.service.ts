@@ -18,14 +18,14 @@ const KOBO_SHELF_ICON = 'pi pi-tablet';
 @Injectable({providedIn: 'root'})
 export class ShelfService {
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/shelves`;
-  private http = inject(HttpClient);
-  private bookService = inject(BookService);
-  private appBooksApi = inject(AppBooksApiService);
-  private authService = inject(AuthService);
-  private queryClient = inject(QueryClient);
+  private readonly http = inject(HttpClient);
+  private readonly bookService = inject(BookService);
+  private readonly appBooksApi = inject(AppBooksApiService);
+  private readonly authService = inject(AuthService);
+  private readonly queryClient = inject(QueryClient);
   private readonly token = this.authService.token;
 
-  private shelvesQuery = injectQuery(() => ({
+  private readonly shelvesQuery = injectQuery(() => ({
     ...this.getShelvesQueryOptions(),
     enabled: !!this.token(),
   }));
@@ -60,13 +60,13 @@ export class ShelfService {
   }
 
   reloadShelves(): void {
-    void this.queryClient.invalidateQueries({queryKey: SHELVES_QUERY_KEY, exact: true});
+    this.queryClient.invalidateQueries({queryKey: SHELVES_QUERY_KEY, exact: true});
   }
 
   createShelf(shelf: Shelf): Observable<Shelf> {
     return this.http.post<Shelf>(this.url, shelf).pipe(
       tap(() => {
-        void this.queryClient.invalidateQueries({queryKey: SHELVES_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: SHELVES_QUERY_KEY, exact: true});
       })
     );
   }
@@ -74,7 +74,7 @@ export class ShelfService {
   updateShelf(shelf: Shelf, id?: number): Observable<Shelf> {
     return this.http.put<Shelf>(`${this.url}/${id}`, shelf).pipe(
       tap(() => {
-        void this.queryClient.invalidateQueries({queryKey: SHELVES_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: SHELVES_QUERY_KEY, exact: true});
       })
     );
   }
@@ -83,7 +83,7 @@ export class ShelfService {
     return this.http.delete<void>(`${this.url}/${id}`).pipe(
       tap(() => {
         this.bookService.removeBooksFromShelf(id);
-        void this.queryClient.invalidateQueries({queryKey: SHELVES_QUERY_KEY, exact: true});
+        this.queryClient.invalidateQueries({queryKey: SHELVES_QUERY_KEY, exact: true});
       })
     );
   }

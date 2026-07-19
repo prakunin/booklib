@@ -43,8 +43,8 @@ export interface QueryParseResult {
 
 @Injectable({providedIn: 'root'})
 export class BookBrowserQueryParamsService {
-  private router = inject(Router);
-  private activatedRoute = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly activatedRoute = inject(ActivatedRoute);
 
   parseQueryParams(
     queryParamMap: ParamMap,
@@ -78,7 +78,7 @@ export class BookBrowserQueryParamsService {
       sortKey: 'addedOn',
       sortDir: 'ASC',
       view: 'GRID',
-      coverSize: 1.0,
+      coverSize: 1,
       seriesCollapsed: false,
       overlayBookType: true
     };

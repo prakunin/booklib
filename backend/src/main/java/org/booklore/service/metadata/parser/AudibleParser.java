@@ -225,7 +225,10 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
 
         try {
             return sendRequest(request, AudibleProductContainer.class).product;
-        } catch (Exception e) {
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (Exception _) {
             return null;
         }
     }
@@ -249,7 +252,10 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
 
         try {
             return sendRequest(request, AudibleProductList.class).products;
-        } catch (Exception e) {
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            return List.of();
+        } catch (Exception _) {
             return List.of();
         }
     }
@@ -361,7 +367,7 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
     private Float valueOfOrNull(String value) {
         try {
             return Float.valueOf(value);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }

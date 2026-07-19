@@ -98,10 +98,9 @@ public class SidecarMetadataReader {
         }
 
         // Content differs - use timestamps to determine which is newer
-        if (sidecar.getGeneratedAt() != null && book.getMetadataUpdatedAt() != null) {
-            if (book.getMetadataUpdatedAt().isAfter(sidecar.getGeneratedAt())) {
-                return SidecarSyncStatus.OUTDATED;  // DB is newer, sidecar needs update
-            }
+        if (sidecar.getGeneratedAt() != null && book.getMetadataUpdatedAt() != null
+                && book.getMetadataUpdatedAt().isAfter(sidecar.getGeneratedAt())) {
+            return SidecarSyncStatus.OUTDATED;  // DB is newer, sidecar needs update
         }
 
         return SidecarSyncStatus.CONFLICT;  // Sidecar is newer or timestamps unavailable

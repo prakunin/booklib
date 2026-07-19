@@ -42,7 +42,7 @@ export class WakeLockService implements OnDestroy {
     }
   }
 
-  private onVisibilityChange = async (): Promise<void> => {
+  private readonly onVisibilityChange = async (): Promise<void> => {
     if (this.enabled && document.visibilityState === 'visible') {
       await this.requestWakeLock();
     }

@@ -21,17 +21,17 @@ import type { MenuItem } from 'primeng/api';
 })
 export class LibraryShelfMenuService {
 
-  private confirmationService = inject(ConfirmationService);
-  private messageService = inject(MessageService);
-  private libraryService = inject(LibraryService);
-  private shelfService = inject(ShelfService);
-  private taskHelperService = inject(TaskHelperService);
-  private router = inject(Router);
-  private dialogLauncherService = inject(DialogLauncherService);
-  private magicShelfService = inject(MagicShelfService);
-  private userService = inject(UserService);
-  private loadingService = inject(LoadingService);
-  private bookDialogHelperService = inject(BookDialogHelperService);
+  private readonly confirmationService = inject(ConfirmationService);
+  private readonly messageService = inject(MessageService);
+  private readonly libraryService = inject(LibraryService);
+  private readonly shelfService = inject(ShelfService);
+  private readonly taskHelperService = inject(TaskHelperService);
+  private readonly router = inject(Router);
+  private readonly dialogLauncherService = inject(DialogLauncherService);
+  private readonly magicShelfService = inject(MagicShelfService);
+  private readonly userService = inject(UserService);
+  private readonly loadingService = inject(LoadingService);
+  private readonly bookDialogHelperService = inject(BookDialogHelperService);
   private readonly t = inject(TranslocoService);
 
   initializeLibraryMenuItems(entity: Library | null): MenuItem[] {

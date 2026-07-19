@@ -19,6 +19,8 @@
   "highlight": "Highlight",
   "note": "Note",
   "bookmark": "Bookmark",
+  "open": "Open",
+  "openInReader": "Open in reader",
   "annotation": "annotation",
   "annotations": "annotations"
 }

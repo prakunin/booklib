@@ -9,6 +9,7 @@ import {ReadingSessionHeatmapResponse, UserStatsService} from '../../../../../se
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {AsyncPipe} from '@angular/common';
 import {readStatsChartThemeColors} from '../../../shared/stats-chart-theme.service';
+import {sortStrings} from '../../../../../../shared/util/string-sort.util';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -260,7 +261,7 @@ export class ReadingSessionHeatmapComponent implements OnInit, OnDestroy {
     this.hasStreakData = true;
     this.totalReadingDays = data.length;
 
-    const sortedDates = Array.from(new Set(data.map(d => d.date))).sort();
+    const sortedDates = sortStrings(Array.from(new Set(data.map(d => d.date))));
     const dateSet = new Set(sortedDates);
 
     // Calculate all streaks

@@ -24,7 +24,7 @@ export interface OpdsUserV2 {
 export class OpdsService {
 
   private readonly baseUrl = `${API_CONFIG.BASE_URL}/api/v2/opds-users`;
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
 
   getUser(): Observable<OpdsUserV2[]> {
     return this.http.get<OpdsUserV2[]>(this.baseUrl);

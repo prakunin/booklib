@@ -233,7 +233,7 @@ export class PublicationTimelineChartComponent {
     // Try parsing as full date or just year
     const yearMatch = dateStr.match(/\d{4}/);
     if (yearMatch) {
-      const year = parseInt(yearMatch[0], 10);
+      const year = Number.parseInt(yearMatch[0], 10);
       if (year >= 1000 && year <= new Date().getFullYear() + 1) {
         return year;
       }

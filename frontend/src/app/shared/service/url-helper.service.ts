@@ -10,8 +10,8 @@ import {Book, BookType} from '../../features/book/model/book.model';
 export class UrlHelperService {
   private readonly baseUrl = API_CONFIG.BASE_URL;
   private readonly mediaBaseUrl = `${this.baseUrl}/api/v1/media`;
-  private authService = inject(AuthService);
-  private router = inject(Router);
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
   private getToken(): string | null {
     return this.authService.getInternalAccessToken();
@@ -106,7 +106,7 @@ export class UrlHelperService {
       return this.getBookUrl(book);
     }
 
-    return this.router.createUrlTree([`/${baseUrl}/book/${book.id}`], undefined);
+    return this.router.createUrlTree([`/${baseUrl}/book/${book.id}`]);
   }
 
   filterBooksBy(filterKey: string, filterValue: string) {

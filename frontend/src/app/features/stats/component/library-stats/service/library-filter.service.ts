@@ -25,9 +25,9 @@ export class LibraryFilterService {
     this.selectedLibraryId.set(libraryId);
   }
 
-  private bookService = inject(BookService);
-  private libraryService = inject(LibraryService);
-  private t = inject(TranslocoService);
+  private readonly bookService = inject(BookService);
+  private readonly libraryService = inject(LibraryService);
+  private readonly t = inject(TranslocoService);
   readonly libraryOptions = computed(() => {
     const books = this.bookService.books();
     const libraries = this.libraryService.libraries();

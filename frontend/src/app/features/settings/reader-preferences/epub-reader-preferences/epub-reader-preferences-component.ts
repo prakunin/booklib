@@ -64,8 +64,8 @@ export class EpubReaderPreferencesComponent {
     });
 
     const fontFamily = this.userSettings()?.ebookReaderSetting?.fontFamily;
-    if (fontFamily && fontFamily.startsWith('custom:')) {
-      const fontId = parseInt(fontFamily.split(':')[1], 10);
+    if (fontFamily?.startsWith('custom:')) {
+      const fontId = Number.parseInt(fontFamily.split(':')[1], 10);
       const fontStillExists = fonts.some(font => font.id === fontId);
       if (!fontStillExists) {
         queueMicrotask(() => this.resetToDefaultFont());
@@ -254,10 +254,10 @@ export class EpubReaderPreferencesComponent {
   }
 
   getCustomFontName(fontKey: string): string | null {
-    if (!fontKey || !fontKey.startsWith('custom:')) {
+    if (!fontKey?.startsWith('custom:')) {
       return null;
     }
-    const fontId = parseInt(fontKey.split(':')[1]);
+    const fontId = Number.parseInt(fontKey.split(':')[1]);
     const customFont = this.customFontService.fonts().find(f => f.id === fontId);
     return customFont ? customFont.fontName : null;
   }

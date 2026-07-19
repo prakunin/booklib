@@ -64,16 +64,16 @@ export class SeriesBrowserComponent implements OnInit {
   private static readonly MIN_SCALE = 0.7;
   private static readonly MAX_SCALE = 1.3;
 
-  private seriesDataService = inject(SeriesDataService);
-  private bookService = inject(BookService);
-  private pageTitle = inject(PageTitleService);
-  private t = inject(TranslocoService);
-  private router = inject(Router);
-  private activatedRoute = inject(ActivatedRoute);
-  private destroyRef = inject(DestroyRef);
-  private scrollService = inject(RouteScrollPositionService);
-  private localStorageService = inject(LocalStorageService);
-  private layoutService = inject(LayoutService);
+  private readonly seriesDataService = inject(SeriesDataService);
+  private readonly bookService = inject(BookService);
+  private readonly pageTitle = inject(PageTitleService);
+  private readonly t = inject(TranslocoService);
+  private readonly router = inject(Router);
+  private readonly activatedRoute = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly scrollService = inject(RouteScrollPositionService);
+  private readonly localStorageService = inject(LocalStorageService);
+  private readonly layoutService = inject(LayoutService);
 
   readonly isBooksLoading = this.bookService.isBooksLoading;
   // Series summaries are grouped from the whole catalog client-side; there is no paginated
@@ -105,7 +105,7 @@ export class SeriesBrowserComponent implements OnInit {
     maxScale: SeriesBrowserComponent.MAX_SCALE,
   });
   private readonly scaleFactor = this.scalePreference.scaleFactor;
-  readonly screenWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  readonly screenWidth = signal(globalThis.window !== undefined ? globalThis.window.innerWidth : 1024);
   readonly isMobile = computed(() => !this.layoutService.isDesktop());
   private readonly baseCardWidth = computed(() => this.isMobile()
     ? SeriesBrowserComponent.MOBILE_BASE_WIDTH
