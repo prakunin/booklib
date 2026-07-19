@@ -58,6 +58,7 @@ class BookServiceDeleteTests {
         SidecarMetadataWriter sidecarMetadataWriter = Mockito.mock(SidecarMetadataWriter.class);
         FileStreamingService fileStreamingService = Mockito.mock(FileStreamingService.class);
         AuditService auditService = Mockito.mock(AuditService.class);
+        KoboReadingStateRepository koboReadingStateRepository = Mockito.mock(KoboReadingStateRepository.class);
         EntityManager entityManager = Mockito.mock(EntityManager.class);
 
         bookService = new BookService(
@@ -79,7 +80,8 @@ class BookServiceDeleteTests {
                 ebookViewerPreferenceRepository,
                 sidecarMetadataWriter,
                 fileStreamingService,
-                auditService
+                auditService,
+                koboReadingStateRepository
         );
     }
 

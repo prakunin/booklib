@@ -79,6 +79,8 @@ class BookServiceTest {
     @Mock
     private AuditService auditService;
     @Mock
+    private KoboReadingStateRepository koboReadingStateRepository;
+    @Mock
     private EntityManager entityManager;
 
     @InjectMocks
@@ -434,6 +436,7 @@ class BookServiceTest {
         assertNotNull(response);
         assertTrue(response.getFailedFileDeletions().isEmpty());
         assertEquals(Set.of(11L), response.getDeleted());
+        verify(koboReadingStateRepository).deleteByEntitlementIdIn(List.of("11"));
         Files.deleteIfExists(filePath);
     }
 

@@ -25,6 +25,7 @@ import org.booklore.repository.UserRepository;
 import org.booklore.service.NotificationService;
 import org.booklore.service.audit.AuditService;
 import org.booklore.service.monitoring.LibraryWatchService;
+import org.booklore.service.oidc.OidcGroupMappingService;
 import org.booklore.task.options.RescanLibraryContext;
 import org.booklore.util.FileService;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -67,6 +68,7 @@ public class LibraryService {
     private final AuditService auditService;
     private final LibraryProcessingService libraryProcessingService;
     private final Executor taskExecutor;
+    private final OidcGroupMappingService oidcGroupMappingService;
     private final Set<Long> scanningLibraries = ConcurrentHashMap.newKeySet();
 
     @Transactional
@@ -254,6 +256,7 @@ public class LibraryService {
         Set<Long> bookIds = bookRepository.findBookIdsByLibraryId(id);
         fileService.deleteBookCovers(bookIds);
         String libraryName = library.getName();
+        oidcGroupMappingService.removeLibraryFromMappings(id);
         libraryRepository.deleteById(id);
         auditService.log(AuditAction.LIBRARY_DELETED, "Library", id, "Deleted library: " + libraryName);
         log.info("Library deleted successfully: {}", id);
