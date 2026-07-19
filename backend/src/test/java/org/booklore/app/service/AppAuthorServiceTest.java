@@ -17,6 +17,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -200,32 +202,13 @@ class AppAuthorServiceTest {
             assertEquals(50, result.getSize());
         }
 
-        @Test
-        void getAuthors_sortByName_asc() {
+        @ParameterizedTest(name = "getAuthors sort by {0} {1}")
+        @CsvSource({"name,asc", "bookCount,desc", "recent,desc"})
+        void getAuthors_sortedByField(String sortField, String sortDir) {
             mockAdminUser();
             mockCountQuery(0L);
 
-            AppPageResponse<AppAuthorSummary> result = service.getAuthors(0, 30, "name", "asc", null, null, null);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        void getAuthors_sortByBookCount_desc() {
-            mockAdminUser();
-            mockCountQuery(0L);
-
-            AppPageResponse<AppAuthorSummary> result = service.getAuthors(0, 30, "bookCount", "desc", null, null, null);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        void getAuthors_sortByRecent_desc() {
-            mockAdminUser();
-            mockCountQuery(0L);
-
-            AppPageResponse<AppAuthorSummary> result = service.getAuthors(0, 30, "recent", "desc", null, null, null);
+            AppPageResponse<AppAuthorSummary> result = service.getAuthors(0, 30, sortField, sortDir, null, null, null);
 
             assertNotNull(result);
         }

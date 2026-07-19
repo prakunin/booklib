@@ -168,7 +168,10 @@ class OpdsBookServiceTest {
         when(bookOpdsRepository.findAllWithFullMetadataByIdsAndLibraryIds(anyList(), anySet())).thenReturn(List.of());
         when(bookOpdsRepository.findAllWithFullMetadataByIdsAndShelfIds(anyList(), anySet(), anySet())).thenReturn(List.of());
 
-        opdsBookService.getBooksPage(details.getOpdsUserV2().getUserId(), "q", 1L, Set.of(2L), 0, 10);
+        Page<Book> result = opdsBookService.getBooksPage(details.getOpdsUserV2().getUserId(), "q", 1L, Set.of(2L), 0, 10);
+
+        assertThat(result.getContent()).isEmpty();
+        verify(bookOpdsRepository).findBookIdsByMetadataSearchAndShelfIds(eq("q"), anySet(), eq(Set.of(2L)), any());
     }
 
     @Test
@@ -208,7 +211,10 @@ class OpdsBookServiceTest {
         when(shelf.getUser()).thenReturn(shelfUser);
         when(shelfRepository.findByIdWithUser(anyLong())).thenReturn(Optional.of(shelf));
 
-        opdsBookService.getBooksPage(details.getOpdsUserV2().getUserId(), "q", 1L, Set.of(2L), 0, 10);
+        Page<Book> result = opdsBookService.getBooksPage(details.getOpdsUserV2().getUserId(), "q", 1L, Set.of(2L), 0, 10);
+
+        assertThat(result.getContent()).isEmpty();
+        verify(bookOpdsRepository).findBookIdsByMetadataSearchAndShelfIds(eq("q"), anySet(), eq(Set.of(2L)), any());
     }
 
     @Test
@@ -225,7 +231,10 @@ class OpdsBookServiceTest {
         when(bookOpdsRepository.findRecentBookIds(any())).thenReturn(Page.empty());
         when(bookOpdsRepository.findAllWithMetadataByIds(anyList())).thenReturn(List.of());
 
-        opdsBookService.getRecentBooksPage(details.getOpdsUserV2().getUserId(), 0, 10);
+        Page<Book> result = opdsBookService.getRecentBooksPage(details.getOpdsUserV2().getUserId(), 0, 10);
+
+        assertThat(result.getContent()).isEmpty();
+        verify(bookOpdsRepository).findRecentBookIds(any());
     }
 
     @Test

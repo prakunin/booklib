@@ -42,6 +42,7 @@ import java.util.*;
 import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -1117,7 +1118,8 @@ class BookCoverServiceTest {
 
             when(bookQueryService.findAllWithMetadataByIds(any())).thenReturn(List.of());
 
-            service.updateCoverFromFileForBooks(Set.of(1L), file);
+            assertThatCode(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
+                    .doesNotThrowAnyException();
         }
 
         @Test
@@ -1137,7 +1139,8 @@ class BookCoverServiceTest {
 
             when(bookQueryService.findAllWithMetadataByIds(any())).thenReturn(List.of());
 
-            service.updateCoverFromFileForBooks(Set.of(1L), file);
+            assertThatCode(() -> service.updateCoverFromFileForBooks(Set.of(1L), file))
+                    .doesNotThrowAnyException();
         }
 
         @Test

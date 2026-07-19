@@ -228,7 +228,7 @@ class BookDropServiceTest {
     }
 
     @Test
-    @Disabled
+    @Disabled("stubs findAllExcludingIdsFlat(), but with an empty excludedIds list finalizeImport's selectAll path calls findAllIds() instead, so this fails on a stub mismatch rather than a product defect")
     void finalizeImport_WhenSelectAllTrue_ShouldProcessAllFiles() throws Exception {
         BookdropFinalizeRequest request = new BookdropFinalizeRequest();
         request.setSelectAll(true);

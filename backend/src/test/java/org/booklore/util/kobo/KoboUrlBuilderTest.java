@@ -3,6 +3,8 @@ package org.booklore.util.kobo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -115,58 +117,19 @@ class KoboUrlBuilderTest {
         assertEquals(expected, actual);
     }
 
-    @Test
-    void testReverseProxy_xForwardedProto_doesNotOverridePort() {
+    @ParameterizedTest(name = "header {0}={1} does not override the resolved port")
+    @CsvSource({
+            "X-Forwarded-Proto, https",
+            "X-Forwarded-Host, books.example.com",
+            "X-Forwarded-Port, 443",
+            "Forwarded, proto=https;host=books.example.com"
+    })
+    void testReverseProxy_forwardedHeader_doesNotOverridePort(String headerName, String headerValue) {
         mockRequest.setScheme("https");
         mockRequest.setServerName("books.example.com");
         mockRequest.setServerPort(443);
         mockRequest.setLocalPort(6060);
-        mockRequest.addHeader("X-Forwarded-Proto", "https");
-
-        String expected = "https://books.example.com/api/kobo/testToken";
-
-        String actual = koboUrlBuilder.withBaseUrl("testToken");
-
-        assertEquals(expected, actual);
-    }
-
-    @Test
-    void testReverseProxy_xForwardedHost_doesNotOverridePort() {
-        mockRequest.setScheme("https");
-        mockRequest.setServerName("books.example.com");
-        mockRequest.setServerPort(443);
-        mockRequest.setLocalPort(6060);
-        mockRequest.addHeader("X-Forwarded-Host", "books.example.com");
-
-        String expected = "https://books.example.com/api/kobo/testToken";
-
-        String actual = koboUrlBuilder.withBaseUrl("testToken");
-
-        assertEquals(expected, actual);
-    }
-
-    @Test
-    void testReverseProxy_xForwardedPort_doesNotOverridePort() {
-        mockRequest.setScheme("https");
-        mockRequest.setServerName("books.example.com");
-        mockRequest.setServerPort(443);
-        mockRequest.setLocalPort(6060);
-        mockRequest.addHeader("X-Forwarded-Port", "443");
-
-        String expected = "https://books.example.com/api/kobo/testToken";
-
-        String actual = koboUrlBuilder.withBaseUrl("testToken");
-
-        assertEquals(expected, actual);
-    }
-
-    @Test
-    void testReverseProxy_forwardedHeader_doesNotOverridePort() {
-        mockRequest.setScheme("https");
-        mockRequest.setServerName("books.example.com");
-        mockRequest.setServerPort(443);
-        mockRequest.setLocalPort(6060);
-        mockRequest.addHeader("Forwarded", "proto=https;host=books.example.com");
+        mockRequest.addHeader(headerName, headerValue);
 
         String expected = "https://books.example.com/api/kobo/testToken";
 

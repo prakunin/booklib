@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PathPatternResolverTest {
@@ -526,7 +527,7 @@ class PathPatternResolverTest {
 
         String authorDir = components[0];
         assertFalse(authorDir.endsWith("."), "Directory name should not end with a dot: " + authorDir);
-        assertTrue(authorDir.equals("Author Name Jr"), "Expected 'Author Name Jr' but got '" + authorDir + "'");
+        assertThat(authorDir).as("Expected 'Author Name Jr' but got '" + authorDir + "'").isEqualTo("Author Name Jr");
     }
 
     @Test
@@ -545,8 +546,8 @@ class PathPatternResolverTest {
             assertFalse(components[i].endsWith("."), "Component " + i + " should not end with dot: " + components[i]);
         }
 
-        assertTrue(components[0].equals("Author"));
-        assertTrue(components[1].equals("Series"));
+        assertThat(components[0]).isEqualTo("Author");
+        assertThat(components[1]).isEqualTo("Series");
     }
 
     @Test

@@ -24,6 +24,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -197,9 +199,14 @@ class BookMetadataUpdaterTest {
         }
     }
 
-    @Test
-    void setBookMetadata_replaceMissing_doesNotOverwriteExisting() {
-        metadataEntity.setPublisher("Existing Publisher");
+    @ParameterizedTest(name = "REPLACE_MISSING with existing publisher [{0}] expects [{1}]")
+    @CsvSource(value = {
+            "Existing Publisher, Existing Publisher",
+            "null, New Publisher",
+            "'  ', New Publisher"
+    }, nullValues = "null")
+    void setBookMetadata_replaceMissing_keepsOrFillsBasedOnExisting(String existingPublisher, String expectedPublisher) {
+        metadataEntity.setPublisher(existingPublisher);
         BookMetadata newMeta = BookMetadata.builder().title("T").publisher("New Publisher").build();
         MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_MISSING);
 
@@ -208,37 +215,7 @@ class BookMetadataUpdaterTest {
 
             updater.setBookMetadata(context);
 
-            assertThat(metadataEntity.getPublisher()).isEqualTo("Existing Publisher");
-        }
-    }
-
-    @Test
-    void setBookMetadata_replaceMissing_fillsWhenExistingIsNull() {
-        metadataEntity.setPublisher(null);
-        BookMetadata newMeta = BookMetadata.builder().title("T").publisher("New Publisher").build();
-        MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_MISSING);
-
-        try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
-            mockSettingsAndChangeDetector(mcd, true, true);
-
-            updater.setBookMetadata(context);
-
-            assertThat(metadataEntity.getPublisher()).isEqualTo("New Publisher");
-        }
-    }
-
-    @Test
-    void setBookMetadata_replaceMissing_fillsWhenExistingIsBlank() {
-        metadataEntity.setPublisher("  ");
-        BookMetadata newMeta = BookMetadata.builder().title("T").publisher("New Publisher").build();
-        MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_MISSING);
-
-        try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
-            mockSettingsAndChangeDetector(mcd, true, true);
-
-            updater.setBookMetadata(context);
-
-            assertThat(metadataEntity.getPublisher()).isEqualTo("New Publisher");
+            assertThat(metadataEntity.getPublisher()).isEqualTo(expectedPublisher);
         }
     }
 

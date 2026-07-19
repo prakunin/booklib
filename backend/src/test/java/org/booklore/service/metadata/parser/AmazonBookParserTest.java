@@ -16,6 +16,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -118,11 +120,12 @@ class AmazonBookParserTest {
         mockJsoup.close();
     }
 
-    @Test
-    void fetchTopMetadata_usesAsinFromBookWhenAvailable() throws Exception {
+    @ParameterizedTest(name = "asin=\"{0}\" is normalized before connecting")
+    @ValueSource(strings = {"EXAMPLESKU", "  EXAMPLESKU  ", "@EXAMPLESKU!!"})
+    void fetchTopMetadata_normalizesAsinFromBook(String rawAsin) throws Exception {
         mockJsoupConnect("https://www.amazon.com/dp/EXAMPLESKU", "<html />");
 
-        Book book = getBook("EXAMPLESKU");
+        Book book = getBook(rawAsin);
         FetchMetadataRequest fetchMetadataRequest = FetchMetadataRequest.builder().build();
 
         amazonBookParser.fetchTopMetadata(book, fetchMetadataRequest);
@@ -141,30 +144,6 @@ class AmazonBookParserTest {
         amazonBookParser.fetchTopMetadata(book, fetchMetadataRequest);
 
         mockJsoup.verify(() -> Jsoup.connect("https://www.amazon.co.jp/dp/EXAMPLESKU"));
-    }
-
-    @Test
-    void fetchTopMetadata_removesExtraWhitespace() throws Exception {
-        mockJsoupConnect("https://www.amazon.com/dp/EXAMPLESKU", "<html />");
-
-        Book book = getBook("  EXAMPLESKU  ");
-        FetchMetadataRequest fetchMetadataRequest = FetchMetadataRequest.builder().build();
-
-        amazonBookParser.fetchTopMetadata(book, fetchMetadataRequest);
-
-        mockJsoup.verify(() -> Jsoup.connect("https://www.amazon.com/dp/EXAMPLESKU"));
-    }
-
-    @Test
-    void fetchTopMetadata_removesExtraCharacters() throws Exception {
-        mockJsoupConnect("https://www.amazon.com/dp/EXAMPLESKU", "<html />");
-
-        Book book = getBook("@EXAMPLESKU!!");
-        FetchMetadataRequest fetchMetadataRequest = FetchMetadataRequest.builder().build();
-
-        amazonBookParser.fetchTopMetadata(book, fetchMetadataRequest);
-
-        mockJsoup.verify(() -> Jsoup.connect("https://www.amazon.com/dp/EXAMPLESKU"));
     }
 
     @Test

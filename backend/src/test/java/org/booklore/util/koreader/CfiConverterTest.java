@@ -65,46 +65,26 @@ class CfiConverterTest {
     @Nested
     class ExtractSpineIndexTests {
 
-        @Test
-        void extractSpineIndex_fromCfi_spineIndex0() {
-            String cfi = "epubcfi(/6/2!/4/2)";
+        @ParameterizedTest(name = "cfi \"{0}\" resolves to spine index {1}")
+        @CsvSource({
+                "epubcfi(/6/2!/4/2), 0",
+                "epubcfi(/6/4!/4/2), 1",
+                "epubcfi(/6/12!/4/2:10), 5"
+        })
+        void extractSpineIndex_fromCfi_returnsSpineIndex(String cfi, int expectedIndex) {
             int result = CfiConverter.extractSpineIndex(cfi);
-            assertEquals(0, result);
+            assertEquals(expectedIndex, result);
         }
 
-        @Test
-        void extractSpineIndex_fromCfi_spineIndex1() {
-            String cfi = "epubcfi(/6/4!/4/2)";
-            int result = CfiConverter.extractSpineIndex(cfi);
-            assertEquals(1, result);
-        }
-
-        @Test
-        void extractSpineIndex_fromCfi_spineIndex5() {
-            String cfi = "epubcfi(/6/12!/4/2:10)";
-            int result = CfiConverter.extractSpineIndex(cfi);
-            assertEquals(5, result);
-        }
-
-        @Test
-        void extractSpineIndex_fromXPointer_spineIndex0() {
-            String xpointer = "/body/DocFragment[1]/body/div/p";
+        @ParameterizedTest(name = "xpointer \"{0}\" resolves to spine index {1}")
+        @CsvSource({
+                "/body/DocFragment[1]/body/div/p, 0",
+                "/body/DocFragment[3]/body/section/div/p, 2",
+                "/body/DocFragment[5]/body/p/text().42, 4"
+        })
+        void extractSpineIndex_fromXPointer_returnsSpineIndex(String xpointer, int expectedIndex) {
             int result = CfiConverter.extractSpineIndex(xpointer);
-            assertEquals(0, result);
-        }
-
-        @Test
-        void extractSpineIndex_fromXPointer_spineIndex2() {
-            String xpointer = "/body/DocFragment[3]/body/section/div/p";
-            int result = CfiConverter.extractSpineIndex(xpointer);
-            assertEquals(2, result);
-        }
-
-        @Test
-        void extractSpineIndex_fromXPointer_withTextOffset() {
-            String xpointer = "/body/DocFragment[5]/body/p/text().42";
-            int result = CfiConverter.extractSpineIndex(xpointer);
-            assertEquals(4, result);
+            assertEquals(expectedIndex, result);
         }
 
         @ParameterizedTest
@@ -309,48 +289,16 @@ class CfiConverterTest {
     class NormalizeProgressXPointerTests {
 
         @Test
-        void normalizeProgressXPointer_removesTextOffset() {
-            String xpointer = "/body/DocFragment[1]/body/div/p/text().42";
-
-            String result = CfiConverter.normalizeProgressXPointer(xpointer);
-
-            assertEquals("/body/DocFragment[1]/body/div/p", result);
-        }
-
-        @Test
-        void normalizeProgressXPointer_removesNodeSuffix() {
-            String xpointer = "/body/DocFragment[1]/body/div/p.5";
-
-            String result = CfiConverter.normalizeProgressXPointer(xpointer);
-
-            assertEquals("/body/DocFragment[1]/body/div/p", result);
-        }
-
-        @Test
-        void normalizeProgressXPointer_removesBothTextOffsetAndNodeSuffix() {
-            String xpointer = "/body/DocFragment[1]/body/div/p/text().10.5";
-
-            String result = CfiConverter.normalizeProgressXPointer(xpointer);
-
-            assertEquals("/body/DocFragment[1]/body/div/p", result);
-        }
-
-        @Test
-        void normalizeProgressXPointer_noChangesNeeded() {
-            String xpointer = "/body/DocFragment[1]/body/div/p";
-
-            String result = CfiConverter.normalizeProgressXPointer(xpointer);
-
-            assertEquals("/body/DocFragment[1]/body/div/p", result);
-        }
-
-        @Test
         void normalizeProgressXPointer_nullInput_returnsNull() {
             assertNull(CfiConverter.normalizeProgressXPointer(null));
         }
 
         @ParameterizedTest
         @CsvSource({
+                "/body/DocFragment[1]/body/div/p/text().42, /body/DocFragment[1]/body/div/p",
+                "/body/DocFragment[1]/body/div/p.5, /body/DocFragment[1]/body/div/p",
+                "/body/DocFragment[1]/body/div/p/text().10.5, /body/DocFragment[1]/body/div/p",
+                "/body/DocFragment[1]/body/div/p, /body/DocFragment[1]/body/div/p",
                 "/body/DocFragment[1]/body/text().0, /body/DocFragment[1]/body",
                 "/body/DocFragment[3]/body/section/div/p/text().100, /body/DocFragment[3]/body/section/div/p",
                 "/body/DocFragment[1]/body/div[2]/p[3]/text().5, /body/DocFragment[1]/body/div[2]/p[3]"

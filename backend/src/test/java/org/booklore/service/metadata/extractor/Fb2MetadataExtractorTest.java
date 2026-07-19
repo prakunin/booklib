@@ -5,6 +5,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +15,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.Base64;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -100,91 +106,53 @@ class Fb2MetadataExtractorTest {
         assertThat(metadata.getLanguage()).isEqualTo("ru");
     }
 
-    @Test
-    void extractMetadata_authorWithMiddleName() throws IOException {
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("singleListFieldCases")
+    void extractsSingleListField(String scenario, String field, String titleInfoXml, List<String> expected) throws IOException {
         File file = writeFb2("""
                 <description>
                   <title-info>
-                    <author>
-                      <first-name>Edgar</first-name>
-                      <middle-name>Allan</middle-name>
-                      <last-name>Poe</last-name>
-                    </author>
+                %s
                   </title-info>
                 </description>
-                """);
+                """.formatted(titleInfoXml));
 
         BookMetadata metadata = extractor.extractMetadata(file);
 
-        assertThat(metadata.getAuthors()).containsExactly("Edgar Allan Poe");
+        Collection<String> actual = "authors".equals(field) ? metadata.getAuthors() : metadata.getCategories();
+        assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 
-    @Test
-    void extractMetadata_authorNicknameFallback() throws IOException {
-        File file = writeFb2("""
-                <description>
-                  <title-info>
-                    <author>
-                      <nickname>voltaire</nickname>
-                    </author>
-                  </title-info>
-                </description>
-                """);
-
-        BookMetadata metadata = extractor.extractMetadata(file);
-
-        assertThat(metadata.getAuthors()).containsExactly("voltaire");
-    }
-
-    @Test
-    void extractMetadata_nicknameIgnoredWhenNamePartsPresent() throws IOException {
-        File file = writeFb2("""
-                <description>
-                  <title-info>
-                    <author>
-                      <first-name>John</first-name>
-                      <last-name>Doe</last-name>
-                      <nickname>jdoe</nickname>
-                    </author>
-                  </title-info>
-                </description>
-                """);
-
-        BookMetadata metadata = extractor.extractMetadata(file);
-
-        assertThat(metadata.getAuthors()).containsExactly("John Doe");
-    }
-
-    @Test
-    void extractMetadata_multipleAuthors() throws IOException {
-        File file = writeFb2("""
-                <description>
-                  <title-info>
-                    <author><first-name>Alpha</first-name><last-name>One</last-name></author>
-                    <author><first-name>Beta</first-name><last-name>Two</last-name></author>
-                  </title-info>
-                </description>
-                """);
-
-        BookMetadata metadata = extractor.extractMetadata(file);
-
-        assertThat(metadata.getAuthors()).containsExactlyInAnyOrder("Alpha One", "Beta Two");
-    }
-
-    @Test
-    void extractMetadata_genres() throws IOException {
-        File file = writeFb2("""
-                <description>
-                  <title-info>
-                    <genre>sf_fantasy</genre>
-                    <genre>adventure</genre>
-                  </title-info>
-                </description>
-                """);
-
-        BookMetadata metadata = extractor.extractMetadata(file);
-
-        assertThat(metadata.getCategories()).containsExactlyInAnyOrder("sf_fantasy", "adventure");
+    private static Stream<Arguments> singleListFieldCases() {
+        return Stream.of(
+                Arguments.of("authorWithMiddleName", "authors", """
+                        <author>
+                          <first-name>Edgar</first-name>
+                          <middle-name>Allan</middle-name>
+                          <last-name>Poe</last-name>
+                        </author>
+                        """, List.of("Edgar Allan Poe")),
+                Arguments.of("authorNicknameFallback", "authors", """
+                        <author>
+                          <nickname>voltaire</nickname>
+                        </author>
+                        """, List.of("voltaire")),
+                Arguments.of("nicknameIgnoredWhenNamePartsPresent", "authors", """
+                        <author>
+                          <first-name>John</first-name>
+                          <last-name>Doe</last-name>
+                          <nickname>jdoe</nickname>
+                        </author>
+                        """, List.of("John Doe")),
+                Arguments.of("multipleAuthors", "authors", """
+                        <author><first-name>Alpha</first-name><last-name>One</last-name></author>
+                        <author><first-name>Beta</first-name><last-name>Two</last-name></author>
+                        """, List.of("Alpha One", "Beta Two")),
+                Arguments.of("genres", "categories", """
+                        <genre>sf_fantasy</genre>
+                        <genre>adventure</genre>
+                        """, List.of("sf_fantasy", "adventure"))
+        );
     }
 
     @Test

@@ -203,6 +203,7 @@ class SystemInfoServiceTest {
         }
 
         @Test
+        @SuppressWarnings("java:S2925") // simulates a genuinely slow (but finite) DB call so the guard's real wall-clock timeout can be exercised; not a wait-for-condition
         void aSlowConfiguredLibraryPathsCallDoesNotEatTheDatabaseBlocksBudget() throws Exception {
             TimeoutGuard shortGuard = new TimeoutGuard(1);
             SystemInfoService boundedService =

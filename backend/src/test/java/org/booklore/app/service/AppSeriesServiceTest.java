@@ -19,6 +19,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -267,32 +269,13 @@ class AppSeriesServiceTest {
             assertEquals(0, result.getTotalElements());
         }
 
-        @Test
-        void getSeriesBooks_sortByTitle_desc() {
+        @ParameterizedTest(name = "getSeriesBooks sort by {0} {1}")
+        @CsvSource(value = {"title,desc", "recentlyAdded,asc", "null,null"}, nullValues = "null")
+        void getSeriesBooks_sortedByField(String sortField, String sortDir) {
             mockAdminUser();
             mockBookPage(Collections.emptyList(), 0L);
 
-            AppPageResponse<AppBookSummary> result = service.getSeriesBooks("Dune", 0, 20, "title", "desc", null);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        void getSeriesBooks_sortByRecentlyAdded_asc() {
-            mockAdminUser();
-            mockBookPage(Collections.emptyList(), 0L);
-
-            AppPageResponse<AppBookSummary> result = service.getSeriesBooks("Dune", 0, 20, "recentlyAdded", "asc", null);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        void getSeriesBooks_defaultSort_isSeriesNumber() {
-            mockAdminUser();
-            mockBookPage(Collections.emptyList(), 0L);
-
-            AppPageResponse<AppBookSummary> result = service.getSeriesBooks("Dune", 0, 20, null, null, null);
+            AppPageResponse<AppBookSummary> result = service.getSeriesBooks("Dune", 0, 20, sortField, sortDir, null);
 
             assertNotNull(result);
         }

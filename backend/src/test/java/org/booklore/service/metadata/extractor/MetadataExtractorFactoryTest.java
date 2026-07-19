@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.File;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -90,7 +91,7 @@ class MetadataExtractorFactoryTest {
         @ParameterizedTest
         @EnumSource(BookFileType.class)
         void allFileTypesHandled(BookFileType type) {
-            factory.extractMetadata(type, dummyFile);
+            assertThatCode(() -> factory.extractMetadata(type, dummyFile)).doesNotThrowAnyException();
         }
     }
 
@@ -172,7 +173,7 @@ class MetadataExtractorFactoryTest {
         @ParameterizedTest
         @EnumSource(BookFileExtension.class)
         void allExtensionsHandled(BookFileExtension ext) {
-            factory.extractMetadata(ext, dummyFile);
+            assertThatCode(() -> factory.extractMetadata(ext, dummyFile)).doesNotThrowAnyException();
         }
     }
 
@@ -214,7 +215,7 @@ class MetadataExtractorFactoryTest {
         @ParameterizedTest
         @EnumSource(BookFileExtension.class)
         void allExtensionsCoverHandled(BookFileExtension ext) {
-            factory.extractCover(ext, dummyFile);
+            assertThatCode(() -> factory.extractCover(ext, dummyFile)).doesNotThrowAnyException();
         }
     }
 

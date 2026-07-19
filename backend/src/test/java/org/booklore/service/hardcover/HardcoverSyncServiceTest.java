@@ -8,6 +8,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -164,9 +166,10 @@ class HardcoverSyncServiceTest {
 
     // === Tests for successful sync (API calls should be made) ===
 
-    @Test
+    @ParameterizedTest(name = "progress {0} with stored bookId makes API calls")
     @DisplayName("Should use stored hardcoverBookId when available")
-    void syncProgressToHardcover_withStoredBookId_shouldUseStoredId() {
+    @ValueSource(floats = {50.0f, 99.0f, 30.0f})
+    void syncProgressToHardcover_withStoredBookId_shouldUseStoredId(float progress) {
         testMetadata.setHardcoverBookId("12345");
         testMetadata.setPageCount(300);
 
@@ -177,7 +180,7 @@ class HardcoverSyncServiceTest {
                 .thenReturn(createEmptyUserBookReadsResponse())
                 .thenReturn(createInsertUserBookReadResponse());
 
-        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+        service.syncProgressToHardcover(TEST_BOOK_ID, progress, TEST_USER_ID);
 
         // Verify API was called at least once (using stored ID, no search needed)
         verify(restClient, atLeastOnce()).post();
@@ -208,40 +211,6 @@ class HardcoverSyncServiceTest {
 
         // Should call search only
         verify(restClient, times(1)).post();
-    }
-
-    @Test
-    @DisplayName("Should set status to READ when progress >= 99%")
-    void syncProgressToHardcover_whenProgress99Percent_shouldMakeApiCalls() {
-        testMetadata.setHardcoverBookId("12345");
-        testMetadata.setPageCount(300);
-
-        when(responseSpec.body(Map.class))
-                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
-                .thenReturn(createInsertUserBookResponse(5001, null))
-                .thenReturn(createEmptyUserBookReadsResponse())
-                .thenReturn(createInsertUserBookReadResponse());
-
-        service.syncProgressToHardcover(TEST_BOOK_ID, 99.0f, TEST_USER_ID);
-
-        verify(restClient, atLeastOnce()).post();
-    }
-
-    @Test
-    @DisplayName("Should set status to CURRENTLY_READING when progress < 99%")
-    void syncProgressToHardcover_whenProgressLessThan99_shouldMakeApiCalls() {
-        testMetadata.setHardcoverBookId("12345");
-        testMetadata.setPageCount(300);
-
-        when(responseSpec.body(Map.class))
-                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
-                .thenReturn(createInsertUserBookResponse(5001, null))
-                .thenReturn(createEmptyUserBookReadsResponse())
-                .thenReturn(createInsertUserBookReadResponse());
-
-        service.syncProgressToHardcover(TEST_BOOK_ID, 30.0f, TEST_USER_ID);
-
-        verify(restClient, atLeastOnce()).post();
     }
 
     @Test

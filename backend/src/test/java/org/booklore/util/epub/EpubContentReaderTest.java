@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -95,31 +97,18 @@ class EpubContentReaderTest {
     @Nested
     class GetSpineItemContentTests {
 
-        @Test
-        void getSpineItemContent_firstChapter_returnsContent() {
-            String content = EpubContentReader.getSpineItemContent(validEpubFile, 0);
+        @ParameterizedTest(name = "spine index {0} returns chapter content containing \"{1}\" and \"{2}\"")
+        @CsvSource({
+                "0, Chapter 1, first paragraph",
+                "1, Chapter 2, chapter two",
+                "2, Chapter 3, Final chapter"
+        })
+        void getSpineItemContent_chapterAtIndex_returnsContent(int spineIndex, String expectedTitle, String expectedSnippet) {
+            String content = EpubContentReader.getSpineItemContent(validEpubFile, spineIndex);
 
             assertNotNull(content);
-            assertTrue(content.contains("Chapter 1"));
-            assertTrue(content.contains("first paragraph"));
-        }
-
-        @Test
-        void getSpineItemContent_secondChapter_returnsContent() {
-            String content = EpubContentReader.getSpineItemContent(validEpubFile, 1);
-
-            assertNotNull(content);
-            assertTrue(content.contains("Chapter 2"));
-            assertTrue(content.contains("chapter two"));
-        }
-
-        @Test
-        void getSpineItemContent_lastChapter_returnsContent() {
-            String content = EpubContentReader.getSpineItemContent(validEpubFile, 2);
-
-            assertNotNull(content);
-            assertTrue(content.contains("Chapter 3"));
-            assertTrue(content.contains("Final chapter"));
+            assertTrue(content.contains(expectedTitle));
+            assertTrue(content.contains(expectedSnippet));
         }
 
         @Test

@@ -6,6 +6,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -33,11 +35,16 @@ class KomgaCleanInterceptorTest {
         KomgaCleanContext.clear();
     }
 
-    @Test
-    void shouldEnableCleanModeWithParameterWithoutValue() throws Exception {
-        // Given: Request with ?clean (no value)
-        when(request.getRequestURI()).thenReturn("/komga/api/v1/series");
-        when(request.getParameter("clean")).thenReturn("");  // Empty string means parameter present without value
+    @ParameterizedTest(name = "clean param [{1}] on {0} enables clean mode")
+    @CsvSource({
+            "/komga/api/v1/series, ''",
+            "/komga/api/v1/series, true",
+            "/komga/api/v1/books/123, TRUE"
+    })
+    void shouldEnableCleanModeWithParameterVariants(String uri, String cleanParam) throws Exception {
+        // Given: Request with ?clean present, ?clean=true, or ?clean=TRUE
+        when(request.getRequestURI()).thenReturn(uri);
+        when(request.getParameter("clean")).thenReturn(cleanParam);
 
         // When: Interceptor processes request
         interceptor.preHandle(request, response, new Object());
@@ -46,63 +53,16 @@ class KomgaCleanInterceptorTest {
         assertThat(KomgaCleanContext.isCleanMode()).isTrue();
     }
 
-    @Test
-    void shouldEnableCleanModeWithParameterSetToTrue() throws Exception {
-        // Given: Request with ?clean=true
-        when(request.getRequestURI()).thenReturn("/komga/api/v1/series");
-        when(request.getParameter("clean")).thenReturn("true");
-
-        // When: Interceptor processes request
-        interceptor.preHandle(request, response, new Object());
-
-        // Then: Clean mode should be enabled
-        assertThat(KomgaCleanContext.isCleanMode()).isTrue();
-    }
-
-    @Test
-    void shouldEnableCleanModeWithParameterSetToTrueCaseInsensitive() throws Exception {
-        // Given: Request with ?clean=TRUE
-        when(request.getRequestURI()).thenReturn("/komga/api/v1/books/123");
-        when(request.getParameter("clean")).thenReturn("TRUE");
-
-        // When: Interceptor processes request
-        interceptor.preHandle(request, response, new Object());
-
-        // Then: Clean mode should be enabled
-        assertThat(KomgaCleanContext.isCleanMode()).isTrue();
-    }
-
-    @Test
-    void shouldNotEnableCleanModeWhenParameterAbsent() throws Exception {
-        // Given: Request without clean parameter
-        when(request.getRequestURI()).thenReturn("/komga/api/v1/series");
-        when(request.getParameter("clean")).thenReturn(null);
-
-        // When: Interceptor processes request
-        interceptor.preHandle(request, response, new Object());
-
-        // Then: Clean mode should not be enabled
-        assertThat(KomgaCleanContext.isCleanMode()).isFalse();
-    }
-
-    @Test
-    void shouldNotEnableCleanModeWhenParameterSetToFalse() throws Exception {
-        // Given: Request with ?clean=false
-        when(request.getRequestURI()).thenReturn("/komga/api/v1/series");
-        when(request.getParameter("clean")).thenReturn("false");
-
-        // When: Interceptor processes request
-        interceptor.preHandle(request, response, new Object());
-
-        // Then: Clean mode should not be enabled
-        assertThat(KomgaCleanContext.isCleanMode()).isFalse();
-    }
-
-    @Test
-    void shouldNotApplyToNonKomgaEndpoints() throws Exception {
-        // Given: Request to non-Komga endpoint with clean parameter
-        when(request.getRequestURI()).thenReturn("/api/v1/books");
-        when(request.getParameter("clean")).thenReturn("true");
+    @ParameterizedTest(name = "clean param [{1}] on {0} does not enable clean mode")
+    @CsvSource(value = {
+            "/komga/api/v1/series, null",
+            "/komga/api/v1/series, false",
+            "/api/v1/books, true"
+    }, nullValues = "null")
+    void shouldNotEnableCleanModeVariants(String uri, String cleanParam) throws Exception {
+        // Given: Request without clean parameter, with ?clean=false, or a non-Komga endpoint
+        when(request.getRequestURI()).thenReturn(uri);
+        when(request.getParameter("clean")).thenReturn(cleanParam);
 
         // When: Interceptor processes request
         interceptor.preHandle(request, response, new Object());

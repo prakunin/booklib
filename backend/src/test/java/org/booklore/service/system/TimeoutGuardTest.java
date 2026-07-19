@@ -81,6 +81,7 @@ class TimeoutGuardTest {
          */
         @Test
         @Timeout(10)
+        @SuppressWarnings("java:S2925") // deliberate real hang (see class javadoc): proves the guard abandons a worker rather than waiting on it
         void abandonsTheWorkerAndReturnsPromptlyRatherThanWaitingForASixtySecondSleep() {
             Instant start = Instant.now();
 

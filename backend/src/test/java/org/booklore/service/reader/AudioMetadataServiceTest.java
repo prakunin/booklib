@@ -19,6 +19,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -461,57 +463,26 @@ class AudioMetadataServiceTest {
         }
     }
 
-    @Test
-    void getMetadata_parsesStereoChannels() throws Exception {
+    @ParameterizedTest(name = "channels tag \"{0}\" parses to {1}")
+    @CsvSource({
+            "Stereo, 2",
+            "Mono, 1",
+            "6 channels, 6"
+    })
+    void getMetadata_parsesChannels(String channelsTag, int expectedChannels) throws Exception {
         AudioFile audioFile = mock(AudioFile.class);
         AudioHeader header = mock(AudioHeader.class);
 
         when(audioFile.getAudioHeader()).thenReturn(header);
         when(audioFile.getTag()).thenReturn(null);
         when(header.getPreciseTrackLength()).thenReturn(100.0);
-        when(header.getChannels()).thenReturn("Stereo");
+        when(header.getChannels()).thenReturn(channelsTag);
 
         try (MockedStatic<AudioFileIO> audioFileIOMock = mockStatic(AudioFileIO.class)) {
             audioFileIOMock.when(() -> AudioFileIO.read(audioPath.toFile())).thenReturn(audioFile);
 
             AudiobookInfo info = audioMetadataService.getMetadata(bookFileEntity, audioPath);
-            assertEquals(2, info.getChannels());
-        }
-    }
-
-    @Test
-    void getMetadata_parsesMonoChannels() throws Exception {
-        AudioFile audioFile = mock(AudioFile.class);
-        AudioHeader header = mock(AudioHeader.class);
-
-        when(audioFile.getAudioHeader()).thenReturn(header);
-        when(audioFile.getTag()).thenReturn(null);
-        when(header.getPreciseTrackLength()).thenReturn(100.0);
-        when(header.getChannels()).thenReturn("Mono");
-
-        try (MockedStatic<AudioFileIO> audioFileIOMock = mockStatic(AudioFileIO.class)) {
-            audioFileIOMock.when(() -> AudioFileIO.read(audioPath.toFile())).thenReturn(audioFile);
-
-            AudiobookInfo info = audioMetadataService.getMetadata(bookFileEntity, audioPath);
-            assertEquals(1, info.getChannels());
-        }
-    }
-
-    @Test
-    void getMetadata_parsesNumericChannels() throws Exception {
-        AudioFile audioFile = mock(AudioFile.class);
-        AudioHeader header = mock(AudioHeader.class);
-
-        when(audioFile.getAudioHeader()).thenReturn(header);
-        when(audioFile.getTag()).thenReturn(null);
-        when(header.getPreciseTrackLength()).thenReturn(100.0);
-        when(header.getChannels()).thenReturn("6 channels");
-
-        try (MockedStatic<AudioFileIO> audioFileIOMock = mockStatic(AudioFileIO.class)) {
-            audioFileIOMock.when(() -> AudioFileIO.read(audioPath.toFile())).thenReturn(audioFile);
-
-            AudiobookInfo info = audioMetadataService.getMetadata(bookFileEntity, audioPath);
-            assertEquals(6, info.getChannels());
+            assertEquals(expectedChannels, info.getChannels());
         }
     }
 

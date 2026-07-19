@@ -2,6 +2,9 @@ package org.booklore.convertor;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
@@ -54,23 +57,11 @@ class JpaJsonConverterTest {
         assertEquals(expected, result);
     }
 
-    @Test
-    void convertToEntityAttribute_withNull_shouldReturnNull() {
-        Map<String, Object> result = converter.convertToEntityAttribute(null);
-
-        assertNull(result);
-    }
-
-    @Test
-    void convertToEntityAttribute_withEmptyString_shouldReturnNull() {
-        Map<String, Object> result = converter.convertToEntityAttribute("");
-
-        assertNull(result);
-    }
-
-    @Test
-    void convertToEntityAttribute_withBlankString_shouldReturnNull() {
-        Map<String, Object> result = converter.convertToEntityAttribute("   ");
+    @ParameterizedTest(name = "convertToEntityAttribute with [{0}] returns null")
+    @NullSource
+    @ValueSource(strings = {"", "   "})
+    void convertToEntityAttribute_withNullOrBlankInput_shouldReturnNull(String input) {
+        Map<String, Object> result = converter.convertToEntityAttribute(input);
 
         assertNull(result);
     }

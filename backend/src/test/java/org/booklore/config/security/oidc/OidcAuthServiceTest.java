@@ -18,6 +18,8 @@ import org.booklore.service.user.UserProvisioningService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -616,33 +618,14 @@ class OidcAuthServiceTest {
         verify(oidcTokenClient, never()).exchangeAuthorizationCode(anyString(), anyString(), anyString(), any());
     }
 
-    @Test
-    void validateRedirectUri_invalidMobileRedirectThrows() {
+    @ParameterizedTest(name = "invalid redirect URI [{0}] throws APIException")
+    @ValueSource(strings = {"booklore://evil-path", "ftp://example.com/oauth2-callback", "https://example.com/login"})
+    void validateRedirectUri_invalidRedirectUriThrows(String redirectUri) {
         var settings = enabledSettings();
         when(appSettingService.getAppSettings()).thenReturn(settings);
 
         var request = mockRequest();
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "booklore://evil-path", NONCE, request))
-                .isInstanceOf(APIException.class);
-    }
-
-    @Test
-    void validateRedirectUri_nonHttpSchemeThrows() {
-        var settings = enabledSettings();
-        when(appSettingService.getAppSettings()).thenReturn(settings);
-
-        var request = mockRequest();
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "ftp://example.com/oauth2-callback", NONCE, request))
-                .isInstanceOf(APIException.class);
-    }
-
-    @Test
-    void validateRedirectUri_missingCallbackPathThrows() {
-        var settings = enabledSettings();
-        when(appSettingService.getAppSettings()).thenReturn(settings);
-
-        var request = mockRequest();
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "https://example.com/login", NONCE, request))
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, redirectUri, NONCE, request))
                 .isInstanceOf(APIException.class);
     }
 
