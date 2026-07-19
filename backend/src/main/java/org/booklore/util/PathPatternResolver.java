@@ -32,7 +32,6 @@ public class PathPatternResolver {
     private final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
     private final Pattern CONTROL_CHARACTER_PATTERN = Pattern.compile("\\p{Cntrl}");
     private final Pattern INVALID_CHARS_PATTERN = Pattern.compile("[\\\\/:*?\"<>|]");
-    private final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{(.*?)}");
     private final Pattern MODIFIER_PLACEHOLDER_PATTERN = Pattern.compile("\\{([^}:]+)(?::([^}]+))?}");
     private final Pattern COMMA_SPACE_PATTERN = Pattern.compile(", ");
     private final Pattern SLASH_PATTERN = Pattern.compile("/");
@@ -121,15 +120,7 @@ public class PathPatternResolver {
         }
         String language = sanitize(metadata != null ? metadata.getLanguage() : "");
         String publisher = sanitize(metadata != null ? metadata.getPublisher() : "");
-        String isbn = sanitize(
-                metadata != null
-                        ? (metadata.getIsbn13() != null
-                        ? metadata.getIsbn13()
-                        : metadata.getIsbn10() != null
-                        ? metadata.getIsbn10()
-                        : "")
-                        : ""
-        );
+        String isbn = sanitize(metadata != null ? resolveIsbn(metadata) : "");
 
         Map<String, String> values = new LinkedHashMap<>();
         values.put("authors", authors);
@@ -144,6 +135,13 @@ public class PathPatternResolver {
         values.put(CURRENT_FILENAME_KEY, filename);
 
         return resolvePatternWithValues(pattern, values, filename, folderBased);
+    }
+
+    private String resolveIsbn(MetadataProvider metadata) {
+        if (metadata.getIsbn13() != null) {
+            return metadata.getIsbn13();
+        }
+        return metadata.getIsbn10() != null ? metadata.getIsbn10() : "";
     }
 
     private String resolvePatternWithValues(String pattern, Map<String, String> values, String currentFilename, boolean folderBased) {

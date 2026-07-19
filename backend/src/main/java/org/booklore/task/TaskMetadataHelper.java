@@ -11,6 +11,9 @@ import java.util.stream.Stream;
 @Slf4j
 public class TaskMetadataHelper {
 
+    private TaskMetadataHelper() {
+    }
+
     public static String getCacheSizeString(String cachePath) {
         try {
             Path path = Paths.get(cachePath);

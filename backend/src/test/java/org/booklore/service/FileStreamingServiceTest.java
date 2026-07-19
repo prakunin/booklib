@@ -545,6 +545,7 @@ class FileStreamingServiceTest {
 
             @Override
             public void setWriteListener(WriteListener writeListener) {
+                // no-op: test double, write listener notifications are not exercised
             }
 
             @Override

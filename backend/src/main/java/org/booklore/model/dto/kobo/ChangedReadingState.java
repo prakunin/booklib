@@ -14,6 +14,7 @@ import tools.jackson.databind.annotation.JsonNaming;
 @JsonNaming(PropertyNamingStrategies.UpperCamelCaseStrategy.class)
 public class ChangedReadingState implements Entitlement {
 
+    @SuppressWarnings("java:S1700") // field name is wire format: Kobo sync API JSON key is derived from this field name via UpperCamelCaseStrategy
     private WrappedReadingState changedReadingState;
     
     @Data

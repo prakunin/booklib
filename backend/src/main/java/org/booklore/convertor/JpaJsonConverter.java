@@ -32,6 +32,7 @@ public class JpaJsonConverter implements AttributeConverter<Map<String, Object>,
     }
 
     @Override
+    @SuppressWarnings("java:S1168") // callers/tests distinguish null from empty map (e.g. TaskHistoryServiceTest asserts null taskOptions); returning Map.of() would change the AttributeConverter round-trip
     public Map<String, Object> convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.isEmpty()) {
             return null;

@@ -7,6 +7,7 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import com.github.gotson.nightcompress.Archive;
 import org.grimmory.pdfium4j.PdfiumLibrary;
 
@@ -17,6 +18,7 @@ import org.grimmory.pdfium4j.PdfiumLibrary;
  * library loading is forced exactly once under the JVM class-init lock.
  */
 @Slf4j
+@SuppressWarnings("java:S6548") // intentional holder-idiom singleton for one-time native library probing; documented above
 public final class NativeLibraries {
 
     public enum Library {
@@ -31,9 +33,9 @@ public final class NativeLibraries {
         Map<Library, Probe> probes = new LinkedHashMap<>();
 
         probes.put(Library.PDFIUM, new Probe("PDFium", () -> {
-            Boolean clean = tryInvokeStaticBoolean("org.grimmory.pdfium4j.PdfiumLibrary");
-            if (clean != null) {
-                return clean;
+            Optional<Boolean> clean = tryInvokeStaticBoolean("org.grimmory.pdfium4j.PdfiumLibrary");
+            if (clean.isPresent()) {
+                return clean.get();
             }
             PdfiumLibrary.initialize();
             return true;
@@ -42,11 +44,11 @@ public final class NativeLibraries {
         probes.put(Library.LIBARCHIVE, new Probe("libarchive", Archive::isAvailable));
 
         probes.put(Library.EPUB4J_NATIVE, new Probe("epub4j-native", () -> {
-            Boolean clean = tryInvokeStaticBoolean(
+            Optional<Boolean> clean = tryInvokeStaticBoolean(
                     "org.grimmory.epub4j.native_parsing.EpubNativeLibrary"
             );
-            if (clean != null) {
-                return clean;
+            if (clean.isPresent()) {
+                return clean.get();
             }
             Class.forName(
                     "org.grimmory.epub4j.native_parsing.PanamaConstants",
@@ -79,28 +81,28 @@ public final class NativeLibraries {
         }
     }
 
-    private static Boolean tryInvokeStaticBoolean(String fqcn) throws Throwable {
+    private static Optional<Boolean> tryInvokeStaticBoolean(String fqcn) throws Throwable {
         Class<?> cls;
         try {
             cls = Class.forName(fqcn, false, NativeLibraries.class.getClassLoader());
         } catch (ClassNotFoundException _) {
-            return null;
+            return Optional.empty();
         }
 
         Method method;
         try {
             method = cls.getMethod("isAvailable");
         } catch (NoSuchMethodException _) {
-            return null;
+            return Optional.empty();
         }
 
         if (method.getReturnType() != boolean.class) {
-            return null;
+            return Optional.empty();
         }
 
         Class.forName(fqcn, true, NativeLibraries.class.getClassLoader());
         try {
-            return (Boolean) method.invoke(null);
+            return Optional.of((Boolean) method.invoke(null));
         } catch (InvocationTargetException ite) {
             Throwable cause = ite.getCause();
             throw cause != null ? cause : ite;

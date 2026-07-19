@@ -57,6 +57,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
+    @SuppressWarnings("java:S4449") // UsernamePasswordAuthenticationToken(principal, credentials, authorities) tolerates null authorities (delegates to AbstractAuthenticationToken, which treats null as NO_AUTHORITIES); that Spring Security constructor parameter is not annotated @Nullable
     private void authenticateUser(String token, HttpServletRequest request) {
         Long userId = jwtUtils.extractUserId(token);
         BookLoreUserEntity entity = userRepository.findByIdWithDetails(userId).orElseThrow(() -> new UsernameNotFoundException("User not found with ID: " + userId));

@@ -32,6 +32,7 @@ public class MapToStringConverter implements AttributeConverter<Map<String, Obje
     }
 
     @Override
+    @SuppressWarnings("java:S1168") // existing tests assert null for null/blank input; returning Map.of() would change the AttributeConverter round-trip
     public Map<String, Object> convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.trim().isEmpty()) {
             return null;

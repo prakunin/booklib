@@ -386,12 +386,10 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.persist(shelf1);
             em.persist(shelf2);
 
-            List<BookEntity> books = new ArrayList<>();
             for (int i = 0; i < 10; i++) {
                 BookEntity book = createBook("Multi-shelf Book " + i);
                 book.setShelves(new HashSet<>(Set.of(shelf1, shelf2)));
                 em.merge(book);
-                books.add(book);
             }
             em.flush();
             em.clear();
@@ -588,12 +586,10 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.persist(shelf3);
             em.persist(shelf4);
 
-            List<BookEntity> books = new ArrayList<>();
             for (int i = 0; i < 5; i++) {
                 BookEntity book = createBook("Many Shelf Book " + i);
                 book.setShelves(new HashSet<>(Set.of(shelf1, shelf2, shelf3, shelf4)));
                 em.merge(book);
-                books.add(book);
             }
             em.flush();
             em.clear();

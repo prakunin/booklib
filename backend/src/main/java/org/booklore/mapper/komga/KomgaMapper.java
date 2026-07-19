@@ -336,17 +336,6 @@ public class KomgaMapper {
         return value != null ? value : defaultValue;
     }
     /**
-     * Helper method to return null for empty integer in clean mode.
-     * In clean mode, we want to allow null values so they can be filtered out.
-     */
-    private Integer nullIfEmptyInCleanMode(Integer value, Integer defaultValue) {
-        if (KomgaCleanContext.isCleanMode()) {
-            return (value != null) ? value : null;
-        }
-        return value != null ? value : defaultValue;
-    }
-
-    /**
      * Helper method to return null for empty float in clean mode.
      * In clean mode, we want to allow null values so they can be filtered out.
      */

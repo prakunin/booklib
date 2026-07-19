@@ -119,7 +119,7 @@ public interface BookMapperV2 {
 
     @Named("mapAlternativeFormats")
     default List<BookFile> mapAlternativeFormats(List<BookFileEntity> bookFiles) {
-        if (bookFiles == null) return null;
+        if (bookFiles == null) return List.of();
         BookFileEntity primary = getPrimaryBookFile(bookFiles);
         return bookFiles.stream()
                 .filter(BookFileEntity::isBook)
@@ -130,7 +130,7 @@ public interface BookMapperV2 {
 
     @Named("mapSupplementaryFiles")
     default List<BookFile> mapSupplementaryFiles(List<BookFileEntity> bookFiles) {
-        if (bookFiles == null) return null;
+        if (bookFiles == null) return List.of();
         return bookFiles.stream()
                 .filter(bf -> !bf.isBook())
                 .map(this::toBookFile)

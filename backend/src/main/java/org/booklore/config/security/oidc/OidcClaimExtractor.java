@@ -40,41 +40,41 @@ public class OidcClaimExtractor {
 
     private List<String> getListClaim(JWTClaimsSet claims, Map<String, Object> userInfo, String primaryClaim, String fallbackClaim) {
         List<String> value = tryGetListClaim(claims, primaryClaim);
-        if (value == null && fallbackClaim != null && !fallbackClaim.equals(primaryClaim)) {
+        if (value.isEmpty() && fallbackClaim != null && !fallbackClaim.equals(primaryClaim)) {
             value = tryGetListClaim(claims, fallbackClaim);
         }
-        if (value == null) {
+        if (value.isEmpty()) {
             value = tryGetUserInfoListClaim(userInfo, primaryClaim);
         }
-        if (value == null && fallbackClaim != null && !fallbackClaim.equals(primaryClaim)) {
+        if (value.isEmpty() && fallbackClaim != null && !fallbackClaim.equals(primaryClaim)) {
             value = tryGetUserInfoListClaim(userInfo, fallbackClaim);
         }
-        return value != null ? value : List.of();
+        return value;
     }
 
     private List<String> tryGetListClaim(JWTClaimsSet claims, String claimName) {
-        if (claimName == null || claimName.isBlank()) return null;
+        if (claimName == null || claimName.isBlank()) return List.of();
         try {
             List<String> list = claims.getStringListClaim(claimName);
-            return list != null && !list.isEmpty() ? list : null;
+            return (list == null || list.isEmpty()) ? List.of() : list;
         } catch (ParseException e) {
             log.debug("Failed to parse list claim '{}': {}", claimName, e.getMessage());
-            return null;
+            return List.of();
         }
     }
 
     @SuppressWarnings("unchecked")
     private List<String> tryGetUserInfoListClaim(Map<String, Object> userInfo, String claimName) {
-        if (claimName == null || claimName.isBlank() || userInfo == null) return null;
+        if (claimName == null || claimName.isBlank() || userInfo == null) return List.of();
         Object value = userInfo.get(claimName);
         if (value instanceof List<?> list) {
             List<String> result = new ArrayList<>();
             for (Object item : list) {
                 if (item instanceof String s) result.add(s);
             }
-            return result.isEmpty() ? null : result;
+            return result;
         }
-        return null;
+        return List.of();
     }
 
     private String getStringClaim(JWTClaimsSet claims, Map<String, Object> userInfo, String primaryClaim, String fallbackClaim) {

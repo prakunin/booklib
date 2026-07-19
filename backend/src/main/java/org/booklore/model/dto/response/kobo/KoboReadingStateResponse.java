@@ -31,6 +31,7 @@ public class KoboReadingStateResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Result {
+        @SuppressWarnings("java:S1700") // field name is wire format: this DTO serializes to the Kobo sync API response JSON key "result" with no @JsonProperty override
         private String result;
 
         public static Result success() {

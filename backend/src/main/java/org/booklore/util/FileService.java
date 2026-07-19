@@ -665,7 +665,10 @@ public class FileService {
 
             double targetRatio = (double) THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT;
             double sourceRatio = (double) rgbImage.getWidth() / rgbImage.getHeight();
-            int cropWidth, cropHeight, cropX, cropY;
+            int cropWidth;
+            int cropHeight;
+            int cropX;
+            int cropY;
             if (sourceRatio > targetRatio) {
                 cropHeight = rgbImage.getHeight();
                 cropWidth = (int) (cropHeight * targetRatio);
@@ -899,7 +902,8 @@ public class FileService {
         }
 
         // Determine thumbnail dimensions based on source aspect ratio
-        int thumbWidth, thumbHeight;
+        int thumbWidth;
+        int thumbHeight;
         double aspectRatio = (double) rgbImage.getWidth() / rgbImage.getHeight();
         if (aspectRatio >= 0.85 && aspectRatio <= 1.15) {
             // Square-ish image (e.g., audiobook covers) - keep square
@@ -1036,8 +1040,12 @@ public class FileService {
     }
 
     private boolean colorsAreSimilar(int rgb1, int rgb2) {
-        int r1 = (rgb1 >> 16) & 0xFF, g1 = (rgb1 >> 8) & 0xFF, b1 = rgb1 & 0xFF;
-        int r2 = (rgb2 >> 16) & 0xFF, g2 = (rgb2 >> 8) & 0xFF, b2 = rgb2 & 0xFF;
+        int r1 = (rgb1 >> 16) & 0xFF;
+        int g1 = (rgb1 >> 8) & 0xFF;
+        int b1 = rgb1 & 0xFF;
+        int r2 = (rgb2 >> 16) & 0xFF;
+        int g2 = (rgb2 >> 8) & 0xFF;
+        int b2 = rgb2 & 0xFF;
         return Math.abs(r1 - r2) <= SMART_CROP_COLOR_TOLERANCE
                 && Math.abs(g1 - g2) <= SMART_CROP_COLOR_TOLERANCE
                 && Math.abs(b1 - b2) <= SMART_CROP_COLOR_TOLERANCE;

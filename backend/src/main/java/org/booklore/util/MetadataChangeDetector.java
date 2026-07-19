@@ -296,10 +296,7 @@ public class MetadataChangeDetector {
                 return true;
             }
         }
-        if (hasComicMetadataChanges(newMeta, existingMeta)) {
-            return true;
-        }
-        return false;
+        return hasComicMetadataChanges(newMeta, existingMeta);
     }
 
     public static boolean hasValueChangesForFileWrite(BookMetadata newMeta, BookMetadataEntity existingMeta, MetadataClearFlags clear) {

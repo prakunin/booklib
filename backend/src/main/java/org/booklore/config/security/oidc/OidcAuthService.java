@@ -103,7 +103,7 @@ public class OidcAuthService {
 
         BookLoreUserEntity user = findOrProvisionUser(userClaims, providerDetails.getIssuerUri());
 
-        persistOidcSession(user, userClaims.subject(), providerDetails.getIssuerUri(), tokenResponse, idToken, claims);
+        persistOidcSession(user, userClaims.subject(), providerDetails.getIssuerUri(), idToken, claims);
 
         String durationStr = appSettingService.getSettingValue("oidc_session_duration_hours");
         ResponseEntity<AccessTokenDto> response;
@@ -220,8 +220,7 @@ public class OidcAuthService {
     }
 
     private void persistOidcSession(BookLoreUserEntity user, String subject, String issuer,
-                                    OidcTokenClient.TokenResponse tokenResponse, String rawIdToken,
-                                    JWTClaimsSet claims) {
+                                    String rawIdToken, JWTClaimsSet claims) {
         String sessionId = null;
         try {
             sessionId = claims.getStringClaim("sid");

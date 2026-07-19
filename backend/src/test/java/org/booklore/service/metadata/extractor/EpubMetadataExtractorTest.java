@@ -412,6 +412,7 @@ class EpubMetadataExtractorTest {
                 case "HARDCOVER" -> assertThat(metadata.getHardcoverId()).isEqualTo(value);
                 case "LUBIMYCZYTAC" -> assertThat(metadata.getLubimyczytacId()).isEqualTo(value);
                 case "RANOBEDB" -> assertThat(metadata.getRanobedbId()).isEqualTo(value);
+                default -> { /* no-op: other schemes are not exercised by this parameterized test */ }
             }
         }
 

@@ -70,6 +70,7 @@ class KoreaderUserControllerTest {
     }
 
     @Test
+    @SuppressWarnings("java:S5738") // deliberately exercises the still-live deprecated compat endpoint (see KoreaderUserController#toggleSyncProgressWithBooklore, kept for old client compatibility)
     void toggleSyncProgressWithBooklore_delegatesToWebReader_andReturnsNoContent() {
         doNothing().when(koreaderUserService).toggleSyncProgressWithWebReader(true);
         ResponseEntity<Void> resp = controller.toggleSyncProgressWithBooklore(true);

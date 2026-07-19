@@ -11,7 +11,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayOutputStream;
-import java.nio.file.Path;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,13 +30,11 @@ class PdfReaderServiceTest {
     private PdfReaderService pdfReaderService;
 
     private BookEntity bookEntity;
-    private Path pdfPath;
 
     @BeforeEach
     void setup() {
         bookEntity = new BookEntity();
         bookEntity.setId(1L);
-        pdfPath = Path.of("/tmp/test.pdf");
     }
 
     @Test
