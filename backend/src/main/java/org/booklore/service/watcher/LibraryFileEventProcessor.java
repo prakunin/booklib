@@ -26,6 +26,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Service
@@ -53,6 +55,8 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
     private final ConcurrentMap<Path, ScheduledFuture<?>> pendingDeletes = new ConcurrentHashMap<>();
     private final ConcurrentMap<Path, ScheduledFuture<?>> pendingFolderCreates = new ConcurrentHashMap<>();
     private final Set<Path> filesFromPendingFolder = ConcurrentHashMap.newKeySet();
+    private final Set<FileEvent> eventsDeferredDuringScan = ConcurrentHashMap.newKeySet();
+    private final AtomicBoolean scanReplayScheduled = new AtomicBoolean();
     private volatile boolean running;
     private Thread workerThread;
 
@@ -106,18 +110,16 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
     }
 
     public void processEvent(WatchEvent.Kind<?> eventKind, long libraryId, Path fullPath, boolean isDirectory) {
+        Path path = fullPath.toAbsolutePath().normalize();
+        FileEvent event = new FileEvent(eventKind, libraryId, path, isDirectory);
+
         if (libraryScanListener.isScanning(libraryId)) {
-            log.debug("[SKIP] Library {} is currently being scanned, ignoring file event for '{}'", libraryId, fullPath);
+            deferEventDuringScan(event);
             return;
         }
 
-        Path path = fullPath.toAbsolutePath().normalize();
-
         if (eventKind == StandardWatchEventKinds.ENTRY_DELETE) {
-            ScheduledFuture<?> existing = pendingDeletes.put(path, scheduler.schedule(() -> {
-                eventQueue.offer(new FileEvent(eventKind, libraryId, path, isDirectory));
-                pendingDeletes.remove(path);
-            }, DEBOUNCE_MS, TimeUnit.MILLISECONDS));
+            ScheduledFuture<?> existing = pendingDeletes.put(path, schedulePendingDelete(event));
 
             if (existing != null) existing.cancel(false);
         } else if (eventKind == StandardWatchEventKinds.ENTRY_CREATE) {
@@ -129,11 +131,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
 
             if (isDirectory) {
                 log.debug("[DEBOUNCE] Scheduling folder create for '{}' with {}ms delay", path, FOLDER_CREATE_DEBOUNCE_MS);
-                ScheduledFuture<?> existingFolder = pendingFolderCreates.put(path, scheduler.schedule(() -> {
-                    eventQueue.offer(new FileEvent(eventKind, libraryId, path, true));
-                    pendingFolderCreates.remove(path);
-                    filesFromPendingFolder.removeIf(f -> f.startsWith(path));
-                }, FOLDER_CREATE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
+                ScheduledFuture<?> existingFolder = pendingFolderCreates.put(path, scheduleFolderCreate(libraryId, path));
 
                 if (existingFolder != null) existingFolder.cancel(false);
             } else {
@@ -145,11 +143,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
                         ScheduledFuture<?> oldTimer = entry.getValue();
                         if (oldTimer != null) oldTimer.cancel(false);
                         Path folderPath = entry.getKey();
-                        pendingFolderCreates.put(folderPath, scheduler.schedule(() -> {
-                            eventQueue.offer(new FileEvent(eventKind, libraryId, folderPath, true));
-                            pendingFolderCreates.remove(folderPath);
-                            filesFromPendingFolder.removeIf(f -> f.startsWith(folderPath));
-                        }, FOLDER_CREATE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
+                        pendingFolderCreates.put(folderPath, scheduleFolderCreate(libraryId, folderPath));
                         log.debug("[DEBOUNCE] File '{}' tracked, reset folder debounce for '{}'", path.getFileName(), folderPath);
                         break;
                     }
@@ -161,6 +155,60 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
             }
         } else {
             eventQueue.offer(new FileEvent(eventKind, libraryId, path, false));
+        }
+    }
+
+    private ScheduledFuture<?> schedulePendingDelete(FileEvent event) {
+        AtomicReference<ScheduledFuture<?>> futureRef = new AtomicReference<>();
+        ScheduledFuture<?> future = scheduler.schedule(() -> {
+            eventQueue.offer(event);
+            pendingDeletes.remove(event.fullPath(), futureRef.get());
+        }, DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+        futureRef.set(future);
+        return future;
+    }
+
+    private ScheduledFuture<?> scheduleFolderCreate(long libraryId, Path folderPath) {
+        AtomicReference<ScheduledFuture<?>> futureRef = new AtomicReference<>();
+        ScheduledFuture<?> future = scheduler.schedule(() -> {
+            eventQueue.offer(new FileEvent(StandardWatchEventKinds.ENTRY_CREATE, libraryId, folderPath, true));
+            pendingFolderCreates.remove(folderPath, futureRef.get());
+            filesFromPendingFolder.removeIf(f -> f.startsWith(folderPath));
+        }, FOLDER_CREATE_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+        futureRef.set(future);
+        return future;
+    }
+
+    private void deferEventDuringScan(FileEvent event) {
+        if (eventsDeferredDuringScan.add(event)) {
+            log.debug("[DEFER] Library {} is scanning; deferring {} event for '{}'",
+                    event.libraryId(), event.eventKind().name(), event.fullPath());
+        }
+        scheduleScanReplay();
+    }
+
+    private void scheduleScanReplay() {
+        if (scanReplayScheduled.compareAndSet(false, true)) {
+            scheduler.schedule(this::replayEventsDeferredDuringScan, DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private void replayEventsDeferredDuringScan() {
+        scanReplayScheduled.set(false);
+
+        for (FileEvent event : eventsDeferredDuringScan) {
+            if (libraryScanListener.isScanning(event.libraryId())) {
+                continue;
+            }
+            if (eventsDeferredDuringScan.remove(event)) {
+                log.debug("[REPLAY] Replaying deferred {} event for '{}'",
+                        event.eventKind().name(), event.fullPath());
+                processEvent(event.eventKind(), event.libraryId(), event.fullPath(), event.isDirectory());
+            }
+        }
+
+        if (!eventsDeferredDuringScan.isEmpty()) {
+            scheduleScanReplay();
         }
     }
 
@@ -593,8 +641,10 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
                 .anyMatch(p -> paths.stream().anyMatch(p::startsWith));
         boolean inFolderCreates = pendingFolderCreates.keySet().stream()
                 .anyMatch(p -> paths.stream().anyMatch(p::startsWith));
+        boolean deferredDuringScan = eventsDeferredDuringScan.stream()
+                .anyMatch(e -> paths.stream().anyMatch(p -> e.fullPath().startsWith(p)));
         boolean inPool = pendingDeletionPool.hasPendingForPaths(paths);
-        return inQueue || inDeletes || inFolderCreates || inPool;
+        return inQueue || inDeletes || inFolderCreates || deferredDuringScan || inPool;
     }
 
     public record FileEvent(WatchEvent.Kind<?> eventKind, long libraryId, Path fullPath, boolean isDirectory) {

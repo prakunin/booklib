@@ -119,6 +119,7 @@ public class PendingDeletionPool {
             for (FileSnapshot fileSnap : bookSnap.files()) {
                 if (hash.equals(fileSnap.currentHash())) {
                     pending.hashToBookFileId().remove(hash);
+                    removeBookWhenAllFilesConsumed(pending, bookSnap);
 
                     boolean allConsumed = pending.hashToBookFileId().isEmpty();
                     if (allConsumed) {
@@ -285,6 +286,7 @@ public class PendingDeletionPool {
                         if (relPath.endsWith(fileSnap.fileName())) {
                             pd.hashToBookFileId().remove(fileSnap.currentHash());
                             hashIndex.remove(fileSnap.currentHash());
+                            removeBookWhenAllFilesConsumed(pd, bookSnap);
                             if (pd.hashToBookFileId().isEmpty()) {
                                 pd.timer().cancel(false);
                                 pendingByPath.remove(entry.getKey());
@@ -297,6 +299,16 @@ public class PendingDeletionPool {
             }
         }
         return false;
+    }
+
+    private void removeBookWhenAllFilesConsumed(PendingDeletion pending, BookSnapshot bookSnap) {
+        boolean bookHasPendingFiles = bookSnap.files().stream()
+                .map(FileSnapshot::currentHash)
+                .filter(Objects::nonNull)
+                .anyMatch(pending.hashToBookFileId()::containsKey);
+        if (!bookHasPendingFiles) {
+            pending.affectedBooks().remove(bookSnap.bookId());
+        }
     }
 
     public boolean hasPendingForPaths(Set<Path> paths) {

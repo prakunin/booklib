@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -161,6 +162,31 @@ class LibraryFileEventProcessorTest {
             Thread.sleep(200);
 
             verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+        }
+
+        @Test
+        void eventArrivingDuringScanIsReplayedAfterScanCompletes() throws Exception {
+            Path file = tempDir.resolve("during-scan.epub");
+            Files.writeString(file, "book content");
+            Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() - 5000));
+            when(libraryScanListener.isScanning(1L)).thenReturn(true, false, false);
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, file, false);
+
+            assertThat(processor.hasPendingEventsForPaths(Set.of(tempDir))).isTrue();
+            verify(bookFileTransactionalHandler, timeout(3000))
+                    .handleNewBookFile(eq(1L), eq(file.toAbsolutePath().normalize()));
+        }
+
+        @Test
+        void eventArrivingDuringScanKeepsDrainWaitPending() throws Exception {
+            Path file = tempDir.resolve("still-scanning.epub");
+            Files.writeString(file, "book content");
+            when(libraryScanListener.isScanning(1L)).thenReturn(true);
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, file, false);
+
+            assertThat(processor.hasPendingEventsForPaths(Set.of(tempDir))).isTrue();
         }
     }
 
