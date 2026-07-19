@@ -114,6 +114,7 @@ public class AppBookProgressService {
         }
     }
 
+    @SuppressWarnings("java:S1168") // three-state contract: null = admin/unrestricted (no library filter applied), empty = restricted to nothing, non-empty = specific IDs; callers branch on != null, so Set.of() would wrongly restrict admins to zero libraries
     private Set<Long> getAccessibleLibraryIds(BookLoreUser user) {
         if (user.getPermissions().isAdmin()) {
             return null;

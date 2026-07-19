@@ -131,7 +131,7 @@ public class AppSeriesService {
                 countQ.setParameter(searchParam, searchPattern);
             }
             long totalElements = countQ.getResultList().size();
-            return buildSeriesPage(aggregateResults, userId, accessibleLibraryIds, libraryId, inProgressOnly, pageNum, pageSize, totalElements);
+            return buildSeriesPage(aggregateResults, accessibleLibraryIds, libraryId, pageNum, pageSize, totalElements);
         }
 
         var countQ = entityManager.createQuery(countQuery, Long.class);
@@ -144,15 +144,13 @@ public class AppSeriesService {
         }
         long totalElements = countQ.getSingleResult();
 
-        return buildSeriesPage(aggregateResults, userId, accessibleLibraryIds, libraryId, inProgressOnly, pageNum, pageSize, totalElements);
+        return buildSeriesPage(aggregateResults, accessibleLibraryIds, libraryId, pageNum, pageSize, totalElements);
     }
 
     private AppPageResponse<AppSeriesSummary> buildSeriesPage(
             List<Tuple> aggregateResults,
-            Long userId,
             Set<Long> accessibleLibraryIds,
             Long libraryId,
-            boolean inProgressOnly,
             int pageNum,
             int pageSize,
             long totalElements) {
@@ -281,6 +279,7 @@ public class AppSeriesService {
 
     // --- Access control helpers (duplicated from AppBookService to minimize blast radius) ---
 
+    @SuppressWarnings("java:S1168") // three-state contract: null = admin/unrestricted (no library filter applied), empty = restricted to nothing, non-empty = specific IDs; callers branch on != null, so Set.of() would wrongly restrict admins to zero libraries
     private Set<Long> getAccessibleLibraryIds(BookLoreUser user) {
         if (user.getPermissions().isAdmin()) {
             return null;

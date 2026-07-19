@@ -138,7 +138,7 @@ public class AppBookService {
             spec = withSort(spec, req.sort(), req.dir(), userId);
 
             Page<BookEntity> bookPage = bookRepository.findAll(spec, pageable);
-            return buildPageResponse(bookPage, userId, pageNum, pageSize);
+            return buildPageResponse(bookPage, userId);
         }
 
         Pageable pageable = PageRequest.of(pageNum, pageSize);
@@ -152,7 +152,7 @@ public class AppBookService {
         spec = withSort(spec, req.sort(), req.dir(), userId);
 
         Page<BookEntity> bookPage = bookRepository.findAll(spec, pageable);
-        return buildPageResponse(bookPage, userId, pageNum, pageSize);
+        return buildPageResponse(bookPage, userId);
     }
 
     public List<Long> getAllBookIds(BookListRequest req) {
@@ -423,7 +423,7 @@ public class AppBookService {
         );
 
         Page<BookEntity> bookPage = bookRepository.findAll(spec, pageable);
-        return buildPageResponse(bookPage, userId, pageNum, pageSize);
+        return buildPageResponse(bookPage, userId);
     }
 
     public List<AppBookSummary> getContinueReading(Integer limit) {
@@ -546,7 +546,7 @@ public class AppBookService {
         Pageable pageable = PageRequest.of(randomOffset / pageSize, pageSize);
         Page<BookEntity> bookPage = bookRepository.findAll(spec, pageable);
 
-        return buildPageResponse(bookPage, userId, pageNum, pageSize);
+        return buildPageResponse(bookPage, userId);
     }
 
     public AppPageResponse<AppBookSummary> getBooksByMagicShelf(
@@ -877,6 +877,7 @@ public class AppBookService {
         }
     }
 
+    @SuppressWarnings("java:S1168") // three-state contract: null = admin/unrestricted (no library filter applied), empty = restricted to nothing, non-empty = specific IDs; callers branch on != null, so Set.of() would wrongly restrict admins to zero libraries
     private Set<Long> getAccessibleLibraryIds(BookLoreUser user) {
         if (user.getPermissions().isAdmin()) {
             return null;
@@ -1238,9 +1239,7 @@ public class AppBookService {
 
     private AppPageResponse<AppBookSummary> buildPageResponse(
             Page<BookEntity> bookPage,
-            Long userId,
-            int pageNum,
-            int pageSize) {
+            Long userId) {
 
         List<BookEntity> books = bookPage.getContent();
         Map<Long, UserBookProgressEntity> progressMap = getProgressMapForBooks(userId, books);
@@ -1443,8 +1442,14 @@ public class AppBookService {
 
     private AppFilterOptions.CountedOption mapToCountedOption(Tuple t) {
         Object val = t.get(0);
-        String name = val instanceof Enum<?> e ? e.name() : val != null ? String.valueOf(val) : null;
-        return new AppFilterOptions.CountedOption(name, t.get(1, Long.class));
+        return new AppFilterOptions.CountedOption(countedOptionName(val), t.get(1, Long.class));
+    }
+
+    private static String countedOptionName(Object val) {
+        if (val instanceof Enum<?> e) {
+            return e.name();
+        }
+        return val != null ? String.valueOf(val) : null;
     }
 
     private static String creatorRoleLabel(ComicCreatorRole role) {
