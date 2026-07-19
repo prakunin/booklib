@@ -2,12 +2,14 @@ package org.booklore.service.migration;
 
 import org.booklore.service.migration.migrations.*;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 @Component
 @AllArgsConstructor
+@Slf4j
 public class AppMigrationStartup {
 
     private final AppMigrationService appMigrationService;
@@ -23,14 +25,22 @@ public class AppMigrationStartup {
 
     @EventListener(ApplicationReadyEvent.class)
     public void runMigrationsOnce() {
-        appMigrationService.executeMigration(generateInstallationIdMigration);
-        appMigrationService.executeMigration(migrateInstallationIdToJsonMigration);
-        appMigrationService.executeMigration(populateMissingFileSizesMigration);
-        appMigrationService.executeMigration(populateMetadataScoresMigration);
-        appMigrationService.executeMigration(populateFileHashesMigration);
-        appMigrationService.executeMigration(populateCoversAndResizeThumbnailsMigration);
-        appMigrationService.executeMigration(populateSearchTextMigration);
-        appMigrationService.executeMigration(generateCoverHashMigration);
-        appMigrationService.executeMigration(migrateProgressToFileProgressMigration);
+        runMigration(generateInstallationIdMigration);
+        runMigration(migrateInstallationIdToJsonMigration);
+        runMigration(populateMissingFileSizesMigration);
+        runMigration(populateMetadataScoresMigration);
+        runMigration(populateFileHashesMigration);
+        runMigration(populateCoversAndResizeThumbnailsMigration);
+        runMigration(populateSearchTextMigration);
+        runMigration(generateCoverHashMigration);
+        runMigration(migrateProgressToFileProgressMigration);
+    }
+
+    private void runMigration(Migration migration) {
+        try {
+            appMigrationService.executeMigration(migration);
+        } catch (Exception e) {
+            log.error("Migration '{}' failed during startup; continuing with remaining migrations", migration.getKey(), e);
+        }
     }
 }

@@ -7,12 +7,17 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.util.stream.Collectors;
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class KepubConversionService {
+
+    private static final Duration KEPUBIFY_TIMEOUT = Duration.ofMinutes(5);
+    private static final Duration PROCESS_DESTROY_GRACE = Duration.ofSeconds(1);
 
     private final FileService fileService;
 
@@ -46,40 +51,86 @@ public class KepubConversionService {
             pb = new ProcessBuilder(kepubifyBinary.toAbsolutePath().toString(), "-o", tempDir.getAbsolutePath(), epubFile.getAbsolutePath());
 
         pb.directory(tempDir);
+        pb.redirectErrorStream(true);
 
         log.info("Starting kepubify conversion for {} -> output dir: {}", epubFile.getAbsolutePath(), tempDir.getAbsolutePath());
 
-        Process process = pb.start();
+        Process process = null;
+        Thread outputReader = null;
+        StringBuilder output = new StringBuilder();
+        AtomicReference<IOException> outputReadFailure = new AtomicReference<>();
 
-        String output = readProcessOutput(process.getInputStream());
-        String error = readProcessOutput(process.getErrorStream());
+        try {
+            process = pb.start();
+            Process kepubifyProcess = process;
+            outputReader = startOutputReader(kepubifyProcess.getInputStream(), output, outputReadFailure);
 
-        int exitCode = process.waitFor();
-        logProcessResults(exitCode, output, error);
+            if (!process.waitFor(KEPUBIFY_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
+                throw new IOException("Kepubify conversion timed out after " + KEPUBIFY_TIMEOUT.toMinutes() + " minutes");
+            }
 
-        if (exitCode != 0) {
-            throw new IOException(String.format("Kepubify conversion failed with exit code: %d. Error: %s", exitCode, error));
+            outputReader.join(PROCESS_DESTROY_GRACE.toMillis());
+            if (outputReader.isAlive()) {
+                throw new IOException("Kepubify conversion output reader did not finish");
+            }
+
+            if (outputReadFailure.get() != null) {
+                throw new IOException("Failed to read kepubify output", outputReadFailure.get());
+            }
+
+            int exitCode = process.exitValue();
+            String processOutput = output.toString();
+            logProcessResults(exitCode, processOutput);
+
+            if (exitCode != 0) {
+                throw new IOException(String.format("Kepubify conversion failed with exit code: %d. Output: %s", exitCode, processOutput));
+            }
+
+            return findOutputFile(tempDir);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw e;
+        } finally {
+            if (outputReader != null && outputReader.isAlive()) {
+                outputReader.interrupt();
+            }
+            stopProcess(process);
         }
-
-        return findOutputFile(tempDir);
     }
 
-    private String readProcessOutput(InputStream inputStream) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-            return reader.lines().collect(Collectors.joining("\n"));
-        } catch (Exception e) {
-            log.warn("Error reading process output: {}", e.getMessage());
-            return "";
+    private Thread startOutputReader(InputStream inputStream, StringBuilder output, AtomicReference<IOException> outputReadFailure) {
+        return Thread.ofVirtual().name("kepubify-output-reader-", 0).start(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append('\n');
+                }
+            } catch (IOException e) {
+                outputReadFailure.set(e);
+            }
+        });
+    }
+
+    private void stopProcess(Process process) {
+        if (process == null || !process.isAlive()) {
+            return;
+        }
+
+        process.destroy();
+        try {
+            if (!process.waitFor(PROCESS_DESTROY_GRACE.toMillis(), TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            process.destroyForcibly();
         }
     }
 
-    private void logProcessResults(int exitCode, String output, String error) {
+    private void logProcessResults(int exitCode, String output) {
         log.debug("Kepubify process exited with code {}", exitCode);
         if (!output.isEmpty()) {
-            log.debug("Kepubify stdout: {}", output);
-        }
-        if (!error.isEmpty()) {
-            log.error("Kepubify stderr: {}", error);
+            log.debug("Kepubify output: {}", output);
         }
     }
 
