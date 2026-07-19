@@ -13,6 +13,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -137,11 +138,9 @@ public class DuckDuckGoCoverService implements BookCoverProvider {
                     for (CoverImage img : generalBookImages) {
                         if (sink.isCancelled()) return;
                         if (count >= 10) break;
-                        if (emittedUrls.contains(img.getUrl())) continue;
-                        CoverImage indexedImg = new CoverImage(img.getUrl(), img.getWidth(), img.getHeight(), index.getAndIncrement());
-                        sink.next(indexedImg);
-                        emittedUrls.add(img.getUrl());
-                        count++;
+                        if (emitGeneralImage(img, emittedUrls, index, sink)) {
+                            count++;
+                        }
                     }
                 }
 
@@ -188,6 +187,16 @@ public class DuckDuckGoCoverService implements BookCoverProvider {
                 sink.error(e);
             }
         });
+    }
+
+    private boolean emitGeneralImage(CoverImage img, Set<String> emittedUrls, AtomicInteger index, FluxSink<CoverImage> sink) {
+        if (emittedUrls.contains(img.getUrl())) {
+            return false;
+        }
+        CoverImage indexedImg = new CoverImage(img.getUrl(), img.getWidth(), img.getHeight(), index.getAndIncrement());
+        sink.next(indexedImg);
+        emittedUrls.add(img.getUrl());
+        return true;
     }
 
     private List<CoverImage> fetchImagesFromApi(String query, String searchToken, Map<String, String> cookies, String referrerUrl, String jsonParams) {

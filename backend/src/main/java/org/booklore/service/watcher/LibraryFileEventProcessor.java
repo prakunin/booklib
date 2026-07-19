@@ -391,36 +391,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
         // Try hash-based move detection for each file
         List<Path> unmatched = new ArrayList<>();
         for (Path p : bookFiles) {
-            try {
-                String hash = fileHashes.get(p);
-                if (hash == null) {
-                    unmatched.add(p);
-                    continue;
-                }
-
-                Optional<PendingDeletionPool.MatchResult> poolMatch = pendingDeletionPool.matchByHash(hash);
-                if (poolMatch.isPresent()) {
-                    var pmatch = poolMatch.get();
-                    String libPath = bookFilePersistenceService.findMatchingLibraryPath(library, p);
-                    LibraryPathEntity lpEntity = bookFilePersistenceService.getLibraryPathEntityForFile(library, libPath);
-                    String subPath = FileUtils.getRelativeSubPath(lpEntity.getPath(), p);
-                    pendingDeletionPool.recoverBook(pmatch, lpEntity, subPath, p.getFileName().toString(), hash);
-                    log.info("[FOLDER_CREATE] File '{}' matched pending deletion, recovered book id={}", p, pmatch.book().bookId());
-                    continue;
-                }
-
-                Optional<BookEntity> existing = bookRepository.findByCurrentHashIncludingRecentlyDeleted(
-                        hash, Instant.now().minus(60, ChronoUnit.SECONDS));
-                if (existing.isPresent()) {
-                    bookFilePersistenceService.updatePathIfChanged(existing.get(), library, p, hash);
-                    log.info("[FOLDER_CREATE] File '{}' recognized as moved file, updated existing book's path", p);
-                } else {
-                    unmatched.add(p);
-                }
-            } catch (Exception e) {
-                log.warn("[ERROR] Hash check for '{}': {}", p, e.getMessage());
-                unmatched.add(p);
-            }
+            resolveOrTrackUnmatchedFile(library, p, fileHashes, unmatched);
         }
 
         if (unmatched.isEmpty()) {
@@ -447,6 +418,39 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
 
         if (!libraryFiles.isEmpty()) {
             libraryProcessingService.processLibraryFiles(libraryFiles, library);
+        }
+    }
+
+    private void resolveOrTrackUnmatchedFile(LibraryEntity library, Path p, Map<Path, String> fileHashes, List<Path> unmatched) {
+        try {
+            String hash = fileHashes.get(p);
+            if (hash == null) {
+                unmatched.add(p);
+                return;
+            }
+
+            Optional<PendingDeletionPool.MatchResult> poolMatch = pendingDeletionPool.matchByHash(hash);
+            if (poolMatch.isPresent()) {
+                var pmatch = poolMatch.get();
+                String libPath = bookFilePersistenceService.findMatchingLibraryPath(library, p);
+                LibraryPathEntity lpEntity = bookFilePersistenceService.getLibraryPathEntityForFile(library, libPath);
+                String subPath = FileUtils.getRelativeSubPath(lpEntity.getPath(), p);
+                pendingDeletionPool.recoverBook(pmatch, lpEntity, subPath, p.getFileName().toString(), hash);
+                log.info("[FOLDER_CREATE] File '{}' matched pending deletion, recovered book id={}", p, pmatch.book().bookId());
+                return;
+            }
+
+            Optional<BookEntity> existing = bookRepository.findByCurrentHashIncludingRecentlyDeleted(
+                    hash, Instant.now().minus(60, ChronoUnit.SECONDS));
+            if (existing.isPresent()) {
+                bookFilePersistenceService.updatePathIfChanged(existing.get(), library, p, hash);
+                log.info("[FOLDER_CREATE] File '{}' recognized as moved file, updated existing book's path", p);
+            } else {
+                unmatched.add(p);
+            }
+        } catch (Exception e) {
+            log.warn("[ERROR] Hash check for '{}': {}", p, e.getMessage());
+            unmatched.add(p);
         }
     }
 

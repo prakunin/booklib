@@ -81,6 +81,10 @@ public final class NativeLibraries {
         }
     }
 
+    // Rethrows InvocationTargetException's cause transparently (any Throwable, including Errors like
+    // UnsatisfiedLinkError from native init) so runProbe's catch (Throwable t) logs the true failure;
+    // wrapping in a narrower type would change the logged exception text and could swallow an Error.
+    @SuppressWarnings("java:S112")
     private static Optional<Boolean> tryInvokeStaticBoolean(String fqcn) throws Throwable {
         Class<?> cls;
         try {
@@ -154,6 +158,9 @@ public final class NativeLibraries {
 
     @FunctionalInterface
     private interface CheckedBooleanSupplier {
+        // Must stay Throwable: probes can propagate Errors (e.g. UnsatisfiedLinkError) from native
+        // library init, which runProbe deliberately catches via `catch (Throwable t)`.
+        @SuppressWarnings("java:S112")
         boolean get() throws Throwable;
     }
 }

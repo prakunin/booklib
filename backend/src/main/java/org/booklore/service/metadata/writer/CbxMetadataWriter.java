@@ -49,7 +49,7 @@ public class CbxMetadataWriter implements MetadataWriter {
         try {
             JAXB_CONTEXT = JAXBContext.newInstance(ComicInfo.class);
         } catch (JAXBException e) {
-            throw new RuntimeException("Failed to initialize JAXB Context", e);
+            throw new IllegalStateException("Failed to initialize JAXB Context", e);
         }
     }
 
@@ -572,21 +572,7 @@ public class CbxMetadataWriter implements MetadataWriter {
                 ZipOutputStream zipOutput = new ZipOutputStream(Files.newOutputStream(targetZip))
         ) {
             for (String entryName : archiveService.getEntryNames(sourceArchive)) {
-                if (isComicInfoXml(entryName)) {
-                    // Skip copying over any existing comic info entry
-                    continue;
-                }
-
-                if (!isPathSafe(entryName)) {
-                    log.warn("Skipping unsafe CBZ entry name: {}", entryName);
-                    continue;
-                }
-
-                zipOutput.putNextEntry(new ZipEntry(entryName));
-
-                archiveService.transferEntryTo(sourceArchive, entryName, zipOutput);
-
-                zipOutput.closeEntry();
+                copyEntryIfSafe(sourceArchive, zipOutput, entryName);
             }
 
             String xmlEntryName = (comicInfoEntryName != null ? comicInfoEntryName : CbxMetadataWriter.DEFAULT_COMICINFO_XML);
@@ -596,7 +582,23 @@ public class CbxMetadataWriter implements MetadataWriter {
         }
     }
 
-    private static void replaceFileAtomic(Path source, Path target) throws Exception {
+    private void copyEntryIfSafe(Path sourceArchive, ZipOutputStream zipOutput, String entryName) throws IOException {
+        if (isComicInfoXml(entryName)) {
+            // Skip copying over any existing comic info entry
+            return;
+        }
+
+        if (!isPathSafe(entryName)) {
+            log.warn("Skipping unsafe CBZ entry name: {}", entryName);
+            return;
+        }
+
+        zipOutput.putNextEntry(new ZipEntry(entryName));
+        archiveService.transferEntryTo(sourceArchive, entryName, zipOutput);
+        zipOutput.closeEntry();
+    }
+
+    private static void replaceFileAtomic(Path source, Path target) throws IOException {
         try {
             Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception _) {

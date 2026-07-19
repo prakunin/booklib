@@ -218,7 +218,7 @@ public class KomgaService {
         Page<BookEntity> seriesBooksPage = findSeriesBooksPage(
                 matchedSeriesName, parsedSeriesId.libraryId(), groupUnknown, unknownSeriesName, PageRequest.of(0, 1));
         if (seriesBooksPage.isEmpty()) {
-            throw new RuntimeException("Series not found");
+            throw new IllegalStateException("Series not found");
         }
 
         KomgaSeriesDto seriesDto = komgaMapper.toKomgaSeriesDto(
@@ -278,7 +278,7 @@ public class KomgaService {
     private ParsedSeriesId parseSeriesId(String seriesId) {
         String[] parts = seriesId.split("-", 2);
         if (parts.length < 2) {
-            throw new RuntimeException("Invalid series ID");
+            throw new IllegalArgumentException("Invalid series ID");
         }
         return new ParsedSeriesId(Long.parseLong(parts[0]), parts[1]);
     }

@@ -11,6 +11,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
 import javax.imageio.ImageIO;
+import javax.xml.parsers.ParserConfigurationException;
+import org.xml.sax.SAXException;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Path;
@@ -72,7 +74,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         return BookMetadata.builder().title(baseName).build();
     }
 
-    private Document buildSecureDocument(InputStream is) throws Exception {
+    private Document buildSecureDocument(InputStream is) throws ParserConfigurationException, SAXException, IOException {
         return SecureXmlUtils.createSecureDocumentBuilder(true).parse(is);
     }
 
@@ -302,37 +304,41 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
     private void parseWebField(String web, BookMetadata.BookMetadataBuilder builder) {
         String[] urls = WEB_SPLIT_PATTERN.split(web);
         for (String url : urls) {
-            if (url.isBlank()) continue;
-            url = url.trim();
-
-            Matcher grMatcher = GOODREADS_URL_PATTERN.matcher(url);
-            if (grMatcher.find()) {
-                builder.goodreadsId(grMatcher.group(1));
+            if (url.isBlank()) {
                 continue;
             }
+            applyWebUrlToBuilder(url.trim(), builder);
+        }
+    }
 
-            Matcher azMatcher = AMAZON_URL_PATTERN.matcher(url);
-            if (azMatcher.find()) {
-                builder.asin(azMatcher.group(1));
-                continue;
-            }
+    private void applyWebUrlToBuilder(String url, BookMetadata.BookMetadataBuilder builder) {
+        Matcher grMatcher = GOODREADS_URL_PATTERN.matcher(url);
+        if (grMatcher.find()) {
+            builder.goodreadsId(grMatcher.group(1));
+            return;
+        }
 
-            Matcher cvMatcher = COMICVINE_URL_PATTERN.matcher(url);
-            if (cvMatcher.find()) {
-                builder.comicvineId(cvMatcher.group(1));
-                continue;
-            }
+        Matcher azMatcher = AMAZON_URL_PATTERN.matcher(url);
+        if (azMatcher.find()) {
+            builder.asin(azMatcher.group(1));
+            return;
+        }
 
-            Matcher cvSiteMatcher = COMICVINE_SITE_URL_PATTERN.matcher(url);
-            if (cvSiteMatcher.find()) {
-                builder.comicvineId(cvSiteMatcher.group(1));
-                continue;
-            }
+        Matcher cvMatcher = COMICVINE_URL_PATTERN.matcher(url);
+        if (cvMatcher.find()) {
+            builder.comicvineId(cvMatcher.group(1));
+            return;
+        }
 
-            Matcher hcMatcher = HARDCOVER_URL_PATTERN.matcher(url);
-            if (hcMatcher.find()) {
-                builder.hardcoverId(hcMatcher.group(1));
-            }
+        Matcher cvSiteMatcher = COMICVINE_SITE_URL_PATTERN.matcher(url);
+        if (cvSiteMatcher.find()) {
+            builder.comicvineId(cvSiteMatcher.group(1));
+            return;
+        }
+
+        Matcher hcMatcher = HARDCOVER_URL_PATTERN.matcher(url);
+        if (hcMatcher.find()) {
+            builder.hardcoverId(hcMatcher.group(1));
         }
     }
 
@@ -556,36 +562,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
 
             NodeList pages = document.getElementsByTagName("Page");
             for (int i = 0; i < pages.getLength(); i++) {
-                try {
-                    Node node = pages.item(i);
-                    if (!(node instanceof Element page)) {
-                        continue;
-                    }
-
-                    if (!"FrontCover".equalsIgnoreCase(page.getAttribute("Type"))) {
-                        continue;
-                    }
-
-                    // The `ImageFile` is an entry name to read.
-                    String imageFile = page.getAttribute("ImageFile");
-                    if (imageFile != null && !imageFile.isBlank()) {
-                        possibleCoverImages.add(imageFile.trim());
-                    }
-
-                    // The `Image` attribute is an index of the pages in the CBZ to read.
-                    String image = page.getAttribute("Image");
-                    if (image != null && !image.isBlank()) {
-                        int index = Integer.parseInt(image.trim());
-                        if (entryNames.size() > index) {
-                            possibleCoverImages.add(entryNames.get(index));
-                        } else if (index > 0 && entryNames.size() > index - 1) {
-                            // It's possible there's an off-by-one error in some cases.
-                            possibleCoverImages.add(entryNames.get(index - 1));
-                        }
-                    }
-                } catch (Exception _) {
-                    // Do nothing
-                }
+                collectCoverImageFromPage(pages.item(i), entryNames, possibleCoverImages);
             }
 
         } catch (Exception e) {
@@ -593,6 +570,38 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         }
 
         return possibleCoverImages.stream();
+    }
+
+    private void collectCoverImageFromPage(Node node, List<String> entryNames, Set<String> possibleCoverImages) {
+        try {
+            if (!(node instanceof Element page)) {
+                return;
+            }
+
+            if (!"FrontCover".equalsIgnoreCase(page.getAttribute("Type"))) {
+                return;
+            }
+
+            // The `ImageFile` is an entry name to read.
+            String imageFile = page.getAttribute("ImageFile");
+            if (imageFile != null && !imageFile.isBlank()) {
+                possibleCoverImages.add(imageFile.trim());
+            }
+
+            // The `Image` attribute is an index of the pages in the CBZ to read.
+            String image = page.getAttribute("Image");
+            if (image != null && !image.isBlank()) {
+                int index = Integer.parseInt(image.trim());
+                if (entryNames.size() > index) {
+                    possibleCoverImages.add(entryNames.get(index));
+                } else if (index > 0 && entryNames.size() > index - 1) {
+                    // It's possible there's an off-by-one error in some cases.
+                    possibleCoverImages.add(entryNames.get(index - 1));
+                }
+            }
+        } catch (Exception _) {
+            // Do nothing
+        }
     }
 
     /**

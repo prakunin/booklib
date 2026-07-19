@@ -21,6 +21,7 @@ import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -196,32 +197,10 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                 log.error("No items found in the search results.");
             } else {
                 for (Element item : items) {
-                    if (item.text().contains("Collects books from")) {
-                        log.debug("Skipping box set item (collects books): {}", extractAmazonBookId(item));
-                        continue;
+                    String bookId = resolveNewBookId(item, bookIds);
+                    if (bookId != null) {
+                        bookIds.add(bookId);
                     }
-                    Element titleDiv = item.selectFirst("div[data-cy=title-recipe]");
-                    if (titleDiv == null) {
-                        log.debug("Skipping item with missing title div: {}", extractAmazonBookId(item));
-                        continue;
-                    }
-
-                    String titleText = titleDiv.text().trim();
-                    if (titleText.isEmpty()) {
-                        log.debug("Skipping item with empty title: {}", extractAmazonBookId(item));
-                        continue;
-                    }
-
-                    String lowerTitle = titleText.toLowerCase();
-                    if (lowerTitle.contains("books set") || lowerTitle.contains("box set") || lowerTitle.contains("collection set") || lowerTitle.contains("summary & study guide")) {
-                        log.debug("Skipping box set item (matched filtered phrase) in title: {}", extractAmazonBookId(item));
-                        continue;
-                    }
-                    String bookId = extractAmazonBookId(item);
-                    if (bookId == null || bookIds.contains(bookId)) {
-                        continue;
-                    }
-                    bookIds.add(bookId);
                 }
             }
         } catch (AmazonAntiScrapingException _) {
@@ -232,6 +211,35 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         }
         log.info("Amazon: Found {} book ids", bookIds.size());
         return bookIds;
+    }
+
+    private String resolveNewBookId(Element item, LinkedList<String> existingBookIds) {
+        if (item.text().contains("Collects books from")) {
+            log.debug("Skipping box set item (collects books): {}", extractAmazonBookId(item));
+            return null;
+        }
+        Element titleDiv = item.selectFirst("div[data-cy=title-recipe]");
+        if (titleDiv == null) {
+            log.debug("Skipping item with missing title div: {}", extractAmazonBookId(item));
+            return null;
+        }
+
+        String titleText = titleDiv.text().trim();
+        if (titleText.isEmpty()) {
+            log.debug("Skipping item with empty title: {}", extractAmazonBookId(item));
+            return null;
+        }
+
+        String lowerTitle = titleText.toLowerCase();
+        if (lowerTitle.contains("books set") || lowerTitle.contains("box set") || lowerTitle.contains("collection set") || lowerTitle.contains("summary & study guide")) {
+            log.debug("Skipping box set item (matched filtered phrase) in title: {}", extractAmazonBookId(item));
+            return null;
+        }
+        String bookId = extractAmazonBookId(item);
+        if (bookId == null || existingBookIds.contains(bookId)) {
+            return null;
+        }
+        return bookId;
     }
 
     private String extractAmazonBookId(Element item) {
@@ -637,6 +645,63 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         return null;
     }
 
+    private record ReviewDateInfo(String country, Instant dateInstant) {}
+
+    private Float parseReviewRating(String ratingText) {
+        if (ratingText.isEmpty()) {
+            return null;
+        }
+        try {
+            Pattern ratingPattern = Pattern.compile("^([0-9]+([.,][0-9]+)?)");
+            Matcher ratingMatcher = ratingPattern.matcher(ratingText);
+            if (ratingMatcher.find()) {
+                String ratingStr = ratingMatcher.group(1).replace(',', '.');
+                return Float.parseFloat(ratingStr);
+            }
+            return null;
+        } catch (NumberFormatException e) {
+            log.warn("Failed to parse rating '{}': {}", ratingText, e.getMessage());
+            return null;
+        }
+    }
+
+    private ReviewDateInfo parseReviewDateInfo(String fullDateText, LocaleInfo localeInfo) {
+        String country = null;
+        Instant dateInstant = null;
+
+        if (fullDateText.isEmpty()) {
+            return new ReviewDateInfo(null, null);
+        }
+
+        try {
+            Matcher matcher = REVIEWED_IN_ON_PATTERN.matcher(fullDateText);
+            String datePart = fullDateText;
+
+            if (matcher.find() && matcher.groupCount() == 2) {
+                country = matcher.group(1).trim();
+                if (country.toLowerCase().startsWith("the ")) {
+                    country = country.substring(4).trim();
+                }
+                datePart = matcher.group(2).trim();
+            } else {
+                Matcher japaneseMatcher = JAPANESE_REVIEW_DATE_PATTERN.matcher(fullDateText);
+                if (japaneseMatcher.find()) {
+                    datePart = japaneseMatcher.group(1);
+                    country = "日本";
+                }
+            }
+
+            LocalDate localDate = parseDate(datePart, localeInfo);
+            if (localDate != null) {
+                dateInstant = localDate.atStartOfDay(ZoneOffset.UTC).toInstant();
+            }
+        } catch (Exception e) {
+            log.warn("Error parsing date string '{}': {}", fullDateText, e.getMessage());
+        }
+
+        return new ReviewDateInfo(country, dateInstant);
+    }
+
     private List<BookReview> getReviews(Document doc, int maxReviews) {
         List<BookReview> reviews = new ArrayList<>();
         String domain = appSettingService.getAppSettings().getMetadataProviderSettings().getAmazon().getDomain();
@@ -661,55 +726,15 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                     if (title.isEmpty()) title = null;
                 }
 
-                Float ratingValue = null;
                 Elements ratingElements = reviewElement.select("[data-hook=review-star-rating] .a-icon-alt");
                 String ratingText = !ratingElements.isEmpty() ? ratingElements.first().text() : "";
-                if (!ratingText.isEmpty()) {
-                    try {
-                        Pattern ratingPattern = Pattern.compile("^([0-9]+([.,][0-9]+)?)");
-                        Matcher ratingMatcher = ratingPattern.matcher(ratingText);
-                        if (ratingMatcher.find()) {
-                            String ratingStr = ratingMatcher.group(1).replace(',', '.');
-                            ratingValue = Float.parseFloat(ratingStr);
-                        }
-                    } catch (NumberFormatException e) {
-                        log.warn("Failed to parse rating '{}': {}", ratingText, e.getMessage());
-                    }
-                }
+                Float ratingValue = parseReviewRating(ratingText);
 
                 Elements fullDateElements = reviewElement.select("[data-hook=review-date]");
                 String fullDateText = !fullDateElements.isEmpty() ? fullDateElements.first().text() : "";
-                String country = null;
-                Instant dateInstant = null;
-
-                if (!fullDateText.isEmpty()) {
-                    try {
-                        Matcher matcher = REVIEWED_IN_ON_PATTERN.matcher(fullDateText);
-                        String datePart = fullDateText;
-
-                        if (matcher.find() && matcher.groupCount() == 2) {
-                            country = matcher.group(1).trim();
-                            if (country.toLowerCase().startsWith("the ")) {
-                                country = country.substring(4).trim();
-                            }
-                            datePart = matcher.group(2).trim();
-                        } else {
-                            Matcher japaneseMatcher = JAPANESE_REVIEW_DATE_PATTERN.matcher(fullDateText);
-                            if (japaneseMatcher.find()) {
-                                datePart = japaneseMatcher.group(1);
-                                country = "日本"; 
-                            }
-                        }
-
-                        LocalDate localDate = parseDate(datePart, localeInfo);
-                        if (localDate != null) {
-                            dateInstant = localDate.atStartOfDay(ZoneOffset.UTC).toInstant();
-                        }
-
-                    } catch (Exception e) {
-                        log.warn("Error parsing date string '{}': {}", fullDateText, e.getMessage());
-                    }
-                }
+                ReviewDateInfo dateInfo = parseReviewDateInfo(fullDateText, localeInfo);
+                String country = dateInfo.country();
+                Instant dateInstant = dateInfo.dateInstant();
 
                 Elements bodyElements = reviewElement.select("[data-hook=review-body]");
                 String body = !bodyElements.isEmpty() ? Objects.requireNonNull(bodyElements.first()).text() : null;
@@ -849,10 +874,10 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                 throw new AmazonAntiScrapingException("Amazon 500 Internal Server Error");
             }
             log.error("HTTP error fetching URL. Status={}, URL=[{}]", e.getStatusCode(), url, e);
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         } catch (IOException e) {
             log.error("Error parsing url: {}", url, e);
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
     }
 

@@ -20,6 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -177,7 +178,7 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
 
             if (response.statusCode() < 200 || response.statusCode() > 399) {
                 log.error("Audible request failed with status code: {}", response.statusCode());
-                throw new RuntimeException("Failed to query Audible");
+                throw new IllegalStateException("Failed to query Audible");
             }
 
             log.debug("Request success with code {}", response.statusCode());
@@ -187,7 +188,7 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
             }
         } catch (IOException e) {
             log.error("Audible request failed", e);
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw e;

@@ -115,14 +115,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
 
             String year = tag.getFirst(FieldKey.YEAR);
             if (StringUtils.isNotBlank(year)) {
-                try {
-                    int yearInt = Integer.parseInt(year.trim().substring(0, Math.min(4, year.trim().length())));
-                    if (yearInt >= 1 && yearInt <= 9999) {
-                        builder.publishedDate(LocalDate.of(yearInt, 1, 1));
-                    }
-                } catch (NumberFormatException _) {
-                    // ignore malformed year value
-                }
+                applyYearIfValid(builder, year);
             }
 
             String genre = tag.getFirst(FieldKey.GENRE);
@@ -144,21 +137,12 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
 
             String trackNo = tag.getFirst(FieldKey.TRACK);
             if (StringUtils.isNotBlank(trackNo)) {
-                try {
-                    String trackNum = trackNo.contains("/") ? trackNo.split("/")[0] : trackNo;
-                    builder.seriesNumber((float) Integer.parseInt(trackNum.trim()));
-                } catch (NumberFormatException _) {
-                    // ignore malformed track number
-                }
+                applyTrackNumberIfValid(builder, trackNo);
             }
 
             String trackTotal = tag.getFirst(FieldKey.TRACK_TOTAL);
             if (StringUtils.isNotBlank(trackTotal)) {
-                try {
-                    builder.seriesTotal(Integer.parseInt(trackTotal.trim()));
-                } catch (NumberFormatException _) {
-                    // ignore malformed track total
-                }
+                applyTrackTotalIfValid(builder, trackTotal);
             }
 
             return builder.build();
@@ -168,6 +152,34 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             return BookMetadata.builder()
                     .title(FilenameUtils.getBaseName(audioFile.getName()))
                     .build();
+        }
+    }
+
+    private void applyYearIfValid(BookMetadata.BookMetadataBuilder builder, String year) {
+        try {
+            int yearInt = Integer.parseInt(year.trim().substring(0, Math.min(4, year.trim().length())));
+            if (yearInt >= 1 && yearInt <= 9999) {
+                builder.publishedDate(LocalDate.of(yearInt, 1, 1));
+            }
+        } catch (NumberFormatException _) {
+            // ignore malformed year value
+        }
+    }
+
+    private void applyTrackNumberIfValid(BookMetadata.BookMetadataBuilder builder, String trackNo) {
+        try {
+            String trackNum = trackNo.contains("/") ? trackNo.split("/")[0] : trackNo;
+            builder.seriesNumber((float) Integer.parseInt(trackNum.trim()));
+        } catch (NumberFormatException _) {
+            // ignore malformed track number
+        }
+    }
+
+    private void applyTrackTotalIfValid(BookMetadata.BookMetadataBuilder builder, String trackTotal) {
+        try {
+            builder.seriesTotal(Integer.parseInt(trackTotal.trim()));
+        } catch (NumberFormatException _) {
+            // ignore malformed track total
         }
     }
 

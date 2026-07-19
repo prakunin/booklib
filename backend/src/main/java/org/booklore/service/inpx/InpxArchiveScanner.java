@@ -153,19 +153,23 @@ public class InpxArchiveScanner {
                     if (existingEntries.contains(entry.getName())) {
                         continue;
                     }
-                    try (InputStream input = archive.getInputStream(entry)) {
-                        BookMetadata metadata = fb2MetadataExtractor.extractMetadata(
-                                input, candidate.archiveName() + "!" + entry.getName());
-                        consumer.accept(toBook(candidate.archiveName(), entry.getName(), entry.getSize(), metadata));
-                    } catch (IOException e) {
-                        log.warn("Unable to read FB2 entry {} from {}: {}",
-                                entry.getName(), candidate.archiveName(), e.getMessage());
-                        consumer.accept(toBook(candidate.archiveName(), entry.getName(), entry.getSize(), null));
-                    }
+                    processFb2Entry(archive, candidate, entry, consumer);
                 }
             }
         } catch (IOException e) {
             log.warn("Unable to scan ZIP archive {}: {}", candidate.path(), e.getMessage());
+        }
+    }
+
+    private void processFb2Entry(ZipFile archive, ArchiveCandidate candidate, ZipEntry entry, Consumer<InpxBookDto> consumer) {
+        try (InputStream input = archive.getInputStream(entry)) {
+            BookMetadata metadata = fb2MetadataExtractor.extractMetadata(
+                    input, candidate.archiveName() + "!" + entry.getName());
+            consumer.accept(toBook(candidate.archiveName(), entry.getName(), entry.getSize(), metadata));
+        } catch (IOException e) {
+            log.warn("Unable to read FB2 entry {} from {}: {}",
+                    entry.getName(), candidate.archiveName(), e.getMessage());
+            consumer.accept(toBook(candidate.archiveName(), entry.getName(), entry.getSize(), null));
         }
     }
 

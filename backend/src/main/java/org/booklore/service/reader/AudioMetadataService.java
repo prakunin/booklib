@@ -232,6 +232,11 @@ public class AudioMetadataService {
                 .build();
   }
 
+  // jaudiotagger's AudioFileIO.read declares several distinct checked exception types
+  // (CannotReadException, TagException, ReadOnlyFileException, InvalidAudioFrameException, IOException);
+  // this "throws Exception" umbrella is shared with sibling methods in this class that are out of
+  // scope for this change, so narrowing only here would be inconsistent without a wider signature pass.
+  @SuppressWarnings("java:S112")
   private AudiobookInfo extractSingleFileMetadata(
       AudiobookInfo.AudiobookInfoBuilder builder, Path audioPath) throws Exception {
     AudioFile audioFile = AudioFileIO.read(audioPath.toFile());

@@ -461,9 +461,9 @@ public class HardcoverSyncService {
      * Get the user's user_book entry for the specified book ID, along with all associated user_book_read entries to check existing reading progress.
      * @param bookId the Hardcover book ID to fetch the user's book entry for
      * @return a UserBookWithReads object containing the user's book entry and associated reading progress, or null if not found
-     * @throws Exception when an error occurs, distinguishing between "not found" (returns null) vs "error fetching from Hardcover" (throws exception)
+     * @throws IllegalStateException when an error occurs, distinguishing between "not found" (returns null) vs "error fetching from Hardcover" (throws exception)
      */
-    private UserBookWithReads getUserBookAndReads(Integer bookId) throws Exception {
+    private UserBookWithReads getUserBookAndReads(Integer bookId) {
         String query = """
             query GetUserBookAndReads($bookId:Int!) {
                 me {
@@ -493,11 +493,11 @@ public class HardcoverSyncService {
         Map<String, Object> response = executeGraphQL(request);
         if (response == null) {
             log.warn("No response from Hardcover for book ID {}", bookId);
-            throw new Exception("No response from Hardcover for book ID " + bookId);
+            throw new IllegalStateException("No response from Hardcover for book ID " + bookId);
         }
 
         Map<String, Object> data = (Map<String, Object>) response.get("data");
-        if (data == null) throw new Exception("No data returned from Hardcover for book ID " + bookId);
+        if (data == null) throw new IllegalStateException("No data returned from Hardcover for book ID " + bookId);
 
         List<Map<String, Object>> meList = (List<Map<String, Object>>) data.get("me");
         if (meList == null || meList.isEmpty()) {

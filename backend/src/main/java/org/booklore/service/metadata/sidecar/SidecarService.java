@@ -129,41 +129,50 @@ public class SidecarService {
         int imported = 0;
 
         for (BookEntity book : books) {
-            try {
-                Path bookPath = book.getFullFilePath();
-                if (bookPath == null) {
-                    continue;
-                }
-
-                Optional<SidecarMetadata> sidecarOpt = sidecarReader.readSidecarMetadata(bookPath);
-                if (sidecarOpt.isEmpty()) {
-                    continue;
-                }
-
-                SidecarMetadata sidecar = sidecarOpt.get();
-                BookMetadata bookMetadata = sidecarMapper.toBookMetadata(sidecar);
-
-                if (bookMetadata != null) {
-                    MetadataUpdateWrapper wrapper = MetadataUpdateWrapper.builder()
-                            .metadata(bookMetadata)
-                            .build();
-
-                    MetadataUpdateContext context = MetadataUpdateContext.builder()
-                            .bookEntity(book)
-                            .metadataUpdateWrapper(wrapper)
-                            .updateThumbnail(false)
-                            .replaceMode(MetadataReplaceMode.REPLACE_WHEN_PROVIDED)
-                            .build();
-
-                    bookMetadataUpdater.setBookMetadata(context);
-                    imported++;
-                }
-            } catch (Exception e) {
-                log.warn("Failed to import sidecar for book ID {}: {}", book.getId(), e.getMessage());
+            if (importSidecarForBook(book)) {
+                imported++;
             }
         }
 
         log.info("Bulk imported {} sidecar files for library {}", imported, library.getName());
         return imported;
+    }
+
+    private boolean importSidecarForBook(BookEntity book) {
+        try {
+            Path bookPath = book.getFullFilePath();
+            if (bookPath == null) {
+                return false;
+            }
+
+            Optional<SidecarMetadata> sidecarOpt = sidecarReader.readSidecarMetadata(bookPath);
+            if (sidecarOpt.isEmpty()) {
+                return false;
+            }
+
+            SidecarMetadata sidecar = sidecarOpt.get();
+            BookMetadata bookMetadata = sidecarMapper.toBookMetadata(sidecar);
+
+            if (bookMetadata == null) {
+                return false;
+            }
+
+            MetadataUpdateWrapper wrapper = MetadataUpdateWrapper.builder()
+                    .metadata(bookMetadata)
+                    .build();
+
+            MetadataUpdateContext context = MetadataUpdateContext.builder()
+                    .bookEntity(book)
+                    .metadataUpdateWrapper(wrapper)
+                    .updateThumbnail(false)
+                    .replaceMode(MetadataReplaceMode.REPLACE_WHEN_PROVIDED)
+                    .build();
+
+            bookMetadataUpdater.setBookMetadata(context);
+            return true;
+        } catch (Exception e) {
+            log.warn("Failed to import sidecar for book ID {}: {}", book.getId(), e.getMessage());
+            return false;
+        }
     }
 }

@@ -57,7 +57,7 @@ public class PdfAnnotationService {
                     Thread.sleep(50); // Small backoff before retry
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new RuntimeException(ie);
+                    throw new IllegalStateException(ie);
                 }
             }
         }

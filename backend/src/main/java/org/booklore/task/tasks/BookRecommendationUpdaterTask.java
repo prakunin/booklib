@@ -69,44 +69,49 @@ public class BookRecommendationUpdaterTask implements Task {
 
         int embeddingProgress = 0;
         int batchPage = 0;
-        while (true) {
+        boolean moreBatches = true;
+        while (moreBatches) {
             if (cancellationManager.isTaskCancelled(taskId)) {
                 return buildCancelledResponse(builder, taskId, lastNotificationTime);
             }
             List<BookEntity> batch = bookQueryService.getAllFullBookEntitiesBatch(
                     PageRequest.of(batchPage, BATCH_SIZE));
-            if (batch.isEmpty()) break;
+            if (batch.isEmpty()) {
+                moreBatches = false;
+            } else {
+                for (BookEntity book : batch) {
+                    double[] embedding = vectorService.generateEmbedding(book);
+                    embeddings.put(book.getId(), embedding);
 
-            for (BookEntity book : batch) {
-                double[] embedding = vectorService.generateEmbedding(book);
-                embeddings.put(book.getId(), embedding);
+                    // Store series name for similarity filtering
+                    String series = Optional.ofNullable(book.getMetadata())
+                            .map(BookMetadataEntity::getSeriesName)
+                            .map(String::toLowerCase)
+                            .orElse(null);
+                    if (series != null) {
+                        seriesNames.put(book.getId(), series);
+                    }
 
-                // Store series name for similarity filtering
-                String series = Optional.ofNullable(book.getMetadata())
-                        .map(BookMetadataEntity::getSeriesName)
-                        .map(String::toLowerCase)
-                        .orElse(null);
-                if (series != null) {
-                    seriesNames.put(book.getId(), series);
+                    embeddingProgress++;
                 }
 
-                embeddingProgress++;
+                // Save embedding vectors for this batch within a transaction
+                Map<Long, String> batchEmbeddingJson = new HashMap<>();
+                for (BookEntity book : batch) {
+                    batchEmbeddingJson.put(book.getId(), vectorService.serializeVector(embeddings.get(book.getId())));
+                }
+                bookQueryService.compareAndSaveEmbeddings(batchEmbeddingJson);
+
+                int progress = 5 + (int) (embeddingProgress * 30L / totalBooks);
+                lastNotificationTime = sendTaskProgressNotification(taskId, progress,
+                        String.format("Generated embeddings: %d/%d books", embeddingProgress, totalBooks),
+                        TaskStatus.IN_PROGRESS, lastNotificationTime, false);
+
+                moreBatches = batch.size() >= BATCH_SIZE;
+                if (moreBatches) {
+                    batchPage++;
+                }
             }
-
-            // Save embedding vectors for this batch within a transaction
-            Map<Long, String> batchEmbeddingJson = new HashMap<>();
-            for (BookEntity book : batch) {
-                batchEmbeddingJson.put(book.getId(), vectorService.serializeVector(embeddings.get(book.getId())));
-            }
-            bookQueryService.compareAndSaveEmbeddings(batchEmbeddingJson);
-
-            int progress = 5 + (int) (embeddingProgress * 30L / totalBooks);
-            lastNotificationTime = sendTaskProgressNotification(taskId, progress,
-                    String.format("Generated embeddings: %d/%d books", embeddingProgress, totalBooks),
-                    TaskStatus.IN_PROGRESS, lastNotificationTime, false);
-
-            if (batch.size() < BATCH_SIZE) break;
-            batchPage++;
         }
 
         lastNotificationTime = sendTaskProgressNotification(taskId, 35, "Computing book similarities...", TaskStatus.IN_PROGRESS, lastNotificationTime, false);

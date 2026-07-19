@@ -601,28 +601,7 @@ public class FilenamePatternExtractor {
         Set<Long> failedFileIds = new HashSet<>();
 
         for (BookdropPatternExtractResult.FileExtractionResult result : results) {
-            if (!result.isSuccess() || result.getExtractedMetadata() == null) {
-                continue;
-            }
-
-            BookdropFileEntity file = fileMap.get(result.getFileId());
-            if (file == null) {
-                continue;
-            }
-
-            try {
-                BookMetadata currentMetadata = metadataHelper.getCurrentMetadata(file);
-                BookMetadata extractedMetadata = result.getExtractedMetadata();
-                metadataHelper.mergeMetadata(currentMetadata, extractedMetadata);
-                metadataHelper.updateFetchedMetadata(file, currentMetadata);
-
-            } catch (RuntimeException e) {
-                log.error("Error persisting extracted metadata for file {} ({}): {}", 
-                         file.getId(), file.getFileName(), e.getMessage(), e);
-                failedFileIds.add(file.getId());
-                result.setSuccess(false);
-                result.setErrorMessage("Failed to save metadata: " + e.getMessage());
-            }
+            persistSingleExtractedResult(result, fileMap, failedFileIds);
         }
 
         List<BookdropFileEntity> filesToSave = files.stream()
@@ -633,7 +612,34 @@ public class FilenamePatternExtractor {
             bookdropFileRepository.saveAll(filesToSave);
         }
     }
-    
+
+    private void persistSingleExtractedResult(BookdropPatternExtractResult.FileExtractionResult result,
+                                               Map<Long, BookdropFileEntity> fileMap,
+                                               Set<Long> failedFileIds) {
+        if (!result.isSuccess() || result.getExtractedMetadata() == null) {
+            return;
+        }
+
+        BookdropFileEntity file = fileMap.get(result.getFileId());
+        if (file == null) {
+            return;
+        }
+
+        try {
+            BookMetadata currentMetadata = metadataHelper.getCurrentMetadata(file);
+            BookMetadata extractedMetadata = result.getExtractedMetadata();
+            metadataHelper.mergeMetadata(currentMetadata, extractedMetadata);
+            metadataHelper.updateFetchedMetadata(file, currentMetadata);
+
+        } catch (RuntimeException e) {
+            log.error("Error persisting extracted metadata for file {} ({}): {}",
+                     file.getId(), file.getFileName(), e.getMessage(), e);
+            failedFileIds.add(file.getId());
+            result.setSuccess(false);
+            result.setErrorMessage("Failed to save metadata: " + e.getMessage());
+        }
+    }
+
     private boolean isYearMonthFormat(String format) {
         return format != null && 
                (format.contains("y") || format.contains("Y")) &&

@@ -220,7 +220,7 @@ public class PdfMetadataExtractor implements FileMetadataExtractor {
                 String xmpStr = new String(rawXmpBytes, StandardCharsets.UTF_8);
                 Matcher siMatcher = Pattern.compile("<series_index>([^<]+)</series_index>").matcher(xmpStr);
                 if (siMatcher.find()) {
-                    try { metadataBuilder.seriesNumber(Float.parseFloat(siMatcher.group(1).trim())); } catch (Exception _) { /* ignore unparseable value */ }
+                    trySetSeriesNumberFromRawXmp(metadataBuilder, siMatcher.group(1));
                 }
             }
         }
@@ -289,6 +289,14 @@ public class PdfMetadataExtractor implements FileMetadataExtractor {
     return metadataBuilder.build();
 }
 
+
+private void trySetSeriesNumberFromRawXmp(BookMetadata.BookMetadataBuilder metadataBuilder, String rawValue) {
+    try {
+        metadataBuilder.seriesNumber(Float.parseFloat(rawValue.trim()));
+    } catch (Exception _) {
+        /* ignore unparseable value */
+    }
+}
 
 private Optional<String> findCustomField(XmpMetadata xmp, Optional<RawXmpMetadata> rawXmp, String name) {
     Optional<String> val = xmp.findField(name);

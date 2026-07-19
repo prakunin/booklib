@@ -124,16 +124,7 @@ public class AudiobookMetadataWriter implements MetadataWriter {
             if (StringUtils.isNotBlank(thumbnailUrl)) {
                 byte[] coverData = loadImage(thumbnailUrl);
                 if (coverData != null) {
-                    try {
-                        tag.deleteArtworkField();
-                        Artwork artwork = ArtworkFactory.getNew();
-                        artwork.setBinaryData(coverData);
-                        artwork.setMimeType(detectMimeType(coverData));
-                        tag.setField(artwork);
-                        hasChanges[0] = true;
-                    } catch (Exception e) {
-                        log.warn("Failed to set cover art for {}: {}", audioFile.getName(), e.getMessage());
-                    }
+                    setCoverArtwork(tag, coverData, audioFile.getName(), hasChanges);
                 }
             }
 
@@ -162,6 +153,19 @@ public class AudiobookMetadataWriter implements MetadataWriter {
                     log.warn("Failed to delete backup for {}: {}", audioFile.getName(), ex.getMessage());
                 }
             }
+        }
+    }
+
+    private void setCoverArtwork(Tag tag, byte[] coverData, String fileName, boolean[] hasChanges) {
+        try {
+            tag.deleteArtworkField();
+            Artwork artwork = ArtworkFactory.getNew();
+            artwork.setBinaryData(coverData);
+            artwork.setMimeType(detectMimeType(coverData));
+            tag.setField(artwork);
+            hasChanges[0] = true;
+        } catch (Exception e) {
+            log.warn("Failed to set cover art for {}: {}", fileName, e.getMessage());
         }
     }
 

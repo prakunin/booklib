@@ -370,73 +370,89 @@ public class LubimyCzytacParser implements BookParser {
 
             // Pages
             if (root.has("numberOfPages")) {
-                try {
-                    int pages = root.get("numberOfPages").asInt();
-                    metadata.setPageCount(pages);
-                } catch (Exception _) {
-                    log.warn("Failed to parse numberOfPages from JSON-LD");
-                }
+                parsePageCountField(root, metadata);
             }
 
             // Publish date
             if (root.has("datePublished")) {
-                try {
-                    String dateStr = root.get("datePublished").asString();
-                    LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE);
-                    metadata.setPublishedDate(date);
-                } catch (Exception e) {
-                    log.warn("Failed to parse datePublished from JSON-LD: {}", e.getMessage());
-                }
+                parsePublishedDateField(root, metadata);
             }
 
             // Author(s) - can be single Person or array of Person objects
             if (root.has("author")) {
-                try {
-                    List<String> authors = new ArrayList<>();
-                    JsonNode authorNode = root.get("author");
-
-                    if (authorNode.isArray()) {
-                        // Multiple authors
-                        for (JsonNode author : authorNode) {
-                            if (author.has("name")) {
-                                authors.add(author.get("name").asString());
-                            }
-                        }
-                    } else if (authorNode.isObject() && authorNode.has("name")) {
-                        // Single author
-                        authors.add(authorNode.get("name").asString());
-                    }
-
-                    if (!authors.isEmpty()) {
-                        metadata.setAuthors(authors);
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to parse author from JSON-LD: {}", e.getMessage());
-                }
+                parseAuthorField(root, metadata);
             }
 
             // Genre/Category - extracted from genre URL
             if (root.has("genre")) {
-                try {
-                    String genreUrl = root.get("genre").asString();
-                    // Extract category name from URL like "https://lubimyczytac.pl/ksiazki/k/69/poradniki"
-                    // Get the last segment after the final slash
-                    String[] urlParts = genreUrl.split("/");
-                    if (urlParts.length > 0) {
-                        String categoryName = urlParts[urlParts.length - 1];
-                        if (!categoryName.isEmpty()) {
-                            Set<String> categories = new HashSet<>();
-                            categories.add(categoryName);
-                            metadata.setCategories(categories);
-                        }
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to parse genre from JSON-LD: {}", e.getMessage());
-                }
+                parseGenreField(root, metadata);
             }
 
         } catch (Exception e) {
             log.warn("Failed to parse JSON-LD structure", e);
+        }
+    }
+
+    private void parsePageCountField(JsonNode root, BookMetadata metadata) {
+        try {
+            int pages = root.get("numberOfPages").asInt();
+            metadata.setPageCount(pages);
+        } catch (Exception _) {
+            log.warn("Failed to parse numberOfPages from JSON-LD");
+        }
+    }
+
+    private void parsePublishedDateField(JsonNode root, BookMetadata metadata) {
+        try {
+            String dateStr = root.get("datePublished").asString();
+            LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE);
+            metadata.setPublishedDate(date);
+        } catch (Exception e) {
+            log.warn("Failed to parse datePublished from JSON-LD: {}", e.getMessage());
+        }
+    }
+
+    private void parseAuthorField(JsonNode root, BookMetadata metadata) {
+        try {
+            List<String> authors = new ArrayList<>();
+            JsonNode authorNode = root.get("author");
+
+            if (authorNode.isArray()) {
+                // Multiple authors
+                for (JsonNode author : authorNode) {
+                    if (author.has("name")) {
+                        authors.add(author.get("name").asString());
+                    }
+                }
+            } else if (authorNode.isObject() && authorNode.has("name")) {
+                // Single author
+                authors.add(authorNode.get("name").asString());
+            }
+
+            if (!authors.isEmpty()) {
+                metadata.setAuthors(authors);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse author from JSON-LD: {}", e.getMessage());
+        }
+    }
+
+    private void parseGenreField(JsonNode root, BookMetadata metadata) {
+        try {
+            String genreUrl = root.get("genre").asString();
+            // Extract category name from URL like "https://lubimyczytac.pl/ksiazki/k/69/poradniki"
+            // Get the last segment after the final slash
+            String[] urlParts = genreUrl.split("/");
+            if (urlParts.length > 0) {
+                String categoryName = urlParts[urlParts.length - 1];
+                if (!categoryName.isEmpty()) {
+                    Set<String> categories = new HashSet<>();
+                    categories.add(categoryName);
+                    metadata.setCategories(categories);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse genre from JSON-LD: {}", e.getMessage());
         }
     }
 

@@ -8,6 +8,7 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.metadata.extractor.AudiobookMetadataExtractor;
 import org.booklore.service.metadata.extractor.CoverExtractionException;
+import org.booklore.service.metadata.extractor.FileMetadataExtractor;
 import org.booklore.service.metadata.extractor.MetadataExtractorFactory;
 import org.booklore.util.BookCoverUtils;
 import org.booklore.util.FileService;
@@ -79,18 +80,8 @@ public class BookCoverGenerator {
                 return;
             }
 
-            byte[] coverData;
-            try {
-                coverData = audiobookMetadataExtractor.extractCover(file);
-            } catch (CoverExtractionException e) {
-                // Generating a cover for an extra file attached to an existing book is best-effort,
-                // so a failed read is still just "no cover this time" here - but it is logged as the
-                // different thing it is, rather than as the clean miss below.
-                log.warn("Could not read a cover from audiobook '{}': {}", audioFile.getFileName(), e.getMessage());
-                return;
-            }
+            byte[] coverData = extractAudiobookCoverBytes(file, audioFile.getFileName());
             if (coverData == null) {
-                log.debug("No cover image found in audiobook '{}'", audioFile.getFileName());
                 return;
             }
 
@@ -119,6 +110,27 @@ public class BookCoverGenerator {
         }
     }
 
+    /**
+     * Extracts audiobook cover bytes, logging and returning {@code null} on either a failed read
+     * or a legitimate absence of an embedded cover.
+     */
+    private byte[] extractAudiobookCoverBytes(File file, String fileName) {
+        byte[] coverData;
+        try {
+            coverData = audiobookMetadataExtractor.extractCover(file);
+        } catch (CoverExtractionException e) {
+            // Generating a cover for an extra file attached to an existing book is best-effort,
+            // so a failed read is still just "no cover this time" here - but it is logged as the
+            // different thing it is, rather than as the clean miss below.
+            log.warn("Could not read a cover from audiobook '{}': {}", fileName, e.getMessage());
+            return null;
+        }
+        if (coverData == null) {
+            log.debug("No cover image found in audiobook '{}'", fileName);
+        }
+        return coverData;
+    }
+
     private void generateEbookCoverFromFile(BookEntity bookEntity, LibraryFile ebookFile) {
         try {
             File file = ebookFile.getFullPath().toFile();
@@ -133,15 +145,8 @@ public class BookCoverGenerator {
                 return;
             }
 
-            byte[] coverData;
-            try {
-                coverData = extractor.extractCover(file);
-            } catch (CoverExtractionException e) {
-                log.warn("Could not read a cover from ebook '{}': {}", ebookFile.getFileName(), e.getMessage());
-                return;
-            }
+            byte[] coverData = extractEbookCoverBytes(extractor, file, ebookFile.getFileName());
             if (coverData == null) {
-                log.debug("No cover image found in ebook '{}'", ebookFile.getFileName());
                 return;
             }
 
@@ -168,6 +173,24 @@ public class BookCoverGenerator {
         } catch (Exception e) {
             log.warn("Error generating ebook cover from {}: {}", ebookFile.getFileName(), e.getMessage());
         }
+    }
+
+    /**
+     * Extracts ebook cover bytes, logging and returning {@code null} on either a failed read
+     * or a legitimate absence of an embedded cover.
+     */
+    private byte[] extractEbookCoverBytes(FileMetadataExtractor extractor, File file, String fileName) {
+        byte[] coverData;
+        try {
+            coverData = extractor.extractCover(file);
+        } catch (CoverExtractionException e) {
+            log.warn("Could not read a cover from ebook '{}': {}", fileName, e.getMessage());
+            return null;
+        }
+        if (coverData == null) {
+            log.debug("No cover image found in ebook '{}'", fileName);
+        }
+        return coverData;
     }
 
     private File getFileForCoverExtraction(LibraryFile libraryFile) {

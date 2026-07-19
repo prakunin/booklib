@@ -331,11 +331,9 @@ public class BookFileTransactionalHandler {
         double bestSimilarity = 0;
 
         for (BookEntity book : booksInDirectory) {
-            if (book.getDeleted() != null && book.getDeleted()) {
-                continue;
-            }
+            boolean deleted = book.getDeleted() != null && book.getDeleted();
             BookFileEntity primaryFile = book.getPrimaryBookFile();
-            if (primaryFile == null) {
+            if (deleted || primaryFile == null) {
                 continue;
             }
             String existingGroupingKey = BookFileGroupingUtils.extractGroupingKey(primaryFile.getFileName());
@@ -378,11 +376,9 @@ public class BookFileTransactionalHandler {
         double bestSimilarity = 0;
 
         for (BookEntity book : booksInParent) {
-            if (book.getDeleted() != null && book.getDeleted()) {
-                continue;
-            }
+            boolean deleted = book.getDeleted() != null && book.getDeleted();
             BookFileEntity primaryFile = book.getPrimaryBookFile();
-            if (primaryFile == null) {
+            if (deleted || primaryFile == null) {
                 continue;
             }
             String existingGroupingKey = BookFileGroupingUtils.extractGroupingKey(primaryFile.getFileName());

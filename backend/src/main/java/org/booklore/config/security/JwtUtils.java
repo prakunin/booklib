@@ -109,7 +109,7 @@ public class JwtUtils {
             throw new IllegalStateException("JWT secret must be at least " + MIN_SECRET_BYTES + " bytes for HS256", e);
         } catch (Exception e) {
             log.error("Error generating JWT token", e);
-            throw new RuntimeException("Could not generate token", e);
+            throw new IllegalStateException("Could not generate token", e);
         }
     }
 

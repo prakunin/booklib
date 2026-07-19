@@ -130,21 +130,26 @@ public class BookRecommendationComputationService {
         Map<String, Integer> authorCounts = new HashMap<>();
         Set<BookRecommendationLite> result = new LinkedHashSet<>();
         for (ScoredCandidate candidate : sorted) {
-            BookEntity book = books.get(candidate.bookId());
-            if (book == null) {
-                continue;
-            }
-            Set<String> authors = authorNames(book);
-            boolean allowed = authors.stream().allMatch(name -> authorCounts.getOrDefault(name, 0) < MAX_BOOKS_PER_AUTHOR);
-            if (allowed) {
-                result.add(new BookRecommendationLite(candidate.bookId(), candidate.score()));
-                authors.forEach(name -> authorCounts.merge(name, 1, Integer::sum));
-            }
-            if (result.size() >= limit) {
+            if (!accumulateRecommendation(candidate, books, authorCounts, result, limit)) {
                 break;
             }
         }
         return result;
+    }
+
+    private boolean accumulateRecommendation(ScoredCandidate candidate, Map<Long, BookEntity> books,
+                                              Map<String, Integer> authorCounts, Set<BookRecommendationLite> result, int limit) {
+        BookEntity book = books.get(candidate.bookId());
+        if (book == null) {
+            return true;
+        }
+        Set<String> authors = authorNames(book);
+        boolean allowed = authors.stream().allMatch(name -> authorCounts.getOrDefault(name, 0) < MAX_BOOKS_PER_AUTHOR);
+        if (allowed) {
+            result.add(new BookRecommendationLite(candidate.bookId(), candidate.score()));
+            authors.forEach(name -> authorCounts.merge(name, 1, Integer::sum));
+        }
+        return result.size() < limit;
     }
 
     private String normalizedSeries(BookEntity book) {

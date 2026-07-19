@@ -66,7 +66,7 @@ public class MagicShelfBookService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to parse or execute magic shelf rules", e);
-            throw new RuntimeException("Failed to parse or execute magic shelf rules: " + e.getMessage(), e);
+            throw ApiError.INTERNAL_SERVER_ERROR.createException("Failed to parse or execute magic shelf rules: " + e.getMessage());
         }
     }
 
@@ -80,7 +80,7 @@ public class MagicShelfBookService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to parse magic shelf rules", e);
-            throw new RuntimeException("Failed to parse magic shelf rules: " + e.getMessage(), e);
+            throw ApiError.INTERNAL_SERVER_ERROR.createException("Failed to parse magic shelf rules: " + e.getMessage());
         }
     }
 
@@ -103,7 +103,7 @@ public class MagicShelfBookService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to parse or execute magic shelf rules", e);
-            throw new RuntimeException("Failed to parse or execute magic shelf rules: " + e.getMessage(), e);
+            throw ApiError.INTERNAL_SERVER_ERROR.createException("Failed to parse or execute magic shelf rules: " + e.getMessage());
         }
     }
 

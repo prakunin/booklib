@@ -94,8 +94,6 @@ public class FileMoveService {
         Long targetLibraryId = move.getTargetLibraryId();
         Long targetLibraryPathId = move.getTargetLibraryPathId();
 
-        record PlannedMove(Path source, Path temp, Path target) {}
-
         Map<Long, PlannedMove> plannedMovesByBookFileId = new HashMap<>();
         Set<Path> sourceParentsToCleanup = new HashSet<>();
 
@@ -200,32 +198,7 @@ public class FileMoveService {
             plannedMovesByBookFileId.clear();
 
             // Only update database after all file commits succeed
-            try {
-                transactionTemplate.executeWithoutResult(status -> {
-                    for (var bookFile : bookFiles) {
-                        String newFileName;
-                        if (bookFile.isBook()) {
-                            Path targetPath = fileMoveHelper.generateNewFilePath(bookEntity, bookFile, libraryPathEntity, pattern);
-                            newFileName = targetPath.getFileName().toString();
-                        } else {
-                            newFileName = bookFile.getFileName();
-                        }
-                        bookFileRepository.updateFileNameAndSubPath(bookFile.getId(), newFileName, newFileSubPath);
-                    }
-
-                    bookRepository.updateLibrary(bookEntity.getId(), targetLibrary.getId(), libraryPathEntity);
-                });
-            } catch (Exception e) {
-                log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", bookId, e);
-                for (PlannedMove committed : committedMoves) {
-                    try {
-                        fileMoveHelper.moveFile(committed.target(), committed.source());
-                    } catch (Exception rollbackEx) {
-                        log.error("Failed to rollback file move (Target -> Source) for book ID {}: {} -> {}", bookId, committed.target(), committed.source(), rollbackEx);
-                    }
-                }
-                throw e;
-            }
+            commitDatabaseUpdate(bookId, bookFiles, pattern, libraryPathEntity, bookEntity, targetLibrary, newFileSubPath, committedMoves);
 
             Set<Path> libraryRoots = targetLibrary.getLibraryPaths().stream()
                     .map(LibraryPathEntity::getPath)
@@ -236,11 +209,7 @@ public class FileMoveService {
             // Also protect the source library root so cleanup doesn't traverse above it
             libraryRoots.add(Paths.get(bookEntity.getLibraryPath().getPath()).toAbsolutePath().normalize());
 
-            try {
-                sidecarMetadataWriter.moveSidecarFiles(currentPrimaryFilePath, newFilePath);
-            } catch (Exception e) {
-                log.warn("Failed to move sidecar files for book ID {}: {}", bookId, e.getMessage());
-            }
+            moveSidecarFilesQuietly(bookId, currentPrimaryFilePath, newFilePath);
 
             for (Path sourceParent : sourceParentsToCleanup) {
                 fileMoveHelper.deleteEmptyParentDirsUpToLibraryFolders(sourceParent, libraryRoots);
@@ -262,8 +231,6 @@ public class FileMoveService {
     }
 
     public FileMoveResult moveSingleFile(BookEntity bookEntity) {
-        record PlannedMove(Path source, Path temp, Path target) {}
-
         validateLocalStorage();
 
         Long libraryId = bookEntity.getLibraryPath().getLibrary().getId();
@@ -378,30 +345,7 @@ public class FileMoveService {
 
             // Update database for ALL BookFileEntity records (only after all commits succeed)
             BookEntity finalBookWithFiles = bookWithFiles;
-            try {
-                transactionTemplate.executeWithoutResult(status -> {
-                    for (var bookFile : bookFiles) {
-                        String newFileName;
-                        if (bookFile.isBook()) {
-                            Path targetPath = fileMoveHelper.generateNewFilePath(finalBookWithFiles, bookFile, finalBookWithFiles.getLibraryPath(), pattern);
-                            newFileName = targetPath.getFileName().toString();
-                        } else {
-                            newFileName = bookFile.getFileName();
-                        }
-                        bookFileRepository.updateFileNameAndSubPath(bookFile.getId(), newFileName, newFileSubPath);
-                    }
-                });
-            } catch (Exception e) {
-                log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", bookEntity.getId(), e);
-                for (PlannedMove committed : committedMoves) {
-                    try {
-                        fileMoveHelper.moveFile(committed.target(), committed.source());
-                    } catch (Exception rollbackEx) {
-                        log.error("Failed to rollback file move (Target -> Source) for book ID {}: {} -> {}", bookEntity.getId(), committed.target(), committed.source(), rollbackEx);
-                    }
-                }
-                throw e;
-            }
+            commitFileRenameUpdate(bookEntity.getId(), bookFiles, pattern, finalBookWithFiles, newFileSubPath, committedMoves);
 
             // Clean up empty parent directories – load library paths via a separate query
             // to avoid LazyInitializationException (OSIV is disabled) and MultipleBagFetchException
@@ -417,11 +361,7 @@ public class FileMoveService {
             // Also protect the source library root so cleanup doesn't traverse above it
             libraryRoots.add(Paths.get(bookWithFiles.getLibraryPath().getPath()).toAbsolutePath().normalize());
 
-            try {
-                sidecarMetadataWriter.moveSidecarFiles(currentPrimaryFilePath, expectedPrimaryFilePath);
-            } catch (Exception e) {
-                log.warn("Failed to move sidecar files for book ID {}: {}", bookEntity.getId(), e.getMessage());
-            }
+            moveSidecarFilesQuietly(bookEntity.getId(), currentPrimaryFilePath, expectedPrimaryFilePath);
 
             for (Path sourceParent : sourceParentsToCleanup) {
                 fileMoveHelper.deleteEmptyParentDirsUpToLibraryFolders(sourceParent, libraryRoots);
@@ -465,7 +405,7 @@ public class FileMoveService {
             Thread.sleep(millis);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Sleep interrupted", e);
+            throw new IllegalStateException("Sleep interrupted", e);
         }
     }
 
@@ -478,4 +418,75 @@ public class FileMoveService {
             );
         }
     }
+
+    private void commitDatabaseUpdate(Long bookId, List<BookFileEntity> bookFiles, String pattern,
+                                       LibraryPathEntity libraryPathEntity, BookEntity bookEntity,
+                                       LibraryEntity targetLibrary, String newFileSubPath,
+                                       List<PlannedMove> committedMoves) {
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                for (var bookFile : bookFiles) {
+                    String newFileName;
+                    if (bookFile.isBook()) {
+                        Path targetPath = fileMoveHelper.generateNewFilePath(bookEntity, bookFile, libraryPathEntity, pattern);
+                        newFileName = targetPath.getFileName().toString();
+                    } else {
+                        newFileName = bookFile.getFileName();
+                    }
+                    bookFileRepository.updateFileNameAndSubPath(bookFile.getId(), newFileName, newFileSubPath);
+                }
+
+                bookRepository.updateLibrary(bookEntity.getId(), targetLibrary.getId(), libraryPathEntity);
+            });
+        } catch (Exception e) {
+            log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", bookId, e);
+            for (PlannedMove committed : committedMoves) {
+                rollbackSingleFileMove(bookId, committed.target(), committed.source());
+            }
+            throw e;
+        }
+    }
+
+    private void commitFileRenameUpdate(Long bookId, List<BookFileEntity> bookFiles, String pattern,
+                                         BookEntity bookWithFiles, String newFileSubPath,
+                                         List<PlannedMove> committedMoves) {
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                for (var bookFile : bookFiles) {
+                    String newFileName;
+                    if (bookFile.isBook()) {
+                        Path targetPath = fileMoveHelper.generateNewFilePath(bookWithFiles, bookFile, bookWithFiles.getLibraryPath(), pattern);
+                        newFileName = targetPath.getFileName().toString();
+                    } else {
+                        newFileName = bookFile.getFileName();
+                    }
+                    bookFileRepository.updateFileNameAndSubPath(bookFile.getId(), newFileName, newFileSubPath);
+                }
+            });
+        } catch (Exception e) {
+            log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", bookId, e);
+            for (PlannedMove committed : committedMoves) {
+                rollbackSingleFileMove(bookId, committed.target(), committed.source());
+            }
+            throw e;
+        }
+    }
+
+    private void rollbackSingleFileMove(Long bookId, Path target, Path source) {
+        try {
+            fileMoveHelper.moveFile(target, source);
+        } catch (Exception rollbackEx) {
+            log.error("Failed to rollback file move (Target -> Source) for book ID {}: {} -> {}", bookId, target, source, rollbackEx);
+        }
+    }
+
+    private void moveSidecarFilesQuietly(Long bookId, Path oldPath, Path newPath) {
+        try {
+            sidecarMetadataWriter.moveSidecarFiles(oldPath, newPath);
+        } catch (Exception e) {
+            log.warn("Failed to move sidecar files for book ID {}: {}", bookId, e.getMessage());
+        }
+    }
+
+    private record PlannedMove(Path source, Path temp, Path target) {}
 }

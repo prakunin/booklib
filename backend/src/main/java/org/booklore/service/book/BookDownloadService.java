@@ -286,11 +286,7 @@ public class BookDownloadService {
             if (convertEpubToKepub) {
                 fileToSend = kepubConversionService.convertEpubToKepub(inputFile, tempDir.toFile(),
                     koboSettings.isForceEnableHyphenation());
-                try {
-                    koboSpanMapService.computeAndStoreIfNeeded(primaryFile, fileToSend);
-                } catch (Exception e) {
-                    log.warn("Failed to compute Kobo span map for file {}: {}", primaryFile.getId(), e.getMessage());
-                }
+                computeKoboSpanMapQuietly(primaryFile, fileToSend);
             }
 
             setResponseHeaders(response, fileToSend);
@@ -306,6 +302,14 @@ public class BookDownloadService {
             throw ApiError.FAILED_TO_DOWNLOAD_FILE.createException(bookId);
         } finally {
             cleanupTempDirectory(tempDir);
+        }
+    }
+
+    private void computeKoboSpanMapQuietly(BookFileEntity primaryFile, File fileToSend) {
+        try {
+            koboSpanMapService.computeAndStoreIfNeeded(primaryFile, fileToSend);
+        } catch (Exception e) {
+            log.warn("Failed to compute Kobo span map for file {}: {}", primaryFile.getId(), e.getMessage());
         }
     }
 

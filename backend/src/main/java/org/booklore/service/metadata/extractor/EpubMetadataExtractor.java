@@ -20,6 +20,7 @@ import org.booklore.util.SecureXmlUtils;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
@@ -270,32 +271,17 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                             seriesFound = true;
                         }
                         if (!seriesIndexFound && ((BookLoreMetadata.NS_PREFIX + ":series_index").equals(prop) || "calibre:series_index".equals(name) || "group-position".equals(prop))) {
-                            try {
-                                builderMeta.seriesNumber(Float.parseFloat(content));
+                            if (trySetSeriesNumber(builderMeta, content)) {
                                 seriesIndexFound = true;
-                            } catch (NumberFormatException _) {
-                                // ignore unparseable series index
                             }
                         }
 
                         if ("calibre:pages".equals(name) || "pagecount".equals(name) || "schema:pagecount".equals(prop) || "media:pagecount".equals(prop) || (BookLoreMetadata.NS_PREFIX + ":page_count").equals(prop)) {
                             safeParseInt(content, builderMeta::pageCount);
                         } else if ("calibre:user_metadata:#pagecount".equals(name)) {
-                            try {
-                                JsonNode jsonRoot = objectMapper.readTree(content);
-                                JsonNode valueNode = jsonRoot.get("#value#");
-                                if (valueNode != null && !valueNode.isNull()) {
-                                    safeParseInt(valueNode.asString(), builderMeta::pageCount);
-                                }
-                            } catch (Exception e) {
-                                log.debug("Failed to parse calibre:user_metadata:#pagecount: {}", e.getMessage());
-                            }
+                            parseUserMetadataPageCount(content, builderMeta);
                         } else if ("calibre:user_metadata".equals(prop)) {
-                            try {
-                                extractCalibreUserMetadata(objectMapper.readTree(content), builderMeta, moods, tags);
-                            } catch (Exception e) {
-                                log.debug("Failed to parse calibre:user_metadata: {}", e.getMessage());
-                            }
+                            parseUserMetadata(content, builderMeta, moods, tags);
                         }
 
 
@@ -440,18 +426,9 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
             }
 
             if (builderMeta.build().getPublishedDate() == null) {
-                for (int i = 0; i < children.getLength(); i++) {
-                    if (!(children.item(i) instanceof Element el)) continue;
-                    if (!"meta".equals(el.getLocalName())) continue;
-                    String prop = el.getAttribute("property").trim().toLowerCase();
-                    String content = el.hasAttribute(CONTENT_ATTR) ? el.getAttribute(CONTENT_ATTR).trim() : el.getTextContent().trim();
-                    if ("dcterms:modified".equals(prop)) {
-                        LocalDate parsed = parseDate(content);
-                        if (parsed != null) {
-                            builderMeta.publishedDate(parsed);
-                            break;
-                        }
-                    }
+                LocalDate modifiedDate = findDctermsModifiedDate(children);
+                if (modifiedDate != null) {
+                    builderMeta.publishedDate(modifiedDate);
                 }
             }
 
@@ -489,6 +466,60 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
         }
     }
 
+    private boolean trySetSeriesNumber(BookMetadata.BookMetadataBuilder builderMeta, String content) {
+        try {
+            builderMeta.seriesNumber(Float.parseFloat(content));
+            return true;
+        } catch (NumberFormatException _) {
+            // ignore unparseable series index
+            return false;
+        }
+    }
+
+    private void parseUserMetadataPageCount(String content, BookMetadata.BookMetadataBuilder builderMeta) {
+        try {
+            JsonNode jsonRoot = objectMapper.readTree(content);
+            JsonNode valueNode = jsonRoot.get("#value#");
+            if (valueNode != null && !valueNode.isNull()) {
+                safeParseInt(valueNode.asString(), builderMeta::pageCount);
+            }
+        } catch (Exception e) {
+            log.debug("Failed to parse calibre:user_metadata:#pagecount: {}", e.getMessage());
+        }
+    }
+
+    private void parseUserMetadata(String content, BookMetadata.BookMetadataBuilder builderMeta, Set<String> moods, Set<String> tags) {
+        try {
+            extractCalibreUserMetadata(objectMapper.readTree(content), builderMeta, moods, tags);
+        } catch (Exception e) {
+            log.debug("Failed to parse calibre:user_metadata: {}", e.getMessage());
+        }
+    }
+
+    private LocalDate findDctermsModifiedDate(NodeList children) {
+        for (int i = 0; i < children.getLength(); i++) {
+            Element el = asMetaElement(children.item(i));
+            if (el != null) {
+                String prop = el.getAttribute("property").trim().toLowerCase();
+                if ("dcterms:modified".equals(prop)) {
+                    String content = el.hasAttribute(CONTENT_ATTR) ? el.getAttribute(CONTENT_ATTR).trim() : el.getTextContent().trim();
+                    LocalDate parsed = parseDate(content);
+                    if (parsed != null) {
+                        return parsed;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private Element asMetaElement(Node node) {
+        if (!(node instanceof Element el) || !"meta".equals(el.getLocalName())) {
+            return null;
+        }
+        return el;
+    }
+
     private static void safeParseInt(String value, IntConsumer setter) {
         try {
             setter.accept(Integer.parseInt(value));
@@ -517,30 +548,42 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
             return;
         }
         for (Map.Entry<String, JsonNode> field : objectNode.properties()) {
-            String fieldName = field.getKey();
-            try {
-                JsonNode fieldObj = field.getValue();
-                if (fieldObj == null || !fieldObj.isObject()) continue;
+            applyCalibreUserMetadataField(field, builder, moodsSet, tagsSet);
+        }
+    }
 
-                JsonNode valueNode = fieldObj.get("#value#");
-                if (valueNode == null || valueNode.isNull()) continue;
-
-
-                if ("#moods".equals(fieldName) || "#extra_tags".equals(fieldName)) {
-                    String value = valueNode.isArray() ? valueNode.toString() : valueNode.asString().trim();
-                    if (value.isEmpty() || "null".equals(value)) continue;
-                    extractSetField(value, "#moods".equals(fieldName) ? moodsSet : tagsSet);
-                } else {
-                    String value = valueNode.asString().trim();
-                    if (value.isEmpty() || "null".equals(value)) continue;
-                    BiConsumer<BookMetadata.BookMetadataBuilder, String> mapper = CALIBRE_FIELD_MAPPINGS.get(fieldName);
-                    if (mapper != null) {
-                        mapper.accept(builder, value);
-                    }
-                }
-            } catch (Exception e) {
-                log.debug("Failed to extract Calibre field '{}': {}", fieldName, e.getMessage());
+    private void applyCalibreUserMetadataField(Map.Entry<String, JsonNode> field, BookMetadata.BookMetadataBuilder builder,
+                                                Set<String> moodsSet, Set<String> tagsSet) {
+        String fieldName = field.getKey();
+        try {
+            JsonNode fieldObj = field.getValue();
+            if (fieldObj == null || !fieldObj.isObject()) {
+                return;
             }
+
+            JsonNode valueNode = fieldObj.get("#value#");
+            if (valueNode == null || valueNode.isNull()) {
+                return;
+            }
+
+            if ("#moods".equals(fieldName) || "#extra_tags".equals(fieldName)) {
+                String value = valueNode.isArray() ? valueNode.toString() : valueNode.asString().trim();
+                if (value.isEmpty() || "null".equals(value)) {
+                    return;
+                }
+                extractSetField(value, "#moods".equals(fieldName) ? moodsSet : tagsSet);
+            } else {
+                String value = valueNode.asString().trim();
+                if (value.isEmpty() || "null".equals(value)) {
+                    return;
+                }
+                BiConsumer<BookMetadata.BookMetadataBuilder, String> mapper = CALIBRE_FIELD_MAPPINGS.get(fieldName);
+                if (mapper != null) {
+                    mapper.accept(builder, value);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to extract Calibre field '{}': {}", fieldName, e.getMessage());
         }
     }
 

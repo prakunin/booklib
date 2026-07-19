@@ -163,77 +163,100 @@ public class BookdropMonitoringService implements SmartLifecycle {
     private void processEvents() {
         while (running) {
             if (paused) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException _) {
-                    log.info("Bookdrop monitor thread interrupted during pause");
-                    Thread.currentThread().interrupt();
+                if (!sleepWhilePaused()) {
                     return;
                 }
-                continue;
-            }
-
-            WatchKey key;
-            try {
-                key = watchService.take();
-            } catch (InterruptedException _) {
-                log.info("Bookdrop monitor thread interrupted");
-                Thread.currentThread().interrupt();
-                return;
-            } catch (ClosedWatchServiceException _) {
-                log.info("WatchService closed, stopping thread");
+            } else if (!processAvailableEvents()) {
                 return;
             }
+        }
+    }
 
-            for (WatchEvent<?> event : key.pollEvents()) {
-                WatchEvent.Kind<?> kind = event.kind();
+    /**
+     * Sleeps briefly while monitoring is paused.
+     * Returns false if the thread was interrupted and should stop.
+     */
+    private boolean sleepWhilePaused() {
+        try {
+            Thread.sleep(1000);
+            return true;
+        } catch (InterruptedException _) {
+            log.info("Bookdrop monitor thread interrupted during pause");
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
 
-                if (kind == StandardWatchEventKinds.OVERFLOW) {
-                    log.warn("Overflow event detected");
-                    continue;
+    /**
+     * Waits for and processes the next batch of watch events.
+     * Returns false if the watcher should stop running.
+     */
+    private boolean processAvailableEvents() {
+        WatchKey key;
+        try {
+            key = watchService.take();
+        } catch (InterruptedException _) {
+            log.info("Bookdrop monitor thread interrupted");
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (ClosedWatchServiceException _) {
+            log.info("WatchService closed, stopping thread");
+            return false;
+        }
+
+        for (WatchEvent<?> event : key.pollEvents()) {
+            handleWatchEvent(event);
+        }
+
+        boolean valid = key.reset();
+        if (!valid) {
+            log.warn("WatchKey is no longer valid");
+            return false;
+        }
+        return true;
+    }
+
+    private void handleWatchEvent(WatchEvent<?> event) {
+        WatchEvent.Kind<?> kind = event.kind();
+
+        if (kind == StandardWatchEventKinds.OVERFLOW) {
+            log.warn("Overflow event detected");
+            return;
+        }
+
+        Path context = (Path) event.context();
+        Path fullPath = bookdrop.resolve(context);
+
+        log.info("Detected {} event on: {}", kind.name(), fullPath);
+
+        if (kind == StandardWatchEventKinds.ENTRY_CREATE || kind == StandardWatchEventKinds.ENTRY_MODIFY) {
+            if (Files.isDirectory(fullPath)) {
+                log.info("New directory detected, scanning recursively: {}", fullPath);
+                try (Stream<Path> pathStream = Files.walk(fullPath)) {
+                    pathStream
+                            .filter(Files::isRegularFile)
+                            .filter(path -> !FileUtils.shouldIgnore(path))
+                            .filter(path -> BookFileExtension.fromFileName(path.getFileName().toString()).isPresent())
+                            .forEach(path -> eventHandler.enqueueFile(path, StandardWatchEventKinds.ENTRY_CREATE));
+                } catch (IOException e) {
+                    log.error("Failed to scan new directory: {}", fullPath, e);
                 }
-
-                Path context = (Path) event.context();
-                Path fullPath = bookdrop.resolve(context);
-
-                log.info("Detected {} event on: {}", kind.name(), fullPath);
-
-                if (kind == StandardWatchEventKinds.ENTRY_CREATE || kind == StandardWatchEventKinds.ENTRY_MODIFY) {
-                    if (Files.isDirectory(fullPath)) {
-                        log.info("New directory detected, scanning recursively: {}", fullPath);
-                        try (Stream<Path> pathStream = Files.walk(fullPath)) {
-                            pathStream
-                                    .filter(Files::isRegularFile)
-                                    .filter(path -> !FileUtils.shouldIgnore(path))
-                                    .filter(path -> BookFileExtension.fromFileName(path.getFileName().toString()).isPresent())
-                                    .forEach(path -> eventHandler.enqueueFile(path, StandardWatchEventKinds.ENTRY_CREATE));
-                        } catch (IOException e) {
-                            log.error("Failed to scan new directory: {}", fullPath, e);
-                        }
+            } else {
+                if (!FileUtils.shouldIgnore(fullPath)) {
+                    if (BookFileExtension.fromFileName(fullPath.getFileName().toString()).isPresent()) {
+                        eventHandler.enqueueFile(fullPath, kind);
                     } else {
-                        if (!FileUtils.shouldIgnore(fullPath)) {
-                            if (BookFileExtension.fromFileName(fullPath.getFileName().toString()).isPresent()) {
-                                eventHandler.enqueueFile(fullPath, kind);
-                            } else {
-                                log.info("Ignored unsupported file type: {}", fullPath);
-                            }
-                        }
+                        log.info("Ignored unsupported file type: {}", fullPath);
                     }
-                } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
-                    if (Files.isDirectory(fullPath)) {
-                        log.info("Directory deleted: {}, performing bulk DB cleanup", fullPath);
-                    } else {
-                        log.info("File deleted: {}", fullPath);
-                    }
-                    eventHandler.enqueueFile(fullPath, kind);
                 }
             }
-
-            boolean valid = key.reset();
-            if (!valid) {
-                log.warn("WatchKey is no longer valid");
-                break;
+        } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
+            if (Files.isDirectory(fullPath)) {
+                log.info("Directory deleted: {}, performing bulk DB cleanup", fullPath);
+            } else {
+                log.info("File deleted: {}", fullPath);
             }
+            eventHandler.enqueueFile(fullPath, kind);
         }
     }
 

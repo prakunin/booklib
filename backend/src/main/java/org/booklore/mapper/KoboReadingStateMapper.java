@@ -40,7 +40,7 @@ public abstract class KoboReadingStateMapper {
         try {
             return value == null ? null : objectMapper.writeValueAsString(value);
         } catch (JacksonException e) {
-            throw new RuntimeException("Failed to serialize JSON", e);
+            throw new IllegalStateException("Failed to serialize JSON", e);
         }
     }
 
@@ -48,7 +48,7 @@ public abstract class KoboReadingStateMapper {
         try {
             return json == null ? null : objectMapper.readValue(json, clazz);
         } catch (JacksonException e) {
-            throw new RuntimeException("Failed to deserialize JSON", e);
+            throw new IllegalStateException("Failed to deserialize JSON", e);
         }
     }
 

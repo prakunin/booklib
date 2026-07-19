@@ -551,13 +551,9 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                 handleRateLimit(response);
                 return null;
             } else if (response.statusCode() >= 500 && retriesLeft > 0) {
-                log.warn("ComicVine API returned status {}. Retrying... ({} retries left)", 
+                log.warn("ComicVine API returned status {}. Retrying... ({} retries left)",
                          response.statusCode(), retriesLeft);
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException _) {
-                    Thread.currentThread().interrupt();
-                }
+                sleepBeforeRetry(2000);
                 return sendRequestWithRetry(uri, responseType, retriesLeft - 1);
             } else {
                 log.error("Comicvine API returned status code {}. Body: {}", response.statusCode(), response.body());
@@ -579,6 +575,14 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
             Thread.currentThread().interrupt();
         }
         return null;
+    }
+
+    private void sleepBeforeRetry(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void handleRateLimit(HttpResponse<String> response) {

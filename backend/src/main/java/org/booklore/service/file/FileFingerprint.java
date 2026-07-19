@@ -43,7 +43,7 @@ public class FileFingerprint {
             return result.toString();
 
         } catch (IOException | NoSuchAlgorithmException e) {
-            throw new RuntimeException("Failed to compute partial MD5 hash for input file", e);
+            throw new IllegalStateException("Failed to compute partial MD5 hash for input file", e);
         }
     }
 
@@ -64,7 +64,7 @@ public class FileFingerprint {
             }
 
             if (audioFiles.isEmpty()) {
-                throw new RuntimeException("No audio files found in folder");
+                throw new IllegalStateException("No audio files found in folder");
             }
 
             // Hash first file and combine with file count for a representative hash
@@ -83,18 +83,18 @@ public class FileFingerprint {
             return result.toString();
 
         } catch (IOException | NoSuchAlgorithmException e) {
-            throw new RuntimeException("Failed to compute folder hash", e);
+            throw new IllegalStateException("Failed to compute folder hash", e);
         }
     }
 
     private Path validateReadableFilePath(Path filePath) {
         if (filePath == null) {
-            throw new RuntimeException("File path cannot be null");
+            throw new IllegalArgumentException("File path cannot be null");
         }
 
         Path normalizedPath = filePath.toAbsolutePath().normalize();
         if (!Files.exists(normalizedPath) || !Files.isRegularFile(normalizedPath)) {
-            throw new RuntimeException("File does not exist or is not a regular file");
+            throw new IllegalArgumentException("File does not exist or is not a regular file");
         }
 
         return normalizedPath;
@@ -102,12 +102,12 @@ public class FileFingerprint {
 
     private Path validateReadableFolderPath(Path folderPath) {
         if (folderPath == null) {
-            throw new RuntimeException("Folder path cannot be null");
+            throw new IllegalArgumentException("Folder path cannot be null");
         }
 
         Path normalizedPath = folderPath.toAbsolutePath().normalize();
         if (!Files.exists(normalizedPath) || !Files.isDirectory(normalizedPath)) {
-            throw new RuntimeException("Folder does not exist or is not a directory");
+            throw new IllegalArgumentException("Folder does not exist or is not a directory");
         }
 
         return normalizedPath;

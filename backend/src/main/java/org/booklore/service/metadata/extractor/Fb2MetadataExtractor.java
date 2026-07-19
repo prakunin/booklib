@@ -12,6 +12,7 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -488,7 +489,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         return null;
     }
 
-    private InputStream getInputStream(File file) throws Exception {
+    private InputStream getInputStream(File file) throws IOException {
         FileInputStream fis = new FileInputStream(file);
         if (file.getName().toLowerCase().endsWith(".gz")) {
             try {

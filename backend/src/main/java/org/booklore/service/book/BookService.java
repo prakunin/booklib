@@ -434,11 +434,7 @@ public class BookService {
                 Path fullFilePath = bookFile.getFullFilePath();
                 try {
                     if (Files.exists(fullFilePath)) {
-                        try {
-                            monitoringRegistrationService.unregisterSpecificPath(fullFilePath.getParent());
-                        } catch (Exception ex) {
-                            log.warn("Failed to unregister monitoring for path: {}", fullFilePath.getParent(), ex);
-                        }
+                        unregisterMonitoringQuietly(fullFilePath.getParent());
 
                         // Handle folder-based audiobooks (delete directory recursively)
                         if (bookFile.isFolderBased() && Files.isDirectory(fullFilePath)) {
@@ -457,11 +453,7 @@ public class BookService {
 
                         deleteEmptyParentDirsUpToLibraryFolders(fullFilePath.getParent(), libraryRoots);
 
-                        try {
-                            sidecarMetadataWriter.deleteSidecarFiles(fullFilePath);
-                        } catch (Exception e) {
-                            log.warn("Failed to delete sidecar files for: {}", fullFilePath, e);
-                        }
+                        deleteSidecarFilesQuietly(fullFilePath);
                     }
                 } catch (IOException e) {
                     log.warn("Failed to delete book file: {}", fullFilePath, e);
@@ -486,6 +478,22 @@ public class BookService {
                 : ResponseEntity.status(HttpStatus.MULTI_STATUS).body(response);
     }
 
+    private void unregisterMonitoringQuietly(Path path) {
+        try {
+            monitoringRegistrationService.unregisterSpecificPath(path);
+        } catch (Exception ex) {
+            log.warn("Failed to unregister monitoring for path: {}", path, ex);
+        }
+    }
+
+    private void deleteSidecarFilesQuietly(Path fullFilePath) {
+        try {
+            sidecarMetadataWriter.deleteSidecarFiles(fullFilePath);
+        } catch (Exception e) {
+            log.warn("Failed to delete sidecar files for: {}", fullFilePath, e);
+        }
+    }
+
     private void deleteDirectoryRecursively(Path path) throws IOException {
         if (!Files.exists(path)) return;
 
@@ -507,57 +515,68 @@ public class BookService {
         }
 
         while (dir != null) {
-            boolean isLibraryRoot = false;
-            for (Path root : normalizedRoots) {
-                try {
-                    if (Files.isSameFile(root, dir)) {
-                        isLibraryRoot = true;
-                        break;
-                    }
-                } catch (IOException _) {
-                    log.warn("Failed to compare paths: {} and {}", root, dir);
-                }
-            }
+            dir = advanceCleanup(dir, normalizedRoots, ignoredFilenames);
+        }
+    }
 
-            if (isLibraryRoot) {
-                log.debug("Reached library root: {}. Stopping cleanup.", dir);
-                break;
-            }
+    private Path advanceCleanup(Path dir, Set<Path> normalizedRoots, Set<String> ignoredFilenames) {
+        if (isLibraryRootDir(dir, normalizedRoots)) {
+            log.debug("Reached library root: {}. Stopping cleanup.", dir);
+            return null;
+        }
 
-            File[] files = dir.toFile().listFiles();
-            if (files == null) {
-                log.warn("Cannot read directory: {}. Stopping cleanup.", dir);
-                break;
-            }
+        File[] files = dir.toFile().listFiles();
+        if (files == null) {
+            log.warn("Cannot read directory: {}. Stopping cleanup.", dir);
+            return null;
+        }
 
-            boolean hasImportantFiles = false;
-            for (File file : files) {
-                if (!ignoredFilenames.contains(file.getName())) {
-                    hasImportantFiles = true;
-                    break;
-                }
-            }
+        if (hasImportantFiles(files, ignoredFilenames)) {
+            log.debug("Directory {} contains important files. Stopping cleanup.", dir);
+            return null;
+        }
 
-            if (!hasImportantFiles) {
-                for (File file : files) {
-                    try {
-                        Files.delete(file.toPath());
-                        log.info("Deleted ignored file: {}", file.getAbsolutePath());
-                    } catch (IOException _) {
-                        log.warn("Failed to delete ignored file: {}", file.getAbsolutePath());
-                    }
+        deleteIgnoredFiles(files);
+
+        try {
+            Files.delete(dir);
+            log.info("Deleted empty directory: {}", dir);
+        } catch (IOException e) {
+            log.warn("Failed to delete directory: {}", dir, e);
+            return null;
+        }
+        return dir.getParent();
+    }
+
+    private boolean isLibraryRootDir(Path dir, Set<Path> normalizedRoots) {
+        for (Path root : normalizedRoots) {
+            try {
+                if (Files.isSameFile(root, dir)) {
+                    return true;
                 }
-                try {
-                    Files.delete(dir);
-                    log.info("Deleted empty directory: {}", dir);
-                } catch (IOException e) {
-                    log.warn("Failed to delete directory: {}", dir, e);
-                    break;
-                }
-                dir = dir.getParent();
-            } else {
-                log.debug("Directory {} contains important files. Stopping cleanup.", dir);
-                break;
+            } catch (IOException _) {
+                log.warn("Failed to compare paths: {} and {}", root, dir);
+            }
+        }
+        return false;
+    }
+
+    private boolean hasImportantFiles(File[] files, Set<String> ignoredFilenames) {
+        for (File file : files) {
+            if (!ignoredFilenames.contains(file.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void deleteIgnoredFiles(File[] files) {
+        for (File file : files) {
+            try {
+                Files.delete(file.toPath());
+                log.info("Deleted ignored file: {}", file.getAbsolutePath());
+            } catch (IOException _) {
+                log.warn("Failed to delete ignored file: {}", file.getAbsolutePath());
             }
         }
     }

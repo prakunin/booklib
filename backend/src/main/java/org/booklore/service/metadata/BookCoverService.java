@@ -485,34 +485,7 @@ public class BookCoverService {
                 int current = 1;
 
                 for (BookCoverInfo bookInfo : books) {
-                    try {
-                        String progress = "(" + current + "/" + total + ") ";
-                        sendNotification(username, Topic.LOG, LogNotification.info(progress + "Regenerating cover for: " + bookInfo.title()));
-
-                        transactionTemplate.execute(status -> {
-                            bookRepository.findByIdWithBookFiles(bookInfo.id()).ifPresent(book -> {
-                                var primaryFile = book.getPrimaryBookFile();
-                                if (primaryFile == null) {
-                                    log.warn("{}Skipping physical book ID {} ({}) - no file to regenerate cover from", progress, book.getId(), bookInfo.title());
-                                    return;
-                                }
-                                BookFileProcessor processor = processorRegistry.getProcessorOrThrow(primaryFile.getBookType());
-                                boolean success = processor.generateCover(book);
-
-                                if (success) {
-                                    updateBookCoverMetadata(book);
-                                    bookRepository.save(book);
-                                    notifyBulkCoverUpdate(List.of(book.getId()), username);
-                                    log.info("{}Successfully regenerated cover for book ID {} ({})", progress, book.getId(), bookInfo.title());
-                                } else {
-                                    log.warn("{}Failed to regenerate cover for book ID {} ({})", progress, book.getId(), bookInfo.title());
-                                }
-                            });
-                            return null;
-                        });
-                    } catch (Exception e) {
-                        log.error("Failed to regenerate cover for book ID {}: {}", bookInfo.id(), e.getMessage(), e);
-                    }
+                    regenerateCoverForBulkRescan(bookInfo, current, total, username);
                     current++;
                 }
 
@@ -536,25 +509,7 @@ public class BookCoverService {
             int current = 1;
 
             for (BookCoverInfo bookInfo : books) {
-                try {
-                    String progress = "(" + current + "/" + total + ") ";
-                    sendNotification(username, Topic.LOG, LogNotification.info(progress + "Updating cover for: " + bookInfo.title()));
-
-                    transactionTemplate.execute(status -> {
-                        bookRepository.findByIdWithBookFiles(bookInfo.id()).ifPresent(book -> {
-                            fileService.createThumbnailFromBytes(bookInfo.id(), coverImageBytes);
-                            writeCoverToBookFile(book, (writer, b) -> writer.replaceCoverImageFromBytes(b, coverImageBytes));
-                            updateBookCoverMetadata(book);
-                            bookRepository.save(book);
-                            notifyBulkCoverUpdate(List.of(book.getId()), username);
-                        });
-                        return null;
-                    });
-
-                    log.info("{}Successfully updated cover for book ID {} ({})", progress, bookInfo.id(), bookInfo.title());
-                } catch (Exception e) {
-                    log.error("Failed to update cover for book ID {}: {}", bookInfo.id(), e.getMessage(), e);
-                }
+                updateCoverForBulkSelection(bookInfo, coverImageBytes, current, total, username);
                 current++;
             }
 
@@ -573,33 +528,7 @@ public class BookCoverService {
             int current = 1;
 
             for (BookCoverInfo bookInfo : books) {
-                try {
-                    String progress = "(" + current + "/" + total + ") ";
-                    sendNotification(username, Topic.LOG, LogNotification.info(progress + "Regenerating cover for: " + bookInfo.title()));
-
-                    transactionTemplate.execute(status -> {
-                        bookRepository.findByIdWithBookFiles(bookInfo.id()).ifPresent(book -> {
-                            var primaryFile = book.getPrimaryBookFile();
-                            if (primaryFile == null) {
-                                log.warn("{}Skipping book ID {} ({}) - no primary file", progress, book.getId(), bookInfo.title());
-                                return;
-                            }
-                            BookFileProcessor processor = processorRegistry.getProcessorOrThrow(primaryFile.getBookType());
-                            boolean success = processor.generateCover(book);
-
-                            if (success) {
-                                updateBookCoverMetadata(book);
-                                bookRepository.save(book);
-                                notifyBulkCoverUpdate(List.of(book.getId()), username);
-                            }
-                        });
-                        return null;
-                    });
-
-                    log.info("{}Successfully regenerated cover for book ID {} ({})", progress, bookInfo.id(), bookInfo.title());
-                } catch (Exception e) {
-                    log.error("Failed to regenerate cover for book ID {}: {}", bookInfo.id(), e.getMessage(), e);
-                }
+                regenerateCoverForBulkSelection(bookInfo, current, total, username);
                 current++;
             }
 
@@ -618,29 +547,7 @@ public class BookCoverService {
             int current = 1;
 
             for (BookCoverInfo bookInfo : books) {
-                try {
-                    String progress = "(" + current + "/" + total + ") ";
-                    sendNotification(username, Topic.LOG, LogNotification.info(progress + "Generating custom cover for: " + bookInfo.title()));
-
-                    transactionTemplate.execute(status -> {
-                        bookRepository.findByIdWithBookFiles(bookInfo.id()).ifPresent(book -> {
-                            String title = book.getMetadata().getTitle();
-                            String author = getAuthorNames(book);
-                            byte[] coverBytes = coverImageGenerator.generateCover(title, author);
-
-                            fileService.createThumbnailFromBytes(book.getId(), coverBytes);
-                            writeCoverToBookFile(book, (writer, b) -> writer.replaceCoverImageFromBytes(b, coverBytes));
-                            updateBookCoverMetadata(book);
-                            bookRepository.save(book);
-                            notifyBulkCoverUpdate(List.of(book.getId()), username);
-                        });
-                        return null;
-                    });
-
-                    log.info("{}Successfully generated custom cover for book ID {} ({})", progress, bookInfo.id(), bookInfo.title());
-                } catch (Exception e) {
-                    log.error("Failed to generate custom cover for book ID {}: {}", bookInfo.id(), e.getMessage(), e);
-                }
+                generateCustomCoverForBulkSelection(bookInfo, current, total, username);
                 current++;
             }
 
@@ -648,6 +555,115 @@ public class BookCoverService {
         } catch (Exception e) {
             log.error("Error during custom cover generation: {}", e.getMessage(), e);
             sendNotification(username, Topic.LOG, LogNotification.error("Error occurred during custom cover generation"));
+        }
+    }
+
+    private void regenerateCoverForBulkRescan(BookCoverInfo bookInfo, int current, int total, String username) {
+        try {
+            String progress = "(" + current + "/" + total + ") ";
+            sendNotification(username, Topic.LOG, LogNotification.info(progress + "Regenerating cover for: " + bookInfo.title()));
+
+            transactionTemplate.execute(status -> {
+                bookRepository.findByIdWithBookFiles(bookInfo.id()).ifPresent(book -> {
+                    var primaryFile = book.getPrimaryBookFile();
+                    if (primaryFile == null) {
+                        log.warn("{}Skipping physical book ID {} ({}) - no file to regenerate cover from", progress, book.getId(), bookInfo.title());
+                        return;
+                    }
+                    BookFileProcessor processor = processorRegistry.getProcessorOrThrow(primaryFile.getBookType());
+                    boolean success = processor.generateCover(book);
+
+                    if (success) {
+                        updateBookCoverMetadata(book);
+                        bookRepository.save(book);
+                        notifyBulkCoverUpdate(List.of(book.getId()), username);
+                        log.info("{}Successfully regenerated cover for book ID {} ({})", progress, book.getId(), bookInfo.title());
+                    } else {
+                        log.warn("{}Failed to regenerate cover for book ID {} ({})", progress, book.getId(), bookInfo.title());
+                    }
+                });
+                return null;
+            });
+        } catch (Exception e) {
+            log.error("Failed to regenerate cover for book ID {}: {}", bookInfo.id(), e.getMessage(), e);
+        }
+    }
+
+    private void updateCoverForBulkSelection(BookCoverInfo bookInfo, byte[] coverImageBytes, int current, int total, String username) {
+        try {
+            String progress = "(" + current + "/" + total + ") ";
+            sendNotification(username, Topic.LOG, LogNotification.info(progress + "Updating cover for: " + bookInfo.title()));
+
+            transactionTemplate.execute(status -> {
+                bookRepository.findByIdWithBookFiles(bookInfo.id()).ifPresent(book -> {
+                    fileService.createThumbnailFromBytes(bookInfo.id(), coverImageBytes);
+                    writeCoverToBookFile(book, (writer, b) -> writer.replaceCoverImageFromBytes(b, coverImageBytes));
+                    updateBookCoverMetadata(book);
+                    bookRepository.save(book);
+                    notifyBulkCoverUpdate(List.of(book.getId()), username);
+                });
+                return null;
+            });
+
+            log.info("{}Successfully updated cover for book ID {} ({})", progress, bookInfo.id(), bookInfo.title());
+        } catch (Exception e) {
+            log.error("Failed to update cover for book ID {}: {}", bookInfo.id(), e.getMessage(), e);
+        }
+    }
+
+    private void regenerateCoverForBulkSelection(BookCoverInfo bookInfo, int current, int total, String username) {
+        try {
+            String progress = "(" + current + "/" + total + ") ";
+            sendNotification(username, Topic.LOG, LogNotification.info(progress + "Regenerating cover for: " + bookInfo.title()));
+
+            transactionTemplate.execute(status -> {
+                bookRepository.findByIdWithBookFiles(bookInfo.id()).ifPresent(book -> {
+                    var primaryFile = book.getPrimaryBookFile();
+                    if (primaryFile == null) {
+                        log.warn("{}Skipping book ID {} ({}) - no primary file", progress, book.getId(), bookInfo.title());
+                        return;
+                    }
+                    BookFileProcessor processor = processorRegistry.getProcessorOrThrow(primaryFile.getBookType());
+                    boolean success = processor.generateCover(book);
+
+                    if (success) {
+                        updateBookCoverMetadata(book);
+                        bookRepository.save(book);
+                        notifyBulkCoverUpdate(List.of(book.getId()), username);
+                    }
+                });
+                return null;
+            });
+
+            log.info("{}Successfully regenerated cover for book ID {} ({})", progress, bookInfo.id(), bookInfo.title());
+        } catch (Exception e) {
+            log.error("Failed to regenerate cover for book ID {}: {}", bookInfo.id(), e.getMessage(), e);
+        }
+    }
+
+    private void generateCustomCoverForBulkSelection(BookCoverInfo bookInfo, int current, int total, String username) {
+        try {
+            String progress = "(" + current + "/" + total + ") ";
+            sendNotification(username, Topic.LOG, LogNotification.info(progress + "Generating custom cover for: " + bookInfo.title()));
+
+            transactionTemplate.execute(status -> {
+                bookRepository.findByIdWithBookFiles(bookInfo.id()).ifPresent(book -> {
+                    String title = book.getMetadata().getTitle();
+                    String author = getAuthorNames(book);
+                    byte[] coverBytes = coverImageGenerator.generateCover(title, author);
+
+                    fileService.createThumbnailFromBytes(book.getId(), coverBytes);
+                    writeCoverToBookFile(book, (writer, b) -> writer.replaceCoverImageFromBytes(b, coverBytes));
+                    updateBookCoverMetadata(book);
+                    bookRepository.save(book);
+                    notifyBulkCoverUpdate(List.of(book.getId()), username);
+                });
+                return null;
+            });
+
+            log.info("{}Successfully generated custom cover for book ID {} ({})", progress, bookInfo.id(), bookInfo.title());
+        } catch (Exception e) {
+            log.error("Failed to generate custom cover for book ID {}: {}", bookInfo.id(), e.getMessage(), e);
         }
     }
 
@@ -693,7 +709,7 @@ public class BookCoverService {
             return file.getBytes();
         } catch (Exception e) {
             log.error("Failed to read cover file: {}", e.getMessage());
-            throw new RuntimeException("Failed to read cover file", e);
+            throw ApiError.INVALID_INPUT.createException("Failed to read cover file");
         }
     }
 

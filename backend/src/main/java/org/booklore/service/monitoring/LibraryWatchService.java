@@ -81,51 +81,15 @@ public class LibraryWatchService implements SmartLifecycle {
     private void pollLoop() {
         try {
             while (!Thread.currentThread().isInterrupted()) {
-                WatchKey key;
-                try {
-                    key = watchService.take();
-                } catch (ClosedWatchServiceException _) {
-                    log.warn("WatchService closed, stopping poll loop.");
+                WatchKey key = takeNextKey();
+                if (key == null) {
                     break;
                 }
 
                 Path directory = (Path) key.watchable();
 
                 for (WatchEvent<?> event : key.pollEvents()) {
-                    WatchEvent.Kind<?> kind = event.kind();
-
-                    if (kind == StandardWatchEventKinds.OVERFLOW) {
-                        handleOverflow(directory);
-                        continue;
-                    }
-
-                    Path fileName = (Path) event.context();
-                    Path fullPath = directory.resolve(fileName);
-
-                    boolean isDir = kind == StandardWatchEventKinds.ENTRY_CREATE
-                            ? Files.isDirectory(fullPath)
-                            : watches.containsKey(fullPath);
-
-                    boolean isRelevantFile = !isDir && isRelevantBookFile(fullPath);
-                    if (!isDir && !isRelevantFile) continue;
-
-                    if (isDir && kind == StandardWatchEventKinds.ENTRY_CREATE) {
-                        WatchEntry parentEntry = watches.get(directory);
-                        if (parentEntry != null) {
-                            registrationExecutor.submit(() -> registerRecursive(fullPath, parentEntry.libraryId()));
-                        }
-                    }
-
-                    if (isDir && kind == StandardWatchEventKinds.ENTRY_DELETE) {
-                        registrationExecutor.submit(() -> unregisterRecursive(fullPath));
-                    }
-
-                    WatchEntry entry = watches.get(directory);
-                    if (entry != null) {
-                        eventProcessor.processEvent(kind, entry.libraryId(), fullPath, isDir);
-                    } else {
-                        log.warn("No library ID found for watched directory: {}", directory);
-                    }
+                    handlePollEvent(directory, event);
                 }
 
                 boolean valid = key.reset();
@@ -137,6 +101,52 @@ public class LibraryWatchService implements SmartLifecycle {
         } catch (InterruptedException _) {
             log.warn("Poll loop interrupted");
             Thread.currentThread().interrupt();
+        }
+    }
+
+    private WatchKey takeNextKey() throws InterruptedException {
+        try {
+            return watchService.take();
+        } catch (ClosedWatchServiceException _) {
+            log.warn("WatchService closed, stopping poll loop.");
+            return null;
+        }
+    }
+
+    private void handlePollEvent(Path directory, WatchEvent<?> event) {
+        WatchEvent.Kind<?> kind = event.kind();
+
+        if (kind == StandardWatchEventKinds.OVERFLOW) {
+            handleOverflow(directory);
+            return;
+        }
+
+        Path fileName = (Path) event.context();
+        Path fullPath = directory.resolve(fileName);
+
+        boolean isDir = kind == StandardWatchEventKinds.ENTRY_CREATE
+                ? Files.isDirectory(fullPath)
+                : watches.containsKey(fullPath);
+
+        boolean isRelevantFile = !isDir && isRelevantBookFile(fullPath);
+        if (!isDir && !isRelevantFile) return;
+
+        if (isDir && kind == StandardWatchEventKinds.ENTRY_CREATE) {
+            WatchEntry parentEntry = watches.get(directory);
+            if (parentEntry != null) {
+                registrationExecutor.submit(() -> registerRecursive(fullPath, parentEntry.libraryId()));
+            }
+        }
+
+        if (isDir && kind == StandardWatchEventKinds.ENTRY_DELETE) {
+            registrationExecutor.submit(() -> unregisterRecursive(fullPath));
+        }
+
+        WatchEntry entry = watches.get(directory);
+        if (entry != null) {
+            eventProcessor.processEvent(kind, entry.libraryId(), fullPath, isDir);
+        } else {
+            log.warn("No library ID found for watched directory: {}", directory);
         }
     }
 

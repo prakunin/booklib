@@ -164,25 +164,22 @@ public class BookFileGroupingUtils {
         for (Map.Entry<String, List<LibraryFile>> folderEntry : byFolder.entrySet()) {
             List<LibraryFile> filesInFolder = folderEntry.getValue();
 
-            if (filesInFolder.isEmpty()) {
-                continue;
-            }
+            if (!filesInFolder.isEmpty()) {
+                String fileSubPath = filesInFolder.getFirst().getFileSubPath();
+                Long libraryPathId = filesInFolder.getFirst().getLibraryPathEntity().getId();
 
-            String fileSubPath = filesInFolder.getFirst().getFileSubPath();
-            Long libraryPathId = filesInFolder.getFirst().getLibraryPathEntity().getId();
-
-            // Root-level files: use exact grouping
-            if (fileSubPath == null || fileSubPath.isEmpty()) {
-                for (LibraryFile file : filesInFolder) {
-                    String key = libraryPathId + "::" + extractGroupingKey(file.getFileName());
-                    result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
+                // Root-level files: use exact grouping
+                if (fileSubPath == null || fileSubPath.isEmpty()) {
+                    for (LibraryFile file : filesInFolder) {
+                        String key = libraryPathId + "::" + extractGroupingKey(file.getFileName());
+                        result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
+                    }
+                } else {
+                    // Files in subfolder: use folder-centric grouping
+                    Map<String, List<LibraryFile>> folderGroups = groupFilesInFolder(filesInFolder, fileSubPath, libraryPathId);
+                    result.putAll(folderGroups);
                 }
-                continue;
             }
-
-            // Files in subfolder: use folder-centric grouping
-            Map<String, List<LibraryFile>> folderGroups = groupFilesInFolder(filesInFolder, fileSubPath, libraryPathId);
-            result.putAll(folderGroups);
         }
 
         return result;

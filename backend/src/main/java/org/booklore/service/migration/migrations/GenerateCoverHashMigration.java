@@ -36,23 +36,26 @@ public class GenerateCoverHashMigration implements Migration {
         int processedCount = 0;
         long lastId = 0;
 
-        while (true) {
+        boolean moreBatches = true;
+        while (moreBatches) {
             List<BookEntity> bookBatch = bookRepository.findBooksForMigrationBatch(lastId, PageRequest.of(0, batchSize));
-            if (bookBatch.isEmpty()) break;
-
-            for (BookEntity book : bookBatch) {
-                if (book.getBookCoverHash() == null) {
-                    book.setBookCoverHash(BookCoverUtils.generateCoverHash());
+            if (bookBatch.isEmpty()) {
+                moreBatches = false;
+            } else {
+                for (BookEntity book : bookBatch) {
+                    if (book.getBookCoverHash() == null) {
+                        book.setBookCoverHash(BookCoverUtils.generateCoverHash());
+                    }
                 }
+
+                bookRepository.saveAll(bookBatch);
+                processedCount += bookBatch.size();
+                lastId = bookBatch.getLast().getId();
+
+                log.info("Migration progress: {} books processed", processedCount);
+
+                moreBatches = bookBatch.size() >= batchSize;
             }
-
-            bookRepository.saveAll(bookBatch);
-            processedCount += bookBatch.size();
-            lastId = bookBatch.getLast().getId();
-
-            log.info("Migration progress: {} books processed", processedCount);
-
-            if (bookBatch.size() < batchSize) break;
         }
 
         log.info("Completed migration '{}'. Total books processed: {}", getKey(), processedCount);

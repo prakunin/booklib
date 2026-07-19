@@ -148,14 +148,9 @@ public class MetadataRefreshService {
 
                         reportProgressIfNeeded(task, jobId, finalCompletedCount, totalBooks, book, isReviewMode);
                         Map<MetadataProvider, BookMetadata> metadataMap = fetchMetadataForBook(providers, book);
-                        if (providers.contains(GoodReads)) {
-                            try {
-                                Thread.sleep(ThreadLocalRandom.current().nextLong(500, 1500));
-                            } catch (InterruptedException _) {
-                                Thread.currentThread().interrupt();
-                                status.setRollbackOnly();
-                                return null;
-                            }
+                        if (providers.contains(GoodReads) && !sleepBeforeGoodreadsFetch()) {
+                            status.setRollbackOnly();
+                            return null;
                         }
                         BookMetadata fetched = null;
                         boolean bookReviewMode = false;
@@ -210,6 +205,21 @@ public class MetadataRefreshService {
             int totalBooksForError = actualBookIds.size();
             sendBatchProgressNotification(jobId, 0, totalBooksForError, "Fatal error during metadata refresh: " + fatal.getMessage(), MetadataFetchTaskStatus.ERROR, false);
             throw fatal;
+        }
+    }
+
+    /**
+     * Sleeps a short randomized delay before hitting GoodReads (rate-limit courtesy). Returns
+     * {@code false} if interrupted while sleeping, preserving the interrupt flag, so the caller
+     * can roll back the current transaction and bail out.
+     */
+    private boolean sleepBeforeGoodreadsFetch() {
+        try {
+            Thread.sleep(ThreadLocalRandom.current().nextLong(500, 1500));
+            return true;
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            return false;
         }
     }
 

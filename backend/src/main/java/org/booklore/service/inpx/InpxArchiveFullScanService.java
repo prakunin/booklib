@@ -95,30 +95,11 @@ public class InpxArchiveFullScanService {
             long removed = 0;
             long processed = 0;
             for (Long bookId : bookIds) {
-                try {
-                    if (bookRefreshService.refresh(bookId)) {
-                        covered++;
-                    }
-                } catch (ArchiveEntryMissingException e) {
-                    // The archive was rewritten and no longer holds this entry. Incremental
-                    // discovery is additive and cannot notice, so retiring the row here is the
-                    // only repair: left in place it stays listed and fails on every read.
-                    // The retire opens its own transaction; a failure there must degrade this one
-                    // book to `failed` like any other, never escape and abort the whole scan.
-                    try {
-                        bookRefreshService.retireOrphan(bookId);
-                        removed++;
-                        log.info("Retired orphaned INPX archive book {} in {}: {}",
-                                bookId, archiveName, e.getMessage());
-                    } catch (RuntimeException retireFailure) {
-                        failed++;
-                        log.warn("Failed to retire orphaned INPX archive book {} in {}: {}",
-                                bookId, archiveName, retireFailure.getMessage());
-                    }
-                } catch (RuntimeException e) {
-                    failed++;
-                    log.warn("Skipping failed INPX archive book {} in {}: {}",
-                            bookId, archiveName, e.getMessage());
+                switch (refreshOrRetireBook(bookId, archiveName)) {
+                    case COVERED -> covered++;
+                    case REMOVED -> removed++;
+                    case FAILED -> failed++;
+                    case NOT_COVERED -> { /* no counter change */ }
                 }
                 processed++;
                 catalogService.progress(libraryId, archiveName, processed, covered, failed);
@@ -131,6 +112,40 @@ public class InpxArchiveFullScanService {
             catalogService.failed(libraryId, archiveName, e.getMessage());
             log.error("Failed to rescan INPX archive {} in library {}: {}",
                     archiveName, libraryId, e.getMessage(), e);
+        }
+    }
+
+    private enum RefreshOutcome {
+        COVERED, NOT_COVERED, REMOVED, FAILED
+    }
+
+    private RefreshOutcome refreshOrRetireBook(Long bookId, String archiveName) {
+        try {
+            return bookRefreshService.refresh(bookId) ? RefreshOutcome.COVERED : RefreshOutcome.NOT_COVERED;
+        } catch (ArchiveEntryMissingException e) {
+            // The archive was rewritten and no longer holds this entry. Incremental
+            // discovery is additive and cannot notice, so retiring the row here is the
+            // only repair: left in place it stays listed and fails on every read.
+            // The retire opens its own transaction; a failure there must degrade this one
+            // book to `failed` like any other, never escape and abort the whole scan.
+            return retireOrphanBook(bookId, archiveName, e);
+        } catch (RuntimeException e) {
+            log.warn("Skipping failed INPX archive book {} in {}: {}",
+                    bookId, archiveName, e.getMessage());
+            return RefreshOutcome.FAILED;
+        }
+    }
+
+    private RefreshOutcome retireOrphanBook(Long bookId, String archiveName, ArchiveEntryMissingException e) {
+        try {
+            bookRefreshService.retireOrphan(bookId);
+            log.info("Retired orphaned INPX archive book {} in {}: {}",
+                    bookId, archiveName, e.getMessage());
+            return RefreshOutcome.REMOVED;
+        } catch (RuntimeException retireFailure) {
+            log.warn("Failed to retire orphaned INPX archive book {} in {}: {}",
+                    bookId, archiveName, retireFailure.getMessage());
+            return RefreshOutcome.FAILED;
         }
     }
 

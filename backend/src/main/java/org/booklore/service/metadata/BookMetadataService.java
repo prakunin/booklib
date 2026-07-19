@@ -188,7 +188,7 @@ public class BookMetadataService {
                     Method setter = BookMetadataEntity.class.getMethod(setterName, Boolean.class);
                     setter.invoke(metadataEntity, "LOCK".equalsIgnoreCase(action));
                 } catch (Exception e) {
-                    throw new RuntimeException("Failed to invoke setter for field: " + entityField + " on bookId: " + metadataEntity.getBookId(), e);
+                    throw new IllegalStateException("Failed to invoke setter for field: " + entityField + " on bookId: " + metadataEntity.getBookId(), e);
                 }
             });
         }

@@ -13,6 +13,7 @@ import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -88,7 +89,7 @@ public class CoverImageGenerator {
 
         } catch (Exception e) {
             log.error("Cover generation failed: {}", title, e);
-            throw new RuntimeException("Cover generation failed", e);
+            throw new IllegalStateException("Cover generation failed", e);
         } finally {
             cleanup(g, render, result);
         }
@@ -139,7 +140,7 @@ public class CoverImageGenerator {
 
         } catch (Exception e) {
             log.error("Square cover generation failed: {}", title, e);
-            throw new RuntimeException("Square cover generation failed", e);
+            throw new IllegalStateException("Square cover generation failed", e);
         } finally {
             cleanup(g, render, result);
         }
@@ -868,7 +869,7 @@ public class CoverImageGenerator {
             writer.write(null, new IIOImage(img, null, null), param);
             return baos.toByteArray();
         } catch (IOException e) {
-            throw new RuntimeException("JPEG encoding failed", e);
+            throw new UncheckedIOException("JPEG encoding failed", e);
         } finally {
             if (writer != null) writer.dispose();
             if (ios != null) try { ios.close(); } catch (IOException _) { /* nothing to recover on close */ }

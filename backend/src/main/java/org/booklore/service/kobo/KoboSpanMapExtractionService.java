@@ -8,7 +8,9 @@ import org.jsoup.parser.Parser;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -112,7 +114,7 @@ public class KoboSpanMapExtractionService {
         return fullPath;
     }
 
-    private org.w3c.dom.Document parseXmlEntry(ZipFile zipFile, String entryName) throws Exception {
+    private org.w3c.dom.Document parseXmlEntry(ZipFile zipFile, String entryName) throws IOException, SAXException, ParserConfigurationException {
         ZipEntry zipEntry = findEntry(zipFile, entryName);
         if (zipEntry == null) {
             throw new IOException("Entry not found in archive: " + entryName);
