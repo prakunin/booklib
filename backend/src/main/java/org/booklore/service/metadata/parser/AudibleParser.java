@@ -177,14 +177,13 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
         try {
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
-            if (response.statusCode() < 200 || response.statusCode() > 399) {
-                log.error("Audible request failed with status code: {}", response.statusCode());
-                throw new RuntimeException("Failed to query Audible");
-            }
-
-            log.debug("Request success with code {}", response.statusCode());
-
             try (InputStream stream = response.body()) {
+                if (response.statusCode() < 200 || response.statusCode() > 399) {
+                    log.error("Audible request failed with status code: {}", response.statusCode());
+                    throw new RuntimeException("Failed to query Audible");
+                }
+
+                log.debug("Request success with code {}", response.statusCode());
                 return objectMapper.readValue(stream, tClass);
             }
         } catch (IOException e) {

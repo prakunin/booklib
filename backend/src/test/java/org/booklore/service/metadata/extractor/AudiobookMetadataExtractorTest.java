@@ -24,6 +24,8 @@ import org.jaudiotagger.audio.AudioFileIO;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
@@ -579,6 +581,48 @@ class AudiobookMetadataExtractorTest {
                 BookMetadata metadata = extractor.extractMetadata(file);
 
                 assertThat(metadata.getAudiobookMetadata().getChapters().get(0).getTitle()).isEqualTo("Chapter 1");
+            }
+        }
+
+        @Test
+        void ffprobeChaptersExtractedFromProcessOutput() throws Exception {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                Path ffprobeScript = tempDir.resolve("ffprobe-test.sh");
+                Files.writeString(ffprobeScript, """
+                        #!/bin/sh
+                        cat <<'JSON'
+                        {"chapters":[{"start_time":"0.000000","end_time":"12.500000","tags":{"title":"Opening"}},{"start":12500,"end":30000,"time_base":"1/1000"}]}
+                        JSON
+                        """, StandardCharsets.UTF_8);
+                assertThat(ffprobeScript.toFile().setExecutable(true)).isTrue();
+                when(ffprobeService.getFfprobeBinary()).thenReturn(ffprobeScript);
+
+                Tag tag = mock(Tag.class);
+                when(tag.getFirst(any(FieldKey.class))).thenReturn("");
+
+                AudioHeader header = mock(AudioHeader.class);
+                when(header.getPreciseTrackLength()).thenReturn(30.0);
+                when(header.getBitRateAsNumber()).thenReturn(128L);
+                when(header.getSampleRateAsNumber()).thenReturn(44100);
+                when(header.getChannels()).thenReturn("Stereo");
+                when(header.getEncodingType()).thenReturn("mp3");
+
+                AudioFile audioFile = mock(AudioFile.class);
+                when(audioFile.getTag()).thenReturn(tag);
+                when(audioFile.getAudioHeader()).thenReturn(header);
+
+                File file = new File(tempDir.toFile(), "test.mp3");
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                BookMetadata metadata = extractor.extractMetadata(file);
+                AudiobookMetadata abMeta = metadata.getAudiobookMetadata();
+
+                assertThat(abMeta.getChapters()).hasSize(2);
+                assertThat(abMeta.getChapterCount()).isEqualTo(2);
+                assertThat(abMeta.getChapters().get(0).getTitle()).isEqualTo("Opening");
+                assertThat(abMeta.getChapters().get(0).getEndTimeMs()).isEqualTo(12500L);
+                assertThat(abMeta.getChapters().get(1).getStartTimeMs()).isEqualTo(12500L);
+                assertThat(abMeta.getChapters().get(1).getTitle()).isEqualTo("Chapter 2");
             }
         }
 
