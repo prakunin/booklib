@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -20,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Stream;
 import java.util.zip.ZipFile;
 
@@ -162,5 +164,14 @@ class CbxReaderServiceTest {
                 cbxReaderService.initCache(1L, "../traversal")
         );
         assertTrue(ex.getMessage().contains("Invalid book type"), "Expected INVALID_INPUT, got: " + ex.getMessage());
+    }
+
+    @Test
+    void shutdownCacheExecutor_ShutsDownBackgroundExecutor() {
+        cbxReaderService.shutdownCacheExecutor();
+
+        ExecutorService cacheExecutor = (ExecutorService) ReflectionTestUtils.getField(cbxReaderService, "cacheExecutor");
+        assertNotNull(cacheExecutor);
+        assertTrue(cacheExecutor.isShutdown());
     }
 }

@@ -18,6 +18,7 @@ import org.booklore.util.ArchiveUtils;
 import org.booklore.util.FileUtils;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PreDestroy;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
@@ -69,6 +70,11 @@ public class CbxReaderService {
     });
     /** Tracks books whose async cache init has already been submitted. */
     private final Set<String> cacheInitSubmitted = ConcurrentHashMap.newKeySet();
+
+    @PreDestroy
+    void shutdownCacheExecutor() {
+        cacheExecutor.shutdownNow();
+    }
 
     // L1 Cache: Open ZipFile handles for active reading sessions (TTL 30m)
     @Setter

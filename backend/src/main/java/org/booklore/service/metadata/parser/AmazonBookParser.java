@@ -46,6 +46,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
 
     private static final int COUNT_DETAILED_METADATA_TO_GET = 3;
     private static final String BASE_BOOK_URL_SUFFIX = "/dp/";
+    private static final int REQUEST_TIMEOUT_MS = 15_000;
     private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("[^\\d]");
     private static final Pattern SERIES_FORMAT_PATTERN = Pattern.compile("Book (\\d+(?:\\.\\d+)?) of (\\d+)");
     private static final Pattern PARENTHESES_WITH_WHITESPACE_PATTERN = Pattern.compile("\\s*\\(.*?\\)");
@@ -823,6 +824,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                     .header("viewport-width", "1170")
                     .header("x-amz-amabot-click-attributes", "disable")
                     .header("x-requested-with", "XMLHttpRequest")
+                    .timeout(REQUEST_TIMEOUT_MS)
                     .method(Connection.Method.GET);
 
             if (amazonCookie != null && !amazonCookie.isBlank()) {
