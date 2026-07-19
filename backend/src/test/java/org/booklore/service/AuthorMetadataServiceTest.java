@@ -4,6 +4,7 @@ import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.exception.APIException;
 import org.booklore.model.dto.AuthorDetails;
 import org.booklore.model.dto.AuthorSearchResult;
+import org.booklore.model.dto.AuthorSummary;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.request.AuthorMatchRequest;
 import org.booklore.model.entity.AuthorEntity;
@@ -15,6 +16,7 @@ import org.booklore.service.audit.AuditService;
 import org.booklore.service.metadata.DuckDuckGoCoverService;
 import org.booklore.service.metadata.parser.AuthorParser;
 import org.booklore.util.FileService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +45,7 @@ class AuthorMetadataServiceTest {
     @Mock private DuckDuckGoCoverService duckDuckGoCoverService;
     @Mock private AuthenticationService authenticationService;
     @Mock private AppSettingService appSettingService;
+    @Mock private ObjectProvider<AuthorMetadataService> selfProvider;
 
     private AuthorMetadataService service;
 
@@ -59,8 +62,10 @@ class AuthorMetadataServiceTest {
                 fileService,
                 duckDuckGoCoverService,
                 authenticationService,
-                appSettingService
+                appSettingService,
+                selfProvider
         );
+        lenient().when(selfProvider.getObject()).thenReturn(service);
 
         BookLoreUser.UserPermissions adminPermissions = new BookLoreUser.UserPermissions();
         adminPermissions.setAdmin(true);
@@ -266,5 +271,28 @@ class AuthorMetadataServiceTest {
         service.matchAuthor(1L, request);
 
         verify(fileService, never()).createAuthorThumbnailFromUrl(anyLong(), anyString());
+    }
+
+    @Test
+    void autoMatchAuthors_callsQuickMatchThroughSelfProvider() {
+        AuthorEntity author = new AuthorEntity();
+        author.setId(1L);
+        author.setName("Test Author");
+        AuthorMetadataService proxy = mock(AuthorMetadataService.class);
+
+        when(authorRepository.findById(1L)).thenReturn(Optional.of(author));
+        when(selfProvider.getObject()).thenReturn(proxy);
+        when(proxy.quickMatchAuthor(1L, "us")).thenReturn(AuthorDetails.builder()
+                .id(1L)
+                .name("Test Author")
+                .asin("B000APZGGS")
+                .build());
+        when(fileService.getAuthorThumbnailFile(1L)).thenReturn("/nonexistent/path/thumbnail.jpg");
+
+        List<AuthorSummary> results = service.autoMatchAuthors(List.of(1L)).collectList().block();
+
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().getAsin()).isEqualTo("B000APZGGS");
+        verify(proxy).quickMatchAuthor(1L, "us");
     }
 }

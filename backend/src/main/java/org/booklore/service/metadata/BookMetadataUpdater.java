@@ -224,7 +224,9 @@ public class BookMetadataUpdater {
             return;
         }
         switch (mode) {
-            case REPLACE_ALL -> setter.accept(newValue);
+            case REPLACE_ALL -> {
+                if (!isValueMissing(newValue)) setter.accept(newValue);
+            }
             case REPLACE_MISSING -> {
                 if (isValueMissing(getter.get())) setter.accept(newValue);
             }
@@ -257,7 +259,6 @@ public class BookMetadataUpdater {
 
         List<String> authorNames = Optional.ofNullable(m.getAuthors()).orElse(Collections.emptyList());
         if (authorNames.isEmpty()) {
-            if (replaceMode == MetadataReplaceMode.REPLACE_ALL) authors.clear();
             return;
         }
 
@@ -303,7 +304,6 @@ public class BookMetadataUpdater {
 
         Set<String> categoryNames = Optional.ofNullable(m.getCategories()).orElse(Collections.emptySet());
         if (categoryNames.isEmpty()) {
-            if (replaceMode == MetadataReplaceMode.REPLACE_ALL) e.getCategories().clear();
             return;
         }
 
@@ -338,7 +338,6 @@ public class BookMetadataUpdater {
 
         Set<String> moodNames = Optional.ofNullable(m.getMoods()).orElse(Collections.emptySet());
         if (moodNames.isEmpty()) {
-            if (replaceMode == MetadataReplaceMode.REPLACE_ALL) e.getMoods().clear();
             return;
         }
 
@@ -373,7 +372,6 @@ public class BookMetadataUpdater {
 
         Set<String> tagNames = Optional.ofNullable(m.getTags()).orElse(Collections.emptySet());
         if (tagNames.isEmpty()) {
-            if (replaceMode == MetadataReplaceMode.REPLACE_ALL) e.getTags().clear();
             return;
         }
 
@@ -540,9 +538,6 @@ public class BookMetadataUpdater {
 
     private void updateComicCharacters(ComicMetadataEntity c, Set<String> characters, MetadataReplaceMode mode) {
         if (characters == null || characters.isEmpty()) {
-            if (mode == MetadataReplaceMode.REPLACE_ALL) {
-                c.getCharacters().clear();
-            }
             return;
         }
         if (c.getCharacters() == null) {
@@ -562,9 +557,6 @@ public class BookMetadataUpdater {
 
     private void updateComicTeams(ComicMetadataEntity c, Set<String> teams, MetadataReplaceMode mode) {
         if (teams == null || teams.isEmpty()) {
-            if (mode == MetadataReplaceMode.REPLACE_ALL) {
-                c.getTeams().clear();
-            }
             return;
         }
         if (c.getTeams() == null) {
@@ -584,9 +576,6 @@ public class BookMetadataUpdater {
 
     private void updateComicLocations(ComicMetadataEntity c, Set<String> locations, MetadataReplaceMode mode) {
         if (locations == null || locations.isEmpty()) {
-            if (mode == MetadataReplaceMode.REPLACE_ALL) {
-                c.getLocations().clear();
-            }
             return;
         }
         if (c.getLocations() == null) {
@@ -626,9 +615,6 @@ public class BookMetadataUpdater {
                 .collect(Collectors.toSet());
 
         if (!hasNewNames) {
-            if (mode == MetadataReplaceMode.REPLACE_ALL) {
-                c.getCreatorMappings().removeAll(existingForRole);
-            }
             return;
         }
 
