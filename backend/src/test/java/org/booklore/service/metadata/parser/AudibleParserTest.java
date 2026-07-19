@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -88,7 +89,9 @@ public class AudibleParserTest {
     private void mockHttpClientResponse(String urlPrefix, int statusCode, String response) throws Exception {
         when(
                 mockHttpClient.<InputStream>send(
-                        argThat(r -> r != null && r.uri().toString().startsWith(urlPrefix)),
+                        argThat(r -> r != null
+                                && r.uri().toString().startsWith(urlPrefix)
+                                && r.timeout().filter(Duration.ofSeconds(15)::equals).isPresent()),
                         any()
                 )
         ).thenAnswer((_) -> getMockResponse(statusCode, response));

@@ -20,6 +20,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Collections;
@@ -36,10 +37,11 @@ import java.util.stream.IntStream;
 public class RanobeDbParser implements BookParser {
     private static final String RANOBEDB_URL = "https://ranobedb.org/api/v0/";
     private static final String RANOBEDB_IMAGE_URL = "https://images.ranobedb.org/";
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
     private final ObjectMapper objectMapper;
     private final AppSettingService appSettingService;
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient;
     
     // Rate limiter: 2 requests per second
     private static final int MAX_REQUESTS_PER_SECOND = 2;
@@ -133,6 +135,7 @@ public class RanobeDbParser implements BookParser {
 
           HttpRequest request = HttpRequest.newBuilder()
                   .uri(uri)
+                  .timeout(REQUEST_TIMEOUT)
                   .header("User-Agent", "BookLore/1.0 (Book and Comic Metadata Fetcher; +https://github.com/booklore-app/booklore)")
                   .GET()
                   .build();
@@ -190,6 +193,7 @@ public class RanobeDbParser implements BookParser {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(uri)
+                    .timeout(REQUEST_TIMEOUT)
                     .header("User-Agent", "BookLore/1.0 (Book and Comic Metadata Fetcher; +https://github.com/booklore-app/booklore)")
                     .GET()
                     .build();

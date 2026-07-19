@@ -23,6 +23,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -59,7 +60,9 @@ public class ComicvineBookParserTest {
         HttpResponse<String> response = getResponse(statusCode, payload);
         when(
             httpClient.<String>send(
-                argThat(arg -> arg != null && arg.uri().toString().contains(uri)),
+                argThat(arg -> arg != null
+                        && arg.uri().toString().contains(uri)
+                        && arg.timeout().filter(Duration.ofSeconds(15)::equals).isPresent()),
                 any()
             )
         ).thenReturn(response);

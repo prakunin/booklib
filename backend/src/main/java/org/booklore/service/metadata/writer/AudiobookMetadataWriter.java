@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.net.URI;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -35,6 +36,9 @@ public class AudiobookMetadataWriter implements MetadataWriter {
     static {
         Logger.getLogger("org.jaudiotagger").setLevel(Level.WARNING);
     }
+
+    private static final int REMOTE_IMAGE_CONNECT_TIMEOUT_MS = 10_000;
+    private static final int REMOTE_IMAGE_READ_TIMEOUT_MS = 15_000;
 
     private final AppSettingService appSettingService;
 
@@ -327,14 +331,22 @@ public class AudiobookMetadataWriter implements MetadataWriter {
     }
 
     private byte[] loadImage(String pathOrUrl) {
-        try (InputStream stream = pathOrUrl.startsWith("http")
-                ? URI.create(pathOrUrl).toURL().openStream()
-                : new FileInputStream(pathOrUrl)) {
+        try (InputStream stream = openImageStream(pathOrUrl)) {
             return stream.readAllBytes();
         } catch (IOException e) {
             log.warn("Failed to load image from {}: {}", pathOrUrl, e.getMessage());
             return null;
         }
+    }
+
+    private InputStream openImageStream(String pathOrUrl) throws IOException {
+        if (!pathOrUrl.startsWith("http")) {
+            return new FileInputStream(pathOrUrl);
+        }
+        URLConnection connection = URI.create(pathOrUrl).toURL().openConnection();
+        connection.setConnectTimeout(REMOTE_IMAGE_CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(REMOTE_IMAGE_READ_TIMEOUT_MS);
+        return connection.getInputStream();
     }
 
     private String detectMimeType(byte[] data) {

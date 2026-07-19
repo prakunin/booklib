@@ -12,6 +12,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -21,6 +22,7 @@ public class AudnexusAuthorParser implements AuthorParser {
 
     private static final String BASE_URL = "https://api.audnex.us";
     private static final long MIN_REQUEST_INTERVAL_MS = 150;
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -46,6 +48,7 @@ public class AudnexusAuthorParser implements AuthorParser {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(uri)
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
 
@@ -94,6 +97,7 @@ public class AudnexusAuthorParser implements AuthorParser {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(uri)
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
 
@@ -130,6 +134,7 @@ public class AudnexusAuthorParser implements AuthorParser {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(uri)
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
 
