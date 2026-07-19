@@ -27,7 +27,6 @@ import java.util.zip.GZIPInputStream;
 @Component
 public class Fb2MetadataExtractor implements FileMetadataExtractor {
 
-    private static final String FB2_NAMESPACE = "http://www.gribuser.ru/xml/fictionbook/2.0";
     private static final Pattern YEAR_PATTERN = Pattern.compile("\\d{4}");
     private static final Pattern ISBN_PATTERN = Pattern.compile("\\d{9}[\\dXx]");
     private static final Pattern KEYWORD_SEPARATOR_PATTERN = Pattern.compile("[,;]");
@@ -46,6 +45,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
      * which {@code BookCoverService}'s lazy probe recorded as a permanent "no cover" verdict.
      */
     @Override
+    @SuppressWarnings("java:S1168") // null (not empty array) means "proven no cover"; BookCoverGenerator/BookdropMetadataService branch on == null
     public byte[] extractCover(File file) {
         try {
             CoverCandidate candidate = findCoverCandidate(file);
@@ -115,6 +115,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         }
     }
 
+    @SuppressWarnings("java:S1168") // return value flows straight through to extractCover's null-means-no-cover contract
     private byte[] decodeCoverBinary(File file, String binaryId) throws Exception {
         try (InputStream inputStream = getInputStream(file)) {
             XMLStreamReader reader = createXmlStreamReader(inputStream);

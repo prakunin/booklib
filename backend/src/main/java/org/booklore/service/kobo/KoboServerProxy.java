@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 public class KoboServerProxy {
 
     private static final Pattern KOBO_API_PREFIX_PATTERN = Pattern.compile("^/api/kobo/[^/]+");
-    private final String KOBO_BOOK_IMAGE_CDN_URL = "https://cdn.kobo.com/book-images/{ImageId}/{Width}/{Height}/{IsGreyscale}/image.jpg";
+    private static final String KOBO_BOOK_IMAGE_CDN_URL = "https://cdn.kobo.com/book-images/{ImageId}/{Width}/{Height}/{IsGreyscale}/image.jpg";
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(1)).build();
     private final ObjectMapper objectMapper;
     private final BookloreSyncTokenGenerator bookloreSyncTokenGenerator;
@@ -63,7 +63,7 @@ public class KoboServerProxy {
         if (includeSyncToken) {
             syncToken = bookloreSyncTokenGenerator.fromRequestHeaders(request);
             if (syncToken == null || syncToken.getRawKoboSyncToken() == null || syncToken.getRawKoboSyncToken().isBlank()) {
-                //throw new IllegalStateException("Request must include sync token, but none found");
+                // Tolerated: some Kobo clients omit the sync token on certain calls; enforcement is left to downstream handlers.
             }
         }
 

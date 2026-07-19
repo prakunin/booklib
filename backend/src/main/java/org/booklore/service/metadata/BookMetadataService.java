@@ -199,10 +199,8 @@ public class BookMetadataService {
     @Transactional
     public List<BookMetadata> toggleAllLock(ToggleAllLockRequest request) {
         boolean lock = request.getLock() == Lock.LOCK;
-        List<BookEntity> books = bookQueryService.findAllWithMetadataByIds(request.getBookIds())
-                .stream()
-                .peek(book -> book.getMetadata().applyLockToAllFields(lock))
-                .toList();
+        List<BookEntity> books = bookQueryService.findAllWithMetadataByIds(request.getBookIds());
+        books.forEach(book -> book.getMetadata().applyLockToAllFields(lock));
         bookRepository.saveAll(books);
         return books.stream().map(b -> bookMetadataMapper.toBookMetadata(b.getMetadata(), false)).toList();
     }

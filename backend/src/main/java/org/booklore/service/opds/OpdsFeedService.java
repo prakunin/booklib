@@ -44,9 +44,9 @@ public class OpdsFeedService {
     private final MagicShelfService magicShelfService;
     private final MagicShelfBookService magicShelfBookService;
 
-    public String generateRootNavigation(HttpServletRequest request) {
+    public String generateRootNavigation() {
 
-        String feed = """
+        return """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">
                   <id>urn:booklore:root</id>
@@ -128,10 +128,9 @@ public class OpdsFeedService {
                           </entry>
                         """.formatted(now()) +
                 FEED_CLOSING_TAG;
-        return feed;
     }
 
-    public String generateLibrariesNavigation(HttpServletRequest request) {
+    public String generateLibrariesNavigation() {
         Long userId = getUserId();
         List<Library> libraries = opdsBookService.getAccessibleLibraries(userId);
 
@@ -168,7 +167,7 @@ public class OpdsFeedService {
         return feed.toString();
     }
 
-    public String generateShelvesNavigation(HttpServletRequest request) {
+    public String generateShelvesNavigation() {
         Long userId = getUserId();
 
         var feed = new StringBuilder("""
@@ -209,7 +208,7 @@ public class OpdsFeedService {
         return feed.toString();
     }
 
-    public String generateMagicShelvesNavigation(HttpServletRequest request) {
+    public String generateMagicShelvesNavigation() {
         Long userId = getUserId();
 
         var feed = new StringBuilder("""
@@ -250,7 +249,7 @@ public class OpdsFeedService {
         return feed.toString();
     }
 
-    public String generateAuthorsNavigation(HttpServletRequest request) {
+    public String generateAuthorsNavigation() {
         Long userId = getUserId();
         List<String> authors = opdsBookService.getDistinctAuthors(userId);
 
@@ -287,7 +286,7 @@ public class OpdsFeedService {
         return feed.toString();
     }
 
-    public String generateSeriesNavigation(HttpServletRequest request) {
+    public String generateSeriesNavigation() {
         Long userId = getUserId();
         List<String> seriesList = opdsBookService.getDistinctSeries(userId);
 
@@ -419,7 +418,7 @@ public class OpdsFeedService {
         return feed.toString();
     }
 
-    public String generateSurpriseFeed(HttpServletRequest request) {
+    public String generateSurpriseFeed() {
         Long userId = getUserId();
         int count = 25;
         List<Book> books = opdsBookService.getRandomBooks(userId, count);

@@ -59,7 +59,7 @@ class OpdsFeedServiceTest {
 
     @Test
     void generateRootNavigation_shouldContainAllSections() {
-        String xml = opdsFeedService.generateRootNavigation(request);
+        String xml = opdsFeedService.generateRootNavigation();
         assertThat(xml)
                 .contains("All Books")
                 .contains("Recently Added")
@@ -78,7 +78,7 @@ class OpdsFeedServiceTest {
         Library lib = Library.builder().id(1L).name("Test Library").watch(false).build();
         when(opdsBookService.getAccessibleLibraries(TEST_USER_ID)).thenReturn(List.of(lib));
 
-        String xml = opdsFeedService.generateLibrariesNavigation(request);
+        String xml = opdsFeedService.generateLibrariesNavigation();
         assertThat(xml)
                 .contains("Test Library")
                 .contains("urn:booklore:library:1")
@@ -91,7 +91,7 @@ class OpdsFeedServiceTest {
         mockAuthenticatedUser();
         when(opdsBookService.getAccessibleLibraries(TEST_USER_ID)).thenReturn(Collections.emptyList());
 
-        String xml = opdsFeedService.generateLibrariesNavigation(request);
+        String xml = opdsFeedService.generateLibrariesNavigation();
         assertThat(xml).contains("</feed>");
     }
 
@@ -102,7 +102,7 @@ class OpdsFeedServiceTest {
         ShelfEntity shelfEntity = ShelfEntity.builder().id(5L).name("Favorites").build();
         when(opdsBookService.getUserShelves(TEST_USER_ID)).thenReturn(Collections.singletonList(shelfEntity));
 
-        String xml = opdsFeedService.generateShelvesNavigation(request);
+        String xml = opdsFeedService.generateShelvesNavigation();
         assertThat(xml)
                 .contains("Favorites")
                 .contains("urn:booklore:shelf:5")
@@ -115,14 +115,14 @@ class OpdsFeedServiceTest {
         mockAuthenticatedUser();
         when(opdsBookService.getUserShelves(TEST_USER_ID)).thenReturn(Collections.emptyList());
 
-        String xml = opdsFeedService.generateShelvesNavigation(request);
+        String xml = opdsFeedService.generateShelvesNavigation();
         assertThat(xml).contains("</feed>");
     }
 
     @Test
     void generateShelvesNavigation_shouldThrowWhenNotAuthenticated() {
         when(authenticationService.getOpdsUser()).thenReturn(null);
-        assertThatThrownBy(() -> opdsFeedService.generateShelvesNavigation(request))
+        assertThatThrownBy(() -> opdsFeedService.generateShelvesNavigation())
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("OPDS authentication required");
         verify(opdsBookService, never()).getUserShelves(any());
@@ -393,7 +393,7 @@ class OpdsFeedServiceTest {
 
         when(opdsBookService.getRandomBooks(TEST_USER_ID, 25)).thenReturn(List.of(book));
 
-        String xml = opdsFeedService.generateSurpriseFeed(request);
+        String xml = opdsFeedService.generateSurpriseFeed();
         assertThat(xml)
                 .contains("Surprise Book")
                 .contains("urn:booklore:book:12")
@@ -406,7 +406,7 @@ class OpdsFeedServiceTest {
         mockAuthenticatedUser();
         when(opdsBookService.getRandomBooks(TEST_USER_ID, 25)).thenReturn(Collections.emptyList());
 
-        String xml = opdsFeedService.generateSurpriseFeed(request);
+        String xml = opdsFeedService.generateSurpriseFeed();
         assertThat(xml).contains("</feed>");
     }
 

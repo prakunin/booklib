@@ -33,6 +33,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
 
 /**
  * Service for converting comic book archive files (CBX) to EPUB format.
@@ -262,7 +263,7 @@ public class CbxConversionService {
     private void addMimetypeEntry(ZipArchiveOutputStream zipOut) throws IOException {
         byte[] mimetypeBytes = MIMETYPE_CONTENT.getBytes(StandardCharsets.UTF_8);
         ZipArchiveEntry mimetypeEntry = new ZipArchiveEntry("mimetype");
-        mimetypeEntry.setMethod(ZipArchiveEntry.STORED);
+        mimetypeEntry.setMethod(ZipEntry.STORED);
         mimetypeEntry.setSize(mimetypeBytes.length);
         mimetypeEntry.setCrc(calculateCrc32(mimetypeBytes));
 

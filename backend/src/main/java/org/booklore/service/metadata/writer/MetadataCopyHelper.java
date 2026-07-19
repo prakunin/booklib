@@ -68,6 +68,9 @@ public class MetadataCopyHelper {
         }
     }
 
+    // S4276: Consumer<Integer> is intentional here — null is passed to signal "clear this field",
+    // which the primitive-based IntConsumer cannot represent.
+    @SuppressWarnings("java:S4276")
     public void copySeriesTotal(boolean clear, Consumer<Integer> consumer) {
         if (!isLocked(metadata.getSeriesTotalLocked())) {
             if (clear) consumer.accept(null);
@@ -96,6 +99,9 @@ public class MetadataCopyHelper {
         }
     }
 
+    // S4276: Consumer<Integer> is intentional here — null is passed to signal "clear this field",
+    // which the primitive-based IntConsumer cannot represent.
+    @SuppressWarnings("java:S4276")
     public void copyPageCount(boolean clear, Consumer<Integer> consumer) {
         if (!isLocked(metadata.getPageCountLocked())) {
             if (clear) consumer.accept(null);
@@ -217,6 +223,9 @@ public class MetadataCopyHelper {
         }
     }
 
+    // S4276: Consumer<Double> is intentional here — null is passed to signal "clear this field",
+    // which the primitive-based DoubleConsumer cannot represent.
+    @SuppressWarnings("java:S4276")
     public void copyRating(boolean clear, Consumer<Double> consumer) {
         if (clear) {
             consumer.accept(null);
@@ -225,6 +234,9 @@ public class MetadataCopyHelper {
         }
     }
 
+    // S4276: Consumer<Double> is intentional here — null is passed to signal "clear this field",
+    // which the primitive-based DoubleConsumer cannot represent.
+    @SuppressWarnings("java:S4276")
     public void copyAmazonRating(boolean clear, Consumer<Double> consumer) {
         if (!isLocked(metadata.getAmazonRatingLocked())) {
             if (clear) consumer.accept(null);
@@ -232,6 +244,9 @@ public class MetadataCopyHelper {
         }
     }
 
+    // S4276: Consumer<Double> is intentional here — null is passed to signal "clear this field",
+    // which the primitive-based DoubleConsumer cannot represent.
+    @SuppressWarnings("java:S4276")
     public void copyGoodreadsRating(boolean clear, Consumer<Double> consumer) {
         if (!isLocked(metadata.getGoodreadsRatingLocked())) {
             if (clear) consumer.accept(null);
@@ -239,6 +254,9 @@ public class MetadataCopyHelper {
         }
     }
 
+    // S4276: Consumer<Double> is intentional here — null is passed to signal "clear this field",
+    // which the primitive-based DoubleConsumer cannot represent.
+    @SuppressWarnings("java:S4276")
     public void copyHardcoverRating(boolean clear, Consumer<Double> consumer) {
         if (!isLocked(metadata.getHardcoverRatingLocked())) {
             if (clear) consumer.accept(null);
@@ -248,6 +266,9 @@ public class MetadataCopyHelper {
 
 
 
+    // S4276: Consumer<Double> is intentional here — null is passed to signal "clear this field",
+    // which the primitive-based DoubleConsumer cannot represent.
+    @SuppressWarnings("java:S4276")
     public void copyLubimyczytacRating(boolean clear, Consumer<Double> consumer) {
         if (!isLocked(metadata.getLubimyczytacRatingLocked())) {
             if (clear) consumer.accept(null);
@@ -255,6 +276,9 @@ public class MetadataCopyHelper {
         }
     }
 
+    // S4276: Consumer<Double> is intentional here — null is passed to signal "clear this field",
+    // which the primitive-based DoubleConsumer cannot represent.
+    @SuppressWarnings("java:S4276")
     public void copyRanobedbRating(boolean clear, Consumer<Double> consumer) {
         if (!isLocked(metadata.getRanobedbRatingLocked())) {
             if (clear) consumer.accept(null);

@@ -203,6 +203,11 @@ class MetadataMerger {
         return resolveFieldWithProviders(metadataMap, fieldProvider, fieldValueExtractor::extract, Objects::nonNull);
     }
 
+    // S1168: null here is a load-bearing sentinel meaning "no provider resolved a value", distinct
+    // from "resolved to empty". applyExistingFallbacks() below relies on this null to decide whether
+    // to fall back to the existing metadata's value; returning an empty collection instead would make
+    // that fallback silently stop firing.
+    @SuppressWarnings("java:S1168")
     List<String> resolveFieldAsList(
             Map<MetadataProvider, BookMetadata> metadataMap,
             MetadataRefreshOptions.FieldProvider fieldProvider,
@@ -213,6 +218,8 @@ class MetadataMerger {
         return result instanceof List<String> list ? list : new ArrayList<>(result);
     }
 
+    // S1168: see resolveFieldAsList - same null-sentinel contract with applyExistingFallbacks().
+    @SuppressWarnings("java:S1168")
     Set<String> resolveFieldAsSet(
             Map<MetadataProvider, BookMetadata> metadataMap,
             MetadataRefreshOptions.FieldProvider fieldProvider,
@@ -295,6 +302,10 @@ class MetadataMerger {
         );
     }
 
+    // S4276: ObjIntConsumer<BookMetadata> takes a primitive int and would NPE on unboxing when
+    // resolveFieldAsInteger()/getter legitimately resolve to null (seriesTotal/pageCount are nullable);
+    // BiConsumer<BookMetadata, Integer> is intentional here.
+    @SuppressWarnings("java:S4276")
     private FieldMergeSpec resolvedInteger(
             Predicate<MetadataRefreshOptions.EnabledFields> enabled,
             Function<MetadataRefreshOptions.FieldOptions, MetadataRefreshOptions.FieldProvider> providerSelector,
@@ -384,6 +395,9 @@ class MetadataMerger {
         );
     }
 
+    // S1168: preserves the same null-sentinel contract as resolveFieldAsList/resolveFieldAsSet - callers
+    // (e.g. applyExistingFallbacks()) distinguish "no existing value" (null) from "existing value is empty".
+    @SuppressWarnings("java:S1168")
     private List<String> asList(Collection<String> value) {
         if (value == null) {
             return null;

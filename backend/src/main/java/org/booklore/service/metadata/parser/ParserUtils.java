@@ -1,7 +1,10 @@
 package org.booklore.service.metadata.parser;
 
+import lombok.experimental.UtilityClass;
+
 import java.util.regex.Pattern;
 
+@UtilityClass
 public class ParserUtils {
 
     private static final Pattern NON_ISBN_CHAR_PATTERN = Pattern.compile("[^0-9Xx]");

@@ -80,11 +80,7 @@ public class KomgaService {
         }
 
         List<BookEntity> filtered = contentRestrictionService.applyRestrictions(List.of(book), user.getId());
-        if (filtered.isEmpty()) {
-            return false;
-        }
-
-        return true;
+        return !filtered.isEmpty();
     }
 
 
@@ -254,13 +250,16 @@ public class KomgaService {
                 .toList();
         int actualPage;
         int actualSize;
+        int totalPages;
 
         if (unpaged) {
             actualPage = 0;
             actualSize = totalElements;
+            totalPages = totalElements > 0 ? 1 : 0;
         } else {
             actualPage = page;
             actualSize = size;
+            totalPages = seriesBooksPage.getTotalPages();
         }
 
         return KomgaPageableDto.<KomgaBookDto>builder()
@@ -269,9 +268,9 @@ public class KomgaService {
                 .size(actualSize)
                 .numberOfElements(content.size())
                 .totalElements(totalElements)
-                .totalPages(unpaged ? (totalElements > 0 ? 1 : 0) : seriesBooksPage.getTotalPages())
+                .totalPages(totalPages)
                 .first(actualPage == 0)
-                .last(totalElements == 0 || actualPage >= (unpaged ? 0 : seriesBooksPage.getTotalPages() - 1))
+                .last(totalElements == 0 || actualPage >= totalPages - 1)
                 .empty(content.isEmpty())
                 .build();
     }
@@ -360,17 +359,6 @@ public class KomgaService {
         return pages;
     }
 
-    private Map<String, List<BookEntity>> groupBooksBySeries(List<BookEntity> books) {
-        Map<String, List<BookEntity>> seriesMap = new HashMap<>();
-        
-        for (BookEntity book : books) {
-            String seriesName = komgaMapper.getBookSeriesName(book);
-            seriesMap.computeIfAbsent(seriesName, k -> new ArrayList<>()).add(book);
-        }
-        
-        return seriesMap;
-    }
-    
     public KomgaPageableDto<KomgaCollectionDto> getCollections(int page, int size, boolean unpaged) {
         log.debug("Getting collections, page: {}, size: {}, unpaged: {}", page, size, unpaged);
         

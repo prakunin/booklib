@@ -101,7 +101,6 @@ public class PdfProcessor extends AbstractFileProcessor implements BookFileProce
             // of potentially large/corrupted PDFs, we prefer graceful degradation
             // over crashing the entire service.
             log.error("Out of memory (heap space exhausted) while generating cover for '{}'. Skipping cover generation.", bookFile.getFileName());
-            System.gc(); // Hint to JVM to reclaim memory
             return false;
         } catch (NegativeArraySizeException _) {
             // This can appear on corrupted PDF, or PDF with such large images that the
@@ -144,7 +143,6 @@ public class PdfProcessor extends AbstractFileProcessor implements BookFileProce
             return CoverExtraction.found(encoded.toByteArray());
         } catch (OutOfMemoryError _) {
             log.error("Out of memory (heap space exhausted) while extracting cover for '{}'.", bookFile.getFileName());
-            System.gc(); // Hint to JVM to reclaim memory
             return CoverExtraction.readFailed();
         } catch (NegativeArraySizeException _) {
             log.warn("Corrupted PDF structure for '{}'.", bookFile.getFileName());

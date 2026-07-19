@@ -70,7 +70,7 @@ public class ArchivedBookContentService {
             Path resolved = resolveLocked(bookFile, false);
             flight.complete(resolved);
             return resolved;
-        } catch (RuntimeException | Error e) {
+        } catch (Exception e) {
             flight.completeExceptionally(e);
             throw e;
         } finally {

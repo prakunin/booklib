@@ -1,6 +1,7 @@
 package org.booklore.service.file;
 
 import org.booklore.util.FileUtils;
+import lombok.experimental.UtilityClass;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -11,9 +12,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
 import java.util.List;
 
+@UtilityClass
 public class FileFingerprint {
 
-    public static String generateHash(Path filePath) {
+    public String generateHash(Path filePath) {
         final long base = 1024L;
         final int blockSize = 1024;
         Path normalizedFilePath = validateReadableFilePath(filePath);
@@ -49,7 +51,7 @@ public class FileFingerprint {
      * Generate a hash for a folder-based audiobook.
      * Uses the first audio file's hash combined with the file count.
      */
-    public static String generateFolderHash(Path folderPath) {
+    public String generateFolderHash(Path folderPath) {
         Path normalizedFolderPath = validateReadableFolderPath(folderPath);
         try {
             List<Path> audioFiles;
@@ -85,7 +87,7 @@ public class FileFingerprint {
         }
     }
 
-    private static Path validateReadableFilePath(Path filePath) {
+    private Path validateReadableFilePath(Path filePath) {
         if (filePath == null) {
             throw new RuntimeException("File path cannot be null");
         }
@@ -98,7 +100,7 @@ public class FileFingerprint {
         return normalizedPath;
     }
 
-    private static Path validateReadableFolderPath(Path folderPath) {
+    private Path validateReadableFolderPath(Path folderPath) {
         if (folderPath == null) {
             throw new RuntimeException("Folder path cannot be null");
         }

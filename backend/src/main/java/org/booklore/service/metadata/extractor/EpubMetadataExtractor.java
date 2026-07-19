@@ -8,7 +8,6 @@ import org.grimmory.epub4j.archive.EpubContainers;
 import org.grimmory.epub4j.domain.Book;
 import org.grimmory.epub4j.domain.MediaType;
 import org.grimmory.epub4j.domain.MediaTypes;
-import org.grimmory.epub4j.domain.Resource;
 import org.grimmory.epub4j.epub.CoverDetector;
 import org.grimmory.epub4j.epub.CoverDetector.CoverDetectionResult;
 import org.grimmory.epub4j.epub.EpubReader;
@@ -115,6 +114,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
      * regenerating the cover of a corrupt EPUB told the user it had "no embedded cover image".
      */
     @Override
+    @SuppressWarnings("java:S1168") // null (not empty array) means "proven no cover"; BookCoverGenerator/BookdropMetadataService/EpubProcessor branch on == null
     public byte[] extractCover(File epubFile) {
         // Primary: use epub4j's CoverDetector with native lazy loading
         try {
@@ -198,6 +198,10 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
     }
 
     @Override
+    // S6916: the "when" guard clause syntax cannot attach to constant case labels (only to type
+    // patterns), so the single-if bodies in the switches below cannot be rewritten as guarded case
+    // labels - Sonar flags this for string switches too (known false positive, see java:S6916 discussions).
+    @SuppressWarnings("java:S6916")
     public BookMetadata extractMetadata(File epubFile) {
         try (EpubContainer container = EpubContainers.open(epubFile.toPath())) {
             String opfPath = findOpfPath(container);
@@ -344,6 +348,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                                     extractSetField(content, tags);
                                 }
                             }
+                            default -> log.debug("Unhandled meta key: {}", key);
                         }
                     }
                     case "creator" -> {
@@ -401,6 +406,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                                 case "HARDCOVER" -> builderMeta.hardcoverId(value);
                                 case "HARDCOVERBOOK", "HARDCOVER_BOOK_ID" -> builderMeta.hardcoverBookId(value);
                                 case "LUBIMYCZYTAC" -> builderMeta.lubimyczytacId(value);
+                                default -> log.debug("Unhandled identifier scheme: {}", scheme);
                             }
                         } else {
                             // Handle Calibre's prefix:value format (e.g., amazon:B09XXX, goodreads:123)
@@ -421,6 +427,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                         LocalDate parsed = parseDate(text);
                         if (parsed != null) builderMeta.publishedDate(parsed);
                     }
+                    default -> log.debug("Unhandled OPF metadata tag: {}", tag);
                 }
             }
 
@@ -613,26 +620,6 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
 
         log.warn("Failed to parse date from string: {}", value);
         return null;
-    }
-
-    private byte[] getImageFromEpubResource(Resource res) {
-        if (res == null) {
-            return null;
-        }
-
-        MediaType mt = res.getMediaType();
-        if (mt == null || mt.name() == null || !mt.name().startsWith("image")) {
-            return null;
-        }
-
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            res.writeTo(baos);
-            return baos.toByteArray();
-        } catch (IOException e) {
-            log.warn("Failed to read data for resource", e);
-            return null;
-        }
     }
 
     private String findOpfPath(EpubContainer container) throws IOException, ParserConfigurationException, SAXException {

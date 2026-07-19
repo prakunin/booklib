@@ -460,7 +460,7 @@ return;
             return genres;
         } catch (Exception e) {
             log.error("Error extracting genres", e);
-            return null;
+            return Set.of();
         }
     }
 

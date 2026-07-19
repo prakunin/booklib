@@ -177,7 +177,7 @@ public class HardcoverSyncService {
                         log.info("Updating existing reading progress for book {} (user {}), hardcoverBookId={}, hardcoverEditionId={}, progress={}% ({}pages)", 
                             bookId, userId, hardcoverBook.bookId, hardcoverBook.editionId, Math.round(progressPercent), progressPages);
 
-                        boolean updatedRead = updateUserBookRead(userBook.id, readInfo);
+                        boolean updatedRead = updateUserBookRead(readInfo);
 
                         if (!updatedRead) {
                           log.warn("Failed to update existing user_book_read entry for book {} (user {})", bookId, userId);
@@ -748,11 +748,10 @@ public class HardcoverSyncService {
     /**
      * Updates an existing user_book_read entry with new progress information. This is used when there is already reading progress for the book, and we want to update it with new progress (e.g. user continued reading).
      * If the user_book_read is being updated to finished, the user_book status is automatically updated to "Read" by Hardcover.
-     * @param userBookId the ID of the existing user_book
      * @param readInfo the entire user_book_read info. We need to pass the entire info because the API requires all fields to update, and we need to update the progress and finished_at fields based on the new progress.
      * @return true if the update was successful, false otherwise
      */
-    private boolean updateUserBookRead(Integer userBookId, UserBookReadInfo readInfo) {
+    private boolean updateUserBookRead(UserBookReadInfo readInfo) {
         String mutation = """
             mutation UpdateUserBookRead($userBookReadId: Int!, $userBookReadObject: DatesReadInput!) {
                 update_user_book_read(id: $userBookReadId, object: $userBookReadObject) {
@@ -800,6 +799,11 @@ public class HardcoverSyncService {
         return true;
     }
 
+    // S1168: the 7 call sites in this class check `response == null` to distinguish a failed
+    // request (this catch block) from a successful-but-empty `data`/`errors` payload, some with
+    // distinct log messages or thrown exceptions; returning Map.of() here would collapse that
+    // distinction, so the null sentinel is kept intentionally.
+    @SuppressWarnings("java:S1168")
     private Map<String, Object> executeGraphQL(GraphQLRequest request) {
         try {
             return restClient.post()
@@ -854,14 +858,6 @@ public class HardcoverSyncService {
     private static class HardcoverBookInfo {
         String bookId;
         Integer editionId;
-        Integer pages;
-    }
-
-    /**
-     * Helper class to hold edition information.
-     */
-    private static class EditionInfo {
-        Integer id;
         Integer pages;
     }
 

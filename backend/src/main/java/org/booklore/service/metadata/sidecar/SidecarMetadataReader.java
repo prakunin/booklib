@@ -17,11 +17,9 @@ import java.util.Optional;
 @Service
 public class SidecarMetadataReader {
 
-    private final SidecarMetadataMapper mapper;
     private final ObjectMapper objectMapper;
 
-    public SidecarMetadataReader(SidecarMetadataMapper mapper, ObjectMapper objectMapper) {
-        this.mapper = mapper;
+    public SidecarMetadataReader(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -49,20 +47,20 @@ public class SidecarMetadataReader {
 
     public byte[] readSidecarCover(Path bookPath) {
         if (bookPath == null) {
-            return null;
+            return new byte[0];
         }
 
         Path coverPath = getCoverPath(bookPath);
         if (!Files.exists(coverPath)) {
             log.debug("No sidecar cover file found at: {}", coverPath);
-            return null;
+            return new byte[0];
         }
 
         try {
             return Files.readAllBytes(coverPath);
         } catch (IOException e) {
             log.warn("Failed to read sidecar cover from {}: {}", coverPath, e.getMessage());
-            return null;
+            return new byte[0];
         }
     }
 

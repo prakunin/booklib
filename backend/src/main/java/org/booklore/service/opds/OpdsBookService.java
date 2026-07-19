@@ -347,18 +347,6 @@ public class OpdsBookService {
         return createPageFromEntities(books, idPage, pageable, userId);
     }
 
-    private Page<Book> getBooksByShelfIdPageInternal(Long shelfId, int page, int size, Long userId) {
-        Pageable pageable = PageRequest.of(Math.max(page, 0), size);
-
-        Page<Long> idPage = bookOpdsRepository.findBookIdsByShelfId(shelfId, pageable);
-        if (idPage.isEmpty()) {
-            return new PageImpl<>(List.of(), pageable, 0);
-        }
-
-        List<BookEntity> books = bookOpdsRepository.findAllWithMetadataByIdsAndShelfId(idPage.getContent(), shelfId);
-        return createPageFromEntities(books, idPage, pageable, userId);
-    }
-
     private Page<Book> getBooksByShelfIdsPageInternal(Set<Long> libraryIds, Set<Long> shelfIds, int page, int size, Long userId) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), size);
 
@@ -592,6 +580,9 @@ public class OpdsBookService {
                 // Same rating, fall back to addedOn descending
                 return compareByAddedOn(b2, b1);
             });
+            default -> {
+                // RECENT is already handled by the early return above; no other values exist
+            }
         }
 
         return new PageImpl<>(sortedBooks, booksPage.getPageable(), booksPage.getTotalElements());

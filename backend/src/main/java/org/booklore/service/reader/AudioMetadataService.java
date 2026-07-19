@@ -324,6 +324,9 @@ public class AudioMetadataService {
     return fallback;
   }
 
+  // null is intentional here and distinct from an empty array: AudiobookReaderController checks
+  // `coverData == null` to return 404 Not Found; an empty array would instead return 200 with no body.
+  @SuppressWarnings("java:S1168")
   public byte[] getEmbeddedCoverArt(Path audioPath) {
     try {
       AudioFile audioFile = AudioFileIO.read(audioPath.toFile());

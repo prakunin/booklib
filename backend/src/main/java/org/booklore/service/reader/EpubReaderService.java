@@ -83,7 +83,7 @@ public class EpubReaderService {
         }
 
         private static Set<String> buildValidPaths(EpubBookInfo bookInfo) {
-            Set<String> paths = new HashSet<>(bookInfo.getManifest().size() + 2);
+            Set<String> paths = HashSet.newHashSet(bookInfo.getManifest().size() + 2);
             paths.add(CONTAINER_PATH);
             if (bookInfo.getContainerPath() != null) {
                 paths.add(bookInfo.getContainerPath());
@@ -95,7 +95,7 @@ public class EpubReaderService {
         }
 
         private static Map<String, EpubManifestItem> buildManifestByHref(EpubBookInfo bookInfo) {
-            Map<String, EpubManifestItem> byHref = new HashMap<>(bookInfo.getManifest().size());
+            Map<String, EpubManifestItem> byHref = HashMap.newHashMap(bookInfo.getManifest().size());
             for (EpubManifestItem item : bookInfo.getManifest()) {
                 byHref.put(item.getHref(), item);
             }

@@ -21,6 +21,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 @Slf4j
 @Service
@@ -744,7 +745,7 @@ public class BookRuleEvaluatorService {
     }
 
     private Predicate buildFieldInPredicate(RuleField ruleField,
-                                            Function<Expression<?>, Expression<?>> fieldTransformer,
+                                            UnaryOperator<Expression<?>> fieldTransformer,
                                             List<String> ruleList,
                                             CriteriaBuilder cb,
                                             Root<BookEntity> root,

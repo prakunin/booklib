@@ -177,7 +177,11 @@ public class PdfMetadataWriter implements MetadataWriter {
     @SuppressWarnings("unchecked")
     private String buildXmpPacket(MetadataCopyHelper helper, MetadataClearFlags clear, BookMetadataEntity metadata) {
         // Capture DC field values from helper
-        String[] title = {null}, description = {null}, publisher = {null}, language = {null}, date = {null};
+        String[] title = {null};
+        String[] description = {null};
+        String[] publisher = {null};
+        String[] language = {null};
+        String[] date = {null};
         List<String>[] authors = new List[]{null};
         List<String>[] subjects = new List[]{null};
 

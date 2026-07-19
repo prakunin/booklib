@@ -21,7 +21,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.function.DoubleConsumer;
-import java.util.function.IntConsumer;
 import java.util.regex.Matcher;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -333,11 +332,14 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             Matcher hcMatcher = HARDCOVER_URL_PATTERN.matcher(url);
             if (hcMatcher.find()) {
                 builder.hardcoverId(hcMatcher.group(1));
-                continue;
             }
         }
     }
 
+    // S6916: the "when" guard clause syntax cannot attach to constant case labels (only to type
+    // patterns), so the single-if bodies below cannot be rewritten as guarded case labels - Sonar
+    // flags this for string switches too (known false positive, see java:S6916 discussions).
+    @SuppressWarnings("java:S6916")
     private void parseNotes(String notes, BookMetadata.BookMetadataBuilder builder) {
         Matcher matcher = BOOKLORE_NOTE_PATTERN.matcher(notes);
         while (matcher.find()) {
@@ -372,6 +374,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
                 case "GoodreadsId" -> builder.goodreadsId(value);
                 case "ASIN" -> builder.asin(value);
                 case "ComicvineId" -> builder.comicvineId(value);
+                default -> log.debug("Unrecognized BookLore note key: {}", key);
             }
         }
     }
@@ -384,13 +387,6 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         }
     }
 
-    private void safeParseInt(String value, IntConsumer consumer) {
-        try {
-            consumer.accept(Integer.parseInt(value));
-        } catch (NumberFormatException _) {
-            log.debug("Failed to parse int from value: {}", value);
-        }
-    }
     /**
      * Extracts and trims text content from the first element with the given tag name.
      *
@@ -407,9 +403,10 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
     }
 
     private String coalesce(String a, String b) {
-        return (a != null && !a.isBlank())
-                ? a
-                : (b != null && !b.isBlank() ? b : null);
+        if (a != null && !a.isBlank()) {
+            return a;
+        }
+        return (b != null && !b.isBlank()) ? b : null;
     }
 
     /**
@@ -499,6 +496,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
      * {@link CoverExtractionException}: a comic whose pages we cannot decode plainly has pages, and
      * telling the user it has no cover would be a lie.
      */
+    @SuppressWarnings("java:S1168") // null (not empty array) means "proven no cover"; BookCoverGenerator/BookdropMetadataService branch on == null
     public byte[] extractCover(Path path) {
         List<String> imageEntries = listComicImageEntries(path);
 
@@ -635,8 +633,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         if (norm.startsWith("__MACOSX/") || norm.contains("/__MACOSX/")) return false;
         String base = baseName(norm);
         if (base.startsWith(".")) return false;
-        if (".ds_store".equalsIgnoreCase(base)) return false;
-        return true;
+        return !".ds_store".equalsIgnoreCase(base);
     }
 
     private String findComicInfoEntry(Path cbxPath) {
@@ -668,6 +665,10 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         return new ByteArrayInputStream(xmlBytes);
     }
 
+    // S1168: null (not empty array) distinguishes "could not read this entry" from a zero-byte
+    // entry; callers here (extractCover's unreadable/undecodable bookkeeping, findComicInfoEntryInputStream)
+    // branch on == null.
+    @SuppressWarnings("java:S1168")
     private byte[] readArchiveEntryBytes(Path cbxPath, String entryName) {
         try {
             return archiveService.getEntryBytes(cbxPath, entryName);
@@ -695,7 +696,10 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         if (b == null) return 1;
         String s1 = a.toLowerCase();
         String s2 = b.toLowerCase();
-        int i = 0, j = 0, n1 = s1.length(), n2 = s2.length();
+        int i = 0;
+        int j = 0;
+        int n1 = s1.length();
+        int n2 = s2.length();
         while (i < n1 && j < n2) {
             char c1 = s1.charAt(i);
             char c2 = s2.charAt(j);

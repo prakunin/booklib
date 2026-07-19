@@ -98,7 +98,7 @@ public class InpxArchiveStatisticsService {
             }
             inFlight.remove(libraryId, future);
             future.complete(statistics);
-        } catch (RuntimeException | Error e) {
+        } catch (Exception e) {
             inFlight.remove(libraryId, future);
             future.completeExceptionally(e);
         }

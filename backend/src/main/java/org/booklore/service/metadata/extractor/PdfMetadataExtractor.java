@@ -33,7 +33,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.nio.charset.StandardCharsets;
-import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
 
 @Component
 @Slf4j
@@ -270,6 +270,7 @@ public class PdfMetadataExtractor implements FileMetadataExtractor {
                 case "lubimyczytac" -> metadataBuilder.lubimyczytacId(value);
                 case "hardcover" -> metadataBuilder.hardcoverId(value);
                 case "hardcover_book_id" -> metadataBuilder.hardcoverBookId(value);
+                default -> log.debug("Unhandled XMP qualified identifier scheme: {}", scheme);
             }
         }
 
@@ -372,7 +373,7 @@ private static String cleanIsbn(String value) {
         return null;
     }
 
-    private void mapRating(XmpMetadata xmp, Optional<RawXmpMetadata> rawXmp, String name, String fallbackName, Consumer<Double> setter) {
+    private void mapRating(XmpMetadata xmp, Optional<RawXmpMetadata> rawXmp, String name, String fallbackName, DoubleConsumer setter) {
         Optional<String> val = findCustomField(xmp, rawXmp, name);
         if (val.isEmpty()) val = findCustomField(xmp, rawXmp, fallbackName);
         val.ifPresent(v -> {

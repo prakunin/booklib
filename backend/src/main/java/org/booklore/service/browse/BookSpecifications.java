@@ -445,7 +445,7 @@ public class BookSpecifications {
             if (cleaned.isEmpty()) return cb.conjunction();
 
             return buildManyToManySpec(root, query, cb, cleaned, mode,
-                    ATTR_METADATA, "authors", "name");
+                    "authors", "name");
         };
     }
 
@@ -464,7 +464,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(languages);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "language");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "language");
         };
     }
 
@@ -480,7 +480,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(seriesNames);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "seriesName");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "seriesName");
         };
     }
 
@@ -497,7 +497,7 @@ public class BookSpecifications {
             if (cleaned.isEmpty()) return cb.conjunction();
 
             return buildManyToManySpec(root, query, cb, cleaned, mode,
-                    ATTR_METADATA, "categories", "name");
+                    "categories", "name");
         };
     }
 
@@ -513,7 +513,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(publishers);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "publisher");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "publisher");
         };
     }
 
@@ -530,7 +530,7 @@ public class BookSpecifications {
             if (cleaned.isEmpty()) return cb.conjunction();
 
             return buildManyToManySpec(root, query, cb, cleaned, mode,
-                    ATTR_METADATA, "tags", "name");
+                    "tags", "name");
         };
     }
 
@@ -547,7 +547,7 @@ public class BookSpecifications {
             if (cleaned.isEmpty()) return cb.conjunction();
 
             return buildManyToManySpec(root, query, cb, cleaned, mode,
-                    ATTR_METADATA, "moods", "name");
+                    "moods", "name");
         };
     }
 
@@ -563,7 +563,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(narrators);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "narrator");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "narrator");
         };
     }
 
@@ -608,7 +608,7 @@ public class BookSpecifications {
         return (root, query, cb) -> {
             List<String> cleaned = cleanLowerCase(values);
             if (cleaned.isEmpty()) return cb.conjunction();
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "contentRating");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "contentRating");
         };
     }
 
@@ -931,7 +931,7 @@ public class BookSpecifications {
      * NOT = metadata field NOT IN (values)
      */
     private static Predicate buildMetadataFieldSpec(
-            Root<BookEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb,
+            Root<BookEntity> root, CriteriaBuilder cb,
             List<String> values, String mode, String fieldName) {
 
         Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, ATTR_METADATA, JoinType.INNER);
@@ -955,7 +955,7 @@ public class BookSpecifications {
     private static Predicate buildManyToManySpec(
             Root<BookEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb,
             List<String> values, String mode,
-            String metadataAttr, String collectionAttr, String nameAttr) {
+            String collectionAttr, String nameAttr) {
 
         if ("and".equals(mode)) {
             // AND: book must have ALL values one EXISTS subquery per value

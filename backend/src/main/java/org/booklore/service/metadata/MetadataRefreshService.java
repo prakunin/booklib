@@ -77,16 +77,26 @@ public class MetadataRefreshService {
 
             final boolean useRequestOptions = requestRefreshOptions != null;
             final MetadataRefreshOptions libraryRefreshOptions = !useRequestOptions && isLibraryRefresh ? resolveMetadataRefreshOptions(request.getLibraryId(), appSettings) : null;
-            final List<MetadataProvider> fixedProviders = useRequestOptions ?
-                    prepareProviders(requestRefreshOptions) :
-                    (isLibraryRefresh ? prepareProviders(libraryRefreshOptions) : null);
+            final List<MetadataProvider> fixedProviders;
+            if (useRequestOptions) {
+                fixedProviders = prepareProviders(requestRefreshOptions);
+            } else if (isLibraryRefresh) {
+                fixedProviders = prepareProviders(libraryRefreshOptions);
+            } else {
+                fixedProviders = null;
+            }
 
             actualBookIds = getBookEntities(request);
             totalBooks = actualBookIds.size();
 
-            MetadataRefreshOptions reviewModeOptions = requestRefreshOptions != null ?
-                    requestRefreshOptions :
-                    (libraryRefreshOptions != null ? libraryRefreshOptions : appSettings.getDefaultMetadataRefreshOptions());
+            MetadataRefreshOptions reviewModeOptions;
+            if (requestRefreshOptions != null) {
+                reviewModeOptions = requestRefreshOptions;
+            } else if (libraryRefreshOptions != null) {
+                reviewModeOptions = libraryRefreshOptions;
+            } else {
+                reviewModeOptions = appSettings.getDefaultMetadataRefreshOptions();
+            }
             boolean isReviewMode = Boolean.TRUE.equals(reviewModeOptions.getReviewBeforeApply());
 
             MetadataFetchJobEntity task = MetadataFetchJobEntity.builder()

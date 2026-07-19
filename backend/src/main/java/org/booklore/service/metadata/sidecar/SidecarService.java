@@ -94,7 +94,7 @@ public class SidecarService {
         }
 
         byte[] coverBytes = sidecarReader.readSidecarCover(bookPath);
-        if (coverBytes != null) {
+        if (coverBytes.length > 0) {
             log.info("Sidecar cover found for book ID {} - cover import is a separate operation", bookId);
         }
     }

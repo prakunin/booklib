@@ -204,9 +204,8 @@ public class CbxMetadataWriter implements MetadataWriter {
         });
 
         // Genre - categories
-        helper.copyCategories(clearFlags != null && clearFlags.isCategories(), set -> {
-            info.setGenre(joinStrings(set));
-        });
+        helper.copyCategories(clearFlags != null && clearFlags.isCategories(), set ->
+                info.setGenre(joinStrings(set)));
         
         // Tags - separate from Genre per Anansi v2.1
         if (metadata.getTags() != null && !metadata.getTags().isEmpty()) {
@@ -643,14 +642,14 @@ public class CbxMetadataWriter implements MetadataWriter {
 
     private void appendBookLoreTag(StringBuilder sb, String tag, String value) {
         if (value != null && !value.isBlank()) {
-            if (sb.length() > 0) sb.append("\n");
+            if (!sb.isEmpty()) sb.append("\n");
             sb.append(BOOKLORE_NOTE_PREFIX).append(tag).append("] ").append(value);
         }
     }
 
     private void appendBookLoreTag(StringBuilder sb, String tag, Number value) {
         if (value != null) {
-            if (sb.length() > 0) sb.append("\n");
+            if (!sb.isEmpty()) sb.append("\n");
             String formatted = (value instanceof Double || value instanceof Float) 
                     ? String.format(Locale.US, "%.2f", value.doubleValue())
                     : value.toString();

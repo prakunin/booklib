@@ -111,7 +111,7 @@ public class BookMetadataUpdater {
         updateTagsIfNeeded(newMetadata, metadata, clearFlags, mergeTags, replaceMode);
         bookReviewUpdateService.updateBookReviews(newMetadata, metadata, clearFlags, mergeCategories);
         updateThumbnailIfNeeded(bookId, bookEntity, newMetadata, metadata, updateThumbnail, bookType);
-        updateAudiobookMetadataIfNeeded(bookEntity, newMetadata, metadata, clearFlags, replaceMode);
+        updateAudiobookMetadataIfNeeded(newMetadata, metadata, clearFlags, replaceMode);
         updateComicMetadataIfNeeded(newMetadata, metadata, replaceMode);
         updateLocks(newMetadata, metadata);
 
@@ -212,6 +212,10 @@ public class BookMetadataUpdater {
         handleFieldUpdate(e.getContentRatingLocked(), clear.isContentRating(), m.getContentRating(), v -> e.setContentRating(nullIfBlank(v)), e::getContentRating, replaceMode);
     }
 
+    // S6916 false positive: "when" guards only attach to type/record patterns, not plain enum
+    // constant case labels (JLS), so the suggested guard form for REPLACE_MISSING/REPLACE_WHEN_PROVIDED
+    // below would not compile.
+    @SuppressWarnings("java:S6916")
     private <T> void handleFieldUpdate(Boolean locked, boolean shouldClear, T newValue, Consumer<T> setter, Supplier<T> getter, MetadataReplaceMode mode) {
         if (Boolean.TRUE.equals(locked)) return;
         if (shouldClear) {
@@ -314,13 +318,10 @@ public class BookMetadataUpdater {
 
         if (newCategories.isEmpty()) return;
 
-        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED) {
+        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED || replaceMode == null) {
             if (!merge) e.getCategories().clear();
             e.getCategories().addAll(newCategories);
         } else if (replaceMode == MetadataReplaceMode.REPLACE_MISSING && e.getCategories().isEmpty()) {
-            e.getCategories().addAll(newCategories);
-        } else if (replaceMode == null) {
-            if (!merge) e.getCategories().clear();
             e.getCategories().addAll(newCategories);
         }
     }
@@ -349,13 +350,10 @@ public class BookMetadataUpdater {
 
         if (newMoods.isEmpty()) return;
 
-        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED) {
+        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED || replaceMode == null) {
             if (!merge) e.getMoods().clear();
             e.getMoods().addAll(newMoods);
         } else if (replaceMode == MetadataReplaceMode.REPLACE_MISSING && e.getMoods().isEmpty()) {
-            e.getMoods().addAll(newMoods);
-        } else if (replaceMode == null) {
-            if (!merge) e.getMoods().clear();
             e.getMoods().addAll(newMoods);
         }
     }
@@ -384,18 +382,15 @@ public class BookMetadataUpdater {
 
         if (newTags.isEmpty()) return;
 
-        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED) {
+        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED || replaceMode == null) {
             if (!merge) e.getTags().clear();
             e.getTags().addAll(newTags);
         } else if (replaceMode == MetadataReplaceMode.REPLACE_MISSING && e.getTags().isEmpty()) {
             e.getTags().addAll(newTags);
-        } else if (replaceMode == null) {
-            if (!merge) e.getTags().clear();
-            e.getTags().addAll(newTags);
         }
     }
 
-    private void updateAudiobookMetadataIfNeeded(BookEntity bookEntity, BookMetadata m, BookMetadataEntity e, MetadataClearFlags clear, MetadataReplaceMode replaceMode) {
+    private void updateAudiobookMetadataIfNeeded(BookMetadata m, BookMetadataEntity e, MetadataClearFlags clear, MetadataReplaceMode replaceMode) {
         if (clear == null) {
             clear = new MetadataClearFlags();
         }

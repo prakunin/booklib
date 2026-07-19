@@ -20,6 +20,7 @@ import java.util.*;
 public class BookGroupingService {
 
     private static final double FILELESS_MATCH_THRESHOLD = 0.85;
+    private static final String PATH_SEPARATOR = "/";
 
     private final BookRepository bookRepository;
 
@@ -108,7 +109,7 @@ public class BookGroupingService {
                 // takes .getParent() (designed for files, not directories). Reconstruct the actual folder path
                 // so sibling audiobook folders stay separate and absorption searches from the correct level.
                 String effectiveSubPath = file.isFolderBased()
-                        ? subPath + "/" + file.getFileName()
+                        ? subPath + PATH_SEPARATOR + file.getFileName()
                         : subPath;
                 String ancestorKey = findNearestEbookAncestor(pathId, effectiveSubPath, ebookFolders);
                 if (ancestorKey != null) {
@@ -181,7 +182,7 @@ public class BookGroupingService {
 
         return switch (mode) {
             case BOOK_PER_FILE -> null;
-            case BOOK_PER_FOLDER -> findMatchBookPerFolderWithAbsorption(file, activeBooksInDirectory);
+            case BOOK_PER_FOLDER -> findMatchBookPerFolderWithAbsorption(activeBooksInDirectory);
             case AUTO_DETECT -> findMatchAutoDetect(file, activeBooksInDirectory);
         };
     }
@@ -239,7 +240,7 @@ public class BookGroupingService {
         return null;
     }
 
-    private BookEntity findMatchBookPerFolderWithAbsorption(LibraryFile file, List<BookEntity> booksInDirectory) {
+    private BookEntity findMatchBookPerFolderWithAbsorption(List<BookEntity> booksInDirectory) {
         List<BookEntity> booksWithFiles = booksInDirectory.stream()
                 .filter(BookEntity::hasFiles)
                 .toList();

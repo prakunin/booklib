@@ -87,13 +87,11 @@ public class AudiobookMetadataWriter implements MetadataWriter {
                 setTagField(tag, FieldKey.COMPOSER, metadata.getNarrator(), hasChanges);
             }
 
-            helper.copyDescription(clear != null && clear.isDescription(), val -> {
-                setTagField(tag, FieldKey.COMMENT, val, hasChanges);
-            });
+            helper.copyDescription(clear != null && clear.isDescription(), val ->
+                    setTagField(tag, FieldKey.COMMENT, val, hasChanges));
 
-            helper.copyPublisher(clear != null && clear.isPublisher(), val -> {
-                setTagField(tag, FieldKey.RECORD_LABEL, val, hasChanges);
-            });
+            helper.copyPublisher(clear != null && clear.isPublisher(), val ->
+                    setTagField(tag, FieldKey.RECORD_LABEL, val, hasChanges));
 
             helper.copyPublishedDate(clear != null && clear.isPublishedDate(), val -> {
                 String year = val != null ? String.valueOf(val.getYear()) : null;
@@ -107,13 +105,11 @@ public class AudiobookMetadataWriter implements MetadataWriter {
                 setTagField(tag, FieldKey.GENRE, genre, hasChanges);
             });
 
-            helper.copyLanguage(clear != null && clear.isLanguage(), val -> {
-                setTagField(tag, FieldKey.LANGUAGE, val, hasChanges);
-            });
+            helper.copyLanguage(clear != null && clear.isLanguage(), val ->
+                    setTagField(tag, FieldKey.LANGUAGE, val, hasChanges));
 
-            helper.copySeriesName(clear != null && clear.isSeriesName(), val -> {
-                setTagField(tag, FieldKey.GROUPING, val, hasChanges);
-            });
+            helper.copySeriesName(clear != null && clear.isSeriesName(), val ->
+                    setTagField(tag, FieldKey.GROUPING, val, hasChanges));
 
             helper.copySeriesNumber(clear != null && clear.isSeriesNumber(), val -> {
                 String trackNo = val != null ? String.format("%.0f", val) : null;
@@ -329,6 +325,10 @@ public class AudiobookMetadataWriter implements MetadataWriter {
         return true;
     }
 
+    // S1168: null here is a load-failure sentinel that callers check via `!= null`/`== null` before
+    // writing artwork/cover bytes; an empty array would be silently treated as a successful load and
+    // written out as bogus zero-length artwork/cover data.
+    @SuppressWarnings("java:S1168")
     private byte[] loadImage(String imageUrl) {
         try {
             return encodeImage(fileService.downloadImageFromUrl(imageUrl));

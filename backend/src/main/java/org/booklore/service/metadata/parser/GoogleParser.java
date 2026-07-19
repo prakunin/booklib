@@ -2,7 +2,6 @@ package org.booklore.service.metadata.parser;
 
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.dto.Book;
-import org.booklore.model.dto.BookFile;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.request.FetchMetadataRequest;
 import org.booklore.model.dto.response.GoogleBooksApiResponse;
@@ -486,22 +485,6 @@ public class GoogleParser implements BookParser {
                         GoogleBooksApiResponse.Item.IndustryIdentifier::getIdentifier,
                         (existing, replacement) -> existing
                 ));
-    }
-
-    private String getSearchTerm(Book book, FetchMetadataRequest request) {
-        String searchTerm = Optional.ofNullable(request.getTitle())
-                .filter(title -> !title.isEmpty())
-                .orElseGet(() -> Optional.ofNullable(book.getPrimaryFile())
-                        .map(BookFile::getFileName)
-                        .filter(fileName -> !fileName.isEmpty())
-                        .map(BookUtils::cleanFileName)
-                        .orElse(null));
-
-        if (searchTerm == null) {
-            return null;
-        }
-
-        return searchTerm;
     }
 
     private String truncateToMaxWords(String input) {

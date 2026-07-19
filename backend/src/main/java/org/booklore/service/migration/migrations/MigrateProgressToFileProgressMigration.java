@@ -160,6 +160,10 @@ public class MigrateProgressToFileProgressMigration implements Migration {
                         String.valueOf(progress.getCbxProgress()) : null);
                 fileProgress.setProgressPercent(progress.getCbxProgressPercent());
             }
+            default -> {
+                // No-op: legacy per-format progress fields never covered AUDIOBOOK; historical
+                // behavior left positionData/progressPercent unset for this type.
+            }
         }
 
         return fileProgress;

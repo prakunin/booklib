@@ -213,10 +213,8 @@ public class BookService {
                 .findFirst()
                 .orElseThrow(() -> ApiError.FILE_NOT_FOUND.createException("Book file not found: " + bookFileId));
         BookFileType bookType = bookFile.getBookType();
-        if (bookType == BookFileType.EPUB || bookType == BookFileType.FB2
-                || bookType == BookFileType.MOBI
-                || bookType == BookFileType.AZW3) {
-            ebookViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
+        switch (bookType) {
+            case EPUB, FB2, MOBI, AZW3 -> ebookViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
                     .ifPresent(epubPref -> settingsBuilder.ebookSettings(EbookViewerPreferences.builder()
                             .bookId(bookId)
                             .userId(user.getId())
@@ -236,25 +234,25 @@ public class BookService {
                             .backgroundSaturation(epubPref.getBackgroundSaturation())
                             .backgroundTransparency(epubPref.getBackgroundTransparency())
                             .build()));
-        } else if (bookType == BookFileType.PDF) {
-            pdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
-                    .ifPresent(pdfPref -> settingsBuilder.pdfSettings(PdfViewerPreferences.builder()
-                            .bookId(bookId)
-                            .zoom(pdfPref.getZoom())
-                            .spread(pdfPref.getSpread())
-                            .isDarkTheme(pdfPref.getIsDarkTheme())
-                            .build()));
-            newPdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
-                    .ifPresent(pdfPref -> settingsBuilder.newPdfSettings(NewPdfViewerPreferences.builder()
-                            .bookId(bookId)
-                            .pageViewMode(pdfPref.getPageViewMode())
-                            .pageSpread(pdfPref.getPageSpread())
-                            .fitMode(pdfPref.getFitMode())
-                            .scrollMode(pdfPref.getScrollMode())
-                            .backgroundColor(pdfPref.getBackgroundColor())
-                            .build()));
-        } else if (bookType == BookFileType.CBX) {
-            cbxViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
+            case PDF -> {
+                pdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
+                        .ifPresent(pdfPref -> settingsBuilder.pdfSettings(PdfViewerPreferences.builder()
+                                .bookId(bookId)
+                                .zoom(pdfPref.getZoom())
+                                .spread(pdfPref.getSpread())
+                                .isDarkTheme(pdfPref.getIsDarkTheme())
+                                .build()));
+                newPdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
+                        .ifPresent(pdfPref -> settingsBuilder.newPdfSettings(NewPdfViewerPreferences.builder()
+                                .bookId(bookId)
+                                .pageViewMode(pdfPref.getPageViewMode())
+                                .pageSpread(pdfPref.getPageSpread())
+                                .fitMode(pdfPref.getFitMode())
+                                .scrollMode(pdfPref.getScrollMode())
+                                .backgroundColor(pdfPref.getBackgroundColor())
+                                .build()));
+            }
+            case CBX -> cbxViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
                     .ifPresent(cbxPref -> settingsBuilder.cbxSettings(CbxViewerPreferences.builder()
                             .bookId(bookId)
                             .pageViewMode(cbxPref.getPageViewMode())
@@ -263,8 +261,7 @@ public class BookService {
                             .scrollMode(cbxPref.getScrollMode())
                             .backgroundColor(cbxPref.getBackgroundColor())
                             .build()));
-        } else {
-            throw ApiError.UNSUPPORTED_BOOK_TYPE.createException();
+            case null, default -> throw ApiError.UNSUPPORTED_BOOK_TYPE.createException();
         }
         return settingsBuilder.build();
     }

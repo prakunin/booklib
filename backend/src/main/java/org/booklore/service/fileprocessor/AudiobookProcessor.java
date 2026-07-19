@@ -305,6 +305,12 @@ public class AudiobookProcessor extends AbstractFileProcessor implements BookFil
         audiobookFile.setChapters(mapChapters(audiobookDto.getChapters()));
     }
 
+    // S1168: intentionally returns null (not an empty list) rather than an empty collection.
+    // Callers (BookMapper#toBook, BookMapperV2) branch on `getChapters() != null` without an
+    // isEmpty() check and feed the result straight into the AudiobookMetadata DTO's `chapters`
+    // field, which is serialized in API responses; returning List.of() here would flip that
+    // field from absent/null to an empty array in the wire format.
+    @SuppressWarnings("java:S1168")
     private List<BookFileEntity.AudioFileChapter> mapChapters(List<AudiobookMetadata.ChapterInfo> chapters) {
         if (chapters == null || chapters.isEmpty()) {
             return null;

@@ -272,14 +272,17 @@ public class KoboEntitlementService {
                     .orElse(null)
                 : null;
 
-        KoboReadingState.CurrentBookmark bookmark = webReaderBookmark != null
-                ? webReaderBookmark
-                : existingState != null && existingState.getCurrentBookmark() != null
-                ? existingState.getCurrentBookmark()
-                : userProgress
-                .filter(progress -> progress.getKoboProgressPercent() != null || (twoWaySync && progress.getEpubProgressPercent() != null))
-                .map(progress -> readingStateBuilder.buildBookmarkFromProgress(progress, fileProgress, now))
-                .orElseGet(() -> readingStateBuilder.buildEmptyBookmark(now));
+        KoboReadingState.CurrentBookmark bookmark;
+        if (webReaderBookmark != null) {
+            bookmark = webReaderBookmark;
+        } else if (existingState != null && existingState.getCurrentBookmark() != null) {
+            bookmark = existingState.getCurrentBookmark();
+        } else {
+            bookmark = userProgress
+                    .filter(progress -> progress.getKoboProgressPercent() != null || (twoWaySync && progress.getEpubProgressPercent() != null))
+                    .map(progress -> readingStateBuilder.buildBookmarkFromProgress(progress, fileProgress, now))
+                    .orElseGet(() -> readingStateBuilder.buildEmptyBookmark(now));
+        }
 
         KoboReadingState.StatusInfo statusInfo = userProgress
                 .map(progress -> readingStateBuilder.buildStatusInfoFromProgress(progress, now.toString()))

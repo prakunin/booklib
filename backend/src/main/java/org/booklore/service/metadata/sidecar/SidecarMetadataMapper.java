@@ -147,28 +147,28 @@ public class SidecarMetadataMapper {
     }
 
     private List<String> extractNames(List<AuthorEntity> entities) {
-        if (entities == null) return null;
+        if (entities == null) return List.of();
         return entities.stream()
                 .map(AuthorEntity::getName)
                 .toList();
     }
 
     private Set<String> extractCategoryNames(Set<CategoryEntity> entities) {
-        if (entities == null) return null;
+        if (entities == null) return Set.of();
         return entities.stream()
                 .map(CategoryEntity::getName)
                 .collect(Collectors.toSet());
     }
 
     private Set<String> extractMoodNames(Set<MoodEntity> entities) {
-        if (entities == null) return null;
+        if (entities == null) return Set.of();
         return entities.stream()
                 .map(MoodEntity::getName)
                 .collect(Collectors.toSet());
     }
 
     private Set<String> extractTagNames(Set<TagEntity> entities) {
-        if (entities == null) return null;
+        if (entities == null) return Set.of();
         return entities.stream()
                 .map(TagEntity::getName)
                 .collect(Collectors.toSet());

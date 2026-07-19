@@ -43,6 +43,7 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
      * without a cover: both used to return the same {@code null} as a book that simply has no cover
      * record, so a truncated {@code .mobi} was indistinguishable from a coverless one.
      */
+    @SuppressWarnings("java:S1168") // null (not empty array) means "proven no cover"; BookCoverGenerator/BookdropMetadataService branch on == null
     public byte[] extractCover(File file) {
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
             PalmDB palmDB = readPalmDB(raf);
@@ -146,6 +147,7 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
                     }
                     case EXTH_LANGUAGE -> builder.language(value.trim());
                     case EXTH_ASIN -> builder.asin(value.trim());
+                    default -> log.debug("Unhandled EXTH record type: {}", recordType);
                 }
             }
 
@@ -194,20 +196,20 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         // Read record list
         raf.seek(78);
         for (int i = 0; i < palmDB.numRecords; i++) {
-            PalmDBRecord record = new PalmDBRecord();
-            record.offset = readInt(raf);
-            record.attributes = raf.read();
-            record.id = readThreeBytes(raf);
-            palmDB.records.add(record);
+            PalmDBRecord palmRecord = new PalmDBRecord();
+            palmRecord.offset = readInt(raf);
+            palmRecord.attributes = raf.read();
+            palmRecord.id = readThreeBytes(raf);
+            palmDB.records.add(palmRecord);
         }
 
         // Calculate record sizes
         for (int i = 0; i < palmDB.records.size(); i++) {
-            PalmDBRecord record = palmDB.records.get(i);
+            PalmDBRecord palmRecord = palmDB.records.get(i);
             if (i < palmDB.records.size() - 1) {
-                record.size = palmDB.records.get(i + 1).offset - record.offset;
+                palmRecord.size = palmDB.records.get(i + 1).offset - palmRecord.offset;
             } else {
-                record.size = (int) (raf.length() - record.offset);
+                palmRecord.size = (int) (raf.length() - palmRecord.offset);
             }
         }
 
@@ -359,13 +361,15 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         }
     }
 
-    protected byte[] extractImageFromRecord(RandomAccessFile raf, PalmDBRecord record) throws IOException {
-        if (record.size <= 0 || record.size > 10_000_000) {
+    // S1168: null (not empty array) flows straight through to extractCover's null-means-no-cover contract.
+    @SuppressWarnings("java:S1168")
+    protected byte[] extractImageFromRecord(RandomAccessFile raf, PalmDBRecord palmRecord) throws IOException {
+        if (palmRecord.size <= 0 || palmRecord.size > 10_000_000) {
             return null;
         }
 
-        raf.seek(record.offset);
-        byte[] data = new byte[record.size];
+        raf.seek(palmRecord.offset);
+        byte[] data = new byte[palmRecord.size];
         raf.readFully(data);
 
         // Check for image magic bytes

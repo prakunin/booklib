@@ -93,7 +93,7 @@ public class DoubanBookParser implements BookParser {
     public List<BookMetadata> fetchMetadata(Book book, FetchMetadataRequest fetchMetadataRequest) {
         List<BookMetadata> searchResults = getDoubanSearchResults(book, fetchMetadataRequest);
         if (searchResults == null || searchResults.isEmpty()) {
-            return null;
+            return List.of();
         }
 
         // For detailed metadata, fetch full book information for top results
@@ -123,7 +123,7 @@ public class DoubanBookParser implements BookParser {
         String queryUrl = buildQueryUrl(request, book);
         if (queryUrl == null) {
             log.error("Query URL is null, cannot proceed.");
-            return null;
+            return List.of();
         }
         List<BookMetadata> searchResults = new ArrayList<>();
         try {
@@ -142,7 +142,7 @@ public class DoubanBookParser implements BookParser {
 
             if (jsonData == null) {
                 log.warn("No JSON data found in Douban search response");
-                return null;
+                return List.of();
             }
 
             log.debug("Extracted JSON data: {}", jsonData);
@@ -154,7 +154,7 @@ public class DoubanBookParser implements BookParser {
                 log.debug("Successfully parsed JSON");
             } catch (Exception e) {
                 log.warn("Failed to parse JSON: {}", e.getMessage());
-                return null;
+                return List.of();
             }
             JsonNode itemsNode = rootNode.get("items");
 
@@ -162,12 +162,12 @@ public class DoubanBookParser implements BookParser {
 
             if (itemsNode == null || !itemsNode.isArray()) {
                 log.warn("No items found in Douban search response or items is not an array");
-                return null;
+                return List.of();
             }
 
             if (itemsNode.isEmpty()) {
                 log.info("No books found for the search query");
-                return null;
+                return List.of();
             }
 
             for (JsonNode item : itemsNode) {
@@ -280,19 +280,19 @@ public class DoubanBookParser implements BookParser {
         return BookMetadata.builder()
                 .provider(MetadataProvider.Douban)
                 .title(getTitle(doc))
-                .subtitle(getSubtitle(doc))
+                .subtitle(getSubtitle())
                 .authors(new ArrayList<>(getAuthors(doc)))
-                .categories(new HashSet<>(getCategories(doc)))
+                .categories(new HashSet<>(getCategories()))
                 .description(cleanDescriptionHtml(getDescription(doc)))
                 .seriesName(getSeriesName(doc))
-                .seriesNumber(getSeriesNumber(doc))
-                .seriesTotal(getSeriesTotal(doc))
+                .seriesNumber(getSeriesNumber())
+                .seriesTotal(getSeriesTotal())
                 .isbn13(getIsbn13(doc))
                 .isbn10(getIsbn10(doc))
                 .doubanId(doubanBookId)
                 .publisher(getPublisher(doc))
                 .publishedDate(getPublicationDate(doc))
-                .language(LanguageNormalizer.normalize(getLanguage(doc)))
+                .language(LanguageNormalizer.normalize(getLanguage()))
                 .pageCount(getPageCount(doc))
                 .thumbnailUrl(getThumbnail(doc))
                 .doubanRating(getRating(doc))
@@ -356,7 +356,7 @@ public class DoubanBookParser implements BookParser {
         return null;
     }
 
-    private String getSubtitle(Document doc) {
+    private String getSubtitle() {
         // Douban doesn't typically have subtitles separate from title
         return null;
     }
@@ -519,22 +519,22 @@ public class DoubanBookParser implements BookParser {
         return null;
     }
 
-    private Float getSeriesNumber(Document doc) {
+    private Float getSeriesNumber() {
         // Douban doesn't typically have series information
         return null;
     }
 
-    private Integer getSeriesTotal(Document doc) {
+    private Integer getSeriesTotal() {
         // Douban doesn't typically have series information
         return null;
     }
 
-    private String getLanguage(Document doc) {
+    private String getLanguage() {
         // Douban doesn't typically specify language
         return null;
     }
 
-    private Set<String> getCategories(Document doc) {
+    private Set<String> getCategories() {
         // Douban doesn't typically have category information
         return Set.of();
     }

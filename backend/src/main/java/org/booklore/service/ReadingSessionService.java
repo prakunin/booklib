@@ -684,7 +684,10 @@ public class ReadingSessionService {
         int n = values.size();
         if (n < 2) return 0.0;
 
-        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        double sumX = 0;
+        double sumY = 0;
+        double sumXY = 0;
+        double sumX2 = 0;
         for (int i = 0; i < n; i++) {
             sumX += i;
             sumY += values.get(i);

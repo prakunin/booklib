@@ -148,13 +148,11 @@ public class EpubMetadataWriter implements MetadataWriter {
                 hasChanges[0] = true;
             });
 
-            helper.copySeriesName(clear != null && clear.isSeriesName(), val -> {
-                replaceBelongsToCollection(metadataElement, opfDoc, metadata.getSeriesName(), metadata.getSeriesNumber(), hasChanges);
-            });
+            helper.copySeriesName(clear != null && clear.isSeriesName(), val ->
+                    replaceBelongsToCollection(metadataElement, opfDoc, metadata.getSeriesName(), metadata.getSeriesNumber(), hasChanges));
 
-            helper.copySeriesNumber(clear != null && clear.isSeriesNumber(), val -> {
-                replaceBelongsToCollection(metadataElement, opfDoc, metadata.getSeriesName(), metadata.getSeriesNumber(), hasChanges);
-            });
+            helper.copySeriesNumber(clear != null && clear.isSeriesNumber(), val ->
+                    replaceBelongsToCollection(metadataElement, opfDoc, metadata.getSeriesName(), metadata.getSeriesNumber(), hasChanges));
 
             helper.copyIsbn13(clear != null && clear.isIsbn13(), val -> {
                 removeIdentifierByUrn(metadataElement, "isbn");
@@ -251,7 +249,11 @@ public class EpubMetadataWriter implements MetadataWriter {
                 File tempEpub = new File(epubFile.getParentFile(), epubFile.getName() + ".tmp");
                 createEpubZipFromDirectory(tempDir, tempEpub.toPath());
 
-                if (!epubFile.delete()) throw new IOException("Could not delete original EPUB");
+                try {
+                    Files.delete(epubFile.toPath());
+                } catch (IOException ex) {
+                    throw new IOException("Could not delete original EPUB: " + ex.getMessage(), ex);
+                }
                 if (!tempEpub.renameTo(epubFile)) throw new IOException("Could not rename temp EPUB");
 
                 log.info("Metadata updated in EPUB: {}", epubFile.getName());
@@ -282,25 +284,8 @@ public class EpubMetadataWriter implements MetadataWriter {
         }
     }
 
-    private void updateIdentifier(Element metadataElement, Document opfDoc, String scheme, String idValue, boolean[] hasChanges) {
-        removeIdentifierByScheme(metadataElement, scheme);
-        if (idValue != null && !idValue.isBlank()) {
-            metadataElement.appendChild(createIdentifierElement(opfDoc, scheme, idValue));
-        }
-        hasChanges[0] = true;
-    }
-
     private void replaceAndTrackChange(Document doc, Element parent, String tag, String ns, String val, boolean[] flag) {
         if (replaceElementText(doc, parent, tag, ns, val, false)) flag[0] = true;
-    }
-
-    private void replaceMetaElement(Element metadataElement, Document doc, String name, String newVal, boolean[] flag) {
-        String existing = getMetaContentByName(metadataElement, name);
-        if (!Objects.equals(existing, newVal)) {
-            removeMetaByName(metadataElement, name);
-            if (newVal != null) metadataElement.appendChild(createMetaElement(doc, name, newVal));
-            flag[0] = true;
-        }
     }
 
     private boolean replaceElementText(Document doc, Element parent, String tagName, String namespaceURI, String newValue, boolean restoreMode) {
@@ -328,7 +313,7 @@ public class EpubMetadataWriter implements MetadataWriter {
         return changed;
     }
 
-
+    @Override
     public void replaceCoverImageFromBytes(BookEntity bookEntity, byte[] file) {
         if (!shouldSaveMetadataToFile(bookEntity.getFullFilePath().toFile())) {
             return;
@@ -341,6 +326,7 @@ public class EpubMetadataWriter implements MetadataWriter {
         replaceCoverImageInternal(bookEntity, file, "byte array");
     }
 
+    @Override
     public void replaceCoverImageFromUpload(BookEntity bookEntity, MultipartFile multipartFile) {
         if (!shouldSaveMetadataToFile(bookEntity.getFullFilePath().toFile())) {
             return;
@@ -405,7 +391,11 @@ public class EpubMetadataWriter implements MetadataWriter {
             File tempEpub = new File(epubFile.getParentFile(), epubFile.getName() + ".tmp");
             createEpubZipFromDirectory(tempDir, tempEpub.toPath());
 
-            if (!epubFile.delete()) throw new IOException("Could not delete original EPUB");
+            try {
+                Files.delete(epubFile.toPath());
+            } catch (IOException ex) {
+                throw new IOException("Could not delete original EPUB: " + ex.getMessage(), ex);
+            }
             if (!tempEpub.renameTo(epubFile)) throw new IOException("Could not rename temp EPUB");
 
             log.info("Cover image updated in EPUB from {}: {}", source, epubFile.getName());
@@ -535,6 +525,10 @@ public class EpubMetadataWriter implements MetadataWriter {
         return null;
     }
 
+    // S1168: null here is a load-failure sentinel that callers check via `!= null`/`== null` before
+    // writing cover bytes; an empty array would be silently treated as a successful load and written
+    // out as bogus zero-length cover data.
+    @SuppressWarnings("java:S1168")
     private byte[] loadImage(String imageUrl) {
         try {
             return encodeImage(fileService.downloadImageFromUrl(imageUrl));
@@ -612,16 +606,6 @@ public class EpubMetadataWriter implements MetadataWriter {
         }
     }
 
-    private void removeMetaByName(Element metadataElement, String name) {
-        NodeList metas = metadataElement.getElementsByTagNameNS("*", "meta");
-        for (int i = metas.getLength() - 1; i >= 0; i--) {
-            Element meta = (Element) metas.item(i);
-            if (name.equals(meta.getAttribute("name"))) {
-                metadataElement.removeChild(meta);
-            }
-        }
-    }
-
     private void removeMetaByRefines(Element metadataElement, String refines) {
         NodeList metas = metadataElement.getElementsByTagNameNS("*", "meta");
         for (int i = metas.getLength() - 1; i >= 0; i--) {
@@ -632,22 +616,6 @@ public class EpubMetadataWriter implements MetadataWriter {
         }
     }
 
-    private Element createMetaElement(Document doc, String name, String content) {
-        Element meta = doc.createElementNS(doc.getDocumentElement().getNamespaceURI(), "meta");
-        meta.setAttribute("name", name);
-        meta.setAttribute(ATTR_CONTENT, content);
-        return meta;
-    }
-
-    private void removeIdentifierByScheme(Element metadataElement, String scheme) {
-        NodeList identifiers = metadataElement.getElementsByTagNameNS("*", TAG_IDENTIFIER);
-        for (int i = identifiers.getLength() - 1; i >= 0; i--) {
-            Element idElement = (Element) identifiers.item(i);
-            if (scheme.equalsIgnoreCase(idElement.getAttributeNS(OPF_NS, "scheme"))) {
-                metadataElement.removeChild(idElement);
-            }
-        }
-    }
     private void removeIdentifierByUrn(Element metadataElement, String urnScheme) {
         NodeList identifiers = metadataElement.getElementsByTagNameNS("*", TAG_IDENTIFIER);
         String urnPrefix = "urn:" + urnScheme.toLowerCase() + ":";
@@ -817,6 +785,16 @@ public class EpubMetadataWriter implements MetadataWriter {
         return version != null && version.trim().startsWith("3");
     }
 
+    private static String bookloreMetaKey(String property, String name) {
+        if (property.startsWith(BOOKLORE_PREFIX)) {
+            return property;
+        }
+        if (name.startsWith(BOOKLORE_PREFIX)) {
+            return name;
+        }
+        return null;
+    }
+
     private boolean hasBookloreMetadataChanges(Element metadataElement, BookMetadataEntity metadata) {
         Map<String, String> existing = new TreeMap<>();
         NodeList metas = metadataElement.getElementsByTagNameNS("*", "meta");
@@ -824,7 +802,7 @@ public class EpubMetadataWriter implements MetadataWriter {
             Element meta = (Element) metas.item(i);
             String property = meta.getAttribute(ATTR_PROPERTY);
             String name = meta.getAttribute("name");
-            String key = property.startsWith(BOOKLORE_PREFIX) ? property : (name.startsWith(BOOKLORE_PREFIX) ? name : null);
+            String key = bookloreMetaKey(property, name);
             if (key != null) {
                 String value = meta.getAttribute(ATTR_CONTENT).isEmpty() ? meta.getTextContent() : meta.getAttribute(ATTR_CONTENT);
                 if (!isEffectivelyZeroOrBlank(value)) {
@@ -1223,6 +1201,10 @@ public class EpubMetadataWriter implements MetadataWriter {
                     case "publisher" -> publishers.add(elem);
                     case "description" -> descriptions.add(elem);
                     case TAG_SUBJECT -> subjects.add(elem);
+                    default -> {
+                        // Other dc: elements (e.g. rights, coverage, source, type, format, relation) are
+                        // intentionally left uncollected here, matching prior behavior of this switch.
+                    }
                 }
             } else if ("meta".equals(localName)) {
                 String property = elem.getAttribute(ATTR_PROPERTY);

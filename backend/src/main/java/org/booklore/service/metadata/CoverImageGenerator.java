@@ -234,7 +234,14 @@ public class CoverImageGenerator {
             float opacity = 0.018f + Math.abs((seed * (i + 1) * 3) % 25) * 0.0012f;
 
             g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity));
-            Color bokehColor = (i % 3 == 0) ? lighten(p.accent, 0.25f) : (i % 3 == 1) ? Color.WHITE : lighten(p.ornament, 0.2f);
+            Color bokehColor;
+            if (i % 3 == 0) {
+                bokehColor = lighten(p.accent, 0.25f);
+            } else if (i % 3 == 1) {
+                bokehColor = Color.WHITE;
+            } else {
+                bokehColor = lighten(p.ornament, 0.2f);
+            }
 
             g.setPaint(new RadialGradientPaint(px, py, size,
                     new float[]{0f, 0.6f, 1f},

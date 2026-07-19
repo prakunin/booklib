@@ -96,7 +96,8 @@ public class AudioFileUtilityService {
         String s1 = p1.getFileName().toString();
         String s2 = p2.getFileName().toString();
 
-        int i1 = 0, i2 = 0;
+        int i1 = 0;
+        int i2 = 0;
         while (i1 < s1.length() && i2 < s2.length()) {
             char c1 = s1.charAt(i1);
             char c2 = s2.charAt(i2);

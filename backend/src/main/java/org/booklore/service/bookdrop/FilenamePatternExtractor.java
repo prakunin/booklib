@@ -338,19 +338,10 @@ public class FilenamePatternExtractor {
             if (dateFormat.startsWith("yyyy", i)) {
                 result.append("\\d{4}");
                 i += 4;
-            } else if (dateFormat.startsWith("yy", i)) {
+            } else if (dateFormat.startsWith("yy", i) || dateFormat.startsWith("MM", i) || dateFormat.startsWith("dd", i)) {
                 result.append(TWO_DIGIT_PATTERN);
                 i += 2;
-            } else if (dateFormat.startsWith("MM", i)) {
-                result.append(TWO_DIGIT_PATTERN);
-                i += 2;
-            } else if (i < dateFormat.length() && dateFormat.charAt(i) == 'M') {
-                result.append("\\d{1,2}");
-                i += 1;
-            } else if (dateFormat.startsWith("dd", i)) {
-                result.append(TWO_DIGIT_PATTERN);
-                i += 2;
-            } else if (i < dateFormat.length() && dateFormat.charAt(i) == 'd') {
+            } else if (i < dateFormat.length() && (dateFormat.charAt(i) == 'M' || dateFormat.charAt(i) == 'd')) {
                 result.append("\\d{1,2}");
                 i += 1;
             } else {
@@ -414,6 +405,9 @@ public class FilenamePatternExtractor {
             case "ISBN10" -> metadata.setIsbn10(value);
             case "ISBN13" -> metadata.setIsbn13(value);
             case "ASIN" -> metadata.setAsin(value);
+            default -> {
+                // no-op: unrecognized placeholder name, nothing to apply
+            }
         }
     }
 
@@ -532,7 +526,9 @@ public class FilenamePatternExtractor {
         String part2 = matcher.group(3);
         String part3 = matcher.group(4);
         
-        int val1, val2, val3;
+        int val1;
+        int val2;
+        int val3;
         try {
             val1 = Integer.parseInt(part1);
             val2 = Integer.parseInt(part2);
@@ -540,15 +536,14 @@ public class FilenamePatternExtractor {
         } catch (NumberFormatException _) {
             return null;
         }
-        
-        String format1, format2, format3;
-        
+
+        String format1;
+        String format2;
+        String format3;
+
         if (isYearValue(part1, val1)) {
             format1 = buildYearFormat(part1);
-            if (val2 <= 12 && val3 > 12) {
-                format2 = buildMonthFormat(part2);
-                format3 = buildDayFormat(part3);
-            } else if (val3 <= 12 && val2 > 12) {
+            if (val3 <= 12 && val2 > 12) {
                 format2 = buildDayFormat(part2);
                 format3 = buildMonthFormat(part3);
             } else {
@@ -560,9 +555,6 @@ public class FilenamePatternExtractor {
             if (val1 <= 12 && val2 > 12) {
                 format1 = buildMonthFormat(part1);
                 format2 = buildDayFormat(part2);
-            } else if (val2 <= 12 && val1 > 12) {
-                format1 = buildDayFormat(part1);
-                format2 = buildMonthFormat(part2);
             } else {
                 format1 = buildDayFormat(part1);
                 format2 = buildMonthFormat(part2);

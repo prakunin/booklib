@@ -230,7 +230,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             return extractChapters(audioFile, f, f.getAudioHeader());
         } catch (Exception e) {
             log.warn("Failed to extract chapters from {}: {}", audioFile.getName(), e.getMessage());
-            return null;
+            return List.of();
         }
     }
 
@@ -255,12 +255,12 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
         try {
             Tag tag = taggedFile.getTag();
             if (!(tag instanceof AbstractID3v2Tag id3v2Tag)) {
-                return null;
+                return List.of();
             }
 
             Object chapFrames = id3v2Tag.getFrame(ID3v2ChapterFrames.FRAME_ID_CHAPTER);
             if (chapFrames == null) {
-                return null;
+                return List.of();
             }
 
             List<AudiobookMetadata.ChapterInfo> chapters = new ArrayList<>();
@@ -271,7 +271,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             } else if (chapFrames instanceof AbstractID3v2Frame abstractid3v2frame) {
                 frameList = List.of(abstractid3v2frame);
             } else {
-                return null;
+                return List.of();
             }
 
             frameList = new ArrayList<>(frameList);
@@ -308,7 +308,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             return chapters.isEmpty() ? null : chapters;
         } catch (Exception e) {
             log.debug("Failed to extract ID3v2 CHAP frames: {}", e.getMessage());
-            return null;
+            return List.of();
         }
     }
 
@@ -348,7 +348,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             Path ffprobeBinary = ffprobeService.getFfprobeBinary();
             if (ffprobeBinary == null) {
                 log.debug("ffprobe binary not available, skipping chapter extraction for {}", audioFile.getName());
-                return null;
+                return List.of();
             }
 
             ProcessBuilder pb = new ProcessBuilder(
@@ -373,19 +373,19 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 log.debug("FFprobe exited with code {} for {}", exitCode, audioFile.getName());
-                return null;
+                return List.of();
             }
 
             String jsonOutput = output.toString().trim();
             if (jsonOutput.isEmpty() || jsonOutput.equals("{}")) {
-                return null;
+                return List.of();
             }
 
             JsonNode root = mapper.readTree(jsonOutput);
             JsonNode chaptersNode = root.get("chapters");
 
             if (chaptersNode == null || !chaptersNode.isArray() || chaptersNode.isEmpty()) {
-                return null;
+                return List.of();
             }
 
             for (int i = 0; i < chaptersNode.size(); i++) {
@@ -435,7 +435,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                 Thread.currentThread().interrupt();
             }
             log.debug("Failed to extract chapters with ffprobe from {}: {}", audioFile.getName(), e.getMessage());
-            return null;
+            return List.of();
         }
     }
 
@@ -474,6 +474,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
      * A file jaudiotagger cannot read at all says nothing about artwork either way.
      */
     @Override
+    @SuppressWarnings("java:S1168") // null (not empty array) means "no cover"; BookCoverGenerator/BookdropMetadataService branch on == null
     public byte[] extractCover(File audioFile) {
         try {
             AudioFile f = AudioFileIO.read(audioFile);

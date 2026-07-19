@@ -137,22 +137,22 @@ public class BookFileTransactionalHandler {
             return;
         }
 
-        BookEntity matchingBook = null;
-
-        if (mode == LibraryOrganizationMode.BOOK_PER_FILE) {
+        BookEntity matchingBook = switch (mode) {
             // BOOK_PER_FILE: never attach to existing books
-        } else if (mode == LibraryOrganizationMode.BOOK_PER_FOLDER) {
-            matchingBook = findBookInSameFolder(libraryPathEntity.getId(), fileSubPath);
-            if (matchingBook == null) {
-                BookFileType fileType = BookFileExtension.fromFileName(fileName)
-                        .map(BookFileExtension::getType).orElse(null);
-                if (fileType == BookFileType.AUDIOBOOK) {
-                    matchingBook = findNearestAncestorBookWithEbook(libraryPathEntity.getId(), fileSubPath);
+            case BOOK_PER_FILE -> null;
+            case BOOK_PER_FOLDER -> {
+                BookEntity candidate = findBookInSameFolder(libraryPathEntity.getId(), fileSubPath);
+                if (candidate == null) {
+                    BookFileType fileType = BookFileExtension.fromFileName(fileName)
+                            .map(BookFileExtension::getType).orElse(null);
+                    if (fileType == BookFileType.AUDIOBOOK) {
+                        candidate = findNearestAncestorBookWithEbook(libraryPathEntity.getId(), fileSubPath);
+                    }
                 }
+                yield candidate;
             }
-        } else {
-            matchingBook = findMatchingBook(libraryPathEntity.getId(), fileSubPath, fileName);
-        }
+            default -> findMatchingBook(libraryPathEntity.getId(), fileSubPath, fileName);
+        };
 
         if (matchingBook != null) {
             autoAttachFile(matchingBook, fileName, fileSubPath, path);
