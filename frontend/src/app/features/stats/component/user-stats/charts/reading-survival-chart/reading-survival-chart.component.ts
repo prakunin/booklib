@@ -116,7 +116,7 @@ export class ReadingSurvivalChartComponent {
       return (survived / totalStarted) * 100;
     });
 
-    const completionRate = Math.round(survivalValues[survivalValues.length - 1]);
+    const completionRate = Math.round(survivalValues.at(-1)!);
 
     const medianIdx = survivalValues.findIndex(v => v < 50);
     const medianDropout = medianIdx === -1

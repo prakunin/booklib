@@ -113,7 +113,7 @@ public class ArchivedBookContentService {
             Files.createDirectories(cacheDirectory);
             extract(archivePath, entryName, cached);
             return cached;
-        } catch (MissingEntryException e) {
+        } catch (MissingEntryException _) {
             throw new ArchiveEntryMissingException(entryName);
         } catch (IOException e) {
             throw ApiError.FILE_READ_ERROR.createException("Unable to read archived book: " + e.getMessage());
@@ -135,7 +135,7 @@ public class ArchivedBookContentService {
                 try {
                     Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING,
                             StandardCopyOption.ATOMIC_MOVE);
-                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                } catch (java.nio.file.AtomicMoveNotSupportedException _) {
                     Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
                 }
             } finally {

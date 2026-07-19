@@ -121,10 +121,9 @@ public class AppAuthorService {
                 .orElseThrow(() -> ApiError.AUTHOR_NOT_FOUND.createException(authorId));
 
         // Verify access for non-admin users
-        if (accessibleLibraryIds != null) {
-            if (accessibleLibraryIds.isEmpty() || !authorRepository.existsByIdAndLibraryIds(authorId, accessibleLibraryIds)) {
-                throw ApiError.AUTHOR_NOT_FOUND.createException(authorId);
-            }
+        if (accessibleLibraryIds != null
+                && (accessibleLibraryIds.isEmpty() || !authorRepository.existsByIdAndLibraryIds(authorId, accessibleLibraryIds))) {
+            throw ApiError.AUTHOR_NOT_FOUND.createException(authorId);
         }
 
         // Count books accessible to this user
@@ -235,7 +234,7 @@ public class AppAuthorService {
         Path path = Paths.get(thumbnailPath);
         try {
             return Files.exists(path) ? Files.getLastModifiedTime(path).toMillis() : null;
-        } catch (IOException e) {
+        } catch (IOException _) {
             return null;
         }
     }

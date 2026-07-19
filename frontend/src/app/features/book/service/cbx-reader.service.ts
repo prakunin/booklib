@@ -13,8 +13,8 @@ export class CbxReaderService {
 
   private readonly pagesUrl = `${API_CONFIG.BASE_URL}/api/v1/cbx`;
   private readonly imageUrl = `${API_CONFIG.BASE_URL}/api/v1/media/book`;
-  private authService = inject(AuthService);
-  private http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
+  private readonly http = inject(HttpClient);
 
   private getToken(): string | null {
     return this.authService.getInternalAccessToken();

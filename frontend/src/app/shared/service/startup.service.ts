@@ -9,12 +9,12 @@ import {AppUiFontService} from './app-ui-font.service';
 
 @Injectable({providedIn: 'root'})
 export class StartupService {
-  private authService = inject(AuthService);
-  private userService = inject(UserService);
-  private queryClient = inject(QueryClient);
-  private appThemeService = inject(AppThemeService);
-  private appLocaleService = inject(AppLocaleService);
-  private appUiFontService = inject(AppUiFontService);
+  private readonly authService = inject(AuthService);
+  private readonly userService = inject(UserService);
+  private readonly queryClient = inject(QueryClient);
+  private readonly appThemeService = inject(AppThemeService);
+  private readonly appLocaleService = inject(AppLocaleService);
+  private readonly appUiFontService = inject(AppUiFontService);
 
   async load(): Promise<void> {
     if (this.authService.token()) {

@@ -51,7 +51,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
     private static final Pattern PARENTHESES_WITH_WHITESPACE_PATTERN = Pattern.compile("\\s*\\(.*?\\)");
     private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^\\p{L}\\p{M}0-9]");
     private static final Pattern ASIN_PATH_PATTERN = Pattern.compile("/dp/([A-Z0-9]{10})");
-    private static final Pattern REVIEWED_IN_ON_PATTERN = Pattern.compile("(?i)(?:Reviewed in|Rezension aus|Beoordeeld in|Recensie uit|Commenté en|Recensito in|Revisado en)\\s+(.+?)\\s+(?:on|vom|op|le|il|el)\\s+(.+)");
+    private static final Pattern REVIEWED_IN_ON_PATTERN = Pattern.compile("(?iu)(?:Reviewed in|Rezension aus|Beoordeeld in|Recensie uit|Commenté en|Recensito in|Revisado en)\\s+(.+?)\\s+(?:on|vom|op|le|il|el)\\s+(.+)");
     private static final Pattern JAPANESE_REVIEW_DATE_PATTERN = Pattern.compile("(\\d{4}年\\d{1,2}月\\d{1,2}日).+");
     private static final String[] TITLE_SELECTORS = {"#productTitle", "#ebooksProductTitle", "h1#title", "span#productTitle"};
     private static final String[] DATE_PATTERNS = {
@@ -118,7 +118,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                 if (metadata != null) {
                     results.add(metadata);
                 }
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
@@ -216,7 +216,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                     bookIds.add(bookId);
                 }
             }
-        } catch (AmazonAntiScrapingException e) {
+        } catch (AmazonAntiScrapingException _) {
             log.debug("Aborting Amazon search due to anti-scraping (503).");
             return Collections.emptyList();
         } catch (Exception e) {
@@ -266,7 +266,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         Document doc;
         try {
             doc = fetchDocument("https://www.amazon." + domain + BASE_BOOK_URL_SUFFIX + amazonBookId);
-        } catch (AmazonAntiScrapingException e) {
+        } catch (AmazonAntiScrapingException _) {
             log.debug("Aborting metadata fetch for ID {} due to status code (503).", amazonBookId);
             return null;
         }
@@ -863,6 +863,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
             try {
                 return LocalDate.parse(trimmedDate, DateTimeFormatter.ofPattern(pattern, Locale.ENGLISH));
             } catch (DateTimeParseException _) {
+                // try the next pattern
             }
         }
 
@@ -871,6 +872,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                 try {
                     return LocalDate.parse(trimmedDate, DateTimeFormatter.ofPattern(pattern, localeInfo.locale()));
                 } catch (DateTimeParseException _) {
+                    // try the next pattern
                 }
             }
         }

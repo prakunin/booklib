@@ -387,12 +387,12 @@ export class AuthorUniverseChartComponent {
     // Highest rated author (with at least 2 books)
     const ratedAuthors = authorStats.filter(a => a.avgRating > 0);
     if (ratedAuthors.length > 0) {
-      const highestRated = ratedAuthors.reduce((a, b) => a.avgRating > b.avgRating ? a : b);
+      const highestRated = ratedAuthors.reduce((a, b) => a.avgRating > b.avgRating ? a : b, ratedAuthors[0]);
       insights.push(this.t.translate('statsLibrary.authorUniverse.insightHighestRated', {name: highestRated.name, rating: `${highestRated.avgRating.toFixed(1)}\u2605`}));
     }
 
     // Most pages by author
-    const mostPages = authorStats.reduce((a, b) => a.totalPages > b.totalPages ? a : b);
+    const mostPages = authorStats.reduce((a, b) => a.totalPages > b.totalPages ? a : b, authorStats[0]);
     if (mostPages.totalPages > 0) {
       insights.push(this.t.translate('statsLibrary.authorUniverse.insightMostPages', {name: mostPages.name, count: mostPages.totalPages.toLocaleString()}));
     }
@@ -401,7 +401,8 @@ export class AuthorUniverseChartComponent {
     const completionCandidates = authorStats.filter(a => a.bookCount >= 3);
     if (completionCandidates.length > 0) {
       const bestCompletion = completionCandidates.reduce((a, b) =>
-        a.completionRate > b.completionRate ? a : b
+        a.completionRate > b.completionRate ? a : b,
+        completionCandidates[0]
       );
       if (bestCompletion.completionRate > 0) {
         insights.push(this.t.translate('statsLibrary.authorUniverse.insightMostRead', {name: bestCompletion.name, percent: Math.round(bestCompletion.completionRate)}));
@@ -409,9 +410,9 @@ export class AuthorUniverseChartComponent {
     }
 
     // Hidden gem - high rated but fewer books (quality over quantity)
-    const hiddenGems = ratedAuthors.filter(a => a.bookCount <= 3 && a.avgRating >= 4.0);
+    const hiddenGems = ratedAuthors.filter(a => a.bookCount <= 3 && a.avgRating >= 4);
     if (hiddenGems.length > 0) {
-      const gem = hiddenGems.reduce((a, b) => a.avgRating > b.avgRating ? a : b);
+      const gem = hiddenGems.reduce((a, b) => a.avgRating > b.avgRating ? a : b, hiddenGems[0]);
       insights.push(this.t.translate('statsLibrary.authorUniverse.insightHiddenGem', {name: gem.name, rating: `${gem.avgRating.toFixed(1)}\u2605`, count: gem.bookCount}));
     }
 
@@ -419,7 +420,8 @@ export class AuthorUniverseChartComponent {
     const authorsWithBacklog = authorStats.filter(a => a.bookCount - a.readCount > 0);
     if (authorsWithBacklog.length > 0) {
       const biggestBacklog = authorsWithBacklog.reduce((a, b) =>
-        (a.bookCount - a.readCount) > (b.bookCount - b.readCount) ? a : b
+        (a.bookCount - a.readCount) > (b.bookCount - b.readCount) ? a : b,
+        authorsWithBacklog[0]
       );
       const unreadCount = biggestBacklog.bookCount - biggestBacklog.readCount;
       if (unreadCount >= 2) {
@@ -441,7 +443,8 @@ export class AuthorUniverseChartComponent {
     const authorsWithPages = authorStats.filter(a => a.totalPages > 0);
     if (authorsWithPages.length > 0) {
       const longestReads = authorsWithPages.reduce((a, b) =>
-        (a.totalPages / a.bookCount) > (b.totalPages / b.bookCount) ? a : b
+        (a.totalPages / a.bookCount) > (b.totalPages / b.bookCount) ? a : b,
+        authorsWithPages[0]
       );
       const avgPages = Math.round(longestReads.totalPages / longestReads.bookCount);
       if (avgPages >= 300) {
@@ -453,7 +456,8 @@ export class AuthorUniverseChartComponent {
     const versatileAuthors = authorStats.filter(a => a.categories.length >= 3);
     if (versatileAuthors.length > 0) {
       const mostVersatile = versatileAuthors.reduce((a, b) =>
-        a.categories.length > b.categories.length ? a : b
+        a.categories.length > b.categories.length ? a : b,
+        versatileAuthors[0]
       );
       insights.push(this.t.translate('statsLibrary.authorUniverse.insightMostVersatile', {name: mostVersatile.name, count: mostVersatile.categories.length}));
     }
@@ -461,7 +465,7 @@ export class AuthorUniverseChartComponent {
     // Completely unread - authors with 0% completion but multiple books
     const completelyUnread = authorStats.filter(a => a.completionRate === 0 && a.bookCount >= 2);
     if (completelyUnread.length > 0) {
-      const topUnread = completelyUnread.reduce((a, b) => a.bookCount > b.bookCount ? a : b);
+      const topUnread = completelyUnread.reduce((a, b) => a.bookCount > b.bookCount ? a : b, completelyUnread[0]);
       insights.push(this.t.translate('statsLibrary.authorUniverse.insightUntouchedAuthor', {name: topUnread.name, count: topUnread.bookCount}));
     }
 
@@ -558,9 +562,9 @@ export class AuthorUniverseChartComponent {
   }
 
   private hexToRgba(hex: string, alpha: number): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
+    const r = Number.parseInt(hex.slice(1, 3), 16);
+    const g = Number.parseInt(hex.slice(3, 5), 16);
+    const b = Number.parseInt(hex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 }

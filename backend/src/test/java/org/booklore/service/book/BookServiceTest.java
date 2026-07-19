@@ -1,8 +1,6 @@
 package org.booklore.service.book;
 
 import jakarta.persistence.EntityManager;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.exception.APIException;
 import org.booklore.mapper.BookMapper;
@@ -28,7 +26,6 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.core.io.UrlResource;
@@ -339,7 +336,7 @@ class BookServiceTest {
     @Test
     void getBookThumbnail_fileMissing_returnsDefault() {
         when(fileService.getThumbnailFile(1L)).thenReturn("/tmp/nonexistent.jpg");
-        Resource res = bookService.getBookThumbnail(1L);
+        bookService.getBookThumbnail(1L);
     }
 
     @Test

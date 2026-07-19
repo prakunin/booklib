@@ -139,7 +139,7 @@ class CustomFontServiceTest {
 
     @Test
     @DisplayName("uploadFont_withFileAboveOldLimit_shouldAllowFileUnder50Mb")
-    void uploadFont_withFileAboveOldLimit_shouldAllowFileUnder50Mb() throws IOException {
+    void uploadFont_withFileAboveOldLimit_shouldAllowFileUnder50Mb() {
         // Arrange
         Long userId = 1L;
         String fontName = "Large Font";
@@ -222,7 +222,7 @@ class CustomFontServiceTest {
         // Verify file was cleaned up
         Path userFontDir = tempDir.resolve("custom-fonts").resolve(String.valueOf(userId));
         if (Files.exists(userFontDir)) {
-            assertThat(Files.list(userFontDir).count()).isEqualTo(0);
+            assertThat(Files.list(userFontDir).count()).isZero();
         }
     }
 
@@ -251,7 +251,7 @@ class CustomFontServiceTest {
         // Verify file was cleaned up
         Path userFontDir = tempDir.resolve("custom-fonts").resolve(String.valueOf(userId));
         if (Files.exists(userFontDir)) {
-            assertThat(Files.list(userFontDir).count()).isEqualTo(0);
+            assertThat(Files.list(userFontDir).count()).isZero();
         }
     }
 
@@ -362,7 +362,6 @@ class CustomFontServiceTest {
     @DisplayName("getFontFile_whenUserNotOwner_shouldThrowException")
     void getFontFile_whenUserNotOwner_shouldThrowException() {
         // Arrange
-        Long userId = 1L;
         Long otherUserId = 2L;
         Long fontId = 1L;
 

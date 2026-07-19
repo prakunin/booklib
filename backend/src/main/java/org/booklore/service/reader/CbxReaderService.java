@@ -79,6 +79,7 @@ public class CbxReaderService {
                 try {
                     value.close();
                 } catch (IOException _) {
+                    // nothing useful to do if closing the cached zip fails
                 }
             })
             .build();

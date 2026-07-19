@@ -65,7 +65,7 @@ class CbxMetadataExtractorTest {
     private Path mockArchiveContents(Map<String, byte[]> contents) throws IOException {
         Path path = Path.of("test.cbz");
         Set<String> keys = contents.keySet();
-        when(archiveService.streamEntryNames(path)).then((i) -> keys.stream());
+        when(archiveService.streamEntryNames(path)).then(i -> keys.stream());
 
         for (String key : keys) {
             when(archiveService.getEntryBytes(path, key)).thenReturn(contents.get(key));
@@ -83,7 +83,7 @@ class CbxMetadataExtractorTest {
 
     private Path mockEmptyArchive() throws IOException {
         Path path = Path.of("test.cbz");
-        when(archiveService.streamEntryNames(path)).then((i) -> Stream.empty());
+        when(archiveService.streamEntryNames(path)).then(i -> Stream.empty());
         when(archiveService.getEntryBytes(eq(path), any())).thenThrow(IOException.class);
         return path;
     }
@@ -92,7 +92,7 @@ class CbxMetadataExtractorTest {
         Path path = Path.of("test.cbz");
         String xml = wrapInComicInfo(innerXml);
         when(archiveService.getEntryBytes(path, "ComicInfo.xml")).thenReturn(xml.getBytes());
-        when(archiveService.streamEntryNames(path)).then((i) -> Stream.of("ComicInfo.xml"));
+        when(archiveService.streamEntryNames(path)).then(i -> Stream.of("ComicInfo.xml"));
 
         return path;
     }

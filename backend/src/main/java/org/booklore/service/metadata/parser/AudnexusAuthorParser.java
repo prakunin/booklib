@@ -107,7 +107,7 @@ public class AudnexusAuthorParser implements AuthorParser {
 
             log.warn("Audnexus author quick search returned status {}", response.statusCode());
             return null;
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return null;
         } catch (Exception e) {
@@ -168,7 +168,7 @@ public class AudnexusAuthorParser implements AuthorParser {
         if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
             try {
                 Thread.sleep(MIN_REQUEST_INTERVAL_MS - timeSinceLastRequest);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
             }
         }

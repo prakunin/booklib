@@ -117,10 +117,10 @@ export interface TaskProgressPayload {
   providedIn: 'root'
 })
 export class TaskService {
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
   private readonly baseUrl = `${API_CONFIG.BASE_URL}/api/v1/tasks`;
 
-  private taskProgressSubject = new BehaviorSubject<TaskProgressPayload | null>(null);
+  private readonly taskProgressSubject = new BehaviorSubject<TaskProgressPayload | null>(null);
   public taskProgress$ = this.taskProgressSubject.asObservable();
 
   getAvailableTasks(): Observable<TaskInfo[]> {

@@ -106,9 +106,9 @@ interface StreamingBookFactoryWindow extends Window {
   providedIn: 'root'
 })
 export class ReaderViewManagerService {
-  private annotationService = inject(ReaderAnnotationService);
-  private eventService = inject(ReaderEventService);
-  private epubStreamingService = inject(EpubStreamingService);
+  private readonly annotationService = inject(ReaderAnnotationService);
+  private readonly eventService = inject(ReaderEventService);
+  private readonly epubStreamingService = inject(EpubStreamingService);
   private view: FoliateViewElement | null = null;
 
   public get events$(): Observable<ViewEvent> {
@@ -148,7 +148,7 @@ export class ReaderViewManagerService {
         const file = new File([blob], epubPath.split('/').pop() || 'book.epub', {
           type: 'application/epub+zip'
         });
-        return from(view.open(file) as Promise<void>);
+        return from(view.open(file));
       }),
       map(() => undefined),
       catchError(err => throwError(() => err))
@@ -168,7 +168,7 @@ export class ReaderViewManagerService {
   }
 
   private async openStreamingBook(bookId: number, bookInfo: EpubBookInfo, bookType?: string): Promise<void> {
-    const makeStreamingBook = (window as StreamingBookFactoryWindow).makeStreamingBook;
+    const makeStreamingBook = (globalThis.window as StreamingBookFactoryWindow).makeStreamingBook;
     if (!makeStreamingBook) {
       throw new Error('makeStreamingBook not available - Foliate script may not be loaded');
     }
@@ -195,7 +195,7 @@ export class ReaderViewManagerService {
     }
     const view = this.view;
     return defer(() =>
-      from(view.goTo(resolvedTarget) as Promise<void>)
+      from(view.goTo(resolvedTarget))
     ).pipe(
       map(() => undefined)
     );
@@ -210,7 +210,7 @@ export class ReaderViewManagerService {
       return of(undefined);
     }
     const view = this.view;
-    return defer(() => from(view.goToFraction(fraction) as Promise<void>)).pipe(
+    return defer(() => from(view.goToFraction(fraction))).pipe(
       map(() => undefined)
     );
   }
@@ -324,7 +324,7 @@ export class ReaderViewManagerService {
     const book = this.view.book;
     return defer(() => {
       const coverPromise = book.getCover?.();
-      return coverPromise ? from(coverPromise as Promise<Blob | null>) : of(null);
+      return coverPromise ? from(coverPromise) : of(null);
     });
   }
 

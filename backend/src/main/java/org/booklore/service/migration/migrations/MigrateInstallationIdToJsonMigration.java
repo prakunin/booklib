@@ -41,7 +41,7 @@ public class MigrateInstallationIdToJsonMigration implements Migration {
             try {
                 objectMapper.readTree(value);
                 log.info("Installation ID is already in JSON format, skipping migration");
-            } catch (Exception e) {
+            } catch (Exception _) {
                 Instant now = Instant.now();
                 String json = String.format("{\"id\":\"%s\",\"date\":\"%s\"}", value, now);
                 setting.setVal(json);

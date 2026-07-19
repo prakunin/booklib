@@ -13,7 +13,7 @@ interface MetadataRefreshDialogContext {
 @Injectable({providedIn: 'root'})
 export class BookDialogHelperService {
 
-  private dialogLauncherService = inject(DialogLauncherService);
+  private readonly dialogLauncherService = inject(DialogLauncherService);
 
   private openDialog(component: unknown, options: object): DynamicDialogRef | null {
     return this.dialogLauncherService.openDialog(component, options);

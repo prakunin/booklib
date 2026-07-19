@@ -7,10 +7,10 @@ import {ReaderLeftSidebarService} from '../panel/panel.service';
 
 @Injectable()
 export class ReaderHeaderService {
-  private stateService = inject(ReaderStateService);
-  private sidebarService = inject(ReaderSidebarService);
-  private leftSidebarService = inject(ReaderLeftSidebarService);
-  private location = inject(Location);
+  private readonly stateService = inject(ReaderStateService);
+  private readonly sidebarService = inject(ReaderSidebarService);
+  private readonly leftSidebarService = inject(ReaderLeftSidebarService);
+  private readonly location = inject(Location);
 
   private bookId!: number;
   private readonly _bookTitle = signal('');
@@ -22,10 +22,10 @@ export class ReaderHeaderService {
   private readonly _isCurrentCfiBookmarked = signal(false);
   readonly isCurrentCfiBookmarked = this._isCurrentCfiBookmarked.asReadonly();
 
-  private _showControls = new Subject<void>();
-  private _showMetadata = new Subject<void>();
-  private _toggleFullscreen = new Subject<void>();
-  private _showShortcutsHelp = new Subject<void>();
+  private readonly _showControls = new Subject<void>();
+  private readonly _showMetadata = new Subject<void>();
+  private readonly _toggleFullscreen = new Subject<void>();
+  private readonly _showShortcutsHelp = new Subject<void>();
   private readonly _isFullscreen = signal(false);
   readonly isFullscreen = this._isFullscreen.asReadonly();
   showControls$ = this._showControls.asObservable();

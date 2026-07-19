@@ -7,7 +7,7 @@ import { createRxStompConfig } from './rx-stomp.config';
   providedIn: 'root',
 })
 export class RxStompService extends RxStomp {
-  private authService = inject(AuthService);
+  private readonly authService = inject(AuthService);
 
   constructor() {
     super();

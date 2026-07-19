@@ -17,9 +17,9 @@ import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/tran
 })
 export class FontUploadDialogComponent implements OnDestroy {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
-  private customFontService = inject(CustomFontService);
-  private messageService = inject(MessageService);
-  private dialogRef = inject(DynamicDialogRef);
+  private readonly customFontService = inject(CustomFontService);
+  private readonly messageService = inject(MessageService);
+  private readonly dialogRef = inject(DynamicDialogRef);
   private readonly t = inject(TranslocoService);
 
   isUploading = false;
@@ -216,7 +216,7 @@ export class FontUploadDialogComponent implements OnDestroy {
 
   cleanupPreviewFont(): void {
     if (this.previewFontFamily) {
-      const fontName = this.previewFontFamily.replace(/"/g, '');
+      const fontName = this.previewFontFamily.replaceAll('"', '');
 
       try {
         for (const font of document.fonts) {

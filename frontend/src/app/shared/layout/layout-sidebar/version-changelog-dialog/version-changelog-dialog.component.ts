@@ -21,13 +21,13 @@ import {TranslocoDirective} from '@jsverse/transloco';
 })
 export class VersionChangelogDialogComponent implements OnInit {
 
-  private versionService = inject(VersionService);
+  private readonly versionService = inject(VersionService);
   dialogRef = inject(DynamicDialogRef);
 
   changelog: ReleaseNote[] = [];
   loading = signal(true);
 
-  private markdown = new MarkdownIt({ html: true });
+  private readonly markdown = new MarkdownIt({ html: true });
 
   ngOnInit(): void {
     this.versionService.getChangelog().subscribe({
@@ -43,7 +43,7 @@ export class VersionChangelogDialogComponent implements OnInit {
 
   markdownToHtml(markdown: string): string {
     let html = this.markdown.render(markdown);
-    html = html.replace(/<h2\b([^>]*)>/g, '<h3$1>').replace(/<\/h2>/g, '</h3>');
+    html = html.replaceAll(/<h2\b([^>]*)>/g, '<h3$1>').replaceAll('</h2>', '</h3>');
     return DOMPurify.sanitize(html);
   }
 }

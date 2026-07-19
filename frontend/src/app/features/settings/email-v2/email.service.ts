@@ -10,7 +10,7 @@ export class EmailService {
 
   private readonly apiUrl = `${API_CONFIG.BASE_URL}/api/v1/email`;
 
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
 
   emailBook(request: { bookId: number, providerId: number, recipientId: number, bookFileId?: number }): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/book`, request);

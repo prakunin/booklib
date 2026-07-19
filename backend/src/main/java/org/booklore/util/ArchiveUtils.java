@@ -32,7 +32,7 @@ public class ArchiveUtils {
             if (fromContent != ArchiveType.UNKNOWN) {
                 return fromContent;
             }
-        } catch (IOException e) {
+        } catch (IOException _) {
             log.warn("Failed to detect archive type by content for file: {}", file.getAbsolutePath());
         }
 

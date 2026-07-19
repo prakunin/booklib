@@ -3,7 +3,7 @@ import {Subject} from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class BookMetadataHostService {
-  private bookSwitchRequest$ = new Subject<number>();
+  private readonly bookSwitchRequest$ = new Subject<number>();
 
   requestBookSwitch(bookId: number) {
     this.bookSwitchRequest$.next(bookId);

@@ -56,7 +56,8 @@ class CbxConversionServiceTest {
 
     @Test
     void convertCbxToEpub_WithNullCbxFile_ShouldThrowException() {
-        assertThatThrownBy(() -> cbxConversionService.convertCbxToEpub(null, tempDir.toFile(), testBookEntity,85))
+        File outputDir = tempDir.toFile();
+        assertThatThrownBy(() -> cbxConversionService.convertCbxToEpub(null, outputDir, testBookEntity,85))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid CBX file");
     }
@@ -64,8 +65,9 @@ class CbxConversionServiceTest {
     @Test
     void convertCbxToEpub_WithNonExistentFile_ShouldThrowException() {
         File nonExistentFile = new File(tempDir.toFile(), "non-existent.cbz");
+        File outputDir = tempDir.toFile();
 
-        assertThatThrownBy(() -> cbxConversionService.convertCbxToEpub(nonExistentFile, tempDir.toFile(), testBookEntity,85))
+        assertThatThrownBy(() -> cbxConversionService.convertCbxToEpub(nonExistentFile, outputDir, testBookEntity,85))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid CBX file");
     }
@@ -73,8 +75,9 @@ class CbxConversionServiceTest {
     @Test
     void convertCbxToEpub_WithUnsupportedFileFormat_ShouldThrowException() throws IOException {
         File unsupportedFile = Files.createFile(tempDir.resolve("test.txt")).toFile();
+        File outputDir = tempDir.toFile();
 
-        assertThatThrownBy(() -> cbxConversionService.convertCbxToEpub(unsupportedFile, tempDir.toFile(), testBookEntity,85))
+        assertThatThrownBy(() -> cbxConversionService.convertCbxToEpub(unsupportedFile, outputDir, testBookEntity,85))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unsupported file format");
     }
@@ -89,8 +92,9 @@ class CbxConversionServiceTest {
     @Test
     void convertCbxToEpub_WithEmptyCbzFile_ShouldThrowException() throws IOException {
         File emptyCbzFile = createEmptyCbzFile();
+        File outputDir = tempDir.toFile();
 
-        assertThatThrownBy(() -> cbxConversionService.convertCbxToEpub(emptyCbzFile, tempDir.toFile(), testBookEntity,85))
+        assertThatThrownBy(() -> cbxConversionService.convertCbxToEpub(emptyCbzFile, outputDir, testBookEntity,85))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No valid images found");
     }

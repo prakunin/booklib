@@ -68,10 +68,10 @@ public class GeoIpService {
                     return node.get("countryCode").asText();
                 }
             }
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             log.debug("Interrupted while resolving country code for IP: {}", ip);
-        } catch (Exception e) {
+        } catch (Exception _) {
             log.debug("Failed to resolve country code for IP: {}", ip);
         }
         return null;
@@ -91,7 +91,7 @@ public class GeoIpService {
                 return null;
             }
             return addr.getHostAddress();
-        } catch (Exception e) {
+        } catch (Exception _) {
             return null;
         }
     }

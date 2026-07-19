@@ -14,8 +14,8 @@ export interface BooksSummary {
   providedIn: 'root'
 })
 export class LibrariesSummaryService {
-  private bookService = inject(BookService);
-  private libraryFilterService = inject(LibraryFilterService);
+  private readonly bookService = inject(BookService);
+  private readonly libraryFilterService = inject(LibraryFilterService);
   readonly booksSummary = computed<BooksSummary>(() => {
     const books = this.bookService.books();
     const selectedLibraryId = this.libraryFilterService.selectedLibrary();

@@ -101,7 +101,8 @@ class OidcAuthServiceTest {
         settings.setOidcEnabled(false);
         when(appSettingService.getAppSettings()).thenReturn(settings);
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, request))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("OIDC is not enabled");
     }
@@ -113,7 +114,8 @@ class OidcAuthServiceTest {
         settings.setOidcProviderDetails(null);
         when(appSettingService.getAppSettings()).thenReturn(settings);
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, request))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("OIDC is not properly configured");
     }
@@ -127,7 +129,8 @@ class OidcAuthServiceTest {
         settings.setOidcProviderDetails(provider);
         when(appSettingService.getAppSettings()).thenReturn(settings);
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, request))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("OIDC is not properly configured");
     }
@@ -141,7 +144,8 @@ class OidcAuthServiceTest {
         when(oidcTokenClient.exchangeAuthorizationCode(CODE, CODE_VERIFIER, REDIRECT_URI, settings.getOidcProviderDetails()))
                 .thenReturn(tokenResponse);
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, request))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("No ID token received");
     }
@@ -362,7 +366,8 @@ class OidcAuthServiceTest {
         when(userRepository.findByOidcIssuerAndOidcSubject(ISSUER_URI, "sub-123")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("jdoe")).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, request))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("not provisioned");
     }
@@ -418,7 +423,8 @@ class OidcAuthServiceTest {
         when(userRepository.findByOidcIssuerAndOidcSubject(ISSUER_URI, "sub-unknown")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, REDIRECT_URI, NONCE, request))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("not provisioned");
     }
@@ -592,7 +598,8 @@ class OidcAuthServiceTest {
         settings.setOidcRedirectUris(List.of("booklib://oauth2-callback"));
         when(appSettingService.getAppSettings()).thenReturn(settings);
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "grimmory://some-other-path", NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "grimmory://some-other-path", NONCE, request))
                 .isInstanceOf(APIException.class);
     }
 
@@ -602,7 +609,8 @@ class OidcAuthServiceTest {
         settings.setOidcRedirectUris(List.of("*"));
         when(appSettingService.getAppSettings()).thenReturn(settings);
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "grimmory://some-other-path", NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "grimmory://some-other-path", NONCE, request))
                 .isInstanceOf(APIException.class);
 
         verify(oidcTokenClient, never()).exchangeAuthorizationCode(anyString(), anyString(), anyString(), any());
@@ -613,7 +621,8 @@ class OidcAuthServiceTest {
         var settings = enabledSettings();
         when(appSettingService.getAppSettings()).thenReturn(settings);
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "booklore://evil-path", NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "booklore://evil-path", NONCE, request))
                 .isInstanceOf(APIException.class);
     }
 
@@ -622,7 +631,8 @@ class OidcAuthServiceTest {
         var settings = enabledSettings();
         when(appSettingService.getAppSettings()).thenReturn(settings);
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "ftp://example.com/oauth2-callback", NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "ftp://example.com/oauth2-callback", NONCE, request))
                 .isInstanceOf(APIException.class);
     }
 
@@ -631,7 +641,8 @@ class OidcAuthServiceTest {
         var settings = enabledSettings();
         when(appSettingService.getAppSettings()).thenReturn(settings);
 
-        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "https://example.com/login", NONCE, mockRequest()))
+        var request = mockRequest();
+        assertThatThrownBy(() -> oidcAuthService.exchangeCodeForTokens(CODE, CODE_VERIFIER, "https://example.com/login", NONCE, request))
                 .isInstanceOf(APIException.class);
     }
 

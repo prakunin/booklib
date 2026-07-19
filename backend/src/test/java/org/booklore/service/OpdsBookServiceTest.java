@@ -335,7 +335,6 @@ class OpdsBookServiceTest {
 
     @Test
     void getBooksPageForV2User_throwsForbidden_whenNoPermission() {
-        OpdsUserV2 v2 = OpdsUserV2.builder().userId(1L).build();
         BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
         var permissionsEntity = mock(UserPermissionsEntity.class);
         when(permissionsEntity.isPermissionAccessOpds()).thenReturn(false);
@@ -350,7 +349,7 @@ class OpdsBookServiceTest {
 
     @Test
     void getBooksPage_withSingleShelfId_returnsShelfBooks() {
-        OpdsUserDetails details = v2UserDetails(1L, false, Set.of(1L));
+        v2UserDetails(1L, false, Set.of(1L));
         BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
         var permissionsEntity = mock(UserPermissionsEntity.class);
         when(permissionsEntity.isPermissionAccessOpds()).thenReturn(true);
@@ -389,7 +388,7 @@ class OpdsBookServiceTest {
 
     @Test
     void getBooksPage_withMultipleShelfIds_returnsShelfBooks() {
-        OpdsUserDetails details = v2UserDetails(1L, false, Set.of(1L));
+        v2UserDetails(1L, false, Set.of(1L));
         BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
         var permissionsEntity = mock(UserPermissionsEntity.class);
         when(permissionsEntity.isPermissionAccessOpds()).thenReturn(true);
@@ -435,7 +434,7 @@ class OpdsBookServiceTest {
 
     @Test
     void getBooksPage_withShelfIdAndQuery_searchesInShelf() {
-        OpdsUserDetails details = v2UserDetails(1L, false, Set.of(1L));
+        v2UserDetails(1L, false, Set.of(1L));
         BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
         var permissionsEntity = mock(UserPermissionsEntity.class);
         when(permissionsEntity.isPermissionAccessOpds()).thenReturn(true);
@@ -474,7 +473,7 @@ class OpdsBookServiceTest {
 
     @Test
     void getBooksPage_withShelfId_throwsForbidden_whenNotOwner() {
-        OpdsUserDetails details = v2UserDetails(1L, false, Set.of(1L));
+        v2UserDetails(1L, false, Set.of(1L));
         BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
         var permissionsEntity = mock(UserPermissionsEntity.class);
         when(permissionsEntity.isPermissionAccessOpds()).thenReturn(true);
@@ -504,7 +503,7 @@ class OpdsBookServiceTest {
 
     @Test
     void getBooksPage_withShelfId_allowsAdmin_evenIfNotOwner() {
-        OpdsUserDetails details = v2UserDetails(1L, true, Set.of(1L));
+        v2UserDetails(1L, true, Set.of(1L));
         BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
         var permissionsEntity = mock(UserPermissionsEntity.class);
         when(permissionsEntity.isPermissionAccessOpds()).thenReturn(true);
@@ -599,7 +598,7 @@ class OpdsBookServiceTest {
         when(book.getLibrary()).thenReturn(library);
         when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
 
-        when(contentRestrictionService.applyRestrictions(eq(List.of(book)), eq(2L)))
+        when(contentRestrictionService.applyRestrictions(List.of(book), 2L))
                 .thenReturn(List.of());
 
         assertThatThrownBy(() ->
@@ -625,12 +624,12 @@ class OpdsBookServiceTest {
         when(book.getLibrary()).thenReturn(library);
         when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
 
-        when(contentRestrictionService.applyRestrictions(eq(List.of(book)), eq(2L)))
+        when(contentRestrictionService.applyRestrictions(List.of(book), 2L))
                 .thenReturn(List.of(book));
 
         opdsBookService.validateBookContentAccess(1L, 2L);
 
-        verify(contentRestrictionService).applyRestrictions(eq(List.of(book)), eq(2L));
+        verify(contentRestrictionService).applyRestrictions(List.of(book), 2L);
     }
 
     // ==================== Content restriction filtering in feeds ====================

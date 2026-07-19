@@ -200,6 +200,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                     case "publish-info" -> extractPublishInfo(reader, builder);
                     case "document-info" -> extractDocumentInfo(reader);
                     default -> {
+                        // ignore other elements
                     }
                 }
             } else if (event == XMLStreamConstants.END_ELEMENT && "description".equals(reader.getLocalName())) {
@@ -242,6 +243,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                         skipElement(reader);
                     }
                     default -> {
+                        // ignore other elements
                     }
                 }
             } else if (event == XMLStreamConstants.END_ELEMENT && "title-info".equals(reader.getLocalName())) {
@@ -260,6 +262,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                     case "year" -> extractPublicationYear(reader, builder);
                     case "isbn" -> extractIsbn(reader, builder);
                     default -> {
+                        // ignore other elements
                     }
                 }
             } else if (event == XMLStreamConstants.END_ELEMENT && "publish-info".equals(reader.getLocalName())) {
@@ -315,6 +318,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                     case "last-name" -> lastName = readElementText(reader);
                     case "nickname" -> nickname = readElementText(reader);
                     default -> {
+                        // ignore other elements
                     }
                 }
             } else if (event == XMLStreamConstants.END_ELEMENT && "author".equals(reader.getLocalName())) {
@@ -352,7 +356,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         if (StringUtils.isNotBlank(seriesNumber)) {
             try {
                 builder.seriesNumber(Float.parseFloat(seriesNumber));
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 log.debug("Failed to parse series number: {}", seriesNumber);
             }
         }
@@ -366,7 +370,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
             try {
                 int yearValue = Integer.parseInt(matcher.group());
                 builder.publishedDate(LocalDate.of(yearValue, 1, 1));
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 log.debug("Failed to parse year: {}", yearText);
             }
         }
@@ -442,8 +446,8 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
 
     private XMLStreamReader createXmlStreamReader(InputStream inputStream) throws XMLStreamException {
         XMLInputFactory factory = XMLInputFactory.newFactory();
-        setXmlProperty(factory, XMLInputFactory.SUPPORT_DTD, false);
-        setXmlProperty(factory, "javax.xml.stream.isSupportingExternalEntities", false);
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        factory.setProperty("javax.xml.stream.isSupportingExternalEntities", false);
         setXmlProperty(factory, XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
         return factory.createXMLStreamReader(inputStream);
     }

@@ -344,7 +344,7 @@ class FileMoveServiceOrderingTest {
 
         try {
             service.moveSingleFile(book);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             // Expected
         }
 

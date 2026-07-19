@@ -202,7 +202,7 @@ export class AuditLogsComponent implements OnInit {
   }
 
   countryCodeToFlag(code: string): string {
-    if (!code || code.length !== 2) return '';
+    if (code?.length !== 2) return '';
     return [...code.toUpperCase()]
       .map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65))
       .join('');
@@ -225,7 +225,7 @@ export class AuditLogsComponent implements OnInit {
   }
 
   formatAction(action: string): string {
-    return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\B\w+/g, c => c.toLowerCase());
+    return action.replaceAll('_', ' ').replaceAll(/\b\w/g, c => c.toUpperCase()).replaceAll(/\B\w+/g, c => c.toLowerCase());
   }
 
   getActionColor(action: string): TagColor {

@@ -30,6 +30,7 @@ import {BookdropBulkEditDialogComponent, BulkEditResult} from '../bookdrop-bulk-
 import {BookdropPatternExtractDialogComponent} from '../bookdrop-pattern-extract-dialog/bookdrop-pattern-extract-dialog.component';
 import {DialogLauncherService} from '../../../../shared/services/dialog-launcher.service';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {sortStrings} from '../../../../shared/util/string-sort.util';
 
 export interface BookdropFileUI {
   file: BookdropFile;
@@ -122,7 +123,7 @@ export class BookdropFileReviewComponent implements OnInit {
 
     const selected = this.libraries.find((lib) => lib?.id && String(lib.id) === value)
 
-    if (selected && selected.paths.length === 1) {
+    if (selected?.paths.length === 1) {
       this.defaultPathId = String(selected.paths[0].id)
     }
   }
@@ -263,7 +264,7 @@ export class BookdropFileReviewComponent implements OnInit {
     const selectedLib = this.libraries.find(l => String(l.id) === this.defaultLibraryId);
     const selectedPaths = selectedLib?.paths ?? [];
 
-    this.getSelectedFiles().map(fileUi => {
+    this.getSelectedFiles().forEach(fileUi => {
       const cachedfUi = this.fileUiCache[fileUi.file.id];
       cachedfUi.selectedLibraryId = this.defaultLibraryId;
       cachedfUi.availablePaths = selectedPaths.map(path => ({id: String(path.id), name: path.path}));
@@ -298,10 +299,10 @@ export class BookdropFileReviewComponent implements OnInit {
       fileUi.metadataForm.patchValue({
         title: original?.title || null,
         subtitle: original?.subtitle || null,
-        authors: [...(original?.authors ?? [])].sort(),
-        categories: [...(original?.categories ?? [])].sort(),
-        moods: [...(original?.moods ?? [])].sort(),
-        tags: [...(original?.tags ?? [])].sort(),
+        authors: sortStrings(original?.authors ?? []),
+        categories: sortStrings(original?.categories ?? []),
+        moods: sortStrings(original?.moods ?? []),
+        tags: sortStrings(original?.tags ?? []),
         publisher: original?.publisher || null,
         publishedDate: original?.publishedDate || null,
         isbn10: original?.isbn10 ?? null,
@@ -579,10 +580,10 @@ export class BookdropFileReviewComponent implements OnInit {
     return new FormGroup({
       title: new FormControl(original?.title ?? ''),
       subtitle: new FormControl(original?.subtitle ?? ''),
-      authors: new FormControl([...(original?.authors ?? [])].sort()),
-      categories: new FormControl([...(original?.categories ?? [])].sort()),
-      moods: new FormControl([...(original?.moods ?? [])].sort()),
-      tags: new FormControl([...(original?.tags ?? [])].sort()),
+      authors: new FormControl(sortStrings(original?.authors ?? [])),
+      categories: new FormControl(sortStrings(original?.categories ?? [])),
+      moods: new FormControl(sortStrings(original?.moods ?? [])),
+      tags: new FormControl(sortStrings(original?.tags ?? [])),
       publisher: new FormControl(original?.publisher ?? ''),
       publishedDate: new FormControl(original?.publishedDate ?? ''),
       isbn10: new FormControl(original?.isbn10 ?? ''),

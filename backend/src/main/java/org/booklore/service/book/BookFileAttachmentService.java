@@ -134,7 +134,7 @@ public class BookFileAttachmentService {
                 }
             }
 
-            long remainingBookFiles = sourceBook.getBookFiles().size() - bookFormatFiles.size();
+            long remainingBookFiles = (long) sourceBook.getBookFiles().size() - bookFormatFiles.size();
             if (remainingBookFiles == 0) {
                 sourceBooksToDeleteIds.add(sourceBook.getId());
             }

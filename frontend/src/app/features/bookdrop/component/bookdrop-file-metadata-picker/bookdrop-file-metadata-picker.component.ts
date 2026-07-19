@@ -19,6 +19,7 @@ import {MetadataUtilsService} from '../../../../shared/metadata';
 import {MetadataProviderSpecificFields} from '../../../../shared/model/app-settings.model';
 import {AppSettingsService} from '../../../../shared/service/app-settings.service';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {sortStrings} from '../../../../shared/util/string-sort.util';
 
 @Component({
   selector: 'app-bookdrop-file-metadata-picker-component',
@@ -206,7 +207,7 @@ export class BookdropFileMetadataPickerComponent {
         const value = this.originalMetadata[key];
 
         if (field.type === 'array') {
-          patchData[field.controlName] = [...(value as string[] ?? [])].sort();
+          patchData[field.controlName] = sortStrings(value as string[] ?? []);
         } else {
           patchData[field.controlName] = value ?? null;
         }

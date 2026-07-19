@@ -215,7 +215,7 @@ class Fb2ProcessorArchivedSourceTest {
          * transient distinction it discards here is the lazy probe's business, not its own.
          */
         @Test
-        void generateCoverReportsFailureWhenTheCoverCannotBeDecoded() throws IOException {
+        void generateCoverReportsFailureWhenTheCoverCannotBeDecoded() {
             Fb2Processor processor = buildProcessor();
             BookEntity book = BookEntity.builder().id(42L).build();
             BookFileEntity bookFile = buildArchivedFile(book);

@@ -12,8 +12,8 @@ export class SecureSrcDirective implements OnChanges, OnDestroy {
   private currentUrl: string | null = null;
   private subscription: Subscription | null = null;
 
-  private el = inject(ElementRef);
-  private http = inject(HttpClient);
+  private readonly el = inject(ElementRef);
+  private readonly http = inject(HttpClient);
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['src']) {

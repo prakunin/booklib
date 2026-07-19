@@ -128,7 +128,7 @@ public class OidcTokenValidator {
                 if (azp != null && !azp.equals(clientId)) {
                     throw ApiError.OIDC_INVALID_TOKEN.createException("ID token authorized party mismatch");
                 }
-            } catch (ParseException e) {
+            } catch (ParseException _) {
                 throw ApiError.OIDC_INVALID_TOKEN.createException("Failed to parse azp claim");
             }
         }
@@ -149,7 +149,7 @@ public class OidcTokenValidator {
             throw ApiError.OIDC_INVALID_TOKEN.createException("ID token missing iat claim");
         }
         Instant iat = claims.getIssueTime().toInstant();
-        if (Instant.now().isAfter(iat.plusSeconds(MAX_IAT_AGE_SECONDS + CLOCK_SKEW_SECONDS))) {
+        if (Instant.now().isAfter(iat.plusSeconds((long) MAX_IAT_AGE_SECONDS + CLOCK_SKEW_SECONDS))) {
             throw ApiError.OIDC_INVALID_TOKEN.createException("ID token was issued too long ago");
         }
     }
@@ -160,7 +160,7 @@ public class OidcTokenValidator {
             if (!expectedNonce.equals(tokenNonce)) {
                 throw ApiError.OIDC_INVALID_TOKEN.createException("ID token nonce mismatch");
             }
-        } catch (ParseException e) {
+        } catch (ParseException _) {
             throw ApiError.OIDC_INVALID_TOKEN.createException("Failed to parse nonce claim");
         }
     }

@@ -191,8 +191,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READING_PROGRESS, RuleOperator.GREATER_THAN, 50));
-            assertThat(ids).contains(book.getId());
-            assertThat(ids).doesNotContain(lowBook.getId());
+            assertThat(ids)
+                    .contains(book.getId())
+                    .doesNotContain(lowBook.getId());
         }
 
         @Test
@@ -206,8 +207,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READING_PROGRESS, RuleOperator.LESS_THAN, 50));
-            assertThat(ids).contains(book.getId());
-            assertThat(ids).doesNotContain(highBook.getId());
+            assertThat(ids)
+                    .contains(book.getId())
+                    .doesNotContain(highBook.getId());
         }
     }
 
@@ -226,8 +228,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.WITHIN_LAST, 7, null, "days"));
-            assertThat(ids).contains(recent.getId());
-            assertThat(ids).doesNotContain(old.getId());
+            assertThat(ids)
+                    .contains(recent.getId())
+                    .doesNotContain(old.getId());
         }
 
         @Test
@@ -243,8 +246,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.OLDER_THAN, 30, null, "days"));
-            assertThat(ids).contains(old.getId());
-            assertThat(ids).doesNotContain(recent.getId());
+            assertThat(ids)
+                    .contains(old.getId())
+                    .doesNotContain(recent.getId());
         }
 
         @Test
@@ -260,8 +264,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.THIS_PERIOD, "year"));
-            assertThat(ids).contains(thisYear.getId());
-            assertThat(ids).doesNotContain(lastYear.getId());
+            assertThat(ids)
+                    .contains(thisYear.getId())
+                    .doesNotContain(lastYear.getId());
         }
 
         @Test
@@ -277,8 +282,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.WITHIN_LAST, 3, null, "months"));
-            assertThat(ids).contains(recent.getId());
-            assertThat(ids).doesNotContain(old.getId());
+            assertThat(ids)
+                    .contains(recent.getId())
+                    .doesNotContain(old.getId());
         }
     }
 
@@ -299,8 +305,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_STATUS, RuleOperator.EQUALS, "fully_read"));
-            assertThat(ids).contains(b1.getId(), b2.getId());
-            assertThat(ids).doesNotContain(u1.getId(), u2.getId());
+            assertThat(ids)
+                    .contains(b1.getId(), b2.getId())
+                    .doesNotContain(u1.getId(), u2.getId());
         }
 
         @Test
@@ -318,8 +325,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_STATUS, RuleOperator.EQUALS, "not_started"));
-            assertThat(ids).contains(u1.getId(), u2.getId());
-            assertThat(ids).doesNotContain(r1.getId(), r2.getId());
+            assertThat(ids)
+                    .contains(u1.getId(), u2.getId())
+                    .doesNotContain(r1.getId(), r2.getId());
         }
 
         @Test
@@ -346,8 +354,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_STATUS, RuleOperator.EQUALS, "completed"));
-            assertThat(ids).contains(b1.getId(), b3.getId());
-            assertThat(ids).doesNotContain(i1.getId(), i2.getId());
+            assertThat(ids)
+                    .contains(b1.getId(), b3.getId())
+                    .doesNotContain(i1.getId(), i2.getId());
         }
     }
 
@@ -364,8 +373,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_GAPS, RuleOperator.EQUALS, "any_gap"));
-            assertThat(ids).contains(g1.getId(), g3.getId());
-            assertThat(ids).doesNotContain(n1.getId(), n2.getId());
+            assertThat(ids)
+                    .contains(g1.getId(), g3.getId())
+                    .doesNotContain(n1.getId(), n2.getId());
         }
 
         @Test
@@ -379,8 +389,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_GAPS, RuleOperator.EQUALS, "missing_first"));
-            assertThat(ids).contains(m2.getId(), m3.getId());
-            assertThat(ids).doesNotContain(h1.getId(), h2.getId());
+            assertThat(ids)
+                    .contains(m2.getId(), m3.getId())
+                    .doesNotContain(h1.getId(), h2.getId());
         }
 
         @Test
@@ -395,8 +406,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_GAPS, RuleOperator.EQUALS, "duplicate_number"));
-            assertThat(ids).contains(d1a.getId(), d1b.getId(), d2.getId());
-            assertThat(ids).doesNotContain(u1.getId(), u2.getId());
+            assertThat(ids)
+                    .contains(d1a.getId(), d1b.getId(), d2.getId())
+                    .doesNotContain(u1.getId(), u2.getId());
         }
     }
 
@@ -411,8 +423,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.EQUALS, "first_in_series"));
-            assertThat(ids).contains(b1.getId());
-            assertThat(ids).doesNotContain(b2.getId(), b3.getId());
+            assertThat(ids)
+                    .contains(b1.getId())
+                    .doesNotContain(b2.getId(), b3.getId());
         }
 
         @Test
@@ -424,8 +437,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.EQUALS, "last_in_series"));
-            assertThat(ids).contains(b3.getId());
-            assertThat(ids).doesNotContain(b1.getId(), b2.getId());
+            assertThat(ids)
+                    .contains(b3.getId())
+                    .doesNotContain(b1.getId(), b2.getId());
         }
 
         @Test
@@ -440,8 +454,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.EQUALS, "next_unread"));
-            assertThat(ids).contains(b2.getId());
-            assertThat(ids).doesNotContain(b1.getId(), b3.getId());
+            assertThat(ids)
+                    .contains(b2.getId())
+                    .doesNotContain(b1.getId(), b3.getId());
         }
     }
 
@@ -462,8 +477,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_STATUS, RuleOperator.NOT_EQUALS, "fully_read"));
-            assertThat(ids).contains(u1.getId(), u2.getId());
-            assertThat(ids).doesNotContain(b1.getId(), b2.getId());
+            assertThat(ids)
+                    .contains(u1.getId(), u2.getId())
+                    .doesNotContain(b1.getId(), b2.getId());
         }
     }
 
@@ -483,8 +499,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READING_PROGRESS, RuleOperator.IN_BETWEEN, null, 30, 70));
-            assertThat(ids).contains(mid.getId());
-            assertThat(ids).doesNotContain(low.getId(), high.getId());
+            assertThat(ids)
+                    .contains(mid.getId())
+                    .doesNotContain(low.getId(), high.getId());
         }
 
         @Test
@@ -498,7 +515,7 @@ class BookRuleEvaluatorServiceIntegrationTest {
             assertThat(matchIds).contains(book.getId());
 
             List<Long> noMatchIds = findMatchingIds(singleRule(RuleField.READING_PROGRESS, RuleOperator.EQUALS, 60));
-            assertThat(noMatchIds).doesNotContain(book.getId());
+            assertThat(noMatchIds).isEmpty();
         }
 
         @Test
@@ -512,7 +529,7 @@ class BookRuleEvaluatorServiceIntegrationTest {
             assertThat(matchIds).contains(book.getId());
 
             List<Long> noMatchIds = findMatchingIds(singleRule(RuleField.READING_PROGRESS, RuleOperator.GREATER_THAN_EQUAL_TO, 51));
-            assertThat(noMatchIds).doesNotContain(book.getId());
+            assertThat(noMatchIds).isEmpty();
         }
 
         @Test
@@ -526,7 +543,7 @@ class BookRuleEvaluatorServiceIntegrationTest {
             assertThat(matchIds).contains(book.getId());
 
             List<Long> noMatchIds = findMatchingIds(singleRule(RuleField.READING_PROGRESS, RuleOperator.LESS_THAN_EQUAL_TO, 49));
-            assertThat(noMatchIds).doesNotContain(book.getId());
+            assertThat(noMatchIds).isEmpty();
         }
 
         @Test
@@ -540,7 +557,7 @@ class BookRuleEvaluatorServiceIntegrationTest {
             assertThat(zeroIds).contains(book.getId());
 
             List<Long> gtIds = findMatchingIds(singleRule(RuleField.READING_PROGRESS, RuleOperator.GREATER_THAN, 0));
-            assertThat(gtIds).doesNotContain(book.getId());
+            assertThat(gtIds).isEmpty();
         }
 
         @Test
@@ -572,8 +589,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.WITHIN_LAST, 2, null, "weeks"));
-            assertThat(ids).contains(recent.getId());
-            assertThat(ids).doesNotContain(old.getId());
+            assertThat(ids)
+                    .contains(recent.getId())
+                    .doesNotContain(old.getId());
         }
 
         @Test
@@ -589,8 +607,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.WITHIN_LAST, 1, null, "years"));
-            assertThat(ids).contains(recent.getId());
-            assertThat(ids).doesNotContain(old.getId());
+            assertThat(ids)
+                    .contains(recent.getId())
+                    .doesNotContain(old.getId());
         }
 
         @Test
@@ -606,8 +625,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.OLDER_THAN, 3, null, "months"));
-            assertThat(ids).contains(old.getId());
-            assertThat(ids).doesNotContain(recent.getId());
+            assertThat(ids)
+                    .contains(old.getId())
+                    .doesNotContain(recent.getId());
         }
 
         @Test
@@ -623,8 +643,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.OLDER_THAN, 1, null, "years"));
-            assertThat(ids).contains(old.getId());
-            assertThat(ids).doesNotContain(recent.getId());
+            assertThat(ids)
+                    .contains(old.getId())
+                    .doesNotContain(recent.getId());
         }
 
         @Test
@@ -641,8 +662,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.THIS_PERIOD, "month"));
-            assertThat(ids).contains(thisMonth.getId());
-            assertThat(ids).doesNotContain(notThisMonth.getId());
+            assertThat(ids)
+                    .contains(thisMonth.getId())
+                    .doesNotContain(notThisMonth.getId());
         }
 
         @Test
@@ -706,34 +728,35 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_STATUS, RuleOperator.EQUALS, "ongoing"));
-            assertThat(ids).contains(o1.getId(), o2.getId());
-            assertThat(ids).doesNotContain(c1.getId(), c2.getId());
+            assertThat(ids)
+                    .contains(o1.getId(), o2.getId())
+                    .doesNotContain(c1.getId(), c2.getId());
         }
 
         @Test
         void booksWithoutSeries_neverMatchSeriesStatus() {
-            BookEntity noSeries = createBook("No Series Book");
+            createBook("No Series Book");
             em.flush();
             em.clear();
 
             List<Long> readingIds = findMatchingIds(singleRule(RuleField.SERIES_STATUS, RuleOperator.EQUALS, "reading"));
-            assertThat(readingIds).doesNotContain(noSeries.getId());
+            assertThat(readingIds).isEmpty();
 
             List<Long> fullyReadIds = findMatchingIds(singleRule(RuleField.SERIES_STATUS, RuleOperator.EQUALS, "fully_read"));
-            assertThat(fullyReadIds).doesNotContain(noSeries.getId());
+            assertThat(fullyReadIds).isEmpty();
         }
 
         @Test
         void emptyStringSeriesName_neverMatchSeriesStatus() {
-            BookEntity emptySeriesBook = createBook("Empty Series Book", "", 1f, 2);
+            createBook("Empty Series Book", "", 1f, 2);
             em.flush();
             em.clear();
 
             List<Long> readingIds = findMatchingIds(singleRule(RuleField.SERIES_STATUS, RuleOperator.EQUALS, "reading"));
-            assertThat(readingIds).doesNotContain(emptySeriesBook.getId());
+            assertThat(readingIds).isEmpty();
 
             List<Long> fullyReadIds = findMatchingIds(singleRule(RuleField.SERIES_STATUS, RuleOperator.EQUALS, "fully_read"));
-            assertThat(fullyReadIds).doesNotContain(emptySeriesBook.getId());
+            assertThat(fullyReadIds).isEmpty();
         }
 
         @Test
@@ -765,20 +788,21 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_GAPS, RuleOperator.EQUALS, "missing_latest"));
-            assertThat(ids).contains(m1.getId(), m2.getId());
-            assertThat(ids).doesNotContain(c1.getId(), c2.getId());
+            assertThat(ids)
+                    .contains(m1.getId(), m2.getId())
+                    .doesNotContain(c1.getId(), c2.getId());
         }
 
         @Test
         void noGaps_doesNotMatch() {
-            BookEntity n1 = createBook("NoGap S1", "Consecutive Series", 1f, 3);
-            BookEntity n2 = createBook("NoGap S2", "Consecutive Series", 2f, 3);
-            BookEntity n3 = createBook("NoGap S3", "Consecutive Series", 3f, 3);
+            createBook("NoGap S1", "Consecutive Series", 1f, 3);
+            createBook("NoGap S2", "Consecutive Series", 2f, 3);
+            createBook("NoGap S3", "Consecutive Series", 3f, 3);
             em.flush();
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_GAPS, RuleOperator.EQUALS, "any_gap"));
-            assertThat(ids).doesNotContain(n1.getId(), n2.getId(), n3.getId());
+            assertThat(ids).isEmpty();
         }
     }
 
@@ -796,7 +820,7 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.EQUALS, "next_unread"));
-            assertThat(ids).doesNotContain(b1.getId(), b2.getId(), b3.getId());
+            assertThat(ids).isEmpty();
         }
 
         @Test
@@ -811,7 +835,7 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.EQUALS, "next_unread"));
-            assertThat(ids).doesNotContain(b1.getId(), b2.getId(), b3.getId());
+            assertThat(ids).isEmpty();
         }
 
         @Test
@@ -823,24 +847,25 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.EQUALS, "first_in_series"));
-            assertThat(ids).contains(b05.getId());
-            assertThat(ids).doesNotContain(b1.getId(), b2.getId());
+            assertThat(ids)
+                    .contains(b05.getId())
+                    .doesNotContain(b1.getId(), b2.getId());
         }
 
         @Test
         void positionFilters_requireSeriesNumber() {
-            BookEntity noNumber = createBook("No Number", "NoNum Series", null, 3);
+            createBook("No Number", "NoNum Series", null, 3);
             em.flush();
             em.clear();
 
             List<Long> firstIds = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.EQUALS, "first_in_series"));
-            assertThat(firstIds).doesNotContain(noNumber.getId());
+            assertThat(firstIds).isEmpty();
 
             List<Long> lastIds = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.EQUALS, "last_in_series"));
-            assertThat(lastIds).doesNotContain(noNumber.getId());
+            assertThat(lastIds).isEmpty();
 
             List<Long> nextIds = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.EQUALS, "next_unread"));
-            assertThat(nextIds).doesNotContain(noNumber.getId());
+            assertThat(nextIds).isEmpty();
         }
     }
 
@@ -877,8 +902,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             group.setRules(List.of(rule1, rule2));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(matchBoth.getId());
-            assertThat(ids).doesNotContain(matchOne.getId());
+            assertThat(ids)
+                    .contains(matchBoth.getId())
+                    .doesNotContain(matchOne.getId());
         }
 
         @Test
@@ -912,8 +938,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             group.setRules(List.of(rule1, rule2));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(matchFirst.getId());
-            assertThat(ids).doesNotContain(matchNeither.getId());
+            assertThat(ids)
+                    .contains(matchFirst.getId())
+                    .doesNotContain(matchNeither.getId());
         }
 
         @Test
@@ -963,8 +990,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             outerGroup.setRules(List.of(outerRule, innerGroup));
 
             List<Long> ids = findMatchingIds(outerGroup);
-            assertThat(ids).contains(matchAll.getId());
-            assertThat(ids).doesNotContain(matchOuterOnly.getId());
+            assertThat(ids)
+                    .contains(matchAll.getId())
+                    .doesNotContain(matchOuterOnly.getId());
         }
 
         @Test
@@ -993,8 +1021,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.TITLE, RuleOperator.CONTAINS, "potter"));
-            assertThat(ids).contains(hp.getId());
-            assertThat(ids).doesNotContain(lotr.getId());
+            assertThat(ids)
+                    .contains(hp.getId())
+                    .doesNotContain(lotr.getId());
         }
 
         @Test
@@ -1005,8 +1034,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.TITLE, RuleOperator.DOES_NOT_CONTAIN, "potter"));
-            assertThat(ids).contains(lotr.getId());
-            assertThat(ids).doesNotContain(hp.getId());
+            assertThat(ids)
+                    .contains(lotr.getId())
+                    .doesNotContain(hp.getId());
         }
 
         @Test
@@ -1017,8 +1047,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.TITLE, RuleOperator.STARTS_WITH, "harry"));
-            assertThat(ids).contains(hp.getId());
-            assertThat(ids).doesNotContain(hobbit.getId());
+            assertThat(ids)
+                    .contains(hp.getId())
+                    .doesNotContain(hobbit.getId());
         }
 
         @Test
@@ -1029,8 +1060,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.TITLE, RuleOperator.ENDS_WITH, "hobbit"));
-            assertThat(ids).contains(hobbit.getId());
-            assertThat(ids).doesNotContain(hp.getId());
+            assertThat(ids)
+                    .contains(hobbit.getId())
+                    .doesNotContain(hp.getId());
         }
 
         @Test
@@ -1050,8 +1082,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUTHORS, RuleOperator.CONTAINS, "sanderson"));
-            assertThat(ids).contains(book1.getId());
-            assertThat(ids).doesNotContain(book2.getId());
+            assertThat(ids)
+                    .contains(book1.getId())
+                    .doesNotContain(book2.getId());
         }
     }
 
@@ -1069,8 +1102,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHER, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noPublisher.getId());
-            assertThat(ids).doesNotContain(withPublisher.getId());
+            assertThat(ids)
+                    .contains(noPublisher.getId())
+                    .doesNotContain(withPublisher.getId());
         }
 
         @Test
@@ -1084,8 +1118,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHER, RuleOperator.IS_NOT_EMPTY, null));
-            assertThat(ids).contains(withPublisher.getId());
-            assertThat(ids).doesNotContain(noPublisher.getId());
+            assertThat(ids)
+                    .contains(withPublisher.getId())
+                    .doesNotContain(noPublisher.getId());
         }
 
         @Test
@@ -1102,8 +1137,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUTHORS, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noAuthors.getId());
-            assertThat(ids).doesNotContain(withAuthors.getId());
+            assertThat(ids)
+                    .contains(noAuthors.getId())
+                    .doesNotContain(withAuthors.getId());
         }
 
         @Test
@@ -1119,8 +1155,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUTHORS, RuleOperator.IS_NOT_EMPTY, null));
-            assertThat(ids).contains(withAuthors.getId());
-            assertThat(ids).doesNotContain(noAuthors.getId());
+            assertThat(ids)
+                    .contains(withAuthors.getId())
+                    .doesNotContain(noAuthors.getId());
         }
     }
 
@@ -1140,8 +1177,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.INCLUDES_ANY, List.of("READ", "READING")));
-            assertThat(ids).contains(readBook.getId(), readingBook.getId());
-            assertThat(ids).doesNotContain(pausedBook.getId());
+            assertThat(ids)
+                    .contains(readBook.getId(), readingBook.getId())
+                    .doesNotContain(pausedBook.getId());
         }
 
         @Test
@@ -1158,8 +1196,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EXCLUDES_ALL, List.of("READ", "READING")));
-            assertThat(ids).contains(pausedBook.getId());
-            assertThat(ids).doesNotContain(readBook.getId(), readingBook.getId());
+            assertThat(ids)
+                    .contains(pausedBook.getId())
+                    .doesNotContain(readBook.getId(), readingBook.getId());
         }
 
         @Test
@@ -1185,8 +1224,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUTHORS, RuleOperator.INCLUDES_ANY, List.of("Author A", "Author B")));
-            assertThat(ids).contains(bookA.getId(), bookB.getId());
-            assertThat(ids).doesNotContain(bookC.getId());
+            assertThat(ids)
+                    .contains(bookA.getId(), bookB.getId())
+                    .doesNotContain(bookC.getId());
         }
 
         @Test
@@ -1212,8 +1252,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUTHORS, RuleOperator.EXCLUDES_ALL, List.of("Author A2", "Author B2")));
-            assertThat(ids).contains(bookC.getId());
-            assertThat(ids).doesNotContain(bookA.getId(), bookB.getId());
+            assertThat(ids)
+                    .contains(bookC.getId())
+                    .doesNotContain(bookA.getId(), bookB.getId());
         }
 
         @Test
@@ -1235,8 +1276,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AUTHORS, RuleOperator.INCLUDES_ALL, List.of("Author X", "Author Y")));
-            assertThat(ids).contains(bookBoth.getId());
-            assertThat(ids).doesNotContain(bookOne.getId());
+            assertThat(ids)
+                    .contains(bookBoth.getId())
+                    .doesNotContain(bookOne.getId());
         }
     }
 
@@ -1265,8 +1307,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.IS_PHYSICAL, RuleOperator.EQUALS, "true"));
-            assertThat(ids).contains(physical.getId());
-            assertThat(ids).doesNotContain(digital.getId());
+            assertThat(ids)
+                    .contains(physical.getId())
+                    .doesNotContain(digital.getId());
         }
 
         @Test
@@ -1282,8 +1325,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.IS_PHYSICAL, RuleOperator.EQUALS, "false"));
-            assertThat(ids).contains(digital.getId());
-            assertThat(ids).doesNotContain(physical.getId());
+            assertThat(ids)
+                    .contains(digital.getId())
+                    .doesNotContain(physical.getId());
         }
 
         @Test
@@ -1294,8 +1338,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.TITLE, RuleOperator.NOT_EQUALS, "harry potter"));
-            assertThat(ids).contains(hobbit.getId());
-            assertThat(ids).doesNotContain(hp.getId());
+            assertThat(ids)
+                    .contains(hobbit.getId())
+                    .doesNotContain(hp.getId());
         }
 
         @Test
@@ -1309,8 +1354,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EQUALS, "READ"));
-            assertThat(ids).contains(readBook.getId());
-            assertThat(ids).doesNotContain(readingBook.getId());
+            assertThat(ids)
+                    .contains(readBook.getId())
+                    .doesNotContain(readingBook.getId());
         }
 
         @Test
@@ -1324,8 +1370,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EQUALS, "UNSET"));
-            assertThat(ids).contains(noProgress.getId());
-            assertThat(ids).doesNotContain(readingBook.getId());
+            assertThat(ids)
+                    .contains(noProgress.getId())
+                    .doesNotContain(readingBook.getId());
         }
     }
 
@@ -1344,8 +1391,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHED_DATE, RuleOperator.GREATER_THAN, "2023-01-01"));
-            assertThat(ids).contains(recentBook.getId());
-            assertThat(ids).doesNotContain(oldBook.getId());
+            assertThat(ids)
+                    .contains(recentBook.getId())
+                    .doesNotContain(oldBook.getId());
         }
 
         @Test
@@ -1361,8 +1409,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHED_DATE, RuleOperator.LESS_THAN, "2023-01-01"));
-            assertThat(ids).contains(oldBook.getId());
-            assertThat(ids).doesNotContain(recentBook.getId());
+            assertThat(ids)
+                    .contains(oldBook.getId())
+                    .doesNotContain(recentBook.getId());
         }
 
         @Test
@@ -1378,8 +1427,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHED_DATE, RuleOperator.IN_BETWEEN, null, "2023-01-01", "2024-01-01"));
-            assertThat(ids).contains(inRange.getId());
-            assertThat(ids).doesNotContain(outOfRange.getId());
+            assertThat(ids)
+                    .contains(inRange.getId())
+                    .doesNotContain(outOfRange.getId());
         }
     }
 
@@ -1398,8 +1448,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.INCLUDES_ANY, List.of("UNSET", "READ")));
-            assertThat(ids).contains(noProgress.getId(), readBook.getId());
-            assertThat(ids).doesNotContain(pausedBook.getId());
+            assertThat(ids)
+                    .contains(noProgress.getId(), readBook.getId())
+                    .doesNotContain(pausedBook.getId());
         }
 
         @Test
@@ -1412,8 +1463,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.INCLUDES_ANY, List.of("UNSET")));
-            assertThat(ids).contains(noProgress.getId());
-            assertThat(ids).doesNotContain(readBook.getId());
+            assertThat(ids)
+                    .contains(noProgress.getId())
+                    .doesNotContain(readBook.getId());
         }
     }
 
@@ -1432,8 +1484,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_GAPS, RuleOperator.NOT_EQUALS, "any_gap"));
-            assertThat(ids).contains(n1.getId(), n2.getId());
-            assertThat(ids).doesNotContain(g1.getId(), g3.getId());
+            assertThat(ids)
+                    .contains(n1.getId(), n2.getId())
+                    .doesNotContain(g1.getId(), g3.getId());
         }
 
         @Test
@@ -1445,8 +1498,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.SERIES_POSITION, RuleOperator.NOT_EQUALS, "first_in_series"));
-            assertThat(ids).contains(b2.getId(), b3.getId());
-            assertThat(ids).doesNotContain(b1.getId());
+            assertThat(ids)
+                    .contains(b2.getId(), b3.getId())
+                    .doesNotContain(b1.getId());
         }
     }
 
@@ -1465,8 +1519,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHED_DATE, RuleOperator.OLDER_THAN, 3, null, "months"));
-            assertThat(ids).contains(oldBook.getId());
-            assertThat(ids).doesNotContain(recentBook.getId());
+            assertThat(ids)
+                    .contains(oldBook.getId())
+                    .doesNotContain(recentBook.getId());
         }
 
         @Test
@@ -1482,8 +1537,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PUBLISHED_DATE, RuleOperator.THIS_PERIOD, "year"));
-            assertThat(ids).contains(recentBook.getId());
-            assertThat(ids).doesNotContain(oldBook.getId());
+            assertThat(ids)
+                    .contains(recentBook.getId())
+                    .doesNotContain(oldBook.getId());
         }
 
         @Test
@@ -1505,8 +1561,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.ADDED_ON, RuleOperator.THIS_PERIOD, "week"));
-            assertThat(ids).contains(thisWeekBook.getId());
-            assertThat(ids).doesNotContain(twoWeeksAgo.getId());
+            assertThat(ids)
+                    .contains(thisWeekBook.getId())
+                    .doesNotContain(twoWeeksAgo.getId());
         }
     }
 
@@ -1524,8 +1581,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "description"));
-            assertThat(ids).contains(withDesc.getId());
-            assertThat(ids).doesNotContain(noDesc.getId());
+            assertThat(ids)
+                    .contains(withDesc.getId())
+                    .doesNotContain(noDesc.getId());
         }
 
         @Test
@@ -1539,8 +1597,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.NOT_EQUALS, "description"));
-            assertThat(ids).contains(noDesc.getId());
-            assertThat(ids).doesNotContain(withDesc.getId());
+            assertThat(ids)
+                    .contains(noDesc.getId())
+                    .doesNotContain(withDesc.getId());
         }
 
         @Test
@@ -1552,7 +1611,7 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "description"));
-            assertThat(ids).doesNotContain(emptyDesc.getId());
+            assertThat(ids).isEmpty();
         }
 
         @Test
@@ -1566,8 +1625,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "pageCount"));
-            assertThat(ids).contains(withPages.getId());
-            assertThat(ids).doesNotContain(noPages.getId());
+            assertThat(ids)
+                    .contains(withPages.getId())
+                    .doesNotContain(noPages.getId());
         }
 
         @Test
@@ -1581,8 +1641,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "isbn13"));
-            assertThat(ids).contains(withIsbn.getId());
-            assertThat(ids).doesNotContain(noIsbn.getId());
+            assertThat(ids)
+                    .contains(withIsbn.getId())
+                    .doesNotContain(noIsbn.getId());
         }
 
         @Test
@@ -1596,8 +1657,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "thumbnailUrl"));
-            assertThat(ids).contains(withCover.getId());
-            assertThat(ids).doesNotContain(noCover.getId());
+            assertThat(ids)
+                    .contains(withCover.getId())
+                    .doesNotContain(noCover.getId());
         }
 
         @Test
@@ -1613,8 +1675,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "authors"));
-            assertThat(ids).contains(withAuthors.getId());
-            assertThat(ids).doesNotContain(noAuthors.getId());
+            assertThat(ids)
+                    .contains(withAuthors.getId())
+                    .doesNotContain(noAuthors.getId());
         }
 
         @Test
@@ -1630,8 +1693,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.NOT_EQUALS, "authors"));
-            assertThat(ids).contains(noAuthors.getId());
-            assertThat(ids).doesNotContain(withAuthors.getId());
+            assertThat(ids)
+                    .contains(noAuthors.getId())
+                    .doesNotContain(withAuthors.getId());
         }
 
         @Test
@@ -1647,8 +1711,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "categories"));
-            assertThat(ids).contains(withCats.getId());
-            assertThat(ids).doesNotContain(noCats.getId());
+            assertThat(ids)
+                    .contains(withCats.getId())
+                    .doesNotContain(noCats.getId());
         }
 
         @Test
@@ -1662,8 +1727,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "amazonRating"));
-            assertThat(ids).contains(withRating.getId());
-            assertThat(ids).doesNotContain(noRating.getId());
+            assertThat(ids)
+                    .contains(withRating.getId())
+                    .doesNotContain(noRating.getId());
         }
 
         @Test
@@ -1677,8 +1743,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "goodreadsId"));
-            assertThat(ids).contains(withId.getId());
-            assertThat(ids).doesNotContain(noId.getId());
+            assertThat(ids)
+                    .contains(withId.getId())
+                    .doesNotContain(noId.getId());
         }
 
         @Test
@@ -1694,8 +1761,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "personalRating"));
-            assertThat(ids).contains(withRating.getId());
-            assertThat(ids).doesNotContain(noRating.getId());
+            assertThat(ids)
+                    .contains(withRating.getId())
+                    .doesNotContain(noRating.getId());
         }
 
         @Test
@@ -1709,8 +1777,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "publishedDate"));
-            assertThat(ids).contains(withDate.getId());
-            assertThat(ids).doesNotContain(noDate.getId());
+            assertThat(ids)
+                    .contains(withDate.getId())
+                    .doesNotContain(noDate.getId());
         }
 
         @Test
@@ -1722,16 +1791,19 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> idsName = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "seriesName"));
-            assertThat(idsName).contains(withSeries.getId());
-            assertThat(idsName).doesNotContain(noSeries.getId());
+            assertThat(idsName)
+                    .contains(withSeries.getId())
+                    .doesNotContain(noSeries.getId());
 
             List<Long> idsNumber = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "seriesNumber"));
-            assertThat(idsNumber).contains(withSeries.getId());
-            assertThat(idsNumber).doesNotContain(noSeries.getId());
+            assertThat(idsNumber)
+                    .contains(withSeries.getId())
+                    .doesNotContain(noSeries.getId());
 
             List<Long> idsTotal = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "seriesTotal"));
-            assertThat(idsTotal).contains(withSeries.getId());
-            assertThat(idsTotal).doesNotContain(noSeries.getId());
+            assertThat(idsTotal)
+                    .contains(withSeries.getId())
+                    .doesNotContain(noSeries.getId());
         }
 
         @Test
@@ -1745,8 +1817,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "narrator"));
-            assertThat(ids).contains(withNarrator.getId());
-            assertThat(ids).doesNotContain(noNarrator.getId());
+            assertThat(ids)
+                    .contains(withNarrator.getId())
+                    .doesNotContain(noNarrator.getId());
         }
 
         @Test
@@ -1772,8 +1845,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "moods"));
-            assertThat(ids).contains(withMoods.getId());
-            assertThat(ids).doesNotContain(noMoods.getId());
+            assertThat(ids)
+                    .contains(withMoods.getId())
+                    .doesNotContain(noMoods.getId());
         }
 
         @Test
@@ -1789,8 +1863,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "tags"));
-            assertThat(ids).contains(withTags.getId());
-            assertThat(ids).doesNotContain(noTags.getId());
+            assertThat(ids)
+                    .contains(withTags.getId())
+                    .doesNotContain(noTags.getId());
         }
 
         @Test
@@ -1821,8 +1896,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             group.setRules(List.of(rule1, rule2));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(withBoth.getId());
-            assertThat(ids).doesNotContain(withOneOnly.getId());
+            assertThat(ids)
+                    .contains(withBoth.getId())
+                    .doesNotContain(withOneOnly.getId());
         }
 
         @Test
@@ -1855,8 +1931,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             group.setRules(List.of(rule1, rule2));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(missingBoth.getId(), missingOne.getId());
-            assertThat(ids).doesNotContain(hasBoth.getId());
+            assertThat(ids)
+                    .contains(missingBoth.getId(), missingOne.getId())
+                    .doesNotContain(hasBoth.getId());
         }
 
         @Test
@@ -1870,8 +1947,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "abridged"));
-            assertThat(ids).contains(withAbridged.getId());
-            assertThat(ids).doesNotContain(noAbridged.getId());
+            assertThat(ids)
+                    .contains(withAbridged.getId())
+                    .doesNotContain(noAbridged.getId());
         }
 
         @Test
@@ -1897,8 +1975,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "ageRating"));
-            assertThat(ids).contains(withAge.getId());
-            assertThat(ids).doesNotContain(noAge.getId());
+            assertThat(ids)
+                    .contains(withAge.getId())
+                    .doesNotContain(noAge.getId());
         }
 
         @Test
@@ -1919,8 +1998,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "audiobookDuration"));
-            assertThat(ids).contains(withDuration.getId());
-            assertThat(ids).doesNotContain(noDuration.getId());
+            assertThat(ids)
+                    .contains(withDuration.getId())
+                    .doesNotContain(noDuration.getId());
         }
 
         @Test
@@ -1941,8 +2021,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.NOT_EQUALS, "audiobookDuration"));
-            assertThat(ids).contains(noDuration.getId());
-            assertThat(ids).doesNotContain(withDuration.getId());
+            assertThat(ids)
+                    .contains(noDuration.getId())
+                    .doesNotContain(withDuration.getId());
         }
 
         @Test
@@ -1964,8 +2045,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "comicCharacters"));
-            assertThat(ids).contains(comicBook.getId());
-            assertThat(ids).doesNotContain(noComic.getId());
+            assertThat(ids)
+                    .contains(comicBook.getId())
+                    .doesNotContain(noComic.getId());
         }
 
         @Test
@@ -1987,8 +2069,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "comicTeams"));
-            assertThat(ids).contains(comicBook.getId());
-            assertThat(ids).doesNotContain(noTeams.getId());
+            assertThat(ids)
+                    .contains(comicBook.getId())
+                    .doesNotContain(noTeams.getId());
         }
 
         @Test
@@ -2010,8 +2093,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "comicLocations"));
-            assertThat(ids).contains(comicBook.getId());
-            assertThat(ids).doesNotContain(noLocations.getId());
+            assertThat(ids)
+                    .contains(comicBook.getId())
+                    .doesNotContain(noLocations.getId());
         }
 
         @Test
@@ -2039,8 +2123,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "comicPencillers"));
-            assertThat(ids).contains(comicBook.getId());
-            assertThat(ids).doesNotContain(noCreators.getId());
+            assertThat(ids)
+                    .contains(comicBook.getId())
+                    .doesNotContain(noCreators.getId());
         }
 
         @Test
@@ -2071,11 +2156,11 @@ class BookRuleEvaluatorServiceIntegrationTest {
 
             // Has penciller → should NOT match (only colorist assigned)
             List<Long> pencillerIds = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "comicPencillers"));
-            assertThat(pencillerIds).doesNotContain(comicBook.getId());
+            assertThat(pencillerIds).isEmpty();
 
             // Has inker → should NOT match
             List<Long> inkerIds = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "comicInkers"));
-            assertThat(inkerIds).doesNotContain(comicBook.getId());
+            assertThat(inkerIds).isEmpty();
         }
 
         @Test
@@ -2089,8 +2174,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.NOT_EQUALS, "thumbnailUrl"));
-            assertThat(ids).contains(noCover.getId());
-            assertThat(ids).doesNotContain(withCover.getId());
+            assertThat(ids)
+                    .contains(noCover.getId())
+                    .doesNotContain(withCover.getId());
         }
 
         @Test
@@ -2104,18 +2190,19 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.NOT_EQUALS, "pageCount"));
-            assertThat(ids).contains(noPages.getId());
-            assertThat(ids).doesNotContain(withPages.getId());
+            assertThat(ids)
+                    .contains(noPages.getId())
+                    .doesNotContain(withPages.getId());
         }
 
         @Test
         void hasNot_unknownField_matchesNothing() {
-            BookEntity book = createBook("Any Book 2");
+            createBook("Any Book 2");
             em.flush();
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.NOT_EQUALS, "nonExistentField"));
-            assertThat(ids).doesNotContain(book.getId());
+            assertThat(ids).isEmpty();
         }
 
         @Test
@@ -2139,8 +2226,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "subtitle"));
-            assertThat(ids).contains(withSubtitle.getId());
-            assertThat(ids).doesNotContain(noSubtitle.getId());
+            assertThat(ids)
+                    .contains(withSubtitle.getId())
+                    .doesNotContain(noSubtitle.getId());
         }
 
         @Test
@@ -2154,8 +2242,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "publisher"));
-            assertThat(ids).contains(withPublisher.getId());
-            assertThat(ids).doesNotContain(noPublisher.getId());
+            assertThat(ids)
+                    .contains(withPublisher.getId())
+                    .doesNotContain(noPublisher.getId());
         }
 
         @Test
@@ -2169,8 +2258,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "language"));
-            assertThat(ids).contains(withLang.getId());
-            assertThat(ids).doesNotContain(noLang.getId());
+            assertThat(ids)
+                    .contains(withLang.getId())
+                    .doesNotContain(noLang.getId());
         }
 
         @Test
@@ -2184,8 +2274,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "asin"));
-            assertThat(ids).contains(withAsin.getId());
-            assertThat(ids).doesNotContain(noAsin.getId());
+            assertThat(ids)
+                    .contains(withAsin.getId())
+                    .doesNotContain(noAsin.getId());
         }
 
         @Test
@@ -2199,8 +2290,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "contentRating"));
-            assertThat(ids).contains(withCR.getId());
-            assertThat(ids).doesNotContain(noCR.getId());
+            assertThat(ids)
+                    .contains(withCR.getId())
+                    .doesNotContain(noCR.getId());
         }
 
         @Test
@@ -2214,8 +2306,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "isbn10"));
-            assertThat(ids).contains(withIsbn10.getId());
-            assertThat(ids).doesNotContain(noIsbn10.getId());
+            assertThat(ids)
+                    .contains(withIsbn10.getId())
+                    .doesNotContain(noIsbn10.getId());
         }
 
         @Test
@@ -2229,8 +2322,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "audibleReviewCount"));
-            assertThat(ids).contains(withReviews.getId());
-            assertThat(ids).doesNotContain(noReviews.getId());
+            assertThat(ids)
+                    .contains(withReviews.getId())
+                    .doesNotContain(noReviews.getId());
         }
 
         @Test
@@ -2278,12 +2372,12 @@ class BookRuleEvaluatorServiceIntegrationTest {
 
         @Test
         void has_personalRating_noProgressEntity_treatedAsAbsent() {
-            BookEntity noProgress = createBook("No Progress At All");
+            createBook("No Progress At All");
             em.flush();
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "personalRating"));
-            assertThat(ids).doesNotContain(noProgress.getId());
+            assertThat(ids).isEmpty();
         }
 
         @Test
@@ -2318,8 +2412,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             group.setRules(List.of(presenceRule, pageRule));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(matchesBoth.getId());
-            assertThat(ids).doesNotContain(hasDescNoPages.getId(), shortWithPages.getId());
+            assertThat(ids)
+                    .contains(matchesBoth.getId())
+                    .doesNotContain(hasDescNoPages.getId(), shortWithPages.getId());
         }
 
         @Test
@@ -2366,8 +2461,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "comicEditors"));
-            assertThat(ids).contains(comicBook.getId());
-            assertThat(ids).doesNotContain(noEditors.getId());
+            assertThat(ids)
+                    .contains(comicBook.getId())
+                    .doesNotContain(noEditors.getId());
         }
 
         @Test
@@ -2389,8 +2485,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.NOT_EQUALS, "comicCharacters"));
-            assertThat(ids).contains(noChars.getId());
-            assertThat(ids).doesNotContain(comicBook.getId());
+            assertThat(ids)
+                    .contains(noChars.getId())
+                    .doesNotContain(comicBook.getId());
         }
 
         @Test
@@ -2408,7 +2505,7 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.METADATA_PRESENCE, RuleOperator.EQUALS, "audiobookDuration"));
-            assertThat(ids).doesNotContain(bookNoDuration.getId());
+            assertThat(ids).isEmpty();
         }
     }
 
@@ -2427,8 +2524,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PAGE_COUNT, RuleOperator.EQUALS, 300));
-            assertThat(ids).contains(book300.getId());
-            assertThat(ids).doesNotContain(book500.getId());
+            assertThat(ids)
+                    .contains(book300.getId())
+                    .doesNotContain(book500.getId());
         }
 
         @Test
@@ -2444,8 +2542,9 @@ class BookRuleEvaluatorServiceIntegrationTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PAGE_COUNT, RuleOperator.NOT_EQUALS, 300));
-            assertThat(ids).contains(book500.getId());
-            assertThat(ids).doesNotContain(book300.getId());
+            assertThat(ids)
+                    .contains(book500.getId())
+                    .doesNotContain(book300.getId());
         }
     }
 }

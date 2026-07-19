@@ -10,7 +10,6 @@ import org.booklore.service.user.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -36,10 +35,8 @@ public class UserController {
     }
 
     @Operation(summary = "Get user by ID", description = "Retrieve a user's profile by their ID.")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "User profile returned successfully"),
-        @ApiResponse(responseCode = "403", description = "Forbidden")
-    })
+    @ApiResponse(responseCode = "200", description = "User profile returned successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
     @GetMapping("/{id}")
     @PreAuthorize("@securityUtil.canViewUserProfile(#id)")
     public ResponseEntity<BookLoreUser> getUser(@Parameter(description = "ID of the user") @PathVariable Long id) {

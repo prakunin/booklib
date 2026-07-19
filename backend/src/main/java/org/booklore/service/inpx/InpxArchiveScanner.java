@@ -124,7 +124,7 @@ public class InpxArchiveScanner {
                 throw ApiError.FILE_NOT_FOUND.createException("ZIP archive is unavailable: " + archiveName);
             }
             return new ArchiveCandidate(path, archiveName, countFb2Entries(path));
-        } catch (InvalidPathException e) {
+        } catch (InvalidPathException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid ZIP archive name");
         }
     }
@@ -271,7 +271,7 @@ public class InpxArchiveScanner {
         try {
             Path entryPath = Path.of(entry.getName());
             return entryPath.getNameCount() == 1 && entryPath.getFileName().toString().equals(entry.getName());
-        } catch (InvalidPathException e) {
+        } catch (InvalidPathException _) {
             return false;
         }
     }
@@ -290,7 +290,7 @@ public class InpxArchiveScanner {
                 throw ApiError.LIBRARY_PATH_NOT_ACCESSIBLE.createException(root.toString());
             }
             return root;
-        } catch (InvalidPathException e) {
+        } catch (InvalidPathException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid INPX archive path");
         }
     }

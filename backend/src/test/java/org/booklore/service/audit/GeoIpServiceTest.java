@@ -71,8 +71,8 @@ class GeoIpServiceTest {
 
         ArgumentCaptor<HttpRequest> request = ArgumentCaptor.forClass(HttpRequest.class);
         verify(httpClient).send(request.capture(), anyStringBodyHandler());
-        assertThat(request.getValue().uri().toString())
-                .isEqualTo("http://ip-api.com/json/2001:4860:4860:0:0:0:0:8888?fields=countryCode");
+        assertThat(request.getValue().uri())
+                .hasToString("http://ip-api.com/json/2001:4860:4860:0:0:0:0:8888?fields=countryCode");
     }
 
     @Test

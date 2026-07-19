@@ -33,11 +33,11 @@ import {TranslocoDirective} from '@jsverse/transloco';
   styleUrl: './add-physical-book-dialog.component.scss',
 })
 export class AddPhysicalBookDialogComponent {
-  private dynamicDialogRef = inject(DynamicDialogRef);
-  private dialogConfig = inject(DynamicDialogConfig);
-  private bookService = inject(BookService);
-  private bookMetadataService = inject(BookMetadataService);
-  private libraryService = inject(LibraryService);
+  private readonly dynamicDialogRef = inject(DynamicDialogRef);
+  private readonly dialogConfig = inject(DynamicDialogConfig);
+  private readonly bookService = inject(BookService);
+  private readonly bookMetadataService = inject(BookMetadataService);
+  private readonly libraryService = inject(LibraryService);
 
   selectedLibraryId: number | null = null;
   title: string = '';

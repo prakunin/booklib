@@ -46,10 +46,7 @@ class KomgaCleanFilterTest {
         Map<String, Object> result = objectMapper.readValue(json, Map.class);
 
         // Then: Lock fields should be excluded
-        assertThat(result).containsKey("title");
-        assertThat(result).containsKey("summary");
-        assertThat(result).doesNotContainKey("titleLock");
-        assertThat(result).doesNotContainKey("summaryLock");
+        assertThat(result).containsKey("title").containsKey("summary").doesNotContainKey("titleLock").doesNotContainKey("summaryLock");
     }
 
     @Test
@@ -69,10 +66,7 @@ class KomgaCleanFilterTest {
         Map<String, Object> result = objectMapper.readValue(json, Map.class);
 
         // Then: Null values should be excluded
-        assertThat(result).containsKey("title");
-        assertThat(result).containsKey("number");
-        assertThat(result).doesNotContainKey("summary");
-        assertThat(result).doesNotContainKey("releaseDate");
+        assertThat(result).containsKey("title").containsKey("number").doesNotContainKey("summary").doesNotContainKey("releaseDate");
     }
 
     @Test
@@ -91,9 +85,7 @@ class KomgaCleanFilterTest {
         Map<String, Object> result = objectMapper.readValue(json, Map.class);
 
         // Then: Empty arrays should be excluded
-        assertThat(result).containsKey("title");
-        assertThat(result).doesNotContainKey("authors");
-        assertThat(result).doesNotContainKey("tags");
+        assertThat(result).containsKey("title").doesNotContainKey("authors").doesNotContainKey("tags");
     }
 
     @Test
@@ -115,8 +107,7 @@ class KomgaCleanFilterTest {
         Map<String, Object> result = objectMapper.readValue(json, Map.class);
 
         // Then: Non-empty arrays should be included
-        assertThat(result).containsKey("title");
-        assertThat(result).containsKey("tags");
+        assertThat(result).containsKey("title").containsKey("tags");
         assertThat((List<?>) result.get("tags")).hasSize(2);
     }
 
@@ -138,10 +129,7 @@ class KomgaCleanFilterTest {
         Map<String, Object> result = objectMapper.readValue(json, Map.class);
 
         // Then: Lock fields and empty arrays should be included
-        assertThat(result).containsKey("title");
-        assertThat(result).containsKey("titleLock");
-        assertThat(result).containsKey("summaryLock");
-        assertThat(result).containsKey("authors");
+        assertThat(result).containsKey("title").containsKey("titleLock").containsKey("summaryLock").containsKey("authors");
         // Note: null values are excluded by @JsonInclude(JsonInclude.Include.NON_NULL) regardless
     }
 }

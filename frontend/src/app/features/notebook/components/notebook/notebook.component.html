@@ -173,6 +173,17 @@
                         </span>
                       }
                       <span class="entry-date">{{ entry.createdAt | date:'mediumDate' }}</span>
+                      <p-button
+                        icon="pi pi-external-link"
+                        [label]="t('notebook.open')"
+                        styleClass="entry-open-button"
+                        [outlined]="true"
+                        size="small"
+                        [pTooltip]="t('notebook.openInReader')"
+                        tooltipPosition="bottom"
+                        [attr.aria-label]="t('notebook.openInReader')"
+                        (onClick)="openEntry(entry)"
+                      />
                     </div>
                     @if (entry.text) {
                       <div class="entry-text">{{ entry.text }}</div>

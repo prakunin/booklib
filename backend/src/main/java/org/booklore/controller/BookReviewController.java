@@ -6,7 +6,6 @@ import org.booklore.service.book.BookReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -25,10 +24,8 @@ public class BookReviewController {
     private final BookReviewService bookReviewService;
 
     @Operation(summary = "List reviews for a book", description = "Retrieve all reviews for a specific book.")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Reviews returned successfully"),
-        @ApiResponse(responseCode = "204", description = "No reviews found")
-    })
+    @ApiResponse(responseCode = "200", description = "Reviews returned successfully")
+    @ApiResponse(responseCode = "204", description = "No reviews found")
     @GetMapping("/book/{bookId}")
     @CheckBookAccess(bookIdParam = "bookId")
     public ResponseEntity<List<BookReview>> listByBook(

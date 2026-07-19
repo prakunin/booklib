@@ -209,7 +209,7 @@ public class FileUtils {
                         .mapToLong(p -> {
                             try {
                                 return Files.size(p);
-                            } catch (IOException e) {
+                            } catch (IOException _) {
                                 return 0L;
                             }
                         })

@@ -160,41 +160,44 @@
               </p-checkbox>
 
               @if (file.metadataForm.get('thumbnailUrl')?.value) {
-                <img
-                  [src]="file.metadataForm.get('thumbnailUrl')?.value"
-                  alt="Cover"
+                <button
+                  type="button"
                   [title]="t('originalCoverTitle')"
-                  class="cover-image"
-                  role="button"
-                  tabindex="0"
+                  class="cover-image-button"
                   (click)="file.showDetails = !file.showDetails"
-                  (keydown.enter)="file.showDetails = !file.showDetails"/>
+                  (keydown.enter)="file.showDetails = !file.showDetails">
+                  <img
+                    [src]="file.metadataForm.get('thumbnailUrl')?.value"
+                    alt="Cover"
+                    class="cover-image"/>
+                </button>
               } @else {
                 <div [title]="t('noCoverFoundTitle')" class="cover-image cover-placeholder">?</div>
               }
 
               @if (file.file.fetchedMetadata?.thumbnailUrl) {
-                <img
-                  [src]="file.file.fetchedMetadata?.thumbnailUrl"
-                  alt="Fetched Cover"
+                <button
+                  type="button"
                   [title]="t('fetchedCoverTitle')"
-                  class="cover-image"
-                  role="button"
-                  tabindex="0"
+                  class="cover-image-button"
                   (click)="file.showDetails = !file.showDetails"
-                  (keydown.enter)="file.showDetails = !file.showDetails"/>
+                  (keydown.enter)="file.showDetails = !file.showDetails">
+                  <img
+                    [src]="file.file.fetchedMetadata?.thumbnailUrl"
+                    alt="Fetched Cover"
+                    class="cover-image"/>
+                </button>
               } @else {
                 <div [title]="t('noCoverFetchedTitle')" class="cover-image cover-placeholder">?</div>
               }
 
-              <div
+              <button
+                type="button"
                 class="file-name"
-                role="button"
-                tabindex="0"
                 (click)="file.showDetails = !file.showDetails"
                 (keydown.enter)="file.showDetails = !file.showDetails">
                 {{ file.file.fileName }}
-              </div>
+              </button>
 
               <div class="file-library">
                 <i

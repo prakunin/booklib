@@ -86,15 +86,15 @@ export class AuthenticationSettingsComponent {
 
   editingLibraryIds: number[] = [];
   sessionDurationHours: number | null = null;
-  backchannelLogoutUri = `${window.location.origin}/api/v1/auth/oidc/backchannel-logout`;
+  backchannelLogoutUri = `${globalThis.location.origin}/api/v1/auth/oidc/backchannel-logout`;
   oidcForceOnlyMode = false;
   mobileRedirectUris: string[] = [this.defaultMobileRedirectUri];
   mobileRedirectUriInput = '';
 
   infoItems = [
-    {labelKey: 'infoPanel.redirectUri', value: `${window.location.origin}/oauth2-callback`},
-    {labelKey: 'infoPanel.postLogoutRedirectUri', value: `${window.location.origin}/login`},
-    {labelKey: 'infoPanel.backChannelLogoutUri', value: `${window.location.origin}/api/v1/auth/oidc/backchannel-logout`},
+    {labelKey: 'infoPanel.redirectUri', value: `${globalThis.location.origin}/oauth2-callback`},
+    {labelKey: 'infoPanel.postLogoutRedirectUri', value: `${globalThis.location.origin}/login`},
+    {labelKey: 'infoPanel.backChannelLogoutUri', value: `${globalThis.location.origin}/api/v1/auth/oidc/backchannel-logout`},
     {labelKey: 'infoPanel.requiredScopes', value: 'openid profile email groups offline_access'},
     {labelKey: 'infoPanel.pkceMethod', value: 'S256'},
     {labelKey: 'infoPanel.grantType', value: 'Authorization Code'},
@@ -129,11 +129,11 @@ export class AuthenticationSettingsComponent {
     }
   };
 
-  private appSettingsService = inject(AppSettingsService);
-  private messageService = inject(MessageService);
-  private libraryService = inject(LibraryService);
-  private groupMappingService = inject(OidcGroupMappingService);
-  private t = inject(TranslocoService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly messageService = inject(MessageService);
+  private readonly libraryService = inject(LibraryService);
+  private readonly groupMappingService = inject(OidcGroupMappingService);
+  private readonly t = inject(TranslocoService);
   get allLibraries() { return this.libraryService.libraries(); }
 
   private readonly loadSettingsEffect = effect(() => {

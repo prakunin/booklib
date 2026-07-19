@@ -1,6 +1,6 @@
 <ng-container *transloco="let t; prefix: 'readerEbook.settingsDialog'">
-<div class="dialog-overlay" role="button" tabindex="0" (click)="closed.emit()" (keydown.enter)="closed.emit()">
-  <div class="dialog" tabindex="0" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+<div class="dialog-overlay" tabindex="0" (click)="closed.emit()" (keydown.escape)="closed.emit()">
+  <dialog class="dialog" tabindex="0" open aria-modal="true" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
     <div class="tabs-row">
       <div class="tabs">
         <button
@@ -292,6 +292,6 @@
         <span class="slider"></span>
       </button>
     </div>
-  </div>
+  </dialog>
 </div>
 </ng-container>

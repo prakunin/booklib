@@ -202,7 +202,7 @@ public class InpxBatchWriter {
         List<AuthorEntity> result = new ArrayList<>();
         for (String name : names) {
             String key = normalize(name);
-            if (key.isBlank()) {
+            if (name == null || key.isBlank()) {
                 continue;
             }
             Long id = committedCache.get(key);
@@ -238,7 +238,7 @@ public class InpxBatchWriter {
         Set<CategoryEntity> result = new HashSet<>();
         for (String name : names) {
             String key = normalize(name);
-            if (key.isBlank()) {
+            if (name == null || key.isBlank()) {
                 continue;
             }
             Long id = committedCache.get(key);
@@ -286,7 +286,7 @@ public class InpxBatchWriter {
     private Float parseSeriesNumber(String value) {
         try {
             return value == null || value.isBlank() ? null : Float.valueOf(value.replace(',', '.'));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }
@@ -294,7 +294,7 @@ public class InpxBatchWriter {
     private LocalDate parseDate(String value) {
         try {
             return value == null || value.isBlank() ? null : LocalDate.parse(value);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             return null;
         }
     }

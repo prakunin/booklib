@@ -68,7 +68,7 @@ class UserProvisioningServiceTest {
 
     @Test
     void provisionOidcUser_setsBasicFieldsCorrectly() {
-        BookLoreUserEntity result = userProvisioningService.provisionOidcUser(
+        userProvisioningService.provisionOidcUser(
                 "jdoe", "jdoe@example.com", "John Doe",
                 "sub-123", "https://issuer.example.com", "https://avatar.example.com/jdoe.png",
                 provisionDetails);
@@ -254,9 +254,9 @@ class UserProvisioningServiceTest {
                 provisionDetails);
 
         verify(auditService).log(
-                eq(AuditAction.USER_CREATED),
-                eq("User"),
-                eq(1L),
-                eq("Created user: jdoe"));
+                AuditAction.USER_CREATED,
+                "User",
+                1L,
+                "Created user: jdoe");
     }
 }

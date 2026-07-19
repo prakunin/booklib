@@ -79,7 +79,7 @@
                 scrollHeight="flex">
                 <ng-template pTemplate="header">
                   <tr>
-                    <th style="width: 2.625rem">
+                    <th scope="col" style="width: 2.625rem">
                       <div class="header-content">
                         <p-checkbox
                           [binary]="true"
@@ -87,21 +87,21 @@
                           (ngModelChange)="setSelectAll(tab.selectAllKey, $event); toggleAll(tab.type, $event, dataTable.filteredValue || dataTable.value)"></p-checkbox>
                       </div>
                     </th>
-                    <th pSortableColumn="value">
+                    <th scope="col" pSortableColumn="value">
                       <div class="header-content">
                         <i class="pi {{ tab.icon }}"></i>
                         <span>{{ t(tab.labelKey) }}</span>
                         <p-sortIcon field="value"></p-sortIcon>
                       </div>
                     </th>
-                    <th pSortableColumn="count">
+                    <th scope="col" pSortableColumn="count">
                       <div class="header-content">
                         <i class="pi pi-book"></i>
                         <span>{{ t('booksColumn') }}</span>
                         <p-sortIcon field="count"></p-sortIcon>
                       </div>
                     </th>
-                    <th class="actions-header">
+                    <th scope="col" class="actions-header">
                       <div class="header-content">
                         <i class="pi pi-cog"></i>
                         <span>{{ t('actionsColumn') }}</span>

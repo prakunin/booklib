@@ -64,7 +64,7 @@ export class PublicationTrendChartComponent {
       return '';
     }
 
-    return `${years[0]} - ${years[years.length - 1]}`;
+    return `${years[0]} - ${years.at(-1)!}`;
   });
   public readonly chartData = computed<TrendChartData>(() => {
     const yearCounts = this.yearCounts();
@@ -75,7 +75,7 @@ export class PublicationTrendChartComponent {
     }
 
     const minYear = years[0];
-    const maxYear = years[years.length - 1];
+    const maxYear = years.at(-1)!;
     const labels: string[] = [];
     const data: number[] = [];
 
@@ -223,7 +223,7 @@ export class PublicationTrendChartComponent {
 
     const yearMatch = dateStr.match(/\d{4}/);
     if (yearMatch) {
-      const year = parseInt(yearMatch[0], 10);
+      const year = Number.parseInt(yearMatch[0], 10);
       if (year >= 1000 && year <= new Date().getFullYear() + 1) {
         return year;
       }
@@ -274,11 +274,11 @@ export class PublicationTrendChartComponent {
     const mostProductiveSpan = this.findMostProductiveSpan(yearCounts, years);
 
     // Time span
-    const timeSpan = years.length > 1 ? years[years.length - 1] - years[0] : 0;
+    const timeSpan = years.length > 1 ? years.at(-1)! - years[0] : 0;
 
     // Oldest and newest decades
     const oldestYear = years[0] || currentYear;
-    const newestYear = years[years.length - 1] || currentYear;
+    const newestYear = years.at(-1) || currentYear;
     const oldestDecade = oldestYear < 1900 ? 'Pre-1900' : `${Math.floor(oldestYear / 10) * 10}s`;
     const newestDecade = `${Math.floor(newestYear / 10) * 10}s`;
 

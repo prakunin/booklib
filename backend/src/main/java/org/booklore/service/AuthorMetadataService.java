@@ -254,7 +254,7 @@ public class AuthorMetadataService {
 
     @Transactional
     public void uploadAuthorPhoto(Long authorId, MultipartFile file) {
-        AuthorEntity author = authorRepository.findById(authorId)
+        authorRepository.findById(authorId)
                 .orElseThrow(() -> ApiError.AUTHOR_NOT_FOUND.createException(authorId));
 
         validatePhoto(file);
@@ -315,7 +315,7 @@ public class AuthorMetadataService {
 
     @Transactional
     public void uploadAuthorPhotoFromUrl(Long authorId, String imageUrl) {
-        AuthorEntity author = authorRepository.findById(authorId)
+        authorRepository.findById(authorId)
                 .orElseThrow(() -> ApiError.AUTHOR_NOT_FOUND.createException(authorId));
 
         fileService.createAuthorThumbnailFromUrl(authorId, imageUrl);
@@ -342,7 +342,7 @@ public class AuthorMetadataService {
             if (Files.exists(photoPath)) {
                 return new UrlResource(photoPath.toUri());
             }
-        } catch (MalformedURLException e) {
+        } catch (MalformedURLException _) {
             log.warn("Malformed URL for author photo path: {}", photoPath);
         }
         return null;
@@ -354,7 +354,7 @@ public class AuthorMetadataService {
             if (Files.exists(thumbnailPath)) {
                 return new UrlResource(thumbnailPath.toUri());
             }
-        } catch (MalformedURLException e) {
+        } catch (MalformedURLException _) {
             log.warn("Malformed URL for author thumbnail path: {}", thumbnailPath);
         }
         return null;

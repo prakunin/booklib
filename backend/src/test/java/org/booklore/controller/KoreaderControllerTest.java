@@ -24,7 +24,8 @@ class KoreaderControllerTest {
 
     @BeforeEach
     void setUp() {
-        try (AutoCloseable mocks = MockitoAnnotations.openMocks(this)) {
+        try (var _ = MockitoAnnotations.openMocks(this)) {
+            // mocks are initialized by openMocks and released when the try completes
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

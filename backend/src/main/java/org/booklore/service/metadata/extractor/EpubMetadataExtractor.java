@@ -164,16 +164,15 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                 String id = item.getAttribute("id");
                 String href = item.getAttribute("href");
                 String mediaType = item.getAttribute("media-type");
-                if (mediaType != null && mediaType.startsWith("image/")) {
-                    if ((id != null && id.toLowerCase().contains("cover")) ||
-                            (href != null && href.toLowerCase().contains("cover"))) {
-                        String decodedHref = URLDecoder.decode(href, StandardCharsets.UTF_8);
-                        String fullPath = resolvePath(opfName, decodedHref);
-                        if (container.exists(fullPath)) {
-                            ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
-                            container.streamTo(fullPath, baos);
-                            return baos.toByteArray();
-                        }
+                if (mediaType != null && mediaType.startsWith("image/")
+                        && ((id != null && id.toLowerCase().contains("cover")) ||
+                            (href != null && href.toLowerCase().contains("cover")))) {
+                    String decodedHref = URLDecoder.decode(href, StandardCharsets.UTF_8);
+                    String fullPath = resolvePath(opfName, decodedHref);
+                    if (container.exists(fullPath)) {
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
+                        container.streamTo(fullPath, baos);
+                        return baos.toByteArray();
                     }
                 }
             }
@@ -269,6 +268,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                                 builderMeta.seriesNumber(Float.parseFloat(content));
                                 seriesIndexFound = true;
                             } catch (NumberFormatException _) {
+                                // ignore unparseable series index
                             }
                         }
 
@@ -310,6 +310,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                             case BookLoreMetadata.NS_PREFIX + ":series_total" ->
                                     safeParseInt(content, builderMeta::seriesTotal);
                             case BookLoreMetadata.NS_PREFIX + ":rating" -> {
+                                // rating handled elsewhere; ignore here
                             }
                             case BookLoreMetadata.NS_PREFIX + ":amazon_rating" ->
                                     safeParseDouble(content, builderMeta::amazonRating);
@@ -483,6 +484,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
         try {
             setter.accept(Integer.parseInt(value));
         } catch (NumberFormatException _) {
+            // ignore unparseable value
         }
     }
 
@@ -490,6 +492,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
         try {
             setter.accept(Double.parseDouble(value));
         } catch (NumberFormatException _) {
+            // ignore unparseable value
         }
     }
     
@@ -588,11 +591,13 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
         try {
             return LocalDate.parse(value);
         } catch (Exception _) {
+            // not an ISO local date; try the next format
         }
 
         try {
             return OffsetDateTime.parse(value).toLocalDate();
         } catch (Exception _) {
+            // not an offset date-time; try the next format
         }
 
         // Try parsing first 10 characters for ISO date format with extra content
@@ -600,6 +605,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
             try {
                 return LocalDate.parse(value.substring(0, 10));
             } catch (Exception _) {
+                // leading 10 chars are not an ISO date; fall through
             }
         }
 

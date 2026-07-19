@@ -15,6 +15,7 @@ import {
 import {ContentRestrictionService} from '../content-restriction.service';
 import {BookService} from '../../../book/service/book.service';
 import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
+import {sortStrings} from '../../../../shared/util/string-sort.util';
 
 @Component({
   selector: 'app-content-restrictions-editor',
@@ -36,17 +37,17 @@ export class ContentRestrictionsEditorComponent implements OnInit, OnChanges {
   @Input() isEditing = false;
   @Output() restrictionsChanged = new EventEmitter<ContentRestriction[]>();
 
-  private contentRestrictionService = inject(ContentRestrictionService);
-  private bookService = inject(BookService);
-  private messageService = inject(MessageService);
-  private t = inject(TranslocoService);
-  private destroyRef = inject(DestroyRef);
+  private readonly contentRestrictionService = inject(ContentRestrictionService);
+  private readonly bookService = inject(BookService);
+  private readonly messageService = inject(MessageService);
+  private readonly t = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly sortedMetadata = computed(() => {
     const md = this.bookService.uniqueMetadata();
     return {
-      categories: [...md.categories].sort(),
-      tags: [...md.tags].sort(),
-      moods: [...md.moods].sort(),
+      categories: sortStrings(md.categories),
+      tags: sortStrings(md.tags),
+      moods: sortStrings(md.moods),
     };
   });
 
@@ -159,9 +160,9 @@ export class ContentRestrictionsEditorComponent implements OnInit, OnChanges {
 
     const restriction: ContentRestriction = {
       userId: this.userId,
-      restrictionType: this.newRestriction.restrictionType!,
-      mode: this.newRestriction.mode!,
-      value: this.newRestriction.value!
+      restrictionType: this.newRestriction.restrictionType,
+      mode: this.newRestriction.mode,
+      value: this.newRestriction.value
     };
     const requestedUserId = this.userId;
 

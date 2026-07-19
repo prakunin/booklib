@@ -110,7 +110,7 @@ export class CbxFooterComponent {
 
   onSliderChange(event: Event): void {
     const target = event.target as HTMLInputElement;
-    const page = parseInt(target.value, 10);
+    const page = Number.parseInt(target.value, 10);
     this.footerService.emitSliderChange(page);
   }
 

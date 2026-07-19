@@ -19,6 +19,8 @@
     "highlight": "Выделение",
     "note": "Заметка",
     "bookmark": "Закладка",
+    "open": "Открыть",
+    "openInReader": "Открыть в читалке",
     "annotation": "аннотация",
     "annotations": "аннотаций"
 }

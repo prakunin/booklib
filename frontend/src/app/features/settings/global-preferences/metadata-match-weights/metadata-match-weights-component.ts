@@ -31,16 +31,16 @@ export class MetadataMatchWeightsComponent {
     'doubanRating', 'doubanReviewCount', 'ranobedbRating'
   ];
 
-  private fb = inject(FormBuilder);
+  private readonly fb = inject(FormBuilder);
   form: FormGroup = this.buildForm();
   isSaving = false;
   isRecalculating = false;
 
-  private weightsService = inject(MetadataMatchWeightsService);
-  private appSettingsService = inject(AppSettingsService);
-  private messageService = inject(MessageService);
-  private t = inject(TranslocoService);
-  private destroyRef = inject(DestroyRef);
+  private readonly weightsService = inject(MetadataMatchWeightsService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly messageService = inject(MessageService);
+  private readonly t = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly syncSettingsEffect = effect(() => {
     const settings = this.appSettingsService.appSettings();

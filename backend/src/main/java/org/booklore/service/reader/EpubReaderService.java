@@ -151,7 +151,7 @@ public class EpubReaderService {
             String normalizedPath = normalizePath(filePath, metadata.bookInfo.getRootPath());
             EpubManifestItem item = metadata.manifestByHref.get(normalizedPath);
             return item != null ? item.getMediaType() : guessContentType(filePath);
-        } catch (IOException e) {
+        } catch (IOException _) {
             return guessContentType(filePath);
         }
     }
@@ -169,7 +169,7 @@ public class EpubReaderService {
             // O(1) lookup instead of O(n) stream filter
             EpubManifestItem item = metadata.manifestByHref.get(normalizedPath);
             return item != null ? item.getSize() : 0L;
-        } catch (IOException e) {
+        } catch (IOException _) {
             return 0L;
         }
     }

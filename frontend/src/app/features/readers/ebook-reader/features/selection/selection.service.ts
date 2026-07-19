@@ -28,9 +28,9 @@ export interface SelectionDetail {
 
 @Injectable()
 export class ReaderSelectionService {
-  private viewManager = inject(ReaderViewManagerService);
-  private annotationService = inject(ReaderAnnotationHttpService);
-  private leftSidebarService = inject(ReaderLeftSidebarService);
+  private readonly viewManager = inject(ReaderViewManagerService);
+  private readonly annotationService = inject(ReaderAnnotationHttpService);
+  private readonly leftSidebarService = inject(ReaderLeftSidebarService);
 
   private readonly destroyRef = inject(DestroyRef);
   private bookId!: number;
@@ -58,7 +58,7 @@ export class ReaderSelectionService {
   private readonly _state = signal<SelectionState>(this.defaultState);
   readonly state = this._state.asReadonly();
 
-  private annotationsChangedSubject = new Subject<Annotation[]>();
+  private readonly annotationsChangedSubject = new Subject<Annotation[]>();
   public annotationsChanged$ = this.annotationsChangedSubject.asObservable();
 
   initialize(bookId: number): void {
@@ -248,7 +248,7 @@ export class ReaderSelectionService {
       const offsetMatch = inner.match(/:(\d+)$/);
       if (offsetMatch) {
         const basePath = inner.replace(/:\d+$/, '');
-        const offset = parseInt(offsetMatch[1], 10);
+        const offset = Number.parseInt(offsetMatch[1], 10);
         return { basePath, startOffset: offset, endOffset: offset };
       }
       return null;
@@ -271,8 +271,8 @@ export class ReaderSelectionService {
 
     if (!startOffsetMatch || !endOffsetMatch) return null;
 
-    const startOffset = parseInt(startOffsetMatch[1], 10);
-    const endOffset = parseInt(endOffsetMatch[1], 10);
+    const startOffset = Number.parseInt(startOffsetMatch[1], 10);
+    const endOffset = Number.parseInt(endOffsetMatch[1], 10);
 
     // Build the full base path by combining parent with the common path structure
     // Strip character offsets from the path to get the node path

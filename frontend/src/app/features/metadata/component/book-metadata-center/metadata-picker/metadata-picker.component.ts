@@ -20,6 +20,7 @@ import {AppSettingsService} from '../../../../../shared/service/app-settings.ser
 import {MetadataProviderSpecificFields} from '../../../../../shared/model/app-settings.model';
 import {ALL_COMIC_METADATA_FIELDS, ALL_METADATA_FIELDS, AUDIOBOOK_METADATA_FIELDS, COMIC_ARRAY_METADATA_FIELDS, COMIC_FORM_TO_MODEL_LOCK, COMIC_TEXT_METADATA_FIELDS, COMIC_TEXTAREA_METADATA_FIELDS, getArrayFields, getBookDetailsFields, getBottomFields, getProviderFields, getSeriesFields, getTextareaFields, getTopFields, MetadataFieldConfig, MetadataFormBuilder, MetadataUtilsService} from '../../../../../shared/metadata';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {sortStrings} from '../../../../../shared/util/string-sort.util';
 
 @Component({
   selector: 'app-metadata-picker',
@@ -101,14 +102,14 @@ export class MetadataPickerComponent {
   isSaving = false;
   hoveredFields: Record<string, boolean> = {};
 
-  private messageService = inject(MessageService);
-  private bookService = inject(BookService);
-  private bookMetadataManageService = inject(BookMetadataManageService);
+  private readonly messageService = inject(MessageService);
+  private readonly bookService = inject(BookService);
+  private readonly bookMetadataManageService = inject(BookMetadataManageService);
   protected urlHelper = inject(UrlHelperService);
-  private destroyRef = inject(DestroyRef);
-  private appSettingsService = inject(AppSettingsService);
-  private formBuilder = inject(MetadataFormBuilder);
-  private metadataUtils = inject(MetadataUtilsService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly formBuilder = inject(MetadataFormBuilder);
+  private readonly metadataUtils = inject(MetadataUtilsService);
   private readonly t = inject(TranslocoService);
   private readonly uniqueMetadata = computed(() => this.bookService.uniqueMetadata());
 
@@ -161,8 +162,7 @@ export class MetadataPickerComponent {
     }
   });
 
-  private patchMetadataToForm(metadata: BookMetadata, book: Book): void {
-    void book;
+  private patchMetadataToForm(metadata: BookMetadata, _book: Book): void {
     const patchData: Record<string, unknown> = {};
 
     for (const field of ALL_METADATA_FIELDS) {
@@ -171,7 +171,7 @@ export class MetadataPickerComponent {
       const value = metadata[key];
 
       if (field.type === 'array') {
-        patchData[field.controlName] = [...(value as string[] ?? [])].sort();
+        patchData[field.controlName] = sortStrings(value as string[] ?? []);
       } else {
         patchData[field.controlName] = value ?? null;
       }
@@ -203,7 +203,7 @@ export class MetadataPickerComponent {
     for (const field of ALL_COMIC_METADATA_FIELDS) {
       const value = comicMeta?.[field.fetchedKey as keyof ComicMetadata];
       if (field.type === 'array') {
-        patchData[field.controlName] = [...(value as string[] ?? [])].sort();
+        patchData[field.controlName] = sortStrings(value as string[] ?? []);
       } else if (field.type === 'boolean') {
         patchData[field.controlName] = value ?? null;
       } else if (field.type === 'number') {
@@ -422,7 +422,7 @@ export class MetadataPickerComponent {
 
   private getNumberValue(field: string): number | null {
     const formValue = this.metadataForm.get(field)?.value;
-    if (formValue === '' || formValue === null || formValue === undefined || isNaN(formValue)) {
+    if (formValue === '' || formValue === null || formValue === undefined || Number.isNaN(formValue)) {
       if (this.copiedFields[field]) {
         return (this.fetchedMetadata[field as keyof BookMetadata] as number | null) ?? null;
       }

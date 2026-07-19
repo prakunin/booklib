@@ -65,7 +65,7 @@ export class ReaderHeaderComponent {
   }
 
   onClose(): void {
-    if (window.history.length <= 2) {
+    if (globalThis.history.length <= 2) {
       this.router.navigate(['/dashboard']);
     } else {
       this.headerService.close();

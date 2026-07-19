@@ -77,7 +77,7 @@ public class BookLoreUserTransformer {
                         case AUTO_SAVE_METADATA -> userSettings.setAutoSaveMetadata(Boolean.parseBoolean(value));
                     }
                 }
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException _) {
                 log.debug("Unknown setting key encountered: {}", key);
             } catch (Exception e) {
                 log.error("Failed to deserialize setting '{}': {}", key, e.getMessage(), e);

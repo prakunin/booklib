@@ -198,12 +198,12 @@ public class FilenamePatternExtractor {
         
         try {
             return future.get(REGEX_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
+        } catch (TimeoutException _) {
             future.cancel(true);
             log.warn("Pattern matching exceeded {} second timeout for: {}", 
                     REGEX_TIMEOUT_SECONDS, input.substring(0, Math.min(50, input.length())));
             return Optional.empty();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return Optional.empty();
         } catch (ExecutionException e) {
@@ -430,6 +430,7 @@ public class FilenamePatternExtractor {
         try {
             metadata.setSeriesNumber(Float.parseFloat(value));
         } catch (NumberFormatException _) {
+            // not a numeric series number, leave it unset
         }
     }
 
@@ -533,7 +534,7 @@ public class FilenamePatternExtractor {
             val1 = Integer.parseInt(part1);
             val2 = Integer.parseInt(part2);
             val3 = Integer.parseInt(part3);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
         
@@ -592,6 +593,7 @@ public class FilenamePatternExtractor {
         try {
             metadata.setSeriesTotal(Integer.parseInt(value));
         } catch (NumberFormatException _) {
+            // not a numeric series total, leave it unset
         }
     }
 

@@ -8,7 +8,7 @@ import {API_CONFIG} from '../../core/config/api-config';
 })
 export class FileDownloadService {
   private readonly document = inject(DOCUMENT);
-  private authService = inject(AuthService);
+  private readonly authService = inject(AuthService);
 
   downloadFile(url: string, filename: string): void {
     this.authService.ensureAccessToken().subscribe({

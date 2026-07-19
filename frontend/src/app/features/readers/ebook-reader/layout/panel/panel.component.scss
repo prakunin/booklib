@@ -134,9 +134,15 @@ $sidebar-width: 320px;
 .reader-list-item {
   display: flex;
   align-items: center;
+  width: 100%;
   gap: 12px;
   padding: 12px 16px;
+  border: 0;
+  background: none;
+  color: inherit;
   cursor: pointer;
+  font: inherit;
+  text-align: left;
   transition: background var(--transition-fast);
 
   &:hover {
@@ -146,6 +152,21 @@ $sidebar-width: 320px;
       opacity: 1;
     }
   }
+}
+
+.reader-list-item-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  gap: 12px;
 }
 
 .item-content {

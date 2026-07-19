@@ -279,7 +279,6 @@ public class PendingDeletionPool {
             if (pd.isDirectory() && filePath.startsWith(entry.getKey())) {
                 for (BookSnapshot bookSnap : pd.affectedBooks().values()) {
                     for (FileSnapshot fileSnap : bookSnap.files()) {
-                        String expectedFilePath = bookSnap.fileSubPath() + "/" + fileSnap.fileName();
                         String relPath = entry.getKey().getParent() != null
                                 ? entry.getKey().getParent().relativize(filePath).toString() : filePath.toString();
                         if (relPath.endsWith(fileSnap.fileName())) {

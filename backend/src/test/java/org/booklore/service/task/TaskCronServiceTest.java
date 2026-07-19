@@ -194,13 +194,11 @@ class TaskCronServiceTest {
     }
 
     @Test
-    void testValidateCronExpression_invalidFieldCount() {
+    void testValidateCronExpression_invalidFieldCount() throws Exception {
         String cron = "0 0 1 * *";
-        Exception ex = assertThrows(Exception.class, () -> {
-            var method = TaskCronService.class.getDeclaredMethod("validateCronExpression", String.class);
-            method.setAccessible(true);
-            method.invoke(service, cron);
-        });
+        var method = TaskCronService.class.getDeclaredMethod("validateCronExpression", String.class);
+        method.setAccessible(true);
+        Exception ex = assertThrows(Exception.class, () -> method.invoke(service, cron));
         Throwable cause = ex.getCause();
         assertNotNull(cause);
         assertInstanceOf(APIException.class, cause);
@@ -208,13 +206,11 @@ class TaskCronServiceTest {
     }
 
     @Test
-    void testValidateCronExpression_invalidFormat() {
+    void testValidateCronExpression_invalidFormat() throws Exception {
         String cron = "invalid cron expression";
-        Exception ex = assertThrows(Exception.class, () -> {
-            var method = TaskCronService.class.getDeclaredMethod("validateCronExpression", String.class);
-            method.setAccessible(true);
-            method.invoke(service, cron);
-        });
+        var method = TaskCronService.class.getDeclaredMethod("validateCronExpression", String.class);
+        method.setAccessible(true);
+        Exception ex = assertThrows(Exception.class, () -> method.invoke(service, cron));
         Throwable cause = ex.getCause();
         assertNotNull(cause);
         assertInstanceOf(APIException.class, cause);
@@ -232,15 +228,13 @@ class TaskCronServiceTest {
     }
 
     @Test
-    void testValidateTaskTypeForCron_notSupported() {
+    void testValidateTaskTypeForCron_notSupported() throws Exception {
         TaskType type = mock(TaskType.class);
         when(type.isCronSupported()).thenReturn(false);
 
-        Exception ex = assertThrows(Exception.class, () -> {
-            var method = TaskCronService.class.getDeclaredMethod("validateTaskTypeForCron", TaskType.class);
-            method.setAccessible(true);
-            method.invoke(service, type);
-        });
+        var method = TaskCronService.class.getDeclaredMethod("validateTaskTypeForCron", TaskType.class);
+        method.setAccessible(true);
+        Exception ex = assertThrows(Exception.class, () -> method.invoke(service, type));
         Throwable cause = ex.getCause();
         assertNotNull(cause);
         assertInstanceOf(APIException.class, cause);
@@ -248,12 +242,10 @@ class TaskCronServiceTest {
     }
 
     @Test
-    void testValidateTaskTypeForCron_nullType() {
-        Exception ex = assertThrows(Exception.class, () -> {
-            var method = TaskCronService.class.getDeclaredMethod("validateTaskTypeForCron", TaskType.class);
-            method.setAccessible(true);
-            method.invoke(service, (Object) null);
-        });
+    void testValidateTaskTypeForCron_nullType() throws Exception {
+        var method = TaskCronService.class.getDeclaredMethod("validateTaskTypeForCron", TaskType.class);
+        method.setAccessible(true);
+        Exception ex = assertThrows(Exception.class, () -> method.invoke(service, (Object) null));
         Throwable cause = ex.getCause();
         assertNotNull(cause);
         assertInstanceOf(APIException.class, cause);

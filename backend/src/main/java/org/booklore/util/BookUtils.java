@@ -42,7 +42,7 @@ public class BookUtils {
                     }
                 }
             }
-        } catch (Exception ex) {
+        } catch (Exception _) {
             // LazyInitializationException or similar - authors won't be included in search text
         }
         

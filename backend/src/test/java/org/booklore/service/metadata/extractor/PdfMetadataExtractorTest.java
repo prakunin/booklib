@@ -840,8 +840,7 @@ class PdfMetadataExtractorTest {
                 // but a blank page should still render to a valid JPEG.
             });
             byte[] cover = extractor.extractCover(pdf);
-            assertThat(cover).isNotNull();
-            assertThat(cover.length).isGreaterThan(0);
+            assertThat(cover).isNotNull().hasSizeGreaterThan(0);
             assertThat(cover[0]).isEqualTo((byte) 0xFF);
             assertThat(cover[1]).isEqualTo((byte) 0xD8);
         }

@@ -24,7 +24,7 @@ public interface AdditionalFileMapper {
         if (entity == null) return null;
         try {
             return entity.getFullFilePath().toString();
-        } catch (Exception e) {
+        } catch (Exception _) {
             return null;
         }
     }

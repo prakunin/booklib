@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,10 +37,8 @@ public class AuthenticationController {
     private final UserRepository userRepository;
 
     @Operation(summary = "Register a new user", description = "Register a new user. Only admins can register users.")
-    @ApiResponses({
-        @ApiResponse(responseCode = "204", description = "User registered successfully"),
-        @ApiResponse(responseCode = "403", description = "Forbidden")
-    })
+    @ApiResponse(responseCode = "204", description = "User registered successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
     @PostMapping("/register")
     @PreAuthorize("@securityUtil.isAdmin()")
     public ResponseEntity<?> registerUser(
@@ -67,10 +64,8 @@ public class AuthenticationController {
     }
 
     @Operation(summary = "Remote login", description = "Authenticate a user using remote authentication headers.")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "User authenticated successfully"),
-        @ApiResponse(responseCode = "403", description = "Remote authentication is disabled")
-    })
+    @ApiResponse(responseCode = "200", description = "User authenticated successfully")
+    @ApiResponse(responseCode = "403", description = "Remote authentication is disabled")
     @GetMapping("/remote")
     public ResponseEntity<AccessTokenDto> loginRemote(
             @Parameter(description = "Authentication headers") @RequestHeader HttpHeaders headers) {

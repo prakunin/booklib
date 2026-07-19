@@ -163,7 +163,7 @@ export class AppPageHeaderComponent {
       if (!region || typeof ResizeObserver === 'undefined') return;
       const target = region.closest<HTMLElement>('.app-page') ?? region;
       const publish = () => {
-        const top = parseFloat(getComputedStyle(region).top) || 0;
+        const top = Number.parseFloat(getComputedStyle(region).top) || 0;
         target.style.setProperty('--page-stuck-offset', `${top + region.offsetHeight}px`);
       };
       sizeObserver = new ResizeObserver(publish);

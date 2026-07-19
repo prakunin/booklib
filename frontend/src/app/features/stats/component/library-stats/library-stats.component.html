@@ -70,15 +70,15 @@
   @if (showConfigPanel) {
     <div
       class="config-modal-overlay"
-      role="button"
-      tabindex="0"
+      tabindex="-1"
       (click)="closeConfigPanel()"
-      (keydown.enter)="closeConfigPanel()">
+      (keydown.escape)="closeConfigPanel()">
       <div
         class="config-modal"
-        tabindex="0"
+        role="dialog"
+        aria-modal="true"
         (click)="$event.stopPropagation()"
-        (keydown.enter)="$event.stopPropagation()">
+        (keydown)="$event.stopPropagation()">
         <div class="config-modal-header">
           <h3><i class="pi pi-cog"></i> {{ t('config.title') }}</h3>
           <button type="button" class="close-btn" (click)="closeConfigPanel()" [title]="t('config.close')">

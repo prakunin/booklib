@@ -254,7 +254,7 @@ export class BookLengthChartComponent {
     }
 
     const sweetSpot = bestRange ? `${bestRange} pages (avg ${bestAvg.toFixed(1)})` : '-';
-    const highestRated = books.reduce((a, b) => (a.personalRating! >= b.personalRating! ? a : b));
+    const highestRated = books.reduce((a, b) => (a.personalRating! >= b.personalRating! ? a : b), books[0]);
     const highestRatedLength = `${highestRated.metadata!.pageCount} pages`;
 
     return {sweetSpot, highestRatedLength};

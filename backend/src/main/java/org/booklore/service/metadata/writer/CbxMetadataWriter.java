@@ -560,7 +560,7 @@ public class CbxMetadataWriter implements MetadataWriter {
             return !parsed.isAbsolute()
                     && !parsed.toString().isEmpty()
                     && !parsed.startsWith("..");
-        } catch (InvalidPathException e) {
+        } catch (InvalidPathException _) {
             return false;
         }
     }
@@ -599,7 +599,7 @@ public class CbxMetadataWriter implements MetadataWriter {
     private static void replaceFileAtomic(Path source, Path target) throws Exception {
         try {
             Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } catch (Exception e) {
+        } catch (Exception _) {
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }

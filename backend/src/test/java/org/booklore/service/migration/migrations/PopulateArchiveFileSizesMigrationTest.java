@@ -119,7 +119,8 @@ class PopulateArchiveFileSizesMigrationTest {
         when(bookFileRepository.findArchivedBookFilesMissingSizeAfterId(eq(10L), any(Pageable.class)))
                 .thenReturn(List.of());
 
-        assertThatThrownBy(() -> new PopulateArchiveFileSizesMigration(bookFileRepository, transactionManager).execute())
+        PopulateArchiveFileSizesMigration migration = new PopulateArchiveFileSizesMigration(bookFileRepository, transactionManager);
+        assertThatThrownBy(migration::execute)
                 .isInstanceOf(MigrationIncompleteException.class)
                 .hasMessageContaining("Unable to resolve file sizes for 1 archived book files");
 

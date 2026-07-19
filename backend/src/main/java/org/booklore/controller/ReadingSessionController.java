@@ -5,7 +5,6 @@ import org.booklore.model.dto.response.ReadingSessionResponse;
 import org.booklore.service.ReadingSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -26,10 +25,8 @@ public class ReadingSessionController {
     private final ReadingSessionService readingSessionService;
 
     @Operation(summary = "Record a reading session", description = "Receive telemetry from the reader client and persist or log the session.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "202", description = "Reading session accepted"),
-            @ApiResponse(responseCode = "400", description = "Invalid payload")
-    })
+    @ApiResponse(responseCode = "202", description = "Reading session accepted")
+    @ApiResponse(responseCode = "400", description = "Invalid payload")
     @PostMapping
     public ResponseEntity<Void> recordReadingSession(@RequestBody @Valid ReadingSessionRequest request) {
         readingSessionService.recordSession(request);
@@ -37,11 +34,9 @@ public class ReadingSessionController {
     }
 
     @Operation(summary = "Get reading sessions for a book", description = "Returns paginated reading sessions for a specific book for the authenticated user")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Reading sessions retrieved successfully"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "404", description = "Book not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Reading sessions retrieved successfully")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @ApiResponse(responseCode = "404", description = "Book not found")
     @GetMapping("/book/{bookId}")
     public ResponseEntity<Page<ReadingSessionResponse>> getReadingSessionsForBook(
             @PathVariable Long bookId, 

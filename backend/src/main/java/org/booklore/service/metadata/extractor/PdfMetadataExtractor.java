@@ -220,7 +220,7 @@ public class PdfMetadataExtractor implements FileMetadataExtractor {
                 String xmpStr = new String(rawXmpBytes, StandardCharsets.UTF_8);
                 Matcher siMatcher = Pattern.compile("<series_index>([^<]+)</series_index>").matcher(xmpStr);
                 if (siMatcher.find()) {
-                    try { metadataBuilder.seriesNumber(Float.parseFloat(siMatcher.group(1).trim())); } catch (Exception _) {}
+                    try { metadataBuilder.seriesNumber(Float.parseFloat(siMatcher.group(1).trim())); } catch (Exception _) { /* ignore unparseable value */ }
                 }
             }
         }
@@ -228,10 +228,10 @@ public class PdfMetadataExtractor implements FileMetadataExtractor {
         // Booklore
         findCustomField(xmp, rawXmp, "seriesName").ifPresent(metadataBuilder::seriesName);
         findCustomField(xmp, rawXmp, "seriesNumber").ifPresent(val -> {
-            try { metadataBuilder.seriesNumber(Float.parseFloat(val)); } catch (Exception _) {}
+            try { metadataBuilder.seriesNumber(Float.parseFloat(val)); } catch (Exception _) { /* ignore unparseable value */ }
         });
         findCustomField(xmp, rawXmp, "seriesTotal").ifPresent(val -> {
-            try { metadataBuilder.seriesTotal(Integer.parseInt(val)); } catch (Exception _) {}
+            try { metadataBuilder.seriesTotal(Integer.parseInt(val)); } catch (Exception _) { /* ignore unparseable value */ }
         });
         
         findCustomField(xmp, rawXmp, "subtitle").ifPresent(metadataBuilder::subtitle);

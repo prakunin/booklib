@@ -57,12 +57,12 @@ const ONIX5 = {
 }
 
 // convert to camel case
-const camel = x => x.toLowerCase().replace(/[-:](.)/g, (_, g) => g.toUpperCase())
+const camel = x => x.toLowerCase().replaceAll(/[-:](.)/g, (_, g) => g.toUpperCase())
 
 // strip and collapse ASCII whitespace
 // https://infra.spec.whatwg.org/#strip-and-collapse-ascii-whitespace
 const normalizeWhitespace = str => str ? str
-    .replace(/[\t\n\f\r ]+/g, ' ')
+    .replaceAll(/[\t\n\f\r ]+/g, ' ')
     .replace(/^[\t\n\f\r ]+/, '')
     .replace(/[\t\n\f\r ]+$/, '') : ''
 
@@ -129,7 +129,7 @@ const replaceSeries = async (str, regex, f) => {
     return str.replace(regex, () => results.shift())
 }
 
-const regexEscape = str => str.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
+const regexEscape = str => str.replaceAll(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
 
 const tidy = obj => {
     for (const [key, val] of Object.entries(obj))
@@ -278,7 +278,7 @@ const getMetadata = opf => {
             series: belongsTo.series?.map(makeCollection)
             ?? legacyMeta?.['calibre:series'] ? {
                 name: legacyMeta?.['calibre:series'],
-                position: parseFloat(legacyMeta?.['calibre:series_index']),
+                position: Number.parseFloat(legacyMeta?.['calibre:series_index']),
             } : null,
         },
         altIdentifier: dc.identifier?.map(makeAltIdentifier),
@@ -373,7 +373,7 @@ const parseNCX = (doc, resolve = f => f) => {
 
 const parseClock = str => {
     if (!str) return
-    const parts = str.split(':').map(x => parseFloat(x))
+    const parts = str.split(':').map(x => Number.parseFloat(x))
     if (parts.length === 3) {
         const [h, m, s] = parts
         return h * 60 * 60 + m * 60 + s
@@ -383,7 +383,7 @@ const parseClock = str => {
         return m * 60 + s
     }
     const [x, unit] = str.split(/(?=[^\d.])/)
-    const n = parseFloat(x)
+    const n = Number.parseFloat(x)
     const f = unit === 'h' ? 60 * 60
         : unit === 'min' ? 60
         : unit === 'ms' ? .001
@@ -589,7 +589,7 @@ const deobfuscators = (sha1 = WebCryptoSHA1) => ({
         key: opf => {
             const uuid = getUUID(opf).replaceAll('-', '')
             return Uint8Array.from({ length: 16 }, (_, i) =>
-                parseInt(uuid.slice(i * 2, i * 2 + 2), 16))
+                Number.parseInt(uuid.slice(i * 2, i * 2 + 2), 16))
         },
         decode: (key, blob) => deobfuscate(key, 1024, blob),
     },
@@ -965,7 +965,7 @@ class Loader {
 
         // Add font-display: swap to @font-face rules that don't have it
         // This ensures text is visible immediately while fonts load
-        return replacedImports.replace(
+        return replacedImports.replaceAll(
             /@font-face\s*\{([^}]*)\}/gi,
             (match, content) => {
                 // Check if font-display is already set

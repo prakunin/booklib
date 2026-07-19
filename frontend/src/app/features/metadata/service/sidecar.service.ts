@@ -76,7 +76,7 @@ export type SidecarSyncStatus = 'IN_SYNC' | 'OUTDATED' | 'MISSING' | 'CONFLICT' 
   providedIn: 'root'
 })
 export class SidecarService {
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
   private readonly apiUrl = `${API_CONFIG.BASE_URL}/api/v1`;
 
   getSidecarContent(bookId: number): Observable<SidecarMetadata> {

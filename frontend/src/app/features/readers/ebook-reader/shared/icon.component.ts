@@ -371,7 +371,7 @@ export class ReaderIconComponent {
   }
 
   getLineCoords(d: string, index: number): string {
-    const coords = d.replace(/[ML]/g, ' ').trim().split(/[\s,]+/);
+    const coords = d.replaceAll(/[ML]/g, ' ').trim().split(/[\s,]+/);
     return coords[index] || '0';
   }
 }

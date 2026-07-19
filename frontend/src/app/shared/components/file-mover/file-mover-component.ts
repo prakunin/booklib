@@ -41,14 +41,14 @@ interface FilePreview {
   styleUrl: './file-mover-component.scss'
 })
 export class FileMoverComponent implements OnDestroy {
-  private config = inject(DynamicDialogConfig);
+  private readonly config = inject(DynamicDialogConfig);
   ref = inject(DynamicDialogRef);
-  private bookService = inject(BookService);
-  private libraryService = inject(LibraryService);
-  private fileOperationsService = inject(FileOperationsService);
-  private messageService = inject(MessageService);
-  private appSettingsService = inject(AppSettingsService);
-  private destroy$ = new Subject<void>();
+  private readonly bookService = inject(BookService);
+  private readonly libraryService = inject(LibraryService);
+  private readonly fileOperationsService = inject(FileOperationsService);
+  private readonly messageService = inject(MessageService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly destroy$ = new Subject<void>();
   private readonly appSettings = this.appSettingsService.appSettings;
   private readonly syncLibraryPatternsEffect = effect(() => {
     const settings = this.appSettings();
@@ -148,7 +148,7 @@ export class FileMoverComponent implements OnDestroy {
   applyPattern(): void {
     const previews = this.books().map(book => {
       const fileName = book.fileName ?? '';
-      const fileSubPath = book.fileSubPath ? `${book.fileSubPath.replace(/\/+$/g, '')}/` : '';
+      const fileSubPath = book.fileSubPath ? `${book.fileSubPath.replaceAll(/\/+$/g, '')}/` : '';
 
       const relativeOriginalPath = `${fileSubPath}${fileName}`;
 
@@ -316,8 +316,8 @@ export class FileMoverComponent implements OnDestroy {
     if (!libraryId) return relativePath;
 
     const paths = this.getLibraryPathsById(libraryId);
-    const libraryPath = paths.length > 0 ? paths[0].path.replace(/\/+$/g, '') : '';
-    return libraryPath ? `${libraryPath}/${relativePath}`.replace(/\/\/+/g, '/') : relativePath;
+    const libraryPath = paths.length > 0 ? paths[0].path.replaceAll(/\/+$/g, '') : '';
+    return libraryPath ? `${libraryPath}/${relativePath}`.replaceAll(/\/\/+/g, '/') : relativePath;
   }
 
   get movedFileCount(): number {
@@ -326,7 +326,7 @@ export class FileMoverComponent implements OnDestroy {
 
   sanitize(input: string | undefined): string {
     const sanitized = (input ?? '')
-      .replace(/[\\/:*?"<>|]/g, '')
+      .replaceAll(/[\\/:*?"<>|]/g, '')
       .split('')
       .filter(char => {
         const code = char.charCodeAt(0);
@@ -334,7 +334,7 @@ export class FileMoverComponent implements OnDestroy {
       })
       .join('');
 
-    return sanitized.replace(/\s+/g, ' ').trim();
+    return sanitized.replaceAll(/\s+/g, ' ').trim();
   }
 
   formatYear(dateStr?: string): string {
@@ -344,7 +344,7 @@ export class FileMoverComponent implements OnDestroy {
       return yearMatch[1];
     }
     const date = new Date(dateStr);
-    return isNaN(date.getTime()) ? '' : date.getUTCFullYear().toString();
+    return Number.isNaN(date.getTime()) ? '' : date.getUTCFullYear().toString();
   }
 
   formatSeriesIndex(seriesNumber?: number): string {

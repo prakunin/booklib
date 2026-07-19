@@ -1,11 +1,9 @@
 import {inject} from '@angular/core';
-import {ActivatedRouteSnapshot, CanActivateChildFn, CanActivateFn, Router, RouterStateSnapshot} from '@angular/router';
+import {CanActivateChildFn, CanActivateFn, Router} from '@angular/router';
 import {AuthService} from '../../shared/service/auth.service';
 import {map} from 'rxjs/operators';
 
-const authenticateRoute = (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
-  void route;
-  void state;
+const authenticateRoute = () => {
   const router = inject(Router);
   const authService = inject(AuthService);
 

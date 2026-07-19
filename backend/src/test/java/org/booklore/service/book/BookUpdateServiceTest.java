@@ -309,7 +309,7 @@ class BookUpdateServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(userEntity));
 
         List<PersonalRatingUpdateResponse> result = bookUpdateService.updatePersonalRating(bookIds, 5);
-        verify(userBookProgressRepository).bulkUpdatePersonalRating(eq(1L), eq(new ArrayList<>(existing)), eq(5));
+        verify(userBookProgressRepository).bulkUpdatePersonalRating(1L, new ArrayList<>(existing), 5);
         verify(userBookProgressRepository).saveAll(anyList());
         assertEquals(3, result.size());
         assertEquals(5, result.getFirst().getPersonalRating());

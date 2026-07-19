@@ -22,12 +22,12 @@
       <p-table [value]="tasks()" [scrollable]="true" scrollHeight="60vh" responsiveLayout="scroll">
         <ng-template #header>
           <tr>
-            <th>{{ t('archive') }}</th>
-            <th>{{ t('phase') }}</th>
-            <th>{{ t('progress') }}</th>
-            <th>{{ t('remaining') }}</th>
-            <th>{{ t('scanResult') }}</th>
-            <th>{{ t('time') }}</th>
+            <th scope="col">{{ t('archive') }}</th>
+            <th scope="col">{{ t('phase') }}</th>
+            <th scope="col">{{ t('progress') }}</th>
+            <th scope="col">{{ t('remaining') }}</th>
+            <th scope="col">{{ t('scanResult') }}</th>
+            <th scope="col">{{ t('time') }}</th>
           </tr>
         </ng-template>
         <ng-template #body let-task>

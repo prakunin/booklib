@@ -1,6 +1,7 @@
 package org.booklore.service.system;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -23,6 +24,7 @@ public class TimeoutProcessRunner implements ProcessRunner {
 
     private final int timeoutSeconds;
 
+    @Autowired
     public TimeoutProcessRunner() {
         this(DEFAULT_TIMEOUT_SECONDS);
     }
@@ -64,7 +66,7 @@ public class TimeoutProcessRunner implements ProcessRunner {
                 return Optional.empty();
             }
             return Optional.of(line.trim());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return Optional.empty();
         } catch (Exception e) {
@@ -92,7 +94,7 @@ public class TimeoutProcessRunner implements ProcessRunner {
             try (BufferedReader bufferedReader = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 result.set(bufferedReader.readLine());
-            } catch (IOException e) {
+            } catch (IOException _) {
                 // Stream closed while the read was blocked, e.g. the process was killed. No line.
             }
         });

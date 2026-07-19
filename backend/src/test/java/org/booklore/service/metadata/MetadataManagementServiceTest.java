@@ -169,8 +169,10 @@ class MetadataManagementServiceTest {
 
     @Test
     void consolidateSeries_throwsWhenMultipleTargetValues() {
+        List<String> targets = List.of("A", "B");
+        List<String> sources = List.of("Old");
         assertThatThrownBy(() ->
-                service.consolidateMetadata(MergeMetadataType.series, List.of("A", "B"), List.of("Old"))
+                service.consolidateMetadata(MergeMetadataType.series, targets, sources)
         ).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exactly one target value");
     }
@@ -187,8 +189,10 @@ class MetadataManagementServiceTest {
 
     @Test
     void consolidatePublishers_throwsWhenMultipleTargetValues() {
+        List<String> targets = List.of("A", "B");
+        List<String> sources = List.of("Old");
         assertThatThrownBy(() ->
-                service.consolidateMetadata(MergeMetadataType.publishers, List.of("A", "B"), List.of("Old"))
+                service.consolidateMetadata(MergeMetadataType.publishers, targets, sources)
         ).isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -204,8 +208,10 @@ class MetadataManagementServiceTest {
 
     @Test
     void consolidateLanguages_throwsWhenMultipleTargetValues() {
+        List<String> targets = List.of("en", "fr");
+        List<String> sources = List.of("de");
         assertThatThrownBy(() ->
-                service.consolidateMetadata(MergeMetadataType.languages, List.of("en", "fr"), List.of("de"))
+                service.consolidateMetadata(MergeMetadataType.languages, targets, sources)
         ).isInstanceOf(IllegalArgumentException.class);
     }
 

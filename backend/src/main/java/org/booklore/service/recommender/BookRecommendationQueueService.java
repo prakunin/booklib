@@ -43,7 +43,7 @@ public class BookRecommendationQueueService {
 
         try {
             recommendationExecutor.execute(() -> process(bookId));
-        } catch (TaskRejectedException e) {
+        } catch (TaskRejectedException _) {
             scheduledBookIds.remove(bookId);
             waitingUsers.remove(bookId);
             throw ApiError.RECOMMENDATION_QUEUE_FULL.createException();

@@ -67,7 +67,8 @@ class PasswordPolicyServiceTest {
     void validate_rejectsPasswordsLongerThanBcryptLimit() {
         usePolicy(PasswordPolicy.builder().minimumLength(1).build());
 
-        assertThatThrownBy(() -> passwordPolicyService.validate("a".repeat(73)))
+        String longPassword = "a".repeat(73);
+        assertThatThrownBy(() -> passwordPolicyService.validate(longPassword))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("no more than 72 characters");
     }

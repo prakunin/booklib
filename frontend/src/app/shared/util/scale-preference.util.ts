@@ -57,6 +57,6 @@ export class ScalePreference {
   }
 
   private get defaultScale(): number {
-    return this.config.defaultScale ?? 1.0;
+    return this.config.defaultScale ?? 1;
   }
 }

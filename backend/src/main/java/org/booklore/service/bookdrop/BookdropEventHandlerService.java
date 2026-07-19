@@ -79,7 +79,7 @@ public class BookdropEventHandlerService implements SmartLifecycle {
             workerThread.interrupt();
             try {
                 workerThread.join(5000);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 log.warn("Interrupted while waiting for BookdropEventHandlerService workerThread to stop");
                 Thread.currentThread().interrupt();
             }
@@ -122,7 +122,7 @@ public class BookdropEventHandlerService implements SmartLifecycle {
                 BookDropFileEvent event = fileQueue.take();
                 queuedFiles.remove(event);
                 processFile(event);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 log.info("File processing thread interrupted, shutting down.");
             }
@@ -246,7 +246,7 @@ public class BookdropEventHandlerService implements SmartLifecycle {
 
                 lastSize = currentSize;
                 Thread.sleep(STABILITY_CHECK_INTERVAL_MS);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return false;
             } catch (IOException e) {

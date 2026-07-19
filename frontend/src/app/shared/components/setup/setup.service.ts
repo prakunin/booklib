@@ -13,7 +13,7 @@ export class SetupService {
 
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/setup`;
 
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
 
   createAdmin(payload: SetupPayload): Observable<void> {
     return this.http.post<void>(this.url, payload);

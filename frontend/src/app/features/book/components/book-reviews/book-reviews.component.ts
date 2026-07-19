@@ -29,16 +29,16 @@ export class BookReviewsComponent implements OnInit, OnChanges {
   @Input() reviews: BookReview[] | undefined = [];
   @Input() active: boolean = false;
 
-  private reviewService = inject(BookReviewService);
-  private bookService = inject(BookService);
-  private bookMetadataManageService = inject(BookMetadataManageService);
-  private confirmationService = inject(ConfirmationService);
-  private messageService = inject(MessageService);
-  private userService = inject(UserService);
-  private appSettingsService = inject(AppSettingsService);
-  private destroyRef = inject(DestroyRef);
+  private readonly reviewService = inject(BookReviewService);
+  private readonly bookService = inject(BookService);
+  private readonly bookMetadataManageService = inject(BookMetadataManageService);
+  private readonly confirmationService = inject(ConfirmationService);
+  private readonly messageService = inject(MessageService);
+  private readonly userService = inject(UserService);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly t = inject(TranslocoService);
-  private bookIdState = signal<number | null>(null);
+  private readonly bookIdState = signal<number | null>(null);
   private loadingBookId: number | null = null;
   private loadingRequestSeq = 0;
   private activeLoadingRequestSeq: number | null = null;
@@ -72,7 +72,7 @@ export class BookReviewsComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['bookId'] && changes['bookId'].currentValue) {
+    if (changes['bookId']?.currentValue) {
       this.bookIdState.set(changes['bookId'].currentValue);
       this.loadReviews();
     }

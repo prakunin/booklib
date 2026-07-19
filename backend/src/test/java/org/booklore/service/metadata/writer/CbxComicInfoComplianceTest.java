@@ -65,6 +65,7 @@ class CbxComicInfoComplianceTest {
                         try {
                             Files.deleteIfExists(p);
                         } catch (Exception _) {
+                            // best-effort cleanup
                         }
                     });
         }

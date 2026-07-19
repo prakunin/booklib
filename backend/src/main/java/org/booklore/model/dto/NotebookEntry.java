@@ -21,6 +21,10 @@ public class NotebookEntry {
     private String color;
     private String style;
     private String chapterTitle;
+    private String cfi;
+    private Long positionMs;
+    private Integer trackIndex;
+    private Integer pageNumber;
     private String primaryBookType;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

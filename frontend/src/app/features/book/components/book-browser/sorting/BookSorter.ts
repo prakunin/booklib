@@ -61,7 +61,7 @@ export class BookSorter {
 
   sortOptions: SortOption[];
 
-  constructor(private onSortChange: (criteria: SortOption[]) => void, translocoService?: TranslocoService) {
+  constructor(private readonly onSortChange: (criteria: SortOption[]) => void, translocoService?: TranslocoService) {
     this.sortOptions = SORT_FIELDS.map(({field, defaultLabel}) => {
       const key = SORT_OPTION_LABEL_KEYS[field];
       const label = key && translocoService ? translocoService.translate(key) : defaultLabel;

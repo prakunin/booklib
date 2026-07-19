@@ -200,7 +200,6 @@ class BookdropBulkEditServiceTest {
     @Test
     void bulkEdit_WithSelectAll_ShouldProcessAllFiles() {
         BookdropFileEntity file1 = createFileEntity(1L, "file1.cbz", new BookMetadata());
-        BookdropFileEntity file2 = createFileEntity(2L, "file2.cbz", new BookMetadata());
         BookdropFileEntity file3 = createFileEntity(3L, "file3.cbz", new BookMetadata());
 
         when(metadataHelper.resolveFileIds(true, List.of(2L), null))

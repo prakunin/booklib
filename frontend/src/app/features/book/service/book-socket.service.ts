@@ -17,8 +17,8 @@ import {
   providedIn: 'root',
 })
 export class BookSocketService {
-  private queryClient = inject(QueryClient);
-  private destroyRef = inject(DestroyRef);
+  private readonly queryClient = inject(QueryClient);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly appBooksInvalidationDebounceMs = 500;
   // Ceiling on how long a continuous burst can defer a flush, so a sustained import still refreshes
   // the visible list periodically instead of only once the burst finally pauses.

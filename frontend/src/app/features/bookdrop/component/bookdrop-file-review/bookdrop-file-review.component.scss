@@ -297,6 +297,18 @@ p-inputgroup.disabled {
   }
 }
 
+.cover-image-button {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  line-height: 0;
+
+  @media #{variables.$mobile-shell-media-query} {
+    display: none !important;
+  }
+}
+
 div.cover-image {
   display: block;
   background-color: rgb(255 255 255 / 10%);
@@ -315,6 +327,15 @@ div.cover-image {
   @media #{variables.$mobile-shell-media-query} {
     max-width: 100%;
   }
+}
+
+button.file-name {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
 .metadata-status {

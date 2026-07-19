@@ -37,12 +37,12 @@ export class EmailV2ProviderComponent implements OnInit {
   emailProviders: EmailProvider[] = [];
   editingProviderIds: number[] = [];
   ref: DynamicDialogRef | undefined | null;
-  private dialogLauncherService = inject(DialogLauncherService);
-  private emailProvidersService = inject(EmailV2ProviderService);
-  private messageService = inject(MessageService);
-  private userService = inject(UserService);
-  private t = inject(TranslocoService);
-  private destroyRef = inject(DestroyRef);
+  private readonly dialogLauncherService = inject(DialogLauncherService);
+  private readonly emailProvidersService = inject(EmailV2ProviderService);
+  private readonly messageService = inject(MessageService);
+  private readonly userService = inject(UserService);
+  private readonly t = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
   loading = signal(false);
   private loadingRequestSeq = 0;
   private activeLoadingRequestSeq: number | null = null;

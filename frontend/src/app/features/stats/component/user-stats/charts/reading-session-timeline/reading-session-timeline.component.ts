@@ -61,9 +61,9 @@ export class ReadingSessionTimelineComponent implements OnInit {
   @Input() initialYear: number = new Date().getFullYear();
   @Input() weekNumber: number = getISOWeek(new Date());
 
-  private userStatsService = inject(UserStatsService);
-  private urlHelperService = inject(UrlHelperService);
-  private translocoService = inject(TranslocoService);
+  private readonly userStatsService = inject(UserStatsService);
+  private readonly urlHelperService = inject(UrlHelperService);
+  private readonly translocoService = inject(TranslocoService);
 
   public daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   public hourLabels: string[] = [];
@@ -275,7 +275,7 @@ export class ReadingSessionTimelineComponent implements OnInit {
     sessions.forEach(session => {
       let placed = false;
       for (const track of tracks) {
-        const lastSessionInTrack = track[track.length - 1];
+        const lastSessionInTrack = track.at(-1)!;
         if (session.startTime >= lastSessionInTrack.endTime) {
           track.push(session);
           placed = true;
@@ -286,7 +286,7 @@ export class ReadingSessionTimelineComponent implements OnInit {
         if (tracks.length < ReadingSessionTimelineComponent.MAX_TRACKS) {
           tracks.push([session]);
         } else {
-          tracks[tracks.length - 1].push(session);
+          tracks.at(-1)!.push(session);
         }
       }
     });

@@ -141,8 +141,9 @@ class BookFileAttachmentServiceTest {
         void attachBookFiles_targetNotFound_throws() {
             when(bookRepository.findByIdWithBookFiles(999L)).thenReturn(Optional.empty());
 
+            List<Long> sourceIds = List.of(2L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(999L, List.of(2L), false));
+                    () -> service.attachBookFiles(999L, sourceIds, false));
             assertTrue(ex.getMessage().contains("999"));
         }
 
@@ -158,8 +159,9 @@ class BookFileAttachmentServiceTest {
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
 
+            List<Long> sourceIds = List.of(2L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(1L, List.of(2L), false));
+                    () -> service.attachBookFiles(1L, sourceIds, false));
             assertTrue(ex.getMessage().contains("no primary file"));
         }
     }
@@ -174,8 +176,9 @@ class BookFileAttachmentServiceTest {
             BookEntity target = createBook(1L);
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
 
+            List<Long> sourceIds = List.of(1L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(1L, List.of(1L), false));
+                    () -> service.attachBookFiles(1L, sourceIds, false));
             assertTrue(ex.getMessage().contains("Cannot attach a book to itself"));
         }
 
@@ -188,8 +191,9 @@ class BookFileAttachmentServiceTest {
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(999L)).thenReturn(Optional.empty());
 
+            List<Long> sourceIds = List.of(999L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(1L, List.of(999L), false));
+                    () -> service.attachBookFiles(1L, sourceIds, false));
             assertTrue(ex.getMessage().contains("999"));
         }
 
@@ -211,8 +215,9 @@ class BookFileAttachmentServiceTest {
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
 
+            List<Long> sourceIds = List.of(2L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(1L, List.of(2L), false));
+                    () -> service.attachBookFiles(1L, sourceIds, false));
             assertTrue(ex.getMessage().contains("same library"));
         }
 
@@ -228,8 +233,9 @@ class BookFileAttachmentServiceTest {
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
 
+            List<Long> sourceIds = List.of(2L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(1L, List.of(2L), false));
+                    () -> service.attachBookFiles(1L, sourceIds, false));
             assertTrue(ex.getMessage().contains("no book format files"));
         }
 
@@ -245,8 +251,9 @@ class BookFileAttachmentServiceTest {
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
 
+            List<Long> sourceIds = List.of(2L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(1L, List.of(2L), false));
+                    () -> service.attachBookFiles(1L, sourceIds, false));
             assertTrue(ex.getMessage().contains("folder-based"));
         }
 
@@ -259,7 +266,7 @@ class BookFileAttachmentServiceTest {
             try {
                 Files.createDirectories(tempDir.resolve("sub"));
                 Files.createFile(tempDir.resolve("sub/target.epub"));
-            } catch (IOException e) {
+            } catch (IOException _) {
                 fail("Setup failed");
             }
 
@@ -269,8 +276,9 @@ class BookFileAttachmentServiceTest {
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
 
+            List<Long> sourceIds = List.of(2L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(1L, List.of(2L), false));
+                    () -> service.attachBookFiles(1L, sourceIds, false));
             assertTrue(ex.getMessage().contains("Source file not found"));
         }
 
@@ -523,8 +531,9 @@ class BookFileAttachmentServiceTest {
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
             setupFileMoveStubs(target, "other_dir/{title}");
 
+            List<Long> sourceIds = List.of(2L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(1L, List.of(2L), true));
+                    () -> service.attachBookFiles(1L, sourceIds, true));
             assertTrue(ex.getMessage().contains("primary file not found"));
         }
 
@@ -735,8 +744,9 @@ class BookFileAttachmentServiceTest {
             BookEntity target = createBook(1L);
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
 
+            List<Long> sourceIds = List.of(1L);
             APIException ex = assertThrows(APIException.class,
-                    () -> service.attachBookFiles(1L, List.of(1L), false));
+                    () -> service.attachBookFiles(1L, sourceIds, false));
             assertTrue(ex.getMessage().contains("Cannot attach a book to itself"));
         }
 

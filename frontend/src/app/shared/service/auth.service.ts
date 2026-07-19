@@ -26,7 +26,7 @@ export class StaleRefreshResponseError extends Error {
 })
 export class AuthService {
 
-  private apiUrl = `${API_CONFIG.BASE_URL}/api/v1/auth`;
+  private readonly apiUrl = `${API_CONFIG.BASE_URL}/api/v1/auth`;
   private rxStompService?: RxStompService;
   private readonly _postLoginInitialized = signal(false);
   readonly postLoginInitialized = this._postLoginInitialized.asReadonly();
@@ -34,10 +34,10 @@ export class AuthService {
   readonly logoutInProgress = this._logoutInProgress.asReadonly();
   private refreshSessionRequest$?: Observable<AccessTokenResponse>;
 
-  private http = inject(HttpClient);
-  private injector = inject(Injector);
-  private router = inject(Router);
-  private postLoginInitializer = inject(PostLoginInitializerService);
+  private readonly http = inject(HttpClient);
+  private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
+  private readonly postLoginInitializer = inject(PostLoginInitializerService);
 
   readonly token = signal<string | null>(this.getInternalAccessToken());
   readonly isAuthenticated = computed(() => !!this.token());
@@ -205,9 +205,9 @@ export class AuthService {
 
   protected redirectTo(url: string, replace = false): void {
     if (replace) {
-      window.location.replace(url);
+      globalThis.location.replace(url);
     } else {
-      window.location.href = url;
+      globalThis.location.href = url;
     }
   }
 

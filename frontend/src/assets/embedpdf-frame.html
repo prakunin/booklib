@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Embedded PDF Viewer</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; }
@@ -19,14 +20,14 @@
     const targetDpr = isSmallViewport ? 2 : Math.max(currentDpr, 2.5);
 
     if (currentDpr !== targetDpr) {
-      Object.defineProperty(window, 'devicePixelRatio', {
+      Object.defineProperty(globalThis, 'devicePixelRatio', {
         get: () => targetDpr,
         configurable: true,
       });
     }
 
-    const OrigWorker = window.Worker;
-    window.Worker = function PatchedWorker(url, opts) {
+    const OrigWorker = globalThis.Worker;
+    globalThis.Worker = function PatchedWorker(url, opts) {
       console.log('[Shim] Worker created, url type=' + typeof url +
         ', isBlob=' + (typeof url === 'string' && url.startsWith('blob:')) +
         ', opts=', opts);
@@ -64,11 +65,11 @@
       }
       return w;
     };
-    window.Worker.prototype = OrigWorker.prototype;
-    Object.setPrototypeOf(window.Worker, OrigWorker);
+    globalThis.Worker.prototype = OrigWorker.prototype;
+    Object.setPrototypeOf(globalThis.Worker, OrigWorker);
 
-    const OrigBlob = window.Blob;
-    window.Blob = function PatchedBlob(parts, opts) {
+    const OrigBlob = globalThis.Blob;
+    globalThis.Blob = function PatchedBlob(parts, opts) {
       if (parts && parts.length >= 1 && typeof parts[0] === 'string') {
         const hasWasmInit = parts[0].includes('wasmInit');
         const hasRunnerPrepare = parts[0].includes('runner.prepare()');
@@ -92,8 +93,8 @@
       }
       return new OrigBlob(parts, opts);
     };
-    window.Blob.prototype = OrigBlob.prototype;
-    Object.setPrototypeOf(window.Blob, OrigBlob);
+    globalThis.Blob.prototype = OrigBlob.prototype;
+    Object.setPrototypeOf(globalThis.Blob, OrigBlob);
   })();
 </script>
 <script type="module">

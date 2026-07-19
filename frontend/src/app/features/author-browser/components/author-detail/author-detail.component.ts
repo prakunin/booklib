@@ -46,16 +46,16 @@ export class AuthorDetailComponent implements OnInit, AfterViewChecked {
 
   private static readonly GRID_GAP = 21;
 
-  private route = inject(ActivatedRoute);
-  private router = inject(Router);
-  private authorService = inject(AuthorService);
-  private bookService = inject(BookService);
-  private messageService = inject(MessageService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly authorService = inject(AuthorService);
+  private readonly bookService = inject(BookService);
+  private readonly messageService = inject(MessageService);
   protected coverScalePreferenceService = inject(CoverScalePreferenceService);
   protected bookCardOverlayPreferenceService = inject(BookCardOverlayPreferenceService);
   protected userService = inject(UserService);
-  private pageTitle = inject(PageTitleService);
-  private t = inject(TranslocoService);
+  private readonly pageTitle = inject(PageTitleService);
+  private readonly t = inject(TranslocoService);
 
   readonly descriptionContentRef = viewChild<ElementRef<HTMLElement>>('descriptionContent');
   private readonly scrollElement = viewChild<ElementRef<HTMLElement>>('scrollElement');
@@ -67,7 +67,7 @@ export class AuthorDetailComponent implements OnInit, AfterViewChecked {
   hasPhoto = true;
   photoTimestamp = 0;
   quickMatching = false;
-  private authorState = signal<AuthorDetails | null>(null);
+  private readonly authorState = signal<AuthorDetails | null>(null);
   author = this.authorState.asReadonly();
   authorBooks = computed(() => {
     const authorName = this.author()?.name?.toLowerCase();

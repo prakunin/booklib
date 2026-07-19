@@ -105,8 +105,8 @@ class BookFileDetachmentServiceTest {
     @Test
     void detachAlternativeFormat_withCopyMetadata() {
         BookEntity book = createBook(1L);
-        BookFileEntity primaryFile = createBookFile(10L, book, true, BookFileType.EPUB);
-        BookFileEntity altFile = createBookFile(11L, book, true, BookFileType.PDF);
+        createBookFile(10L, book, true, BookFileType.EPUB);
+        createBookFile(11L, book, true, BookFileType.PDF);
 
         when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(book));
         when(bookRepository.saveAndFlush(any(BookEntity.class))).thenAnswer(inv -> {
@@ -182,7 +182,7 @@ class BookFileDetachmentServiceTest {
     @Test
     void detachPrimaryFile_alternativeGetsPromoted() {
         BookEntity book = createBook(1L);
-        BookFileEntity primaryFile = createBookFile(10L, book, true, BookFileType.EPUB);
+        createBookFile(10L, book, true, BookFileType.EPUB);
         createBookFile(11L, book, true, BookFileType.PDF);
 
         when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(book));
@@ -262,7 +262,7 @@ class BookFileDetachmentServiceTest {
         library.getLibraryPaths().add(libraryPath2);
 
         BookEntity book = createBook(1L);
-        BookFileEntity primaryFile = createBookFile(10L, book, true, BookFileType.EPUB);
+        createBookFile(10L, book, true, BookFileType.EPUB);
         BookFileEntity altFile = createBookFile(11L, book, true, BookFileType.PDF);
         altFile.setFileSubPath("folder-2");
 

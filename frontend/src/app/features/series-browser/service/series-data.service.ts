@@ -8,7 +8,7 @@ import {SeriesSummary} from '../model/series.model';
 })
 export class SeriesDataService {
 
-  private bookService = inject(BookService);
+  private readonly bookService = inject(BookService);
 
   allSeries = computed(() => this.buildSeriesSummaries(this.bookService.books()));
 

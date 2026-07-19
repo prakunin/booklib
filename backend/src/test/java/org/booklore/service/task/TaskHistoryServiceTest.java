@@ -283,6 +283,7 @@ class TaskHistoryServiceTest {
                 field.setAccessible(true);
                 field.set(type, true);
             } catch (Exception _) {
+                // ignore reflection failures in test setup
             }
         });
 

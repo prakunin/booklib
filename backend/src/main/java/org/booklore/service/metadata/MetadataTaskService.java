@@ -85,7 +85,7 @@ public class MetadataTaskService {
     private Optional<FetchedMetadataProposalStatus> parseStatus(String statusStr) {
         try {
             return Optional.of(FetchedMetadataProposalStatus.valueOf(statusStr.toUpperCase()));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

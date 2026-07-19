@@ -112,9 +112,7 @@ class AudnexusAuthorParserTest {
 
         verify(httpClient).send(requestCaptor.capture(), any());
         String uri = requestCaptor.getValue().uri().toString();
-        assertThat(uri).contains("api.audnex.us/authors");
-        assertThat(uri).contains("name=Stephen%20King");
-        assertThat(uri).contains("region=uk");
+        assertThat(uri).contains("api.audnex.us/authors").contains("name=Stephen%20King").contains("region=uk");
     }
 
     @Test
@@ -179,7 +177,6 @@ class AudnexusAuthorParserTest {
 
         verify(httpClient).send(requestCaptor.capture(), any());
         String uri = requestCaptor.getValue().uri().toString();
-        assertThat(uri).contains("api.audnex.us/authors/B000APZGGS");
-        assertThat(uri).contains("region=uk");
+        assertThat(uri).contains("api.audnex.us/authors/B000APZGGS").contains("region=uk");
     }
 }

@@ -113,7 +113,7 @@ public class OidcAuthController {
             headers.setLocation(URI.create(redirectUrl));
             return new ResponseEntity<>(headers, HttpStatus.FOUND);
 
-        } catch (Exception e) {
+        } catch (Exception _) {
             auditService.log(AuditAction.OIDC_LOGIN_FAILED, "OIDC redirect login failed");
             String errorRedirect = appRedirectUri + "#error=" + URLEncoder.encode("Authentication failed", StandardCharsets.UTF_8);
 

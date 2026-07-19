@@ -8,7 +8,7 @@ import {SelectButton} from 'primeng/selectbutton';
 import {ProgressBar} from 'primeng/progressbar';
 import {Tag} from 'primeng/tag';
 import {Paginator, PaginatorState} from 'primeng/paginator';
-import {Subject, takeUntil} from 'rxjs';
+import {firstValueFrom, Subject, takeUntil} from 'rxjs';
 import {BookFileService} from '../../service/book-file.service';
 import {BookService} from '../../service/book.service';
 import {Book, DuplicateDetectionRequest, DuplicateGroup} from '../../model/book.model';
@@ -69,7 +69,7 @@ export class DuplicateMergerComponent implements OnInit, OnDestroy {
   pageFirst = 0;
   pageSize = 20;
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
   private readonly bookFileService = inject(BookFileService);
   private readonly bookService = inject(BookService);
   private readonly messageService = inject(MessageService);
@@ -297,9 +297,10 @@ export class DuplicateMergerComponent implements OnInit, OnDestroy {
 
     group.dismissed = true;
     try {
-      await this.bookFileService.attachBookFiles(targetId, sourceIds, this.moveFiles)
-        .pipe(takeUntil(this.destroy$))
-        .toPromise();
+      await firstValueFrom(
+        this.bookFileService.attachBookFiles(targetId, sourceIds, this.moveFiles)
+          .pipe(takeUntil(this.destroy$))
+      );
     } catch {
       group.dismissed = false;
       this.messageService.add({
@@ -334,9 +335,10 @@ export class DuplicateMergerComponent implements OnInit, OnDestroy {
       }
 
       try {
-        await this.bookFileService.attachBookFiles(targetId, sourceIds, this.moveFiles)
-          .pipe(takeUntil(this.destroy$))
-          .toPromise();
+        await firstValueFrom(
+          this.bookFileService.attachBookFiles(targetId, sourceIds, this.moveFiles)
+            .pipe(takeUntil(this.destroy$))
+        );
         group.dismissed = true;
         successCount++;
       } catch {

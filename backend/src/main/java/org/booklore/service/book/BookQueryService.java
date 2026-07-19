@@ -140,11 +140,10 @@ public class BookQueryService {
         List<BookEntity> books = bookRepository.findAllWithMetadataByIds(new HashSet<>(embeddingJsonByBookId.keySet()));
         for (BookEntity book : books) {
             String embeddingJson = embeddingJsonByBookId.get(book.getId());
-            if (embeddingJson != null && book.getMetadata() != null) {
-                if (!Objects.equals(book.getMetadata().getEmbeddingVector(), embeddingJson)) {
-                    book.getMetadata().setEmbeddingVector(embeddingJson);
-                    book.getMetadata().setEmbeddingUpdatedAt(Instant.now());
-                }
+            if (embeddingJson != null && book.getMetadata() != null
+                    && !Objects.equals(book.getMetadata().getEmbeddingVector(), embeddingJson)) {
+                book.getMetadata().setEmbeddingVector(embeddingJson);
+                book.getMetadata().setEmbeddingUpdatedAt(Instant.now());
             }
         }
     }

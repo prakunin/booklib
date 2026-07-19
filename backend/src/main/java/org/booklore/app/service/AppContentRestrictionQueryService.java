@@ -51,7 +51,7 @@ public class AppContentRestrictionQueryService {
                     .map(value -> {
                         try {
                             return Integer.parseInt(value);
-                        } catch (NumberFormatException ignoredException) {
+                        } catch (NumberFormatException _) {
                             return null;
                         }
                     })

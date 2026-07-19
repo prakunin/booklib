@@ -397,9 +397,9 @@ export class UserService {
   private readonly apiUrl = `${API_CONFIG.BASE_URL}/api/v1/auth/register`;
   private readonly userUrl = `${API_CONFIG.BASE_URL}/api/v1/users`;
 
-  private http = inject(HttpClient);
-  private authService = inject(AuthService);
-  private queryClient = inject(QueryClient);
+  private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
+  private readonly queryClient = inject(QueryClient);
   private readonly token = this.authService.token;
 
   private readonly userQuery = injectQuery(() => ({

@@ -78,7 +78,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     const step = Math.max(1, Math.floor(total / 10));
     const ticks: number[] = [];
     for (let i = 1; i <= total; i += step) ticks.push(i);
-    if (ticks[ticks.length - 1] !== total) ticks.push(total);
+    if (ticks.at(-1) !== total) ticks.push(total);
     return ticks;
   });
 
@@ -160,8 +160,8 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   private dbAnnotationIds = new Set<string>();
 
   private altBookType?: string;
-  private annotationSaveSubject = new Subject<void>();
-  private annotationCacheSubject = new Subject<void>();
+  private readonly annotationSaveSubject = new Subject<void>();
+  private readonly annotationCacheSubject = new Subject<void>();
   private annotationsLoaded = false;
   private isImportingAnnotations = false;
   private lastAnnotationData: string | null = null;
@@ -170,22 +170,22 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
 
-  private bookService = inject(BookService);
-  private userService = inject(UserService);
-  private authService = inject(AuthService);
-  private messageService = inject(MessageService);
-  private route = inject(ActivatedRoute);
-  private pageTitle = inject(PageTitleService);
-  private readingSessionService = inject(ReadingSessionService);
-  private location = inject(Location);
-  private router = inject(Router);
-  private pdfAnnotationService = inject(PdfAnnotationService);
-  private cacheStorageService = inject(CacheStorageService);
-  private localSettingsService = inject(LocalSettingsService);
+  private readonly bookService = inject(BookService);
+  private readonly userService = inject(UserService);
+  private readonly authService = inject(AuthService);
+  private readonly messageService = inject(MessageService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly pageTitle = inject(PageTitleService);
+  private readonly readingSessionService = inject(ReadingSessionService);
+  private readonly location = inject(Location);
+  private readonly router = inject(Router);
+  private readonly pdfAnnotationService = inject(PdfAnnotationService);
+  private readonly cacheStorageService = inject(CacheStorageService);
+  private readonly localSettingsService = inject(LocalSettingsService);
   private readonly t = inject(TranslocoService);
-  private wakeLockService = inject(WakeLockService);
-  private fullscreenService = inject(ReaderFullscreenService);
-  private pdfEmbedBridge = inject(PdfEmbedBridgeService);
+  private readonly wakeLockService = inject(WakeLockService);
+  private readonly fullscreenService = inject(ReaderFullscreenService);
+  private readonly pdfEmbedBridge = inject(PdfEmbedBridgeService);
   readonly embedPdfBook = inject(EmbedPdfBookService);
   readonly pdfBookmarkService = inject(PdfBookmarkService);
   private readonly ngZone = inject(NgZone);
@@ -215,7 +215,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     window.addEventListener('resize', syncPhoneMode);
     this.destroyRef.onDestroy(() => window.removeEventListener('resize', syncPhoneMode));
 
-    this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    this.isMobile = 'ontouchstart' in globalThis || navigator.maxTouchPoints > 0;
 
     setTimeout(() => this.wakeLockService.enable(), 1000);
     this.startChromeAutoHide();
@@ -396,7 +396,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
         } else {
           zoomVal = pdfPrefs.pdfSettings?.zoom || myself.userSettings.pdfReaderSetting.pageZoom || 'page-fit';
           const rawSpread = pdfPrefs.pdfSettings?.spread || myself.userSettings.pdfReaderSetting.pageSpread || 'none';
-          spreadVal = rawSpread === 'off' ? 'none' : rawSpread as 'none' | 'even' | 'odd';
+          spreadVal = rawSpread === 'off' ? 'none' : rawSpread;
           scrollLayoutVal = pdfPrefs.pdfSettings?.scrollLayout
             || myself.userSettings.pdfReaderSetting.scrollLayout
             || 'vertical';
@@ -406,7 +406,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
         this.spreadMode.set(spreadVal);
         this.scrollLayout.set(scrollLayoutVal);
         this.canPrint = myself.permissions.canDownload || myself.permissions.admin;
-        this.initialPage = pdfMeta.pdfProgress?.page || 1;
+        this.initialPage = this.getRequestedPage() ?? pdfMeta.pdfProgress?.page ?? 1;
         this.page.set(this.initialPage);
         this.zoom.set(this.normalizeZoom(zoomVal));
         this.bookData = bookData;
@@ -909,6 +909,11 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
       this.embedPdfBook.scrollToPage(pageNumber);
     }
     this.onPageChange(pageNumber);
+  }
+
+  private getRequestedPage(): number | null {
+    const page = Number.parseInt(this.route.snapshot.queryParamMap.get('page') ?? '', 10);
+    return Number.isFinite(page) && page > 0 ? page : null;
   }
 
   // --- Viewer mode switching ---
@@ -1425,7 +1430,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     this.fullscreenService.toggle();
   }
 
-  private onFullscreenChange = (): void => {
+  private readonly onFullscreenChange = (): void => {
     this.isFullscreen.set(this.fullscreenService.isFullscreen());
   };
 
@@ -1532,7 +1537,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
         this.readingSessionService.endSession(currentPage.toString(), percentage);
       }
       // Navigate back within the SPA; fall back to home if there's no history
-      if (window.history.length > 1) {
+      if (globalThis.history.length > 1) {
         this.location.back();
       } else {
         this.router.navigate(['/']);

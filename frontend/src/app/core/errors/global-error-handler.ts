@@ -36,7 +36,7 @@ export class GlobalErrorHandler implements ErrorHandler {
             }
 
             if (shouldReload) {
-                window.location.reload();
+                globalThis.location.reload();
             } else {
                 console.error('Chunk load failed multiple times in a short period. Stopped reloading to avoid loop.');
             }

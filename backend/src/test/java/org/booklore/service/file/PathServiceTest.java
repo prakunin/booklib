@@ -73,8 +73,9 @@ class PathServiceTest {
         @Test
         void rejectsExistingDirectoryOutsideConfiguredRoots() throws IOException {
             Path outside = Files.createDirectory(tempDir.resolve("outside"));
+            String outsidePath = outside.toString();
 
-            assertThatThrownBy(() -> pathService.getFoldersAtPath(outside.toString()))
+            assertThatThrownBy(() -> pathService.getFoldersAtPath(outsidePath))
                     .isInstanceOf(APIException.class);
         }
 

@@ -77,7 +77,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
                     FileEvent event = eventQueue.take();
                     queuedEvents.remove(event);
                     handleEvent(event);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException _) {
                     Thread.currentThread().interrupt();
                     log.warn("LibraryFileEventProcessor virtual thread interrupted.");
                 } catch (Exception e) {
@@ -554,7 +554,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
     private boolean fileHasContent(Path path) {
         try {
             return Files.size(path) > 0;
-        } catch (IOException e) {
+        } catch (IOException _) {
             return false;
         }
     }

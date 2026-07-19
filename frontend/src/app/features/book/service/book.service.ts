@@ -36,20 +36,20 @@ export class BookService {
 
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/books`;
 
-  private http = inject(HttpClient);
-  private messageService = inject(MessageService);
-  private authService = inject(AuthService);
-  private router = inject(Router);
-  private bookSocketService = inject(BookSocketService);
-  private bookPatchService = inject(BookPatchService);
-  private queryClient = inject(QueryClient);
-  private appBooksApi = inject(AppBooksApiService);
+  private readonly http = inject(HttpClient);
+  private readonly messageService = inject(MessageService);
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly bookSocketService = inject(BookSocketService);
+  private readonly bookPatchService = inject(BookPatchService);
+  private readonly queryClient = inject(QueryClient);
+  private readonly appBooksApi = inject(AppBooksApiService);
   private readonly t = inject(TranslocoService);
   private readonly token = this.authService.token;
   private readonly legacyCatalogEnabled = signal(false);
   private legacyCatalogRequested = false;
 
-  private booksQuery = injectQuery(() => ({
+  private readonly booksQuery = injectQuery(() => ({
     ...this.getBooksQueryOptions(),
     enabled: !!this.token() && this.legacyCatalogEnabled(),
   }));
@@ -171,8 +171,7 @@ export class BookService {
     });
   }
 
-  removeBooksFromShelf(shelfId: number): void {
-    void shelfId;
+  removeBooksFromShelf(_shelfId: number): void {
     invalidateLegacyBooksQuery(this.queryClient);
     invalidateAppBooksQueries(this.queryClient);
   }

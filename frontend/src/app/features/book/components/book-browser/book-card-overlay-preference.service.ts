@@ -16,7 +16,7 @@ export class BookCardOverlayPreferenceService {
   private readonly _showBookTypePill = signal(true);
   readonly showBookTypePill = this._showBookTypePill.asReadonly();
 
-  private currentContext: { type: 'LIBRARY' | 'SHELF' | 'MAGIC_SHELF', id: number } | null = null;
+  private readonly currentContext: { type: 'LIBRARY' | 'SHELF' | 'MAGIC_SHELF', id: number } | null = null;
   private persistTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -83,7 +83,7 @@ export class BookCardOverlayPreferenceService {
         sortKey: 'addedOn',
         sortDir: 'DESC',
         view: 'GRID',
-        coverSize: 1.0,
+        coverSize: 1,
         seriesCollapsed: false,
         overlayBookType: true
       },

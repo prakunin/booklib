@@ -3,7 +3,6 @@ package org.booklore.service.metadata;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.mapper.BookMapper;
 import org.booklore.model.dto.*;
-import org.booklore.model.dto.request.FetchMetadataRequest;
 import org.booklore.model.dto.request.MetadataRefreshOptions;
 import org.booklore.model.dto.request.MetadataRefreshRequest;
 import org.booklore.model.dto.settings.AppSettings;
@@ -11,9 +10,7 @@ import org.booklore.model.dto.settings.MetadataProviderSettings;
 import org.booklore.model.MetadataUpdateContext;
 import org.booklore.model.MetadataUpdateWrapper;
 import org.booklore.model.entity.BookEntity;
-import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.LibraryEntity;
-import org.booklore.model.entity.MetadataFetchJobEntity;
 import org.booklore.model.enums.MetadataProvider;
 import org.booklore.model.enums.MetadataReplaceMode;
 import org.booklore.repository.BookRepository;
@@ -174,8 +171,9 @@ class MetadataRefreshServiceTest {
 
         List<MetadataProvider> result = service.prepareProviders(options);
 
-        assertThat(result).containsExactly(MetadataProvider.Google);
-        assertThat(result).doesNotContain(MetadataProvider.Amazon);
+        assertThat(result)
+                .containsExactly(MetadataProvider.Google)
+                .doesNotContain(MetadataProvider.Amazon);
     }
 
     @Test

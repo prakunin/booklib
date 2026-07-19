@@ -5,6 +5,7 @@ import {LibraryFilterService} from '../../service/library-filter.service';
 import {BookService} from '../../../../../book/service/book.service';
 import {Book, ReadStatus} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {sortStrings} from '../../../../../../shared/util/string-sort.util';
 
 interface MonthlyData {
   month: string;
@@ -66,7 +67,7 @@ export class ReadingJourneyChartComponent {
       return '';
     }
 
-    return `${monthlyData[0].label} - ${monthlyData[monthlyData.length - 1].label}`;
+    return `${monthlyData[0].label} - ${monthlyData.at(-1)!.label}`;
   });
   public readonly chartData = computed<JourneyChartData>(() => {
     const monthlyData = this.monthlyData();
@@ -247,7 +248,7 @@ export class ReadingJourneyChartComponent {
 
     // Get all unique months and sort them
     const allMonths = new Set([...monthlyAdded.keys(), ...monthlyFinished.keys()]);
-    const sortedMonths = Array.from(allMonths).sort();
+    const sortedMonths = sortStrings(Array.from(allMonths));
 
     if (sortedMonths.length === 0) {
       return [];
@@ -255,7 +256,7 @@ export class ReadingJourneyChartComponent {
 
     // Fill in gaps and calculate cumulative values
     const firstMonth = sortedMonths[0];
-    const lastMonth = sortedMonths[sortedMonths.length - 1];
+    const lastMonth = sortedMonths.at(-1)!;
     const allMonthsRange = this.getMonthRange(firstMonth, lastMonth);
 
     let cumulativeAdded = 0;
@@ -282,7 +283,7 @@ export class ReadingJourneyChartComponent {
     if (!dateStr) return null;
     try {
       const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return null;
+      if (Number.isNaN(date.getTime())) return null;
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       return `${year}-${month}`;
@@ -314,7 +315,7 @@ export class ReadingJourneyChartComponent {
   private formatMonthLabel(monthKey: string): string {
     const [year, month] = monthKey.split('-');
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${monthNames[parseInt(month, 10) - 1]} ${year}`;
+    return `${monthNames[Number.parseInt(month, 10) - 1]} ${year}`;
   }
 
   private calculateInsights(books: Book[], monthlyData: MonthlyData[]): JourneyInsights {
@@ -334,7 +335,7 @@ export class ReadingJourneyChartComponent {
       if (book.addedOn && book.dateFinished) {
         const addedDate = new Date(book.addedOn);
         const finishedDate = new Date(book.dateFinished);
-        if (!isNaN(addedDate.getTime()) && !isNaN(finishedDate.getTime())) {
+        if (!Number.isNaN(addedDate.getTime()) && !Number.isNaN(finishedDate.getTime())) {
           const days = Math.floor((finishedDate.getTime() - addedDate.getTime()) / (1000 * 60 * 60 * 24));
           if (days >= 0) {
             totalDaysToFinish += days;

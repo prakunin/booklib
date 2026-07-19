@@ -144,7 +144,7 @@ public class FileService {
                 long authorId;
                 try {
                     authorId = Long.parseLong(dir.getFileName().toString());
-                } catch (NumberFormatException e) {
+                } catch (NumberFormatException _) {
                     return;
                 }
                 if (Files.exists(dir.resolve(AUTHOR_THUMBNAIL_FILENAME))) {
@@ -543,7 +543,7 @@ public class FileService {
         BufferedImage originalImage;
         try {
             originalImage = readImage(imageData);
-        } catch (OutOfMemoryError e) {
+        } catch (OutOfMemoryError _) {
             log.error("Out of memory decoding cover image for book {}; leaving it eligible for a retry", bookId);
             return CoverSaveOutcome.SAVE_FAILED;
         } catch (Exception e) {
@@ -564,7 +564,7 @@ public class FileService {
         PreparedCover prepared;
         try {
             prepared = prepareCoverImages(originalImage, getCoverCroppingSettings());
-        } catch (OutOfMemoryError e) {
+        } catch (OutOfMemoryError _) {
             log.error("Out of memory processing cover image for book {}; leaving it eligible for a retry", bookId);
             return CoverSaveOutcome.SAVE_FAILED;
         } catch (Exception e) {
@@ -576,7 +576,7 @@ public class FileService {
 
         try {
             return writeCoverImages(prepared, bookId) ? CoverSaveOutcome.SAVED : CoverSaveOutcome.SAVE_FAILED;
-        } catch (OutOfMemoryError e) {
+        } catch (OutOfMemoryError _) {
             log.error("Out of memory writing cover image for book {}; leaving it eligible for a retry", bookId);
             return CoverSaveOutcome.SAVE_FAILED;
         } catch (Exception e) {

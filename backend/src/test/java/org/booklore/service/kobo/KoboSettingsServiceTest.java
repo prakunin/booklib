@@ -79,7 +79,7 @@ class KoboSettingsServiceTest {
         when(authenticationService.getAuthenticatedUser()).thenReturn(user);
         when(repository.findByUserId(1L)).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(shelfService.getShelf(eq(1L), eq(ShelfType.KOBO.getName()))).thenReturn(Optional.empty());
+        when(shelfService.getShelf(1L, ShelfType.KOBO.getName())).thenReturn(Optional.empty());
         doReturn(Shelf.builder().id(100L).build()).when(shelfService).createShelf(any(ShelfCreateRequest.class));
         when(koboTokenService.generateToken()).thenReturn("new-token");
         when(koboTokenService.hashToken("new-token")).thenReturn("new-token-hash");
@@ -97,7 +97,7 @@ class KoboSettingsServiceTest {
         when(authenticationService.getAuthenticatedUser()).thenReturn(user);
         when(repository.findByUserId(1L)).thenReturn(Optional.of(settingsEntity));
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(shelfService.getShelf(eq(1L), eq(ShelfType.KOBO.getName()))).thenReturn(Optional.of(ShelfEntity.builder().id(100L).build()));
+        when(shelfService.getShelf(1L, ShelfType.KOBO.getName())).thenReturn(Optional.of(ShelfEntity.builder().id(100L).build()));
         when(koboTokenService.generateToken()).thenReturn("rotated-token");
         when(koboTokenService.hashToken("rotated-token")).thenReturn("rotated-token-hash");
         when(koboTokenService.newExpiry()).thenReturn(Instant.parse("2026-10-01T00:00:00Z"));
@@ -114,7 +114,7 @@ class KoboSettingsServiceTest {
         when(authenticationService.getAuthenticatedUser()).thenReturn(user);
         when(repository.findByUserId(1L)).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(shelfService.getShelf(eq(1L), eq(ShelfType.KOBO.getName()))).thenReturn(Optional.empty());
+        when(shelfService.getShelf(1L, ShelfType.KOBO.getName())).thenReturn(Optional.empty());
         doReturn(Shelf.builder().id(100L).build()).when(shelfService).createShelf(any(ShelfCreateRequest.class));
         when(koboTokenService.generateToken()).thenReturn("created-token");
         when(koboTokenService.hashToken("created-token")).thenReturn("created-token-hash");
@@ -153,7 +153,7 @@ class KoboSettingsServiceTest {
         when(repository.findByUserId(1L)).thenReturn(Optional.of(settingsEntity));
         when(shelfService.getUserKoboShelf()).thenReturn(null);
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(shelfService.getShelf(eq(1L), eq(ShelfType.KOBO.getName()))).thenReturn(Optional.empty());
+        when(shelfService.getShelf(1L, ShelfType.KOBO.getName())).thenReturn(Optional.empty());
         doReturn(Shelf.builder().id(100L).build()).when(shelfService).createShelf(any(ShelfCreateRequest.class));
 
         KoboSyncSettings update = new KoboSyncSettings();
@@ -238,7 +238,7 @@ class KoboSettingsServiceTest {
 
     @Test
     void ensureKoboShelfExists_doesNotCreateIfExists() throws Exception {
-        when(shelfService.getShelf(eq(1L), eq(ShelfType.KOBO.getName()))).thenReturn(Optional.of(ShelfEntity.builder().id(100L).build()));
+        when(shelfService.getShelf(1L, ShelfType.KOBO.getName())).thenReturn(Optional.of(ShelfEntity.builder().id(100L).build()));
 
         var method = service.getClass().getDeclaredMethod("ensureKoboShelfExists", Long.class);
         method.setAccessible(true);
@@ -248,7 +248,7 @@ class KoboSettingsServiceTest {
 
     @Test
     void ensureKoboShelfExists_createsIfMissing() throws Exception {
-        when(shelfService.getShelf(eq(1L), eq(ShelfType.KOBO.getName()))).thenReturn(Optional.empty());
+        when(shelfService.getShelf(1L, ShelfType.KOBO.getName())).thenReturn(Optional.empty());
         doReturn(Shelf.builder().id(100L).build()).when(shelfService).createShelf(any(ShelfCreateRequest.class));
 
         var method = service.getClass().getDeclaredMethod("ensureKoboShelfExists", Long.class);
@@ -259,7 +259,7 @@ class KoboSettingsServiceTest {
 
     @Test
     void ensureKoboShelfExists_idempotentIfCalledTwice() throws Exception {
-        when(shelfService.getShelf(eq(1L), eq(ShelfType.KOBO.getName())))
+        when(shelfService.getShelf(1L, ShelfType.KOBO.getName()))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(ShelfEntity.builder().id(100L).build()));
         doReturn(Shelf.builder().id(100L).build()).when(shelfService).createShelf(any(ShelfCreateRequest.class));
@@ -280,7 +280,7 @@ class KoboSettingsServiceTest {
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(settingsEntity));
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(shelfService.getShelf(eq(1L), eq(ShelfType.KOBO.getName()))).thenReturn(Optional.empty());
+        when(shelfService.getShelf(1L, ShelfType.KOBO.getName())).thenReturn(Optional.empty());
         doReturn(Shelf.builder().id(100L).build()).when(shelfService).createShelf(any(ShelfCreateRequest.class));
         when(koboTokenService.generateToken()).thenReturn("token-1", "token-2");
         when(koboTokenService.hashToken("token-1")).thenReturn("hash-1");

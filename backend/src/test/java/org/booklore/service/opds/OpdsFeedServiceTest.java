@@ -60,14 +60,15 @@ class OpdsFeedServiceTest {
     @Test
     void generateRootNavigation_shouldContainAllSections() {
         String xml = opdsFeedService.generateRootNavigation(request);
-        assertThat(xml).contains("All Books");
-        assertThat(xml).contains("Recently Added");
-        assertThat(xml).contains("Libraries");
-        assertThat(xml).contains("Shelves");
-        assertThat(xml).contains("Magic Shelves");
-        assertThat(xml).contains("Surprise Me");
-        assertThat(xml).contains("<?xml");
-        assertThat(xml).contains("</feed>");
+        assertThat(xml)
+                .contains("All Books")
+                .contains("Recently Added")
+                .contains("Libraries")
+                .contains("Shelves")
+                .contains("Magic Shelves")
+                .contains("Surprise Me")
+                .contains("<?xml")
+                .contains("</feed>");
     }
 
     @Test
@@ -78,9 +79,10 @@ class OpdsFeedServiceTest {
         when(opdsBookService.getAccessibleLibraries(TEST_USER_ID)).thenReturn(List.of(lib));
 
         String xml = opdsFeedService.generateLibrariesNavigation(request);
-        assertThat(xml).contains("Test Library");
-        assertThat(xml).contains("urn:booklore:library:1");
-        assertThat(xml).contains("</feed>");
+        assertThat(xml)
+                .contains("Test Library")
+                .contains("urn:booklore:library:1")
+                .contains("</feed>");
         verify(opdsBookService).getAccessibleLibraries(TEST_USER_ID);
     }
 
@@ -101,9 +103,10 @@ class OpdsFeedServiceTest {
         when(opdsBookService.getUserShelves(TEST_USER_ID)).thenReturn(Collections.singletonList(shelfEntity));
 
         String xml = opdsFeedService.generateShelvesNavigation(request);
-        assertThat(xml).contains("Favorites");
-        assertThat(xml).contains("urn:booklore:shelf:5");
-        assertThat(xml).contains("</feed>");
+        assertThat(xml)
+                .contains("Favorites")
+                .contains("urn:booklore:shelf:5")
+                .contains("</feed>");
         verify(opdsBookService).getUserShelves(TEST_USER_ID);
     }
 
@@ -158,12 +161,13 @@ class OpdsFeedServiceTest {
         when(opdsBookService.applySortOrder(any(), any())).thenReturn(page);
 
         String xml = opdsFeedService.generateCatalogFeed(request);
-        assertThat(xml).contains("Book Title");
-        assertThat(xml).contains("Author A");
-        assertThat(xml).contains("Publisher X");
-        assertThat(xml).contains("urn:booklore:book:10");
-        assertThat(xml).contains("application/epub+zip");
-        assertThat(xml).contains("</feed>");
+        assertThat(xml)
+                .contains("Book Title")
+                .contains("Author A")
+                .contains("Publisher X")
+                .contains("urn:booklore:book:10")
+                .contains("application/epub+zip")
+                .contains("</feed>");
         verify(opdsBookService).getBooksPage(TEST_USER_ID, null, null, null, 0, 50);
     }
 
@@ -191,8 +195,9 @@ class OpdsFeedServiceTest {
 
         // Acquisition link carries the token so header-less clients authenticate via ?token=.
         // The '&' separator must be XML-escaped inside the attribute value.
-        assertThat(xml).contains("/api/v1/opds/10/download?fileId=7&amp;token=test.jwt.token");
-        assertThat(xml).doesNotContain("fileId=7&token=");
+        assertThat(xml)
+                .contains("/api/v1/opds/10/download?fileId=7&amp;token=test.jwt.token")
+                .doesNotContain("fileId=7&token=");
         verify(authenticationService).generateDownloadToken(TEST_USER_ID);
     }
 
@@ -218,8 +223,9 @@ class OpdsFeedServiceTest {
 
         String xml = opdsFeedService.generateCatalogFeed(request);
 
-        assertThat(xml).contains("/api/v1/opds/10/download?fileId=7\"");
-        assertThat(xml).doesNotContain("token=");
+        assertThat(xml)
+                .contains("/api/v1/opds/10/download?fileId=7\"")
+                .doesNotContain("token=");
     }
 
     @Test
@@ -347,13 +353,14 @@ class OpdsFeedServiceTest {
                 .build();
 
         Page<Book> page = new PageImpl<>(List.of(book), PageRequest.of(0, 50), 1);
-        when(opdsBookService.getRecentBooksPage(eq(TEST_USER_ID), eq(0), eq(50))).thenReturn(page);
+        when(opdsBookService.getRecentBooksPage(TEST_USER_ID, 0, 50)).thenReturn(page);
         when(opdsBookService.applySortOrder(any(), any())).thenReturn(page);
 
         String xml = opdsFeedService.generateRecentFeed(request);
-        assertThat(xml).contains("Recent Book");
-        assertThat(xml).contains("application/pdf");
-        assertThat(xml).contains("</feed>");
+        assertThat(xml)
+                .contains("Recent Book")
+                .contains("application/pdf")
+                .contains("</feed>");
         verify(opdsBookService).getRecentBooksPage(TEST_USER_ID, 0, 50);
     }
 
@@ -387,9 +394,10 @@ class OpdsFeedServiceTest {
         when(opdsBookService.getRandomBooks(TEST_USER_ID, 25)).thenReturn(List.of(book));
 
         String xml = opdsFeedService.generateSurpriseFeed(request);
-        assertThat(xml).contains("Surprise Book");
-        assertThat(xml).contains("urn:booklore:book:12");
-        assertThat(xml).contains("</feed>");
+        assertThat(xml)
+                .contains("Surprise Book")
+                .contains("urn:booklore:book:12")
+                .contains("</feed>");
         verify(opdsBookService).getRandomBooks(TEST_USER_ID, 25);
     }
 
@@ -405,9 +413,10 @@ class OpdsFeedServiceTest {
     @Test
     void getOpenSearchDescription_shouldReturnValidXml() {
         String xml = opdsFeedService.getOpenSearchDescription();
-        assertThat(xml).contains("<OpenSearchDescription");
-        assertThat(xml).contains("Search Booklore catalog");
-        assertThat(xml).contains("</OpenSearchDescription>");
+        assertThat(xml)
+                .contains("<OpenSearchDescription")
+                .contains("Search Booklore catalog")
+                .contains("</OpenSearchDescription>");
     }
 
     @Test
@@ -550,9 +559,10 @@ class OpdsFeedServiceTest {
         when(opdsBookService.getShelfName(10L)).thenReturn("My Shelf - Shelf");
 
         String xml = opdsFeedService.generateCatalogFeed(request);
-        assertThat(xml).contains("Shelf Book");
-        assertThat(xml).contains("My Shelf - Shelf");
-        assertThat(xml).contains("</feed>");
+        assertThat(xml)
+                .contains("Shelf Book")
+                .contains("My Shelf - Shelf")
+                .contains("</feed>");
         verify(opdsBookService).getBooksPage(TEST_USER_ID, null, null, Set.of(10L), 0, 50);
     }
 
@@ -584,9 +594,10 @@ class OpdsFeedServiceTest {
         when(opdsBookService.applySortOrder(any(), any())).thenReturn(page);
 
         String xml = opdsFeedService.generateCatalogFeed(request);
-        assertThat(xml).contains("Multi Shelf Book");
-        assertThat(xml).contains("Multiple Shelves");
-        assertThat(xml).contains("</feed>");
+        assertThat(xml)
+                .contains("Multi Shelf Book")
+                .contains("Multiple Shelves")
+                .contains("</feed>");
         verify(opdsBookService).getBooksPage(TEST_USER_ID, null, null, Set.of(10L, 20L), 0, 50);
     }
 
@@ -619,8 +630,9 @@ class OpdsFeedServiceTest {
         when(opdsBookService.getShelfName(10L)).thenReturn("Fantasy Shelf - Shelf");
 
         String xml = opdsFeedService.generateCatalogFeed(request);
-        assertThat(xml).contains("Fantasy Book");
-        assertThat(xml).contains("</feed>");
+        assertThat(xml)
+                .contains("Fantasy Book")
+                .contains("</feed>");
         verify(opdsBookService).getBooksPage(TEST_USER_ID, "fantasy", null, Set.of(10L), 0, 50);
     }
     @Test

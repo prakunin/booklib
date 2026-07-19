@@ -873,7 +873,7 @@ class FileMoveServiceTest {
             service.bulkMoveFiles(request);
 
             verify(bookFileRepository).updateFileNameAndSubPath(anyLong(), anyString(), anyString());
-            verify(bookRepository).updateLibrary(eq(100L), eq(2L), eq(targetLibraryPath));
+            verify(bookRepository).updateLibrary(100L, 2L, targetLibraryPath);
         }
 
         @Test

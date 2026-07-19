@@ -130,7 +130,7 @@ export class DashboardPreferencesComponent {
     if (this.config.scrollers.length >= MAX_SCROLLERS) {
       return;
     }
-    const newId = (Math.max(...this.config.scrollers.map((s: ScrollerConfig) => parseInt(s.id)), 0) + 1).toString();
+    const newId = (Math.max(...this.config.scrollers.map((s: ScrollerConfig) => Number.parseInt(s.id)), 0) + 1).toString();
     this.config.scrollers.push({
       id: newId,
       type: ScrollerType.LATEST_ADDED,

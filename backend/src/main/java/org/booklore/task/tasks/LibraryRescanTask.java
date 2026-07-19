@@ -58,7 +58,7 @@ public class LibraryRescanTask implements Task {
                     .build();
             try {
                 libraryRescanHelper.handleRescanOptions(context, taskId);
-            } catch (InvalidDataAccessApiUsageException e) {
+            } catch (InvalidDataAccessApiUsageException _) {
                 log.debug("InvalidDataAccessApiUsageException - Library id: {}", libraryId);
             }
             log.info("{}: Library rescan completed for library: {}", getTaskType(), libraryId);

@@ -84,7 +84,7 @@ export class AudiobookSessionService {
    * Called when playback is paused - accumulates listening time
    */
   pauseSession(currentPositionMs: number): void {
-    if (!this.currentSession || !this.currentSession.lastPlayStartTime) {
+    if (!this.currentSession?.lastPlayStartTime) {
       return;
     }
 
@@ -258,7 +258,7 @@ export class AudiobookSessionService {
     this.stopPeriodicSave();
 
     this.periodicSaveInterval = setInterval(() => {
-      if (this.currentSession && this.currentSession.lastPlayStartTime) {
+      if (this.currentSession?.lastPlayStartTime) {
         // Send intermediate session data
         this.sendIntermediateSession();
       }

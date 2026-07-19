@@ -232,8 +232,8 @@ public class JwtUtils {
      */
     public Long extractUserId(String token) {
         Object userIdClaim = extractClaims(token).getClaim("userId");
-        if (userIdClaim instanceof Number) {
-            return ((Number) userIdClaim).longValue();
+        if (userIdClaim instanceof Number number) {
+            return number.longValue();
         }
         throw ApiError.JWT_INVALID.createException("Invalid userId claim type");
     }

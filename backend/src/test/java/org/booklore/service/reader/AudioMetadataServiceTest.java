@@ -309,7 +309,7 @@ class AudioMetadataServiceTest {
     }
 
     @Test
-    void getEmbeddedCoverArt_returnsArtworkData() throws Exception {
+    void getEmbeddedCoverArt_returnsArtworkData() {
         byte[] expectedData = new byte[]{(byte) 0xFF, (byte) 0xD8, 0x00, 0x01};
 
         AudioFile audioFile = mock(AudioFile.class);
@@ -330,7 +330,7 @@ class AudioMetadataServiceTest {
     }
 
     @Test
-    void getEmbeddedCoverArt_returnsNullWhenNoArtwork() throws Exception {
+    void getEmbeddedCoverArt_returnsNullWhenNoArtwork() {
         AudioFile audioFile = mock(AudioFile.class);
         Tag tag = mock(Tag.class);
 
@@ -347,7 +347,7 @@ class AudioMetadataServiceTest {
     }
 
     @Test
-    void getEmbeddedCoverArt_returnsNullWhenNoTag() throws Exception {
+    void getEmbeddedCoverArt_returnsNullWhenNoTag() {
         AudioFile audioFile = mock(AudioFile.class);
         when(audioFile.getTag()).thenReturn(null);
 
@@ -372,7 +372,7 @@ class AudioMetadataServiceTest {
     }
 
     @Test
-    void getCoverArtMimeType_returnsMimeTypeFromArtwork() throws Exception {
+    void getCoverArtMimeType_returnsMimeTypeFromArtwork() {
         AudioFile audioFile = mock(AudioFile.class);
         Tag tag = mock(Tag.class);
         Artwork artwork = mock(Artwork.class);
@@ -391,7 +391,7 @@ class AudioMetadataServiceTest {
     }
 
     @Test
-    void getCoverArtMimeType_detectsJpegFromMagicBytes() throws Exception {
+    void getCoverArtMimeType_detectsJpegFromMagicBytes() {
         AudioFile audioFile = mock(AudioFile.class);
         Tag tag = mock(Tag.class);
         Artwork artwork = mock(Artwork.class);
@@ -411,7 +411,7 @@ class AudioMetadataServiceTest {
     }
 
     @Test
-    void getCoverArtMimeType_detectsPngFromMagicBytes() throws Exception {
+    void getCoverArtMimeType_detectsPngFromMagicBytes() {
         AudioFile audioFile = mock(AudioFile.class);
         Tag tag = mock(Tag.class);
         Artwork artwork = mock(Artwork.class);
@@ -431,7 +431,7 @@ class AudioMetadataServiceTest {
     }
 
     @Test
-    void getCoverArtMimeType_returnsDefaultJpegWhenCannotDetermine() throws Exception {
+    void getCoverArtMimeType_returnsDefaultJpegWhenCannotDetermine() {
         AudioFile audioFile = mock(AudioFile.class);
         Tag tag = mock(Tag.class);
         Artwork artwork = mock(Artwork.class);

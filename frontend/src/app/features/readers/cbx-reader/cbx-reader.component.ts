@@ -84,7 +84,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   private static readonly INFINITE_SCROLL_MAX_DOM_PAGES = 18;
 
   private readonly destroyRef = inject(DestroyRef);
-  private progressSaveSubject$ = new Subject<void>();
+  private readonly progressSaveSubject$ = new Subject<void>();
 
   bookType = signal<BookType | null>(null);
   bookId = signal<number | null>(null);
@@ -115,18 +115,18 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
   // Long-strip state (Kavita-inspired webtoon reader)
   longStripImages = signal<{ src: string; page: number }[]>([]);
-  private longStripLoadedPages = new Set<number>();
+  private readonly longStripLoadedPages = new Set<number>();
   private longStripIntersectionObserver: IntersectionObserver | null = null;
   private longStripScrollHandler: (() => void) | null = null;
   private longStripScrollEndHandler: (() => void) | null = null;
   private longStripScrollDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private longStripScrollEndDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  private longStripIsScrolling = signal(false);
-  private longStripAllImagesLoaded = signal(false);
-  private longStripInitFinished = signal(false);
+  private readonly longStripIsScrolling = signal(false);
+  private readonly longStripAllImagesLoaded = signal(false);
+  private readonly longStripInitFinished = signal(false);
   private longStripPrevScrollTop = 0;
 
-  private preloadedImages = new Map<string, HTMLImageElement>();
+  private readonly preloadedImages = new Map<string, HTMLImageElement>();
   previousImageUrls = signal<string[]>([]);
   currentImageUrls = signal<string[]>([]);
   isPageTransitioning = signal(false);
@@ -138,7 +138,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   currentPageHasNotes = signal(false);
   showNoteDialog = signal(false);
   noteDialogData = signal<CbxNoteDialogData | null>(null);
-  private editingNote = signal<BookNoteV2 | null>(null);
+  private readonly editingNote = signal<BookNoteV2 | null>(null);
 
   // Fullscreen state
   isFullscreen = signal(false);
@@ -151,7 +151,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   slideshowInterval = signal<CbxSlideshowInterval>(CbxSlideshowInterval.FIVE_SECONDS);
 
   // Double-tap zoom
-  private lastTapTime = 0;
+  private readonly lastTapTime = 0;
   private originalFitMode: CbxFitMode | null = null;
 
   // Shortcuts help dialog
@@ -159,9 +159,9 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
   // Magnifier
   isMagnifierActive = signal(false);
-  private magnifierLensRef = viewChild<ElementRef<HTMLDivElement>>('magnifierLens');
-  private readerRootRef = viewChild<ElementRef<HTMLElement>>('readerRoot');
-  private imageScrollHostRef = viewChild<ElementRef<HTMLElement>>('imageScrollHost');
+  private readonly magnifierLensRef = viewChild<ElementRef<HTMLDivElement>>('magnifierLens');
+  private readonly readerRootRef = viewChild<ElementRef<HTMLElement>>('readerRoot');
+  private readonly imageScrollHostRef = viewChild<ElementRef<HTMLElement>>('imageScrollHost');
   magnifierZoom = signal<CbxMagnifierZoom>(CbxMagnifierZoom.ZOOM_3X);
   magnifierLensSize = signal<CbxMagnifierLensSize>(CbxMagnifierLensSize.MEDIUM);
   private lastMouseEvent: MouseEvent | null = null;
@@ -181,12 +181,12 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   /** Near bottom of strip + next in series: show subtle continuation hint. */
   continuationHintVisible = signal(false);
 
-  private cbxSettingsUsesGlobal = signal(true);
-  private readerLayoutGraceUntilMs = signal(0);
+  private readonly cbxSettingsUsesGlobal = signal(true);
+  private readonly readerLayoutGraceUntilMs = signal(0);
   /** Invalidates delayed scroll/layout work after book or scroll-mode changes. */
-  private readerLayoutGeneration = signal(0);
+  private readonly readerLayoutGeneration = signal(0);
   /** Avoid continuation hint flicker when scroll height changes (hysteresis). */
-  private continuationHintLatched = signal(false);
+  private readonly continuationHintLatched = signal(false);
 
   // Emulate book mode (spine shadow in two-page view)
   emulateBook = signal(false);
@@ -201,11 +201,11 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   // Page dimensions from backend
   pageDimensions = signal<CbxPageDimension[]>([]);
   // Double page detection (fallback cache for pages without backend dims)
-  private pageDimensionsCache = new Map<number, { width: number, height: number }>();
+  private readonly pageDimensionsCache = new Map<number, { width: number, height: number }>();
 
   // Swipe double-action prevention
-  private hasHitRightScroll = signal(false);
-  private hasHitZeroScroll = signal(false);
+  private readonly hasHitRightScroll = signal(false);
+  private readonly hasHitZeroScroll = signal(false);
   private touchMoveCount = 0;
 
   // Canvas split state
@@ -215,26 +215,26 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   protected readonly CbxSlideshowInterval = CbxSlideshowInterval;
   protected readonly CbxPageSplitOption = CbxPageSplitOption;
 
-  private route = inject(ActivatedRoute);
-  private router = inject(Router);
-  private cbxReaderService = inject(CbxReaderService);
-  private bookService = inject(BookService);
-  private userService = inject(UserService);
-  private messageService = inject(MessageService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly cbxReaderService = inject(CbxReaderService);
+  private readonly bookService = inject(BookService);
+  private readonly userService = inject(UserService);
+  private readonly messageService = inject(MessageService);
   private readonly t = inject(TranslocoService);
-  private pageTitle = inject(PageTitleService);
-  private readingSessionService = inject(ReadingSessionService);
-  private headerService = inject(CbxHeaderService);
-  private sidebarService = inject(CbxSidebarService);
-  private footerService = inject(CbxFooterService);
-  private quickSettingsService = inject(CbxQuickSettingsService);
+  private readonly pageTitle = inject(PageTitleService);
+  private readonly readingSessionService = inject(ReadingSessionService);
+  private readonly headerService = inject(CbxHeaderService);
+  private readonly sidebarService = inject(CbxSidebarService);
+  private readonly footerService = inject(CbxFooterService);
+  private readonly quickSettingsService = inject(CbxQuickSettingsService);
   /** Template reads this signal so strip width tracks the slider (same source as quick settings panel). */
   protected readonly cbxQuickSettingsState = this.quickSettingsService.state;
-  private pageDimensionService = inject(CbxPageDimensionService);
-  private wakeLockService = inject(WakeLockService);
-  private readerPreferencesService = inject(ReaderPreferencesService);
-  private fullscreenService = inject(ReaderFullscreenService);
-  private slideshowController = new CbxSlideshowController({
+  private readonly pageDimensionService = inject(CbxPageDimensionService);
+  private readonly wakeLockService = inject(WakeLockService);
+  private readonly readerPreferencesService = inject(ReaderPreferencesService);
+  private readonly fullscreenService = inject(ReaderFullscreenService);
+  private readonly slideshowController = new CbxSlideshowController({
     canAdvance: () => this.currentPage() < this.pages().length - 1,
     advance: () => this.advancePage(1),
     onActiveChange: active => this.setSlideshowActive(active),
@@ -263,7 +263,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   isAtEndOfLongStrip = computed(() => {
     const images = this.longStripImages();
     if (images.length === 0) return false;
-    const last = images[images.length - 1];
+    const last = images.at(-1)!;
     return last.page >= this.pages().length - 1;
   });
 
@@ -271,7 +271,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   isAtEndOfInfiniteScroll = computed(() => {
     const pages = this.infiniteScrollPages();
     if (pages.length === 0) return false;
-    const lastIdx = pages[pages.length - 1];
+    const lastIdx = pages.at(-1)!;
     return lastIdx >= this.pages().length - 1;
   });
 
@@ -435,7 +435,9 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
             this.autoCloseMenu.set(cbxSrc.autoCloseMenu ?? false);
           }
 
-          this.currentPage.set((book.cbxProgress?.page || 1) - 1);
+          const requestedPage = this.getRequestedPage();
+          const initialPage = requestedPage ?? book.cbxProgress?.page ?? 1;
+          this.currentPage.set(Math.min(Math.max(initialPage - 1, 0), Math.max(pages.length - 1, 0)));
 
           if (this.scrollMode() === CbxScrollMode.INFINITE) {
             this.initializeInfiniteScroll();
@@ -645,12 +647,12 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     this.quickSettingsService.stripMaxWidthChange$
       .pipe(
         tap((value) => {
-          this.stripMaxWidthPercent.set(value as number);
+          this.stripMaxWidthPercent.set(value);
         }),
         debounceTime(CbxReaderComponent.STRIP_WIDTH_PERSIST_DEBOUNCE_MS),
         takeUntilDestroyed(this.destroyRef)
       )
-      .subscribe((value) => this.persistStripMaxWidth(value as number));
+      .subscribe((value) => this.persistStripMaxWidth(value));
   }
 
   private updateServiceStates(): void {
@@ -1121,6 +1123,11 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     this.infiniteScrollPages.set(pages);
   }
 
+  private getRequestedPage(): number | null {
+    const page = Number.parseInt(this.route.snapshot.queryParamMap.get('page') ?? '', 10);
+    return Number.isFinite(page) && page > 0 ? page : null;
+  }
+
   onScroll(event: Event): void {
     if (this.scrollMode() !== CbxScrollMode.INFINITE) return;
 
@@ -1156,7 +1163,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     if (this.isLoadingMore()) return;
 
     const currentPages = this.infiniteScrollPages();
-    const lastLoadedIndex = currentPages[currentPages.length - 1];
+    const lastLoadedIndex = currentPages.at(-1);
     if (lastLoadedIndex === undefined || lastLoadedIndex >= this.pages().length - 1) return;
 
     this.isLoadingMore.set(true);
@@ -1249,7 +1256,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     if (!best) return;
 
     const attr = best.getAttribute('data-page');
-    const newPage = attr != null ? parseInt(attr, 10) : NaN;
+    const newPage = attr != null ? Number.parseInt(attr, 10) : Number.NaN;
     if (Number.isNaN(newPage) || newPage === this.currentPage()) return;
 
     this.currentPage.set(newPage);
@@ -1445,7 +1452,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
       if (entry.isIntersecting) {
         const pageAttr = entry.target.getAttribute('data-page');
         if (pageAttr != null) {
-          const page = parseInt(pageAttr, 10);
+          const page = Number.parseInt(pageAttr, 10);
           // Prefetch more images when a page enters the viewport
           this.longStripPrefetchAround(page);
         }
@@ -1530,7 +1537,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     const closest = this.longStripFindClosestImage(images, container);
 
     if (closest) {
-      const page = parseInt(closest.getAttribute('data-page') ?? '0', 10);
+      const page = Number.parseInt(closest.getAttribute('data-page') ?? '0', 10);
       if (page !== this.currentPage()) {
         this.currentPage.set(page);
         this.progressSaveSubject$.next();
@@ -2097,7 +2104,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
       this.onFitModeChange(CbxFitMode.ACTUAL_SIZE);
     } else {
       // Restore original fit mode
-      this.onFitModeChange(this.originalFitMode as CbxFitMode);
+      this.onFitModeChange(this.originalFitMode);
       this.originalFitMode = null;
     }
   }
@@ -2289,7 +2296,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   private openNoteDialogForEdit(note: BookNoteV2): void {
     this.editingNote.set(note);
     this.noteDialogData.set({
-      pageNumber: parseInt(note.cfi, 10) || this.currentPage() + 1,
+      pageNumber: Number.parseInt(note.cfi, 10) || this.currentPage() + 1,
       noteId: note.id,
       noteContent: note.noteContent,
       color: note.color

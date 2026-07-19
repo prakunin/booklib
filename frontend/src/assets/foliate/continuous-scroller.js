@@ -444,8 +444,8 @@ export class ContinuousScroller extends HTMLElement {
     }
     #layout() {
         const style = getComputedStyle(this)
-        const margin = parseFloat(style.getPropertyValue('--_margin')) || 0
-        const maxInlineSize = parseFloat(style.getPropertyValue('--_max-inline-size')) || 10000
+        const margin = Number.parseFloat(style.getPropertyValue('--_margin')) || 0
+        const maxInlineSize = Number.parseFloat(style.getPropertyValue('--_max-inline-size')) || 10000
         return { margin, maxInlineSize }
     }
     #render() {

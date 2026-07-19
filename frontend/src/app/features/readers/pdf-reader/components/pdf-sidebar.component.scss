@@ -264,6 +264,21 @@ $transition-fast: 150ms ease;
   }
 }
 
+.reader-list-item-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  gap: 12px;
+}
+
 .item-content {
   flex: 1;
   min-width: 0;

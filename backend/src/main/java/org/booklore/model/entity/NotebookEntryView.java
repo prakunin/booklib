@@ -24,6 +24,10 @@ import java.time.LocalDateTime;
            a.color,
            a.style,
            a.chapter_title,
+           a.cfi,
+           NULL AS position_ms,
+           NULL AS track_index,
+           NULL AS page_number,
            (SELECT bf.book_type FROM book_file bf WHERE bf.book_id = a.book_id ORDER BY bf.id LIMIT 1) AS primary_book_type,
            bm.cover_updated_on,
            a.created_at,
@@ -42,6 +46,10 @@ import java.time.LocalDateTime;
            n.color,
            NULL,
            n.chapter_title,
+           n.cfi,
+           NULL,
+           NULL,
+           NULL,
            (SELECT bf.book_type FROM book_file bf WHERE bf.book_id = n.book_id ORDER BY bf.id LIMIT 1),
            bm.cover_updated_on,
            n.created_at,
@@ -60,6 +68,10 @@ import java.time.LocalDateTime;
            b.color,
            NULL,
            NULL,
+           b.cfi,
+           b.position_ms,
+           b.track_index,
+           b.page_number,
            (SELECT bf.book_type FROM book_file bf WHERE bf.book_id = b.book_id ORDER BY bf.id LIMIT 1),
            bm.cover_updated_on,
            b.created_at,
@@ -102,6 +114,18 @@ public class NotebookEntryView {
 
     @Column(name = "chapter_title")
     private String chapterTitle;
+
+    @Column(name = "cfi")
+    private String cfi;
+
+    @Column(name = "position_ms")
+    private Long positionMs;
+
+    @Column(name = "track_index")
+    private Integer trackIndex;
+
+    @Column(name = "page_number")
+    private Integer pageNumber;
 
     @Column(name = "primary_book_type")
     private String primaryBookType;

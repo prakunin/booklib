@@ -16,8 +16,8 @@ export class SetupGuard implements CanActivate {
 
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/setup`;
 
-  private http = inject(HttpClient);
-  private router = inject(Router);
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
 
   canActivate(): Observable<boolean | UrlTree> {
     return this.http.get<{ data: boolean }>(`${this.url}/status`).pipe(

@@ -26,9 +26,9 @@ import {DEFAULT_PASSWORD_POLICY, passwordPolicyValidator} from '../../validators
   ]
 })
 export class SetupComponent {
-  private fb = inject(FormBuilder);
-  private setupService = inject(SetupService);
-  private router = inject(Router);
+  private readonly fb = inject(FormBuilder);
+  private readonly setupService = inject(SetupService);
+  private readonly router = inject(Router);
   setupForm: FormGroup;
   loading = signal(false);
   error: string | null = null;
@@ -57,7 +57,6 @@ export class SetupComponent {
     this.error = null;
     // Remove confirm password from the payload, as it does not need to be sent to backend
     const { confirmPassword, ...payload } = this.setupForm.value;
-    void confirmPassword;
     this.setupService.createAdmin(payload).subscribe({
       next: () => {
         this.success = true;

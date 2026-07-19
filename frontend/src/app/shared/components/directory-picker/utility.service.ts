@@ -14,9 +14,9 @@ export interface InpxIndexOption {
 })
 export class UtilityService {
 
-  private pathUrl = `${API_CONFIG.BASE_URL}/api/v1/path`;
+  private readonly pathUrl = `${API_CONFIG.BASE_URL}/api/v1/path`;
 
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
 
   getFolders(path: string): Observable<string[]> {
     const params = new HttpParams().set('path', path);

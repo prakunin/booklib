@@ -141,7 +141,7 @@ public class MetadataRefreshService {
                         if (providers.contains(GoodReads)) {
                             try {
                                 Thread.sleep(ThreadLocalRandom.current().nextLong(500, 1500));
-                            } catch (InterruptedException e) {
+                            } catch (InterruptedException _) {
                                 Thread.currentThread().interrupt();
                                 status.setRollbackOnly();
                                 return null;

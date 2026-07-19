@@ -72,7 +72,7 @@ public class EpubReaderController {
 
         try {
             epubReaderService.streamFile(bookId, bookType, cleanPath, response.getOutputStream());
-        } catch (FileNotFoundException e) {
+        } catch (FileNotFoundException _) {
             response.reset();
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
         }

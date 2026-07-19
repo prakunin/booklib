@@ -16,8 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import reactor.core.publisher.Flux;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -132,7 +130,7 @@ class DuckDuckGoCoverServiceTest {
                 .coverType("audiobook")
                 .build();
 
-        assertThat("audiobook".equalsIgnoreCase(request.getCoverType())).isTrue();
+        assertThat(request.getCoverType()).isEqualToIgnoringCase("audiobook");
     }
 
     @Test
@@ -142,7 +140,7 @@ class DuckDuckGoCoverServiceTest {
                 .coverType("ebook")
                 .build();
 
-        assertThat("audiobook".equalsIgnoreCase(request.getCoverType())).isFalse();
+        assertThat(request.getCoverType()).isNotEqualToIgnoringCase("audiobook");
     }
 
     @Test
@@ -217,7 +215,7 @@ class DuckDuckGoCoverServiceTest {
         images.removeIf(dto -> {
             try {
                 return !(boolean) method.invoke(service, dto.getWidth(), dto.getHeight());
-            } catch (Exception e) {
+            } catch (Exception _) {
                 return true;
             }
         });
@@ -325,7 +323,7 @@ class DuckDuckGoCoverServiceTest {
         assertThat(all).hasSize(4);
     }
 
-    private Connection mockJsoupConnect(MockedStatic<Jsoup> jsoupMock) throws IOException {
+    private Connection mockJsoupConnect(MockedStatic<Jsoup> jsoupMock) {
         Connection connection = mock(Connection.class, RETURNS_SELF);
         jsoupMock.when(() -> Jsoup.connect(anyString())).thenReturn(connection);
         return connection;
@@ -431,6 +429,7 @@ class DuckDuckGoCoverServiceTest {
 
                 List<CoverImage> result = service.getCovers(request).collectList().block();
 
+                assertThat(result).isNotEmpty();
                 assertThat(result).allSatisfy(img ->
                         assertThat((double) img.getWidth() / img.getHeight()).isBetween(0.85, 1.15));
             }
@@ -468,6 +467,7 @@ class DuckDuckGoCoverServiceTest {
 
                 List<CoverImage> result = service.getCovers(request).collectList().block();
 
+                assertThat(result).isNotEmpty();
                 assertThat(result).allSatisfy(img -> {
                     assertThat(img.getWidth()).isGreaterThanOrEqualTo(350);
                     assertThat(img.getWidth()).isLessThan(img.getHeight());
@@ -584,7 +584,8 @@ class DuckDuckGoCoverServiceTest {
                 CoverFetchRequest request = CoverFetchRequest.builder()
                         .title("Test").coverType("ebook").build();
 
-                assertThatThrownBy(() -> service.getCovers(request).collectList().block())
+                var covers = service.getCovers(request).collectList();
+                assertThatThrownBy(covers::block)
                         .isInstanceOf(APIException.class)
                         .hasMessageContaining("Error fetching URL:");
             }
@@ -605,7 +606,8 @@ class DuckDuckGoCoverServiceTest {
                 CoverFetchRequest request = CoverFetchRequest.builder()
                         .title("Test").coverType("ebook").build();
 
-                assertThatThrownBy(() -> service.getCovers(request).collectList().block())
+                var covers = service.getCovers(request).collectList();
+                assertThatThrownBy(covers::block)
                         .isInstanceOf(APIException.class)
                         .hasMessageContaining("Error parsing response");
             }
@@ -630,7 +632,8 @@ class DuckDuckGoCoverServiceTest {
                 CoverFetchRequest request = CoverFetchRequest.builder()
                         .title("Test").coverType("ebook").build();
 
-                assertThatThrownBy(() -> service.getCovers(request).collectList().block())
+                var covers = service.getCovers(request).collectList();
+                assertThatThrownBy(covers::block)
                         .isInstanceOf(APIException.class)
                         .hasMessageContaining("DuckDuckGo image fetch failed");
             }

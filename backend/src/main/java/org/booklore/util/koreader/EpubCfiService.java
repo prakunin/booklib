@@ -172,7 +172,7 @@ public class EpubCfiService {
     private String buildCacheKey(File epubFile, int spineIndex) {
         try {
             return epubFile.getCanonicalPath() + ":" + spineIndex;
-        } catch (IOException e) {
+        } catch (IOException _) {
             return epubFile.getAbsolutePath() + ":" + spineIndex;
         }
     }
@@ -181,7 +181,7 @@ public class EpubCfiService {
         try {
             String pathPrefix = epubFile.getCanonicalPath() + ":";
             documentCache.asMap().keySet().removeIf(key -> key.startsWith(pathPrefix));
-        } catch (IOException e) {
+        } catch (IOException _) {
             String pathPrefix = epubFile.getAbsolutePath() + ":";
             documentCache.asMap().keySet().removeIf(key -> key.startsWith(pathPrefix));
         }
@@ -222,7 +222,7 @@ public class EpubCfiService {
             }
         }
 
-        return element.sourceRange() == null ? null : Math.max(element.sourceRange().startPos(), 0);
+        return element.sourceRange().isTracked() ? Math.max(element.sourceRange().startPos(), 0) : null;
     }
 
     private Element resolveElement(Element root, List<CfiExpression.PathStep> steps) {
@@ -262,7 +262,7 @@ public class EpubCfiService {
             int nodeLength = nodeText.length();
 
             if (totalChars + nodeLength >= cfiOffset) {
-                if (textNode.sourceRange() == null) {
+                if (!textNode.sourceRange().isTracked()) {
                     return null;
                 }
 
@@ -274,7 +274,7 @@ public class EpubCfiService {
             totalChars += nodeLength;
         }
 
-        return element.sourceRange() == null ? null : Math.max(element.sourceRange().startPos(), 0);
+        return element.sourceRange().isTracked() ? Math.max(element.sourceRange().startPos(), 0) : null;
     }
 
     private void collectTextNodes(Element element, List<TextNode> textNodes) {

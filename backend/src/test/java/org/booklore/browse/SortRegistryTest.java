@@ -73,8 +73,9 @@ class SortRegistryTest {
     @Test
     void unknownKeyThrows() {
         SortRegistry<Object> registry = new SortRegistry<>().register("id", ascOn("id"));
+        List<SortTerm> terms = List.of(new SortTerm("bogus", false));
         assertThrows(APIException.class,
-                () -> registry.toOrders(List.of(new SortTerm("bogus", false)), root, query, cb, null));
+                () -> registry.toOrders(terms, root, query, cb, null));
     }
 
     private SortOrderBuilder<Object> ascOn(String attribute) {

@@ -31,7 +31,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import tools.jackson.databind.ObjectMapper;
 
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.UserBookFileProgressEntity;
@@ -424,7 +423,7 @@ class KoboReadingStateServiceTest {
 
     @Test
     @DisplayName("Should merge per-field updates based on lastModified")
-    void testSaveReadingState_PerFieldMerge() throws Exception {
+    void testSaveReadingState_PerFieldMerge() {
         String entitlementId = "100";
         String existingTimestamp = "2025-01-01T00:00:00.0000000Z";
         String newerTimestamp = "2025-01-04T00:00:00.0000000Z";
@@ -505,7 +504,7 @@ class KoboReadingStateServiceTest {
 
     @Test
     @DisplayName("Should not update fields when timestamps are equal")
-    void testSaveReadingState_EqualTimestampNoUpdate() throws Exception {
+    void testSaveReadingState_EqualTimestampNoUpdate() {
         String entitlementId = "100";
         String timestamp = "2025-01-01T00:00:00.0000000Z";
 
@@ -995,7 +994,7 @@ class KoboReadingStateServiceTest {
         testSettings.setTwoWayProgressSync(true);
         String entitlementId = "100";
 
-        BookFileEntity primaryFile = setPrimaryEpub(10L);
+        setPrimaryEpub(10L);
 
         UserBookFileProgressEntity fileProgress = new UserBookFileProgressEntity();
         fileProgress.setLastReadTime(Instant.now().plusSeconds(3600));
@@ -1233,8 +1232,8 @@ class KoboReadingStateServiceTest {
 
         service.saveReadingState(List.of(readingState));
 
-        verify(koreaderService).syncProgressToKoreader(eq(100L), eq(50f), eq(1L));
-        verify(hardcoverSyncService).syncProgressToHardcover(eq(100L), eq(50f), eq(1L));
+        verify(koreaderService).syncProgressToKoreader(100L, 50f, 1L);
+        verify(hardcoverSyncService).syncProgressToHardcover(100L, 50f, 1L);
     }
 
     @Test

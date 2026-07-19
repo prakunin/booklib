@@ -17,7 +17,6 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 
 @RequestMapping("/api/v1/books/{bookId}/files")
@@ -83,7 +82,7 @@ public class AdditionalFileController {
     @CheckBookAccess(bookIdParam = "bookId")
     public ResponseEntity<StreamingResponseBody> downloadAdditionalFile(
             @PathVariable Long bookId,
-            @PathVariable Long fileId) throws IOException {
+            @PathVariable Long fileId) {
         return additionalFileService.downloadAdditionalFile(bookId, fileId);
     }
 

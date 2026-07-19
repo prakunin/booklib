@@ -20,7 +20,7 @@ interface AnnotationView {
   providedIn: 'root'
 })
 export class ReaderAnnotationService {
-  private annotationStyles = new Map<string, { color: string; style: AnnotationStyle }>();
+  private readonly annotationStyles = new Map<string, { color: string; style: AnnotationStyle }>();
   private allAnnotations: Annotation[] = [];
 
   addAnnotation(view: AnnotationView | null | undefined, annotation: Annotation): Observable<{ index: number; label: string } | undefined> {
@@ -47,13 +47,13 @@ export class ReaderAnnotationService {
     this.annotationStyles.delete(cfi);
     this.allAnnotations = this.allAnnotations.filter(a => a.value !== cfi);
 
-    return defer(() => from(view.deleteAnnotation({value: cfi}) as Promise<void>));
+    return defer(() => from(view.deleteAnnotation({value: cfi})));
   }
 
   showAnnotation(view: AnnotationView | null | undefined, cfi: string): Observable<void> {
     if (!view) return of(undefined);
 
-    return defer(() => from(view.showAnnotation({value: cfi}) as Promise<void>));
+    return defer(() => from(view.showAnnotation({value: cfi})));
   }
 
   addAnnotations(view: AnnotationView | null | undefined, annotations: Annotation[]): void {
@@ -140,8 +140,8 @@ export class ReaderAnnotationService {
           const {color = 'yellow'} = options;
           const g = createSVGElement('g');
           g.setAttribute('fill', color);
-          (g as SVGElement).style.opacity = 'var(--overlayer-highlight-opacity, .3)';
-          (g as SVGElement).style.mixBlendMode = 'var(--overlayer-highlight-blend-mode, multiply)';
+          (g).style.opacity = 'var(--overlayer-highlight-opacity, .3)';
+          (g).style.mixBlendMode = 'var(--overlayer-highlight-blend-mode, multiply)';
           for (const {left, top, height, width} of Array.from(rects)) {
             const el = createSVGElement('rect');
             el.setAttribute('x', String(left));

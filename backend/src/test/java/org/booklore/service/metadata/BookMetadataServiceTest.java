@@ -1,7 +1,6 @@
 package org.booklore.service.metadata;
 
 import org.booklore.exception.APIException;
-import org.booklore.exception.ApiError;
 import org.booklore.mapper.BookMapper;
 import org.booklore.mapper.BookMetadataMapper;
 import org.booklore.mapper.MetadataClearFlagsMapper;
@@ -37,17 +36,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionCallback;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import org.springframework.transaction.TransactionStatus;
 
@@ -101,7 +95,9 @@ class BookMetadataServiceTest {
 
         @Test
         void throwsWhenProviderNotInMap() {
-            assertThatThrownBy(() -> service.fetchMetadataListFromAProvider(MetadataProvider.Amazon, Book.builder().build(), FetchMetadataRequest.builder().build()))
+            Book book = Book.builder().build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+            assertThatThrownBy(() -> service.fetchMetadataListFromAProvider(MetadataProvider.Amazon, book, request))
                     .isInstanceOf(APIException.class);
         }
     }
@@ -399,7 +395,9 @@ class BookMetadataServiceTest {
             BookMetadataEntity entity = BookMetadataEntity.builder().bookId(1L).build();
             when(bookMetadataRepository.getMetadataForBookIds(List.of(1L))).thenReturn(List.of(entity));
 
-            assertThatThrownBy(() -> service.toggleFieldLocks(List.of(1L), Map.of("nonExistentField", "LOCK")))
+            List<Long> bookIds = List.of(1L);
+            Map<String, String> fieldLocks = Map.of("nonExistentField", "LOCK");
+            assertThatThrownBy(() -> service.toggleFieldLocks(bookIds, fieldLocks))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("Failed to invoke setter for field: nonExistentField");
         }

@@ -217,7 +217,7 @@ class BookRuleEvaluatorEdgeCasesTest {
     class MalformedRuleTests {
         @Test
         void invalidRuleObject_loggedAndSkipped() {
-            BookEntity book = createBook("Any Book");
+            createBook("Any Book");
             em.flush();
             em.clear();
 
@@ -333,7 +333,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EQUALS, "READ"));
-            assertThat(ids).doesNotContain(book.getId());
+            assertThat(ids).isEmpty();
         }
     }
 
@@ -379,8 +379,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             outerGroup.setRules(List.of(pageRule, innerGroup));
 
             List<Long> ids = findMatchingIds(outerGroup);
-            assertThat(ids).contains(match.getId());
-            assertThat(ids).doesNotContain(noMatch.getId());
+            assertThat(ids).contains(match.getId()).doesNotContain(noMatch.getId());
         }
 
         @Test
@@ -429,8 +428,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             outerGroup.setRules(List.of(pageRule, orGroup));
 
             List<Long> ids = findMatchingIds(outerGroup);
-            assertThat(ids).contains(matchA.getId(), matchB.getId());
-            assertThat(ids).doesNotContain(noMatch.getId());
+            assertThat(ids).contains(matchA.getId(), matchB.getId()).doesNotContain(noMatch.getId());
         }
     }
 
@@ -467,8 +465,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             group.setRules(List.of(gtRule, ltRule));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(mid.getId());
-            assertThat(ids).doesNotContain(low.getId(), high.getId());
+            assertThat(ids).contains(mid.getId()).doesNotContain(low.getId(), high.getId());
         }
     }
 
@@ -504,8 +501,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> readingIds = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EQUALS, "READING"));
-            assertThat(readingIds).contains(reading.getId());
-            assertThat(readingIds).doesNotContain(read.getId(), paused.getId(), reReading.getId(), unread.getId());
+            assertThat(readingIds).contains(reading.getId()).doesNotContain(read.getId(), paused.getId(), reReading.getId(), unread.getId());
 
             List<Long> pausedIds = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EQUALS, "PAUSED"));
             assertThat(pausedIds).contains(paused.getId());
@@ -526,8 +522,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EXCLUDES_ALL, List.of("UNSET")));
-            assertThat(ids).contains(readBook.getId());
-            assertThat(ids).doesNotContain(noProgress.getId());
+            assertThat(ids).contains(readBook.getId()).doesNotContain(noProgress.getId());
         }
     }
 
@@ -552,8 +547,7 @@ class BookRuleEvaluatorEdgeCasesTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EXCLUDES_ALL,
                     List.of("READ", "ABANDONED", "WONT_READ")));
-            assertThat(ids).contains(noProgress.getId());
-            assertThat(ids).doesNotContain(readBook.getId(), abandonedBook.getId());
+            assertThat(ids).contains(noProgress.getId()).doesNotContain(readBook.getId(), abandonedBook.getId());
         }
 
         @Test
@@ -565,8 +559,7 @@ class BookRuleEvaluatorEdgeCasesTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EXCLUDES_ALL,
                     List.of("UNSET")));
-            assertThat(ids).contains(readBook.getId());
-            assertThat(ids).doesNotContain(noProgress.getId());
+            assertThat(ids).contains(readBook.getId()).doesNotContain(noProgress.getId());
         }
 
         @Test
@@ -579,8 +572,7 @@ class BookRuleEvaluatorEdgeCasesTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EXCLUDES_ALL,
                     List.of("READ", "UNSET")));
-            assertThat(ids).contains(readingBook.getId());
-            assertThat(ids).doesNotContain(noProgress.getId(), readBook.getId());
+            assertThat(ids).contains(readingBook.getId()).doesNotContain(noProgress.getId(), readBook.getId());
         }
 
         @Test
@@ -591,8 +583,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.NOT_EQUALS, "READ"));
-            assertThat(ids).contains(noProgress.getId());
-            assertThat(ids).doesNotContain(readBook.getId());
+            assertThat(ids).contains(noProgress.getId()).doesNotContain(readBook.getId());
         }
 
         @Test
@@ -603,8 +594,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.NOT_EQUALS, "UNSET"));
-            assertThat(ids).contains(readBook.getId());
-            assertThat(ids).doesNotContain(noProgress.getId());
+            assertThat(ids).contains(readBook.getId()).doesNotContain(noProgress.getId());
         }
 
         @Test
@@ -615,8 +605,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.DOES_NOT_CONTAIN, "READ"));
-            assertThat(ids).contains(noProgress.getId());
-            assertThat(ids).doesNotContain(readBook.getId());
+            assertThat(ids).contains(noProgress.getId()).doesNotContain(readBook.getId());
         }
 
         @Test
@@ -627,8 +616,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EQUALS, "READ"));
-            assertThat(ids).contains(readBook.getId());
-            assertThat(ids).doesNotContain(noProgress.getId());
+            assertThat(ids).contains(readBook.getId()).doesNotContain(noProgress.getId());
         }
 
         @Test
@@ -639,8 +627,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EQUALS, "UNSET"));
-            assertThat(ids).contains(noProgress.getId());
-            assertThat(ids).doesNotContain(readBook.getId());
+            assertThat(ids).contains(noProgress.getId()).doesNotContain(readBook.getId());
         }
 
         @Test
@@ -653,8 +640,7 @@ class BookRuleEvaluatorEdgeCasesTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.INCLUDES_ANY,
                     List.of("READ", "READING")));
-            assertThat(ids).contains(readBook.getId(), readingBook.getId());
-            assertThat(ids).doesNotContain(noProgress.getId());
+            assertThat(ids).contains(readBook.getId(), readingBook.getId()).doesNotContain(noProgress.getId());
         }
 
         @Test
@@ -677,8 +663,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.IS_EMPTY, null));
-            assertThat(ids).contains(noProgress.getId());
-            assertThat(ids).doesNotContain(readBook.getId());
+            assertThat(ids).contains(noProgress.getId()).doesNotContain(readBook.getId());
         }
 
         @Test
@@ -689,8 +674,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.IS_NOT_EMPTY, null));
-            assertThat(ids).contains(readBook.getId());
-            assertThat(ids).doesNotContain(noProgress.getId());
+            assertThat(ids).contains(readBook.getId()).doesNotContain(noProgress.getId());
         }
 
         @Test
@@ -726,8 +710,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             group.setRules(List.of(titleRule, statusRule));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(noProgressMatch.getId());
-            assertThat(ids).doesNotContain(readMatch.getId(), noProgressNoTitle.getId());
+            assertThat(ids).contains(noProgressMatch.getId()).doesNotContain(readMatch.getId(), noProgressNoTitle.getId());
         }
 
         @Test
@@ -761,8 +744,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             group.setRules(List.of(langRule, statusRule));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(noProgressEn.getId());
-            assertThat(ids).doesNotContain(readEn.getId(), noProgressFr.getId());
+            assertThat(ids).contains(noProgressEn.getId()).doesNotContain(readEn.getId(), noProgressFr.getId());
         }
 
         @Test
@@ -786,8 +768,7 @@ class BookRuleEvaluatorEdgeCasesTest {
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.READ_STATUS, RuleOperator.EXCLUDES_ALL,
                     List.of("READ", "ABANDONED")));
-            assertThat(ids).doesNotContain(book.getId());
-            assertThat(ids).contains(noProgressBook.getId());
+            assertThat(ids).doesNotContain(book.getId()).contains(noProgressBook.getId());
         }
     }
 
@@ -795,27 +776,27 @@ class BookRuleEvaluatorEdgeCasesTest {
     class ComparisonWithNullFieldValueTests {
         @Test
         void greaterThan_onNullField_doesNotMatch() {
-            BookEntity book = createBook("No Page Count");
+            createBook("No Page Count");
             em.flush();
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PAGE_COUNT, RuleOperator.GREATER_THAN, 0));
-            assertThat(ids).doesNotContain(book.getId());
+            assertThat(ids).isEmpty();
         }
 
         @Test
         void lessThan_onNullField_doesNotMatch() {
-            BookEntity book = createBook("No Page Count");
+            createBook("No Page Count");
             em.flush();
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PAGE_COUNT, RuleOperator.LESS_THAN, 999999));
-            assertThat(ids).doesNotContain(book.getId());
+            assertThat(ids).isEmpty();
         }
 
         @Test
         void inBetween_onNullField_doesNotMatch() {
-            BookEntity book = createBook("No Score");
+            createBook("No Score");
             em.flush();
             em.clear();
 
@@ -830,17 +811,17 @@ class BookRuleEvaluatorEdgeCasesTest {
             group.setRules(List.of(rule));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).doesNotContain(book.getId());
+            assertThat(ids).isEmpty();
         }
 
         @Test
         void equals_onNullField_doesNotMatchNumericValue() {
-            BookEntity book = createBook("No Rating");
+            createBook("No Rating");
             em.flush();
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.AMAZON_RATING, RuleOperator.EQUALS, 0));
-            assertThat(ids).doesNotContain(book.getId());
+            assertThat(ids).isEmpty();
         }
     }
 
@@ -946,8 +927,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             group.setRules(List.of(presenceRule, pageRule));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(matchBoth.getId());
-            assertThat(ids).doesNotContain(hasDescLowPages.getId(), highPagesNoDesc.getId());
+            assertThat(ids).contains(matchBoth.getId()).doesNotContain(hasDescLowPages.getId(), highPagesNoDesc.getId());
         }
 
         @Test
@@ -979,8 +959,7 @@ class BookRuleEvaluatorEdgeCasesTest {
             group.setRules(List.of(titleRule, langRule));
 
             List<Long> ids = findMatchingIds(group);
-            assertThat(ids).contains(match.getId());
-            assertThat(ids).doesNotContain(wrongLang.getId());
+            assertThat(ids).contains(match.getId()).doesNotContain(wrongLang.getId());
         }
     }
 }

@@ -195,7 +195,7 @@ public class HardcoverParser implements BookParser {
         if (doc.getReleaseDate() != null) {
             try {
                 metadata.setPublishedDate(LocalDate.parse(doc.getReleaseDate()));
-            } catch (Exception e) {
+            } catch (Exception _) {
                 log.debug("Could not parse release date: {}", doc.getReleaseDate());
             }
         }
@@ -238,6 +238,7 @@ public class HardcoverParser implements BookParser {
                 try {
                     metadata.setSeriesNumber(Float.parseFloat(String.valueOf(book.getFeaturedBookSeries().getPosition())));
                 } catch (NumberFormatException _) {
+                    // position is not a valid number; leave series number unset
                 }
             }
         }
@@ -253,7 +254,7 @@ public class HardcoverParser implements BookParser {
         if (edition.getReleaseDate() != null) {
             try {
                 metadata.setPublishedDate(LocalDate.parse(edition.getReleaseDate()));
-            } catch (Exception e) {
+            } catch (Exception _) {
                 log.debug("Could not parse release date: {}", edition.getReleaseDate());
             }
         }
@@ -323,6 +324,7 @@ public class HardcoverParser implements BookParser {
             try {
                 metadata.setSeriesNumber(Float.parseFloat(String.valueOf(doc.getFeaturedSeries().getPosition())));
             } catch (NumberFormatException _) {
+                // position is not a valid number; leave series number unset
             }
         }
     }

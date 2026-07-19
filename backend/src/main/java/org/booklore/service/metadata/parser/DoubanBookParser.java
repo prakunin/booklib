@@ -227,7 +227,7 @@ public class DoubanBookParser implements BookParser {
                         if (pubDate != null) {
                             try {
                                 metadata.setPublishedDate(parseDoubanDate(pubDate));
-                            } catch (Exception e) {
+                            } catch (Exception _) {
                                 log.debug("Could not parse publication date: {}", pubDate);
                             }
                         }
@@ -415,8 +415,8 @@ public class DoubanBookParser implements BookParser {
                 Element span = infoElement.selectFirst("span:contains(ISBN)");
                 if (span != null) {
                     Node next = span.nextSibling();
-                    if (next instanceof TextNode) {
-                        String isbn = ((TextNode) next).text().trim();
+                    if (next instanceof TextNode textNode) {
+                        String isbn = textNode.text().trim();
                         String digits = NON_DIGIT_PATTERN.matcher(isbn).replaceAll("");
                         if (digits.length() == 10) {
                             return digits;
@@ -438,8 +438,8 @@ public class DoubanBookParser implements BookParser {
                 Element span = infoElement.selectFirst("span:contains(ISBN)");
                 if (span != null) {
                     Node next = span.nextSibling();
-                    if (next instanceof TextNode) {
-                        String isbn = ((TextNode) next).text().trim();
+                    if (next instanceof TextNode textNode) {
+                        String isbn = textNode.text().trim();
                         String digits = NON_DIGIT_PATTERN.matcher(isbn).replaceAll("");
                         if (digits.length() == 13) {
                             return digits;
@@ -482,8 +482,8 @@ public class DoubanBookParser implements BookParser {
                 Element span = infoElement.selectFirst("span:contains(出版年)");
                 if (span != null) {
                     Node next = span.nextSibling();
-                    if (next instanceof TextNode) {
-                        String dateText = ((TextNode) next).text().trim();
+                    if (next instanceof TextNode textNode) {
+                        String dateText = textNode.text().trim();
                         return parseDoubanDate(dateText);
                     }
                 }
@@ -665,12 +665,12 @@ public class DoubanBookParser implements BookParser {
                 Element span = infoElement.selectFirst("span:contains(页数)");
                 if (span != null) {
                     Node next = span.nextSibling();
-                    if (next instanceof TextNode) {
-                        String pageText = ((TextNode) next).text().trim();
+                    if (next instanceof TextNode textNode) {
+                        String pageText = textNode.text().trim();
                         if (!pageText.isEmpty()) {
                             try {
                                 return Integer.parseInt(NON_DIGIT_PATTERN.matcher(pageText).replaceAll(""));
-                            } catch (NumberFormatException e) {
+                            } catch (NumberFormatException _) {
                                 log.warn("Error parsing page count: {}", pageText);
                             }
                         }

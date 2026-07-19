@@ -98,10 +98,10 @@ export class MetadataProviderSettingsComponent {
   ranobedbEnabled: boolean = false;
   googleApiKey: string = '';
 
-  private appSettingsService = inject(AppSettingsService);
-  private messageService = inject(MessageService);
-  private t = inject(TranslocoService);
-  private destroyRef = inject(DestroyRef);
+  private readonly appSettingsService = inject(AppSettingsService);
+  private readonly messageService = inject(MessageService);
+  private readonly t = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly syncSettingsEffect = effect(() => {
     const settings = this.appSettingsService.appSettings();

@@ -86,7 +86,7 @@ export class CommandPaletteComponent {
   }
 
   protected itemDomId(item: PaletteItem): string {
-    return `cp-${item.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    return `cp-${item.id.replaceAll(/[^a-zA-Z0-9_-]/g, '_')}`;
   }
 
   protected onQueryChange(value: string): void {
@@ -200,32 +200,32 @@ export class CommandPaletteComponent {
   }
 
   private isMobileViewport(): boolean {
-    if (typeof window === 'undefined') return false;
-    return window
+    if (globalThis.window === undefined) return false;
+    return globalThis
       .getComputedStyle(document.documentElement)
       .getPropertyValue(MOBILE_SHELL_ACTIVE_PROPERTY)
       .trim() === '1';
   }
 
   private bindMobileStateListener(): void {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     window.addEventListener('resize', this.mobileStateListener);
   }
 
   private unbindMobileStateListener(): void {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     window.removeEventListener('resize', this.mobileStateListener);
   }
 
   private bindVisualViewportListener(): void {
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    const vv = globalThis.window !== undefined ? globalThis.window.visualViewport : null;
     if (!vv) return;
     vv.addEventListener('resize', this.visualViewportListener);
     vv.addEventListener('scroll', this.visualViewportListener);
   }
 
   private unbindVisualViewportListener(): void {
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    const vv = globalThis.window !== undefined ? globalThis.window.visualViewport : null;
     if (!vv) return;
     vv.removeEventListener('resize', this.visualViewportListener);
     vv.removeEventListener('scroll', this.visualViewportListener);
@@ -237,7 +237,7 @@ export class CommandPaletteComponent {
       this.availableHeightPx.set(null);
       return;
     }
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    const vv = globalThis.window !== undefined ? globalThis.window.visualViewport : null;
     if (!vv) {
       this.availableHeightPx.set(null);
       return;
@@ -246,9 +246,9 @@ export class CommandPaletteComponent {
   }
 
   private scheduleViewportRefresh(): void {
-    if (typeof window === 'undefined' || this.viewportAnimationFrameId !== undefined) return;
+    if (globalThis.window === undefined || this.viewportAnimationFrameId !== undefined) return;
 
-    this.viewportAnimationFrameId = window.requestAnimationFrame(() => {
+    this.viewportAnimationFrameId = globalThis.requestAnimationFrame(() => {
       this.viewportAnimationFrameId = undefined;
       this.applyPositionStrategy();
       this.refreshAvailableHeight();
@@ -256,20 +256,20 @@ export class CommandPaletteComponent {
   }
 
   private clearPendingViewportRefresh(): void {
-    if (typeof window !== 'undefined' && this.viewportAnimationFrameId !== undefined) {
-      window.cancelAnimationFrame(this.viewportAnimationFrameId);
+    if (globalThis.window !== undefined && this.viewportAnimationFrameId !== undefined) {
+      globalThis.cancelAnimationFrame(this.viewportAnimationFrameId);
     }
     this.viewportAnimationFrameId = undefined;
   }
 
   private scheduleInputFocus(): void {
     this.clearPendingFocus();
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
 
     // iOS Safari only raises the virtual keyboard when focus() lands after layout.
     const focusInput = () => this.focusInputNow();
-    this.focusAnimationFrameId = window.requestAnimationFrame(focusInput);
-    this.focusTimeoutId = window.setTimeout(focusInput, 60);
+    this.focusAnimationFrameId = globalThis.requestAnimationFrame(focusInput);
+    this.focusTimeoutId = globalThis.window.setTimeout(focusInput, 60);
   }
 
   private focusInputNow(): void {
@@ -295,11 +295,11 @@ export class CommandPaletteComponent {
   }
 
   private clearPendingFocus(): void {
-    if (typeof window !== 'undefined' && this.focusAnimationFrameId !== undefined) {
-      window.cancelAnimationFrame(this.focusAnimationFrameId);
+    if (globalThis.window !== undefined && this.focusAnimationFrameId !== undefined) {
+      globalThis.cancelAnimationFrame(this.focusAnimationFrameId);
     }
-    if (typeof window !== 'undefined' && this.focusTimeoutId !== undefined) {
-      window.clearTimeout(this.focusTimeoutId);
+    if (globalThis.window !== undefined && this.focusTimeoutId !== undefined) {
+      globalThis.window.clearTimeout(this.focusTimeoutId);
     }
     this.focusAnimationFrameId = undefined;
     this.focusTimeoutId = undefined;

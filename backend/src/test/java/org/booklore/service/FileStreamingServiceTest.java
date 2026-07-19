@@ -18,7 +18,6 @@ import java.net.SocketTimeoutException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -69,7 +68,7 @@ class FileStreamingServiceTest {
     }
 
     @Test
-    void streamWithRangeSupport_fileNotFound_sends404() throws IOException {
+    void streamWithRangeSupport_fileNotFound_sends404() {
         var request = mock(HttpServletRequest.class);
         var response = mock(HttpServletResponse.class);
 

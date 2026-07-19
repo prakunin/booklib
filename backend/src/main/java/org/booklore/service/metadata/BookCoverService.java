@@ -282,6 +282,7 @@ public class BookCoverService {
             case COVER_FOUND -> {
                 switch (fileService.saveCoverImageFromBytes(bookId, extraction.data())) {
                     case SAVED -> {
+                        // cover saved successfully, nothing more to do
                     }
                     case UNDECODABLE -> throw ApiError.FAILED_TO_REGENERATE_COVER.createException(
                             "the file's cover image cannot be turned into a picture (for example an SVG, or an unsupported format)");
@@ -681,7 +682,7 @@ public class BookCoverService {
             if (!"image/jpeg".equals(detectedMime) && !"image/png".equals(detectedMime)) {
                 throw ApiError.INVALID_INPUT.createException("Only JPEG and PNG files are allowed (detected: " + detectedMime + ")");
             }
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw ApiError.INVALID_INPUT.createException("Failed to read uploaded file for MIME detection");
         }
     }

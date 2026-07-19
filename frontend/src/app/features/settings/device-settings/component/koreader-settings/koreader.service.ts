@@ -18,7 +18,7 @@ export class KoreaderService {
 
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/koreader-users`;
 
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
 
   createUser(username: string, password: string): Observable<KoreaderUser> {
     const payload: unknown = {username, password};

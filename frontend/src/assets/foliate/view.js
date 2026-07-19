@@ -131,7 +131,7 @@ export const makeBook = async file => {
     if (await isMOBI(file)) {
       const fflate = await import('./vendor/fflate.js')
       book = await new MOBI({unzlib: fflate.unzlibSync}).open(file)
-    } else if (isFB2(file)) {
+    } else if (await isFB2(file)) {
       const {makeFB2} = await import('./fb2.js')
       book = await makeFB2(file)
     }
@@ -729,4 +729,4 @@ export class View extends HTMLElement {
 customElements.define('foliate-view', View)
 
 // Export makeStreamingBook to window for use from Angular
-window.makeStreamingBook = makeStreamingBook
+globalThis.makeStreamingBook = makeStreamingBook

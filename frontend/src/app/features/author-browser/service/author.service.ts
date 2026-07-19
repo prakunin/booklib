@@ -16,18 +16,18 @@ import {invalidateAuthorsQuery, patchAuthorInCache} from './author-query-cache';
 })
 export class AuthorService {
 
-  private http = inject(HttpClient);
-  private authService = inject(AuthService);
-  private sseClient = inject(SseClient);
-  private queryClient = inject(QueryClient);
-  private destroyRef = inject(DestroyRef);
+  private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
+  private readonly sseClient = inject(SseClient);
+  private readonly queryClient = inject(QueryClient);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly baseUrl = `${API_CONFIG.BASE_URL}/api/v1/authors`;
   private readonly mediaBaseUrl = `${API_CONFIG.BASE_URL}/api/v1/media`;
   private readonly token = this.authService.token;
   private readonly authorInvalidationDebounceMs = 200;
   private authorInvalidationTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private authorsQuery = injectQuery(() => ({
+  private readonly authorsQuery = injectQuery(() => ({
     ...this.getAuthorsQueryOptions(),
     enabled: !!this.token(),
   }));

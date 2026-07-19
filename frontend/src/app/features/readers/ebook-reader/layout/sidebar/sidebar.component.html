@@ -1,20 +1,18 @@
 <ng-container *transloco="let t; prefix: 'readerEbook.sidebar'">
 @if (isOpen()) {
-  <div class="sidebar-overlay" role="button" tabindex="0" (click)="onOverlayClick()" (keydown.enter)="onOverlayClick()" [class.closing]="closing()">
-    <aside class="sidebar" role="button" tabindex="0" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" [class.closing]="closing()">
+  <div class="sidebar-overlay" tabindex="0" (click)="onOverlayClick()" (keydown.escape)="onOverlayClick()" [class.closing]="closing()">
+    <aside class="sidebar" tabindex="0" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()" [class.closing]="closing()">
       <!-- Header with book info -->
       <header class="sidebar-header">
-        <app-cover
-          class="book-cover"
-          [src]="bookInfo().coverUrl"
-          [title]="bookInfo().title"
-          [authors]="bookInfo().authors"
-          size="sm"
-          [alt]="bookInfo().title || t('bookCoverAlt')"
-          role="button"
-          tabindex="0"
-          (click)="onCoverClick()"
-          (keydown.enter)="onCoverClick()" />
+        <button type="button" class="book-cover-button" (click)="onCoverClick()">
+          <app-cover
+            class="book-cover"
+            [src]="bookInfo().coverUrl"
+            [title]="bookInfo().title"
+            [authors]="bookInfo().authors"
+            size="sm"
+            [alt]="bookInfo().title || t('bookCoverAlt')" />
+        </button>
         <div class="book-meta">
           <h2 class="book-title">{{ bookInfo().title }}</h2>
           @if (bookInfo().authors) {
@@ -58,7 +56,7 @@
       <div class="content">
         @switch (activeTab()) {
           @case ('chapters') {
-            <ul class="chapter-list" role="tree">
+            <ul class="chapter-list">
               @for (chapter of chapters(); track chapter.href) {
                 <ng-container *ngTemplateOutlet="chapterItem; context: { $implicit: chapter, depth: 0 }"/>
               }
@@ -66,8 +64,7 @@
 
             <ng-template #chapterItem let-chapter let-depth="depth">
               <li
-                role="treeitem"
-                [attr.aria-selected]="isChapterActive(chapter.href)">
+                [attr.aria-current]="isChapterActive(chapter.href) ? 'location' : null">
                 <button
                   class="chapter-row"
                   [class.active]="isChapterActive(chapter.href)"
@@ -85,7 +82,7 @@
                   }
                 </button>
                 @if (chapter.subitems?.length && isChapterExpanded(chapter.href)) {
-                  <ul class="subchapter-list" role="group">
+                  <ul class="subchapter-list">
                     @for (sub of chapter.subitems; track sub.href) {
                       <ng-container *ngTemplateOutlet="chapterItem; context: { $implicit: sub, depth: depth + 1 }"/>
                     }
@@ -99,11 +96,13 @@
             @if (bookmarks().length > 0) {
               <ul class="item-list">
                 @for (bookmark of bookmarks(); track bookmark.id) {
-                  <li class="reader-list-item" role="button" tabindex="0" (click)="onBookmarkClick(bookmark.cfi!)" (keydown.enter)="onBookmarkClick(bookmark.cfi!)">
-                    <div class="item-content">
-                      <span class="item-title">{{ bookmark.title }}</span>
-                      <span class="item-meta">{{ bookmark.createdAt | date: 'MMM d, y' }}</span>
-                    </div>
+                  <li class="reader-list-item">
+                    <button type="button" class="reader-list-item-main" (click)="onBookmarkClick(bookmark.cfi!)">
+                      <div class="item-content">
+                        <span class="item-title">{{ bookmark.title }}</span>
+                        <span class="item-meta">{{ bookmark.createdAt | date: 'MMM d, y' }}</span>
+                      </div>
+                    </button>
                     <button class="delete-btn" (click)="onDeleteBookmark($event, bookmark.id)" [attr.aria-label]="t('deleteBookmark')">
                       <app-reader-icon name="trash" [size]="16"></app-reader-icon>
                     </button>
@@ -123,15 +122,17 @@
             @if (annotations().length > 0) {
               <ul class="item-list">
                 @for (annotation of annotations(); track annotation.id) {
-                  <li class="reader-list-item highlight-item" role="button" tabindex="0" (click)="onAnnotationClick(annotation.cfi)" (keydown.enter)="onAnnotationClick(annotation.cfi)">
-                    <div class="highlight-bar" [style.background-color]="annotation.color"></div>
-                    <div class="item-content">
-                      <span class="highlight-text">"{{ annotation.text }}"</span>
-                      @if (annotation.chapterTitle) {
-                        <span class="item-chapter">{{ annotation.chapterTitle }}</span>
-                      }
-                      <span class="item-meta">{{ annotation.createdAt | date: 'MMM d, y' }}</span>
-                    </div>
+                  <li class="reader-list-item highlight-item">
+                    <button type="button" class="reader-list-item-main" (click)="onAnnotationClick(annotation.cfi)">
+                      <div class="highlight-bar" [style.background-color]="annotation.color"></div>
+                      <div class="item-content">
+                        <span class="highlight-text">"{{ annotation.text }}"</span>
+                        @if (annotation.chapterTitle) {
+                          <span class="item-chapter">{{ annotation.chapterTitle }}</span>
+                        }
+                        <span class="item-meta">{{ annotation.createdAt | date: 'MMM d, y' }}</span>
+                      </div>
+                    </button>
                     <button class="delete-btn" (click)="onDeleteAnnotation($event, annotation.id)" [attr.aria-label]="t('deleteHighlight')">
                       <app-reader-icon name="trash" [size]="16"></app-reader-icon>
                     </button>

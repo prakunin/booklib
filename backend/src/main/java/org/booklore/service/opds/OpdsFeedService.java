@@ -733,7 +733,7 @@ public class OpdsFeedService {
             String v = request.getParameter(name);
             if (v == null || v.isBlank()) return defaultValue;
             return Long.parseLong(v);
-        } catch (Exception e) {
+        } catch (Exception _) {
             return defaultValue;
         }
     }
@@ -748,7 +748,7 @@ public class OpdsFeedService {
         if (shelfIdParam != null && !shelfIdParam.isBlank()) {
             try {
                 shelfIds.add(Long.parseLong(shelfIdParam));
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 log.warn("Invalid shelfId parameter: {}", shelfIdParam);
             }
         }
@@ -757,7 +757,7 @@ public class OpdsFeedService {
             for (String id : shelfIdsParam.split(",")) {
                 try {
                     shelfIds.add(Long.parseLong(id.trim()));
-                } catch (NumberFormatException e) {
+                } catch (NumberFormatException _) {
                     log.warn("Invalid shelf ID in shelfIds parameter: {}", id);
                 }
             }

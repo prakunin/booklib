@@ -25,7 +25,7 @@ export class ReaderNavbarComponent {
   @Output() progressChange = new EventEmitter<number>();
   @Output() hoverChange = new EventEmitter<boolean>();
 
-  private managerService = inject(ReaderViewManagerService);
+  private readonly managerService = inject(ReaderViewManagerService);
   showLocationPopover = false;
 
   @HostListener('document:click', ['$event'])
@@ -98,13 +98,13 @@ export class ReaderNavbarComponent {
 
   onProgressChange(event: Event) {
     const target = event.target as HTMLInputElement;
-    const fraction = parseFloat(target.value) / 100;
+    const fraction = Number.parseFloat(target.value) / 100;
     this.progressChange.emit(fraction);
   }
 
   onGoToPercentage(value: string): void {
-    const percentage = parseFloat(value);
-    if (isNaN(percentage) || percentage < 0 || percentage > 100) return;
+    const percentage = Number.parseFloat(value);
+    if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) return;
     const fraction = percentage / 100;
     this.progressChange.emit(fraction);
   }

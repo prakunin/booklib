@@ -128,7 +128,8 @@ class InpxImportServiceTest {
         givenDestinationLibrary(destination, LibrarySourceType.FILESYSTEM);
         doThrow(ApiError.FORBIDDEN.createException("nope")).when(libraryAccessGuard).requireAccess(7L);
 
-        assertThatThrownBy(() -> service.importBooks(7L, request()))
+        InpxImportRequest request = request();
+        assertThatThrownBy(() -> service.importBooks(7L, request))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("nope");
         verifyNoInteractions(inpxSourceResolver);
@@ -139,7 +140,8 @@ class InpxImportServiceTest {
         Path destination = Files.createDirectory(tempDir.resolve("destination"));
         givenDestinationLibrary(destination, LibrarySourceType.INPX);
 
-        assertThatThrownBy(() -> service.importBooks(7L, request()))
+        InpxImportRequest request = request();
+        assertThatThrownBy(() -> service.importBooks(7L, request))
                 .isInstanceOf(APIException.class)
                 .hasMessageContaining("select a filesystem library");
         verifyNoInteractions(inpxSourceResolver);

@@ -7,7 +7,7 @@ const concatArrays = (a, b) =>
 
 const isNumber = /\d/
 export const isCFI = /^epubcfi\((.*)\)$/
-const escapeCFI = str => str.replace(/[\^[\](),;=]/g, '^$&')
+const escapeCFI = str => str.replaceAll(/[\^[\](),;=]/g, '^$&')
 
 const wrap = x => isCFI.test(x) ? x : `epubcfi(${x})`
 const unwrap = x => x.match(isCFI)?.[1] ?? x
@@ -31,22 +31,22 @@ const tokenizer = str => {
             if (isNumber.test(char)) {
                 cat(char)
                 continue
-            } else push([state, parseInt(value)])
+            } else push([state, Number.parseInt(value)])
         } else if (state === '~') {
             if (isNumber.test(char) || char === '.') {
                 cat(char)
                 continue
-            } else push(['~', parseFloat(value)])
+            } else push(['~', Number.parseFloat(value)])
         } else if (state === '@') {
             if (char === ':') {
-                push(['@', parseFloat(value)])
+                push(['@', Number.parseFloat(value)])
                 state = '@'
                 continue
             }
             if (isNumber.test(char) || char === '.') {
                 cat(char)
                 continue
-            } else push(['@', parseFloat(value)])
+            } else push(['@', Number.parseFloat(value)])
         } else if (state === '[') {
             if (char === ';' && !escape) {
                 push(['[', value])

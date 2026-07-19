@@ -36,13 +36,13 @@ export class CoverSearchComponent implements OnInit {
   hasSearched = signal(false);
   coverType: 'ebook' | 'audiobook' = 'ebook';
 
-  private fb = inject(FormBuilder);
-  private bookCoverService = inject(BookCoverService);
-  private dynamicDialogConfig = inject(DynamicDialogConfig);
+  private readonly fb = inject(FormBuilder);
+  private readonly bookCoverService = inject(BookCoverService);
+  private readonly dynamicDialogConfig = inject(DynamicDialogConfig);
   protected dynamicDialogRef = inject(DynamicDialogRef);
   protected bookService = inject(BookService);
-  private bookMetadataManageService = inject(BookMetadataManageService);
-  private messageService = inject(MessageService);
+  private readonly bookMetadataManageService = inject(BookMetadataManageService);
+  private readonly messageService = inject(MessageService);
   private readonly t = inject(TranslocoService);
 
   constructor() {

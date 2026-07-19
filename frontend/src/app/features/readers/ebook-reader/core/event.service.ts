@@ -92,7 +92,7 @@ export class ReaderEventService {
   private readonly RIGHT_ZONE_PERCENT = 0.7;
   private readonly SWIPE_THRESHOLD_PX = 50;
 
-  private annotationService = inject(ReaderAnnotationService);
+  private readonly annotationService = inject(ReaderAnnotationService);
 
   private view: EventServiceView | null = null;
   private viewCallbacks: ViewCallbacks | null = null;
@@ -115,7 +115,7 @@ export class ReaderEventService {
   private currentSectionIndex: number | null = null;
   private sectionCount: number | null = null;
 
-  private eventSubject = new Subject<ViewEvent>();
+  private readonly eventSubject = new Subject<ViewEvent>();
   public events$ = this.eventSubject.asObservable();
 
   initialize(view: EventServiceView, callbacks: ViewCallbacks): void {
@@ -329,6 +329,9 @@ export class ReaderEventService {
   }
 
   private readonly windowMessageHandler = (event: MessageEvent): void => {
+    if (event.origin !== globalThis.location.origin) {
+      return;
+    }
     if (this.isIframeClickMessage(event.data)) {
       this.handleIframeClickMessage(event.data);
     }
@@ -384,7 +387,7 @@ export class ReaderEventService {
         iframeWidth: iframeRect.width,
         eventClientX: event.clientX,
         target: (event.target as HTMLElement)?.tagName
-      }, '*');
+      }, globalThis.location.origin);
     }) as EventListener, {capture: true});
 
     track(doc, 'touchstart', ((event: TouchEvent) => {
@@ -428,7 +431,7 @@ export class ReaderEventService {
       const text = range.toString().trim();
       if (!text) return;
 
-      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      if ('ontouchstart' in globalThis || navigator.maxTouchPoints > 0) {
         this.handleSelectionEnd(doc);
       }
     }, 300);
@@ -451,7 +454,6 @@ export class ReaderEventService {
   }
 
   private handleTouchStart(event: TouchEvent, _doc: Document): void {
-    void _doc;
     if (event.touches.length !== 1) return;
 
     const touch = event.touches[0];
@@ -542,15 +544,14 @@ export class ReaderEventService {
           iframeWidth: iframeRect.width,
           eventClientX: touch.clientX,
           target: (event.target as HTMLElement)?.tagName
-        }, '*');
+        }, globalThis.location.origin);
       }
     }
 
     this.isTextSelectionInProgress = false;
   }
 
-  private tryNavigateAcrossScrolledBoundary(scrollDelta: number): boolean {
-    void scrollDelta;
+  private tryNavigateAcrossScrolledBoundary(_scrollDelta: number): boolean {
     return false;
   }
 
@@ -706,7 +707,7 @@ export class ReaderEventService {
     const leftThreshold = width * this.LEFT_ZONE_PERCENT;
     const rightThreshold = width * this.RIGHT_ZONE_PERCENT;
 
-    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isMobile = 'ontouchstart' in globalThis || navigator.maxTouchPoints > 0;
 
     if (x < leftThreshold && !isMobile) {
       this.isNavigating = true;

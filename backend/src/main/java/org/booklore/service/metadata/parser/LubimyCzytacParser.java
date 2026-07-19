@@ -164,8 +164,8 @@ public class LubimyCzytacParser implements BookParser {
                 } else {
                     log.warn("Attempt {}/{} failed to connect to {}. Retrying...", attempt, MAX_RETRIES, url);
                     try {
-                        Thread.sleep(1000 * attempt);
-                    } catch (InterruptedException ie) {
+                        Thread.sleep(1000L * attempt);
+                    } catch (InterruptedException _) {
                         Thread.currentThread().interrupt();
                     }
                 }
@@ -309,7 +309,7 @@ public class LubimyCzytacParser implements BookParser {
             if (matcher.find()) {
                 return matcher.group(1);
             }
-        } catch (Exception e) {
+        } catch (Exception _) {
             log.warn("Could not extract ID from URL: {}", url);
         }
         return null;
@@ -355,7 +355,7 @@ public class LubimyCzytacParser implements BookParser {
                 // Remove the "(tom X)" part to get series name
                 String seriesName = SERIES_NUMBER_PATTERN.matcher(seriesText).replaceAll("").trim();
                 metadata.setSeriesName(seriesName);
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 log.warn("Failed to parse series number from: {}", seriesText);
                 metadata.setSeriesName(seriesText);
             }
@@ -373,7 +373,7 @@ public class LubimyCzytacParser implements BookParser {
                 try {
                     int pages = root.get("numberOfPages").asInt();
                     metadata.setPageCount(pages);
-                } catch (Exception e) {
+                } catch (Exception _) {
                     log.warn("Failed to parse numberOfPages from JSON-LD");
                 }
             }

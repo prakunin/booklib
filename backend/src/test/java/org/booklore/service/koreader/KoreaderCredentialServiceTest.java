@@ -16,8 +16,7 @@ class KoreaderCredentialServiceTest {
 
         String storedHash = service.hashRawPassword("secret");
 
-        assertThat(storedHash).isNotEqualTo("secret");
-        assertThat(storedHash).isNotEqualTo(wireKey);
+        assertThat(storedHash).isNotEqualTo("secret").isNotEqualTo(wireKey);
         assertThat(service.matches(wireKey, storedHash)).isTrue();
     }
 

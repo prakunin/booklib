@@ -33,10 +33,10 @@ export class AuthorCardComponent implements OnChanges {
   @Input() index = 0;
   @Input() cacheBuster = 0;
 
-  private authorService = inject(AuthorService);
-  private messageService = inject(MessageService);
-  private t = inject(TranslocoService);
-  private cdr = inject(ChangeDetectorRef);
+  private readonly authorService = inject(AuthorService);
+  private readonly messageService = inject(MessageService);
+  private readonly t = inject(TranslocoService);
+  private readonly cdr = inject(ChangeDetectorRef);
   private lastShiftKey = false;
 
   hasPhoto = false;
@@ -49,7 +49,7 @@ export class AuthorCardComponent implements OnChanges {
     if (changes['author']) {
       const prev = changes['author'].previousValue as AuthorSummary | undefined;
       const curr = changes['author'].currentValue as AuthorSummary;
-      if (!prev || prev.id !== curr.id || prev.hasPhoto !== curr.hasPhoto || prev.asin !== curr.asin || prev.photoLastModified !== curr.photoLastModified) {
+      if (prev?.id !== curr.id || prev.hasPhoto !== curr.hasPhoto || prev.asin !== curr.asin || prev.photoLastModified !== curr.photoLastModified) {
         this.hasPhoto = curr.hasPhoto;
       }
     }

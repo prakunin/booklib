@@ -99,7 +99,7 @@ public class FileAsBookProcessor {
         try {
             Thread.sleep(RETRY_DELAY_MS);
             return true;
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return false;
         }

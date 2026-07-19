@@ -106,9 +106,9 @@ class OidcAuthControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
 
         String location = response.getHeaders().getLocation().toString();
-        assertThat(location).startsWith("https://app.example.com#");
-        assertThat(location).contains("access_token=" + URLEncoder.encode("at123", StandardCharsets.UTF_8));
-        assertThat(location).doesNotContain("refresh_token=");
+        assertThat(location).startsWith("https://app.example.com#")
+                .contains("access_token=" + URLEncoder.encode("at123", StandardCharsets.UTF_8))
+                .doesNotContain("refresh_token=");
     }
 
     @Test

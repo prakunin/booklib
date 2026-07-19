@@ -56,7 +56,7 @@ public class InpxArchiveFullScanService {
         }
         try {
             taskExecutor.execute(() -> scan(libraryId, archiveName));
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             String message = ApiError.INPX_ARCHIVE_SCAN_QUEUE_FULL.getMessage();
             catalogService.failed(libraryId, archiveName, message);
             throw ApiError.INPX_ARCHIVE_SCAN_QUEUE_FULL.createException();

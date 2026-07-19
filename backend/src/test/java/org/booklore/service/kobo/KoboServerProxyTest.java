@@ -249,13 +249,13 @@ class KoboServerProxyTest {
     void getKoboCDNCoverUri_shouldGenerateUri() {
         URI actual = koboServerProxy.getKoboCDNCoverUri("example", 1, 2, false);
 
-        assertThat(actual.toString()).isEqualTo("https://cdn.kobo.com/book-images/example/1/2/false/image.jpg");
+        assertThat(actual).hasToString("https://cdn.kobo.com/book-images/example/1/2/false/image.jpg");
     }
 
     @Test
     void getKoboCDNCoverUri_shouldEscapeImageComponent() {
         URI actual = koboServerProxy.getKoboCDNCoverUri("foo/bar", 1, 2, false);
 
-        assertThat(actual.toString()).isEqualTo("https://cdn.kobo.com/book-images/foo%2Fbar/1/2/false/image.jpg");
+        assertThat(actual).hasToString("https://cdn.kobo.com/book-images/foo%2Fbar/1/2/false/image.jpg");
     }
 }

@@ -49,15 +49,18 @@ class BookFacetRegistryMagicShelfTest {
 
     @Test
     void unknownFacetThrows() {
-        assertThatThrownBy(() -> registry.toSpecification("bogus", List.of("x"), FacetLogic.AND, 1L))
+        List<String> values = List.of("x");
+        assertThatThrownBy(() -> registry.toSpecification("bogus", values, FacetLogic.AND, 1L))
                 .isInstanceOf(APIException.class);
     }
 
     @Test
     void malformedMagicShelfIdThrows() {
-        assertThatThrownBy(() -> registry.toSpecification("shelf", List.of("magic:not-a-number"), FacetLogic.AND, 1L))
+        List<String> notANumber = List.of("magic:not-a-number");
+        assertThatThrownBy(() -> registry.toSpecification("shelf", notANumber, FacetLogic.AND, 1L))
                 .isInstanceOf(APIException.class);
-        assertThatThrownBy(() -> registry.toSpecification("shelf", List.of("magic:"), FacetLogic.AND, 1L))
+        List<String> emptyMagic = List.of("magic:");
+        assertThatThrownBy(() -> registry.toSpecification("shelf", emptyMagic, FacetLogic.AND, 1L))
                 .isInstanceOf(APIException.class);
     }
 

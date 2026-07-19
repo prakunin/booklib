@@ -32,7 +32,7 @@ function parseDate(val: unknown): Date | null {
     val = new Date(val);
   }
 
-  if (!(val instanceof Date) || isNaN(val.getTime())) {
+  if (!(val instanceof Date) || Number.isNaN(val.getTime())) {
     return null;
   }
 
@@ -43,7 +43,7 @@ export function parseValue(val: unknown, type: 'string' | 'number' | 'decimal' |
   if (val == null) return null;
   if (type === 'number' || type === 'decimal') {
     const num = Number(val);
-    return isNaN(num) ? null : num;
+    return Number.isNaN(num) ? null : num;
   }
   if (type === 'date') {
     return parseDate(val)

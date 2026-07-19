@@ -77,6 +77,8 @@ class KoreaderAuthFilterTest {
     @Test
     void unknownUser_performsDummyCredentialMatchAndRecordsFailure() throws Exception {
         KoreaderAuthFilter filter = new KoreaderAuthFilter(koreaderUserRepository, koreaderCredentialService, authRateLimitService);
+        when(koreaderCredentialService.hashRawPassword(anyString())).thenReturn("dummy-hash");
+        filter.initDummyHash();
         MockHttpServletRequest request = request("missing", "0123456789abcdef0123456789abcdef");
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicBoolean chainCalled = new AtomicBoolean(false);

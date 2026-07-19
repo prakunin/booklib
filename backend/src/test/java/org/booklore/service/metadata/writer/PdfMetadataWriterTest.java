@@ -67,6 +67,7 @@ class PdfMetadataWriterTest {
                         try {
                             Files.deleteIfExists(p);
                         } catch (Exception _) {
+                            // best-effort cleanup
                         }
                     });
         }
@@ -392,7 +393,7 @@ class PdfMetadataWriterTest {
         return meta;
     }
 
-    private String readXmpContent(File pdf) throws IOException {
+    private String readXmpContent(File pdf) {
         try (PdfDocument doc = PdfDocument.open(pdf.toPath())) {
             String xmp = doc.xmpMetadataString();
             return xmp != null ? xmp : "";

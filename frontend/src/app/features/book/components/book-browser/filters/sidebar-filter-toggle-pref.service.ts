@@ -52,7 +52,7 @@ export class SidebarFilterTogglePrefService {
       this._showFilter.set(false);
     } else {
       const saved = this.localStorageService.get<boolean>(this.STORAGE_KEY);
-      this._showFilter.set(saved !== null ? saved : true);
+      this._showFilter.set(saved ?? true);
     }
   }
 }

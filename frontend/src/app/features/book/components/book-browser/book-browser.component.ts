@@ -89,25 +89,25 @@ export class BookBrowserComponent implements AfterViewInit {
   protected taskHelperService = inject(TaskHelperService);
   protected bookCardOverlayPreferenceService = inject(BookCardOverlayPreferenceService);
   protected bookSelectionService = inject(BookSelectionService);
-  private bookNavigationService = inject(BookNavigationService);
+  private readonly bookNavigationService = inject(BookNavigationService);
   protected appSettingsService = inject(AppSettingsService);
 
-  private activatedRoute = inject(ActivatedRoute);
-  private messageService = inject(MessageService);
-  private bookService = inject(BookService);
-  private appBooksApi = inject(AppBooksApiService);
-  private bookMetadataManageService = inject(BookMetadataManageService);
-  private dialogHelperService = inject(BookDialogHelperService);
-  private bookMenuService = inject(BookMenuService);
-  private libraryShelfMenuService = inject(LibraryShelfMenuService);
-  private pageTitle = inject(PageTitleService);
-  private loadingService = inject(LoadingService);
-  private queryParamsService = inject(BookBrowserQueryParamsService);
-  private entityService = inject(BookBrowserEntityService);
-  private localStorageService = inject(LocalStorageService);
-  private scrollService = inject(RouteScrollPositionService);
-  private layoutService = inject(LayoutService);
-  private gridLayoutService = inject(BookBrowserGridLayoutService);
+  private readonly activatedRoute = inject(ActivatedRoute);
+  private readonly messageService = inject(MessageService);
+  private readonly bookService = inject(BookService);
+  private readonly appBooksApi = inject(AppBooksApiService);
+  private readonly bookMetadataManageService = inject(BookMetadataManageService);
+  private readonly dialogHelperService = inject(BookDialogHelperService);
+  private readonly bookMenuService = inject(BookMenuService);
+  private readonly libraryShelfMenuService = inject(LibraryShelfMenuService);
+  private readonly pageTitle = inject(PageTitleService);
+  private readonly loadingService = inject(LoadingService);
+  private readonly queryParamsService = inject(BookBrowserQueryParamsService);
+  private readonly entityService = inject(BookBrowserEntityService);
+  private readonly localStorageService = inject(LocalStorageService);
+  private readonly scrollService = inject(RouteScrollPositionService);
+  private readonly layoutService = inject(LayoutService);
+  private readonly gridLayoutService = inject(BookBrowserGridLayoutService);
   private readonly t = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -157,7 +157,7 @@ export class BookBrowserComponent implements AfterViewInit {
   private readonly selectedFilterMode = signal<BookFilterMode>('and');
   private readonly sortCriteria = signal<SortOption[]>(this.defaultSortCriteria);
 
-  readonly screenWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  readonly screenWidth = signal(globalThis.window !== undefined ? globalThis.window.innerWidth : 1024);
   readonly currentViewMode = signal<string | undefined>(undefined);
   readonly bookTitle = signal('');
   readonly visibleColumns = signal<{ field: string; header: string }[]>([]);
@@ -171,10 +171,10 @@ export class BookBrowserComponent implements AfterViewInit {
   readonly entityInfo = computed<EntityInfo>(() => {
     const routePath = this.routePath();
     if (routePath === 'all-books') {
-      return {entityId: NaN, entityType: EntityType.ALL_BOOKS};
+      return {entityId: Number.NaN, entityType: EntityType.ALL_BOOKS};
     }
     if (routePath === 'unshelved-books') {
-      return {entityId: NaN, entityType: EntityType.UNSHELVED};
+      return {entityId: Number.NaN, entityType: EntityType.UNSHELVED};
     }
     return this.entityService.getEntityInfo(this.routeParamMap());
   });
@@ -755,7 +755,7 @@ export class BookBrowserComponent implements AfterViewInit {
     }));
 
     const currentPrefs = user.userSettings.entityViewPreferences ?? {
-      global: {sortKey: 'title', sortDir: 'ASC', view: 'GRID', coverSize: 1.0, seriesCollapsed: false, overlayBookType: true},
+      global: {sortKey: 'title', sortDir: 'ASC', view: 'GRID', coverSize: 1, seriesCollapsed: false, overlayBookType: true},
       overrides: []
     };
     const prefs: EntityViewPreferences = {
@@ -808,7 +808,7 @@ export class BookBrowserComponent implements AfterViewInit {
             sortDir: sortCriteria[0]?.direction ?? 'ASC',
             sortCriteria,
             view: 'GRID',
-            coverSize: 1.0,
+            coverSize: 1,
             seriesCollapsed: false,
             overlayBookType: true
           }
@@ -850,7 +850,7 @@ export class BookBrowserComponent implements AfterViewInit {
   toggleTableGrid(): void {
     const newMode = this.currentViewMode() === VIEW_MODES.GRID ? VIEW_MODES.TABLE : VIEW_MODES.GRID;
     this.currentViewMode.set(newMode);
-    this.queryParamsService.updateViewMode(newMode as 'grid' | 'table');
+    this.queryParamsService.updateViewMode(newMode);
   }
 
   onViewModeChange(mode: string): void {

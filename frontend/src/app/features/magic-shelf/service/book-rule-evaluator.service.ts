@@ -9,7 +9,7 @@ export class BookRuleEvaluatorService {
   evaluateGroup(book: Book, group: GroupRule, allBooks: Book[] = []): boolean {
     const results = group.rules.map(rule => {
       if ('type' in rule && rule.type === 'group') {
-        return this.evaluateGroup(book, rule as GroupRule, allBooks);
+        return this.evaluateGroup(book, rule, allBooks);
       } else {
         return this.evaluateRule(book, rule as Rule, allBooks);
       }

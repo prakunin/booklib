@@ -63,7 +63,7 @@ export class FixedLayout extends HTMLElement {
         switch (name) {
             case 'zoom':
                 this.#zoom = value !== 'fit-width' && value !== 'fit-page'
-                    ? parseFloat(value) : value
+                    ? Number.parseFloat(value) : value
                 this.#render()
                 break
         }
@@ -95,8 +95,8 @@ export class FixedLayout extends HTMLElement {
                 const { width, height } = getViewport(doc, this.defaultViewport)
                 resolve({
                     element, iframe,
-                    width: parseFloat(width),
-                    height: parseFloat(height),
+                    width: Number.parseFloat(width),
+                    height: Number.parseFloat(height),
                     onZoom,
                 })
             }, { once: true })
@@ -115,7 +115,7 @@ export class FixedLayout extends HTMLElement {
         const blankWidth = left.width ?? right.width ?? 0
         const blankHeight = left.height ?? right.height ?? 0
 
-        const scale = typeof this.#zoom === 'number' && !isNaN(this.#zoom)
+        const scale = typeof this.#zoom === 'number' && !Number.isNaN(this.#zoom)
             ? this.#zoom
             : (this.#zoom === 'fit-width'
                 ? (portrait || this.#center

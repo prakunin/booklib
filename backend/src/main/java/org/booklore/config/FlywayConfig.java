@@ -13,7 +13,7 @@ public class FlywayConfig {
         return flyway -> {
             try {
                 flyway.migrate();
-            } catch (FlywayValidateException e) {
+            } catch (FlywayValidateException _) {
                 flyway.repair();
                 flyway.migrate();
             }

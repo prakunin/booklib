@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class GoodReadsParserTest {
+class GoodReadsParserTest {
     @Mock
     private AppSettingService appSettingService;
 
@@ -106,7 +106,7 @@ public class GoodReadsParserTest {
                         argThat(r -> r != null && r.uri() != null && r.uri().toString().startsWith(urlPrefix)),
                         any()
                 )
-        ).thenAnswer((_) -> getMockResponse(statusCode, response));
+        ).thenAnswer(_ -> getMockResponse(statusCode, response));
     }
 
     @Test
@@ -124,8 +124,7 @@ public class GoodReadsParserTest {
         List<BookMetadata> results = parser.fetchMetadata(book, request);
 
         // Then
-        assertThat(results).isNotNull();
-        assertThat(results).as("Should return empty list when query is empty").isEmpty();
+        assertThat(results).isNotNull().as("Should return empty list when query is empty").isEmpty();
     }
 
     @Test
@@ -151,8 +150,7 @@ public class GoodReadsParserTest {
         List<BookMetadata> results = parser.fetchMetadata(book, request);
 
         // Then
-        assertThat(results).isNotNull();
-        assertThat(results).as("Should return results for real book").isNotEmpty();
+        assertThat(results).isNotNull().as("Should return results for real book").isNotEmpty();
 
         BookMetadata result = results.getFirst();
         assertThat(result.getTitle()).isEqualTo("A Clockwork Orange");
@@ -187,7 +185,6 @@ public class GoodReadsParserTest {
         List<BookMetadata> results = parser.fetchMetadata(book, request);
 
         // Then
-        assertThat(results).isNotNull();
-        assertThat(results).as("Should not return results").isEmpty();
+        assertThat(results).isNotNull().as("Should not return results").isEmpty();
     }
 }

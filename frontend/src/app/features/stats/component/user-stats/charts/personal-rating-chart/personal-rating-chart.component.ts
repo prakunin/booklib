@@ -31,16 +31,16 @@ const CHART_DEFAULTS = {
 } as const;
 
 const RATING_RANGES = [
-  {range: '1', min: 1.0, max: 1.0},
-  {range: '2', min: 2.0, max: 2.0},
-  {range: '3', min: 3.0, max: 3.0},
-  {range: '4', min: 4.0, max: 4.0},
-  {range: '5', min: 5.0, max: 5.0},
-  {range: '6', min: 6.0, max: 6.0},
-  {range: '7', min: 7.0, max: 7.0},
-  {range: '8', min: 8.0, max: 8.0},
-  {range: '9', min: 9.0, max: 9.0},
-  {range: '10', min: 10.0, max: 10.0}
+  {range: '1', min: 1, max: 1},
+  {range: '2', min: 2, max: 2},
+  {range: '3', min: 3, max: 3},
+  {range: '4', min: 4, max: 4},
+  {range: '5', min: 5, max: 5},
+  {range: '6', min: 6, max: 6},
+  {range: '7', min: 7, max: 7},
+  {range: '8', min: 8, max: 8},
+  {range: '9', min: 9, max: 9},
+  {range: '10', min: 10, max: 10}
 ] as const;
 
 type RatingChartData = ChartData<'bar', number[], string>;

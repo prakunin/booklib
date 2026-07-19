@@ -10,5 +10,5 @@ export function patchAuthorInCache(queryClient: QueryClient, authorId: number, f
 }
 
 export function invalidateAuthorsQuery(queryClient: QueryClient): void {
-  void queryClient.invalidateQueries({queryKey: AUTHORS_QUERY_KEY, exact: true});
+  queryClient.invalidateQueries({queryKey: AUTHORS_QUERY_KEY, exact: true});
 }

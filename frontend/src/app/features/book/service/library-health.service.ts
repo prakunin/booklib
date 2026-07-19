@@ -11,14 +11,14 @@ const LIBRARY_HEALTH_QUERY_KEY = ['libraryHealth'] as const;
 @Injectable({providedIn: 'root'})
 export class LibraryHealthService {
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/libraries/health`;
-  private http = inject(HttpClient);
-  private rxStompService = inject(RxStompService);
-  private queryClient = inject(QueryClient);
-  private destroyRef = inject(DestroyRef);
+  private readonly http = inject(HttpClient);
+  private readonly rxStompService = inject(RxStompService);
+  private readonly queryClient = inject(QueryClient);
+  private readonly destroyRef = inject(DestroyRef);
 
   private socketInitialized = false;
 
-  private healthQuery = injectQuery(() => ({
+  private readonly healthQuery = injectQuery(() => ({
     ...this.getHealthQueryOptions(),
     enabled: false, // manually triggered via initialize()
   }));
@@ -33,7 +33,7 @@ export class LibraryHealthService {
   }
 
   fetchHealth(): void {
-    void this.queryClient.fetchQuery(this.getHealthQueryOptions());
+    this.queryClient.fetchQuery(this.getHealthQueryOptions());
   }
 
   initWebsocket(): void {

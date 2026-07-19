@@ -128,7 +128,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
         try {
             Long.parseLong(numericId);
             return goodreadsId;
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.debug("GoodReads: Invalid Goodreads ID format: {}", goodreadsId);
             return null;
         }
@@ -152,6 +152,9 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
                             sink.next(metadata);
                         }
                     } catch (Exception e) {
+                        if (e instanceof InterruptedException) {
+                            Thread.currentThread().interrupt();
+                        }
                         log.warn("GoodReads: ISBN lookup failed: {}, falling back to title search", e.getMessage());
                     }
                 }
@@ -180,6 +183,9 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
 
                 sink.complete();
             } catch (Exception e) {
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
                 sink.error(e);
             }
         });
@@ -248,10 +254,13 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
             }
 
             return bookNode;
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.error("Invalid Goodreads ID format: {}", goodreadsId);
             return null;
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.error("GraphQL request failed for ID: {}", goodreadsId, e);
             return null;
         }
@@ -471,7 +480,7 @@ return;
         }
         try {
             return parser.apply(value);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.warn("Error parsing number: {}", value);
             return null;
         }

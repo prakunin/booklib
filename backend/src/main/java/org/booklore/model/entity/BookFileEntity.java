@@ -124,12 +124,11 @@ public class BookFileEntity {
     }
 
     /**
-     * For folder-based audiobooks, returns the folder path.
-     * For regular files, returns the file path.
+     * For folder-based audiobooks, the stored file name is the folder itself,
+     * so the full path covers both the folder and the regular-file case.
      */
     public Path getAudiobookPath() {
-        Path fullPath = getFullFilePath();
-        return folderBased ? fullPath : fullPath;
+        return getFullFilePath();
     }
 
     /**
@@ -151,7 +150,7 @@ public class BookFileEntity {
                     .sorted()
                     .findFirst()
                     .orElse(folderPath);
-        } catch (IOException e) {
+        } catch (IOException _) {
             return folderPath;
         }
     }

@@ -9,6 +9,7 @@ import {Button} from 'primeng/button';
 import {Tooltip} from 'primeng/tooltip';
 import {Paginator} from 'primeng/paginator';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {Router} from '@angular/router';
 import {NotebookService} from '../../service/notebook.service';
 import {NotebookEntry, NotebookPage} from '../../model/notebook.model';
 import {UrlHelperService} from '../../../../shared/service/url-helper.service';
@@ -59,6 +60,7 @@ export class NotebookComponent implements OnInit {
   private readonly urlHelper = inject(UrlHelperService);
   private readonly pageTitle = inject(PageTitleService);
   private readonly t = inject(TranslocoService);
+  private readonly router = inject(Router);
 
   filteredGroups: BookGroup[] = [];
   totalEntries = 0;
@@ -78,7 +80,7 @@ export class NotebookComponent implements OnInit {
   pageSize = 50;
   first = 0;
 
-  private collapsedGroups = new Set<number>();
+  private readonly collapsedGroups = new Set<number>();
 
   ngOnInit(): void {
     this.pageTitle.setPageTitle(this.t.translate('notebook.pageTitle'));
@@ -229,6 +231,53 @@ export class NotebookComponent implements OnInit {
     }
   }
 
+  openEntry(entry: NotebookEntry): void {
+    const queryParams: Record<string, string | number | boolean> = {};
+
+    switch (entry.primaryBookType) {
+      case 'PDF':
+        if (entry.pageNumber) {
+          queryParams['page'] = entry.pageNumber;
+        }
+        void this.router.navigate([`/pdf-reader/book/${entry.bookId}`], {queryParams});
+        break;
+      case 'EPUB':
+        if (entry.cfi) {
+          queryParams['cfi'] = entry.cfi;
+        }
+        void this.router.navigate([`/ebook-reader/book/${entry.bookId}`], {queryParams});
+        break;
+      case 'FB2':
+      case 'MOBI':
+      case 'AZW3':
+        if (entry.cfi) {
+          queryParams['cfi'] = entry.cfi;
+        }
+        void this.router.navigate([`/ebook-reader/book/${entry.bookId}`], {queryParams});
+        break;
+      case 'CBX': {
+        const page = entry.pageNumber ?? this.parsePositiveInt(entry.cfi);
+        if (page) {
+          queryParams['page'] = page;
+        }
+        void this.router.navigate([`/cbx-reader/book/${entry.bookId}`], {queryParams});
+        break;
+      }
+      case 'AUDIOBOOK':
+        if (entry.positionMs !== undefined && entry.positionMs !== null) {
+          queryParams['positionMs'] = entry.positionMs;
+        }
+        if (entry.trackIndex !== undefined && entry.trackIndex !== null) {
+          queryParams['trackIndex'] = entry.trackIndex;
+        }
+        void this.router.navigate([`/audiobook-player/book/${entry.bookId}`], {queryParams});
+        break;
+      default:
+        void this.router.navigate(['/book', entry.bookId], {queryParams: {tab: 'view'}});
+        break;
+    }
+  }
+
   exportMarkdown(): void {
     const types = this.activeTypes;
     if (types.length === 0) return;
@@ -277,5 +326,11 @@ export class NotebookComponent implements OnInit {
     a.download = 'notebook-export.md';
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  private parsePositiveInt(value: string | undefined): number | null {
+    if (!value) return null;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
 }

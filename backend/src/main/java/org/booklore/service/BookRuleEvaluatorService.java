@@ -185,10 +185,10 @@ public class BookRuleEvaluatorService {
         int amount;
         try {
             amount = ((Number) rule.getValue()).intValue();
-        } catch (ClassCastException e) {
+        } catch (ClassCastException _) {
             try {
                 amount = Integer.parseInt(rule.getValue().toString());
-            } catch (NumberFormatException ex) {
+            } catch (NumberFormatException _) {
                 return null;
             }
         }
@@ -530,6 +530,7 @@ public class BookRuleEvaluatorService {
         if (field == null) return cb.conjunction();
 
         Object value = normalizeValue(rule.getValue(), rule.getField());
+        if (value == null) return cb.conjunction();
 
         if (value instanceof Boolean) {
             return cb.equal(field, value);
@@ -635,11 +636,11 @@ public class BookRuleEvaluatorService {
 
         Object value = normalizeValue(rule.getValue(), rule.getField());
 
-        if (value instanceof LocalDate) {
-            return dateComparator.apply(field, (LocalDate) value);
+        if (value instanceof LocalDate localdate) {
+            return dateComparator.apply(field, localdate);
         }
-        if (value instanceof LocalDateTime) {
-            return dateTimeComparator.apply(field, (LocalDateTime) value);
+        if (value instanceof LocalDateTime localdatetime) {
+            return dateTimeComparator.apply(field, localdatetime);
         }
         if (!(value instanceof Number)) return cb.conjunction();
         return numberComparator.apply(field, ((Number) value).doubleValue());
@@ -654,12 +655,12 @@ public class BookRuleEvaluatorService {
 
         if (start == null || end == null) return cb.conjunction();
 
-        if (start instanceof LocalDate && end instanceof LocalDate) {
-            return cb.between(field.as(LocalDate.class), (LocalDate) start, (LocalDate) end);
+        if (start instanceof LocalDate startDate && end instanceof LocalDate endDate) {
+            return cb.between(field.as(LocalDate.class), startDate, endDate);
         }
 
-        if (start instanceof LocalDateTime && end instanceof LocalDateTime) {
-            return cb.between(field.as(LocalDateTime.class), (LocalDateTime) start, (LocalDateTime) end);
+        if (start instanceof LocalDateTime startDateTime && end instanceof LocalDateTime endDateTime) {
+            return cb.between(field.as(LocalDateTime.class), startDateTime, endDateTime);
         }
 
         if (!(start instanceof Number) || !(end instanceof Number)) {
@@ -921,6 +922,7 @@ public class BookRuleEvaluatorService {
             try {
                 return Double.parseDouble(value.toString());
             } catch (NumberFormatException _) {
+                // not a number, fall through to string handling
             }
         }
 
@@ -929,14 +931,14 @@ public class BookRuleEvaluatorService {
 
     private LocalDateTime parseDate(Object value) {
         if (value == null) return null;
-        if (value instanceof LocalDateTime) return (LocalDateTime) value;
+        if (value instanceof LocalDateTime localdatetime) return localdatetime;
 
         try {
             return LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_DATE_TIME);
-        } catch (Exception e) {
+        } catch (Exception _) {
             try {
                 return LocalDate.parse(value.toString()).atStartOfDay();
-            } catch (Exception ex) {
+            } catch (Exception _) {
                 return null;
             }
         }

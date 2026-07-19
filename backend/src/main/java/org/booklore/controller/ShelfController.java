@@ -7,7 +7,6 @@ import org.booklore.service.ShelfService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -34,10 +33,8 @@ public class ShelfController {
     }
 
     @Operation(summary = "Get a shelf by ID", description = "Retrieve details of a specific shelf by its ID.")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Shelf details returned successfully"),
-        @ApiResponse(responseCode = "403", description = "Forbidden")
-    })
+    @ApiResponse(responseCode = "200", description = "Shelf details returned successfully")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
     @GetMapping("/{shelfId}")
     @PreAuthorize("@securityUtil.canReadShelf(#shelfId)")
     public ResponseEntity<Shelf> getShelf(

@@ -37,7 +37,7 @@ export class KoreaderSettingsComponent {
   koReaderUsername = signal('');
   koReaderPassword = signal('');
   credentialsSaved = signal(false);
-  readonly koreaderEndpoint = `${window.location.origin}/api/koreader`;
+  readonly koreaderEndpoint = `${globalThis.location.origin}/api/koreader`;
 
   private readonly messageService = inject(MessageService);
   private readonly koreaderService = inject(KoreaderService);

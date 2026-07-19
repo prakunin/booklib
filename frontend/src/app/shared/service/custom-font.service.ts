@@ -12,15 +12,15 @@ const CUSTOM_FONTS_QUERY_KEY = ['customFonts'] as const;
   providedIn: 'root'
 })
 export class CustomFontService {
-  private apiUrl = `${API_CONFIG.BASE_URL}/api/v1/custom-fonts`;
+  private readonly apiUrl = `${API_CONFIG.BASE_URL}/api/v1/custom-fonts`;
   private loadAllFontsRunId = 0;
-  private loadedFonts = new Set<string>();
-  private http = inject(HttpClient);
-  private authService = inject(AuthService);
-  private queryClient = inject(QueryClient);
+  private readonly loadedFonts = new Set<string>();
+  private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
+  private readonly queryClient = inject(QueryClient);
   private readonly token = this.authService.token;
 
-  private fontsQuery = injectQuery(() => ({
+  private readonly fontsQuery = injectQuery(() => ({
     ...this.getFontsQueryOptions(),
     enabled: !!this.token(),
   }));

@@ -7,13 +7,13 @@ import {LogNotification} from './model/log-notification.model';
   providedIn: 'root',
 })
 export class NotificationEventService {
-  private latestNotificationSubject = new BehaviorSubject<LogNotification | null>(null);
+  private readonly latestNotificationSubject = new BehaviorSubject<LogNotification | null>(null);
 
   latestNotification$: Observable<LogNotification> = this.latestNotificationSubject.asObservable().pipe(
     filter((event): event is LogNotification => event !== null)
   );
 
-  private notificationHighlightSubject = new BehaviorSubject<boolean>(false);
+  private readonly notificationHighlightSubject = new BehaviorSubject<boolean>(false);
   notificationHighlight$ = this.notificationHighlightSubject.asObservable();
 
   private highlightTimeout: ReturnType<typeof setTimeout> | undefined;

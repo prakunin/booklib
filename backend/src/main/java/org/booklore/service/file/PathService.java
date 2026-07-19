@@ -78,7 +78,7 @@ public class PathService {
         final Path rawPath;
         try {
             rawPath = Paths.get(path.trim());
-        } catch (InvalidPathException e) {
+        } catch (InvalidPathException _) {
             log.warn("Invalid path syntax: {}", path);
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid path");
         }

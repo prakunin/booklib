@@ -317,7 +317,7 @@ public class KomgaService {
         }
         
         List<KomgaBookDto> content = bookPage.getContent().stream()
-                .map(book -> komgaMapper.toKomgaBookDto(book))
+                .map(komgaMapper::toKomgaBookDto)
                 .toList();
         
         return KomgaPageableDto.<KomgaBookDto>builder()
