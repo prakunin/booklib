@@ -41,8 +41,9 @@ public class OidcTokenValidator {
 
     private static final int CLOCK_SKEW_SECONDS = 30;
     private static final int MAX_IAT_AGE_SECONDS = 300;
-    private static final long JWKS_CACHE_TTL_MS = 21_600_000; // 6 hours
-    private static final long JWKS_REFRESH_MS = 3_600_000; // 1 hour
+    private static final long JWKS_CACHE_TTL_MS = 3_600_000; // 1 hour - synchronous refresh cadence (matches the old DefaultJWKSetCache refresh time)
+    private static final long JWKS_OUTAGE_TOLERANCE_MS = 21_600_000; // 6 hours - serve the stale JWK set on refresh failure (matches the old DefaultJWKSetCache lifespan)
+    private static final long JWKS_REFRESH_WAIT_TIMEOUT_MS = 15_000; // lock-wait timeout for concurrent refreshes (builder default)
 
     private final OidcDiscoveryService discoveryService;
 
@@ -88,7 +89,8 @@ public class OidcTokenValidator {
 
         var resourceRetriever = new DefaultResourceRetriever(10_000, 10_000);
         JWKSource<SecurityContext> jwkSource = JWKSourceBuilder.<SecurityContext>create(uriToUrl(jwksUri), resourceRetriever)
-                .cache(JWKS_CACHE_TTL_MS, JWKS_REFRESH_MS)
+                .cache(JWKS_CACHE_TTL_MS, JWKS_REFRESH_WAIT_TIMEOUT_MS)
+                .outageTolerant(JWKS_OUTAGE_TOLERANCE_MS)
                 .refreshAheadCache(false)
                 .rateLimited(false)
                 .build();
