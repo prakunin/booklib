@@ -50,6 +50,7 @@ import java.util.stream.Collectors;
 public class BookCoverService {
 
     private static final int BATCH_SIZE = 100;
+    private static final String SELECTED_BOOKS_SUFFIX = " selected book(s)";
 
     private final AppProperties appProperties;
     private final BookRepository bookRepository;
@@ -530,7 +531,7 @@ public class BookCoverService {
     private void processBulkCoverUpdate(List<BookCoverInfo> books, byte[] coverImageBytes, String username) {
         try {
             int total = books.size();
-            sendNotification(username, Topic.LOG, LogNotification.info("Started updating covers for " + total + " selected book(s)"));
+            sendNotification(username, Topic.LOG, LogNotification.info("Started updating covers for " + total + SELECTED_BOOKS_SUFFIX));
 
             int current = 1;
 
@@ -567,7 +568,7 @@ public class BookCoverService {
     private void processBulkCoverRegeneration(List<BookCoverInfo> books, String username) {
         try {
             int total = books.size();
-            sendNotification(username, Topic.LOG, LogNotification.info("Started regenerating covers for " + total + " selected book(s)"));
+            sendNotification(username, Topic.LOG, LogNotification.info("Started regenerating covers for " + total + SELECTED_BOOKS_SUFFIX));
 
             int current = 1;
 
@@ -612,7 +613,7 @@ public class BookCoverService {
     private void processBulkCustomCoverGeneration(List<BookCoverInfo> books, String username) {
         try {
             int total = books.size();
-            sendNotification(username, Topic.LOG, LogNotification.info("Started generating custom covers for " + total + " selected book(s)"));
+            sendNotification(username, Topic.LOG, LogNotification.info("Started generating custom covers for " + total + SELECTED_BOOKS_SUFFIX));
 
             int current = 1;
 

@@ -69,6 +69,7 @@ public class CbxConversionService {
     private static final String MIMETYPE_CONTENT = "application/epub+zip";
     private static final long MAX_IMAGE_SIZE_BYTES = 50L * 1024 * 1024;
     private static final String EXTRACTED_IMAGES_SUBDIR = "cbx_extracted_images";
+    private static final String TEMPLATE_MODEL_KEY_CONTENT_FILE_GROUPS = "contentFileGroups";
 
     private final Configuration freemarkerConfig;
     private final ArchiveService archiveService;
@@ -412,7 +413,7 @@ public class CbxConversionService {
                         makeRelativeToOebps(group.htmlPath())))
                 .toList();
 
-        model.put("contentFileGroups", relativeContentGroups);
+        model.put(TEMPLATE_MODEL_KEY_CONTENT_FILE_GROUPS, relativeContentGroups);
         model.put("coverImagePath", makeRelativeToOebps(COVER_IMAGE_PATH));
         model.put("tocNcxPath", makeRelativeToOebps(TOC_NCX_PATH));
         model.put("navXhtmlPath", makeRelativeToOebps(NAV_XHTML_PATH));
@@ -431,7 +432,7 @@ public class CbxConversionService {
             List<EpubContentFileGroup> contentGroups) throws IOException, TemplateException {
 
         Map<String, Object> model = createBookMetadataModel(bookEntity);
-        model.put("contentFileGroups", contentGroups);
+        model.put(TEMPLATE_MODEL_KEY_CONTENT_FILE_GROUPS, contentGroups);
 
         String tocNcx = processTemplate("xml/toc.xml.ftl", model);
 
@@ -445,7 +446,7 @@ public class CbxConversionService {
             List<EpubContentFileGroup> contentGroups) throws IOException, TemplateException {
 
         Map<String, Object> model = createBookMetadataModel(bookEntity);
-        model.put("contentFileGroups", contentGroups);
+        model.put(TEMPLATE_MODEL_KEY_CONTENT_FILE_GROUPS, contentGroups);
 
         String navXhtml = processTemplate("xml/nav.xhtml.ftl", model);
 

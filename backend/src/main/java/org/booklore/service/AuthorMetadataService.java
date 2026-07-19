@@ -54,6 +54,8 @@ import java.util.stream.Stream;
 @Transactional(readOnly = true)
 public class AuthorMetadataService {
 
+    private static final String AUDIT_ENTITY_AUTHOR = "Author";
+
     private final AuthorRepository authorRepository;
     private final Map<AuthorMetadataSource, AuthorParser> authorParserMap;
     private final AuditService auditService;
@@ -130,7 +132,7 @@ public class AuthorMetadataService {
             authorPhotoIndex.invalidate();
         }
 
-        auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
+        auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, AUDIT_ENTITY_AUTHOR, authorId,
                 "Matched author '" + author.getName() + "' via " + result.getSource() + " (ASIN: " + result.getAsin() + ")");
 
         return toAuthorDetails(author);
@@ -152,7 +154,7 @@ public class AuthorMetadataService {
                     authorPhotoIndex.invalidate();
                 }
 
-                auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
+                auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, AUDIT_ENTITY_AUTHOR, authorId,
                         "Quick-matched author '" + author.getName() + "' via " + result.getSource() + " (ASIN: " + result.getAsin() + ")");
 
                 return toAuthorDetails(author);
@@ -200,7 +202,7 @@ public class AuthorMetadataService {
             fileService.deleteAuthorImages(authorId);
             authorPhotoIndex.invalidate();
 
-            auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
+            auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, AUDIT_ENTITY_AUTHOR, authorId,
                     "Unmatched author '" + author.getName() + "'");
         }
     }
@@ -223,7 +225,7 @@ public class AuthorMetadataService {
             authorPhotoIndex.invalidate();
             authorRepository.delete(author);
 
-            auditService.log(AuditAction.AUTHOR_DELETED, "Author", authorId,
+            auditService.log(AuditAction.AUTHOR_DELETED, AUDIT_ENTITY_AUTHOR, authorId,
                     "Deleted author '" + authorName + "'");
         }
     }
@@ -301,7 +303,7 @@ public class AuthorMetadataService {
 
         authorRepository.save(author);
 
-        auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
+        auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, AUDIT_ENTITY_AUTHOR, authorId,
                 "Updated author '" + author.getName() + "'");
 
         return toAuthorDetails(author);

@@ -16,6 +16,7 @@ import org.grimmory.epub4j.domain.*;
 import org.grimmory.epub4j.epub.CoverDetector;
 import org.grimmory.epub4j.epub.EpubReader;
 import org.grimmory.epub4j.native_parsing.NativeArchive;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -36,9 +37,9 @@ public class EpubReaderService {
     private static final int MAX_CACHE_ENTRIES = 50;
 
     private static final Map<String, String> CONTENT_TYPE_MAP = Map.ofEntries(
-            Map.entry(".xhtml", "application/xhtml+xml"),
-            Map.entry(".html", "application/xhtml+xml"),
-            Map.entry(".htm", "application/xhtml+xml"),
+            Map.entry(".xhtml", MediaType.APPLICATION_XHTML_XML_VALUE),
+            Map.entry(".html", MediaType.APPLICATION_XHTML_XML_VALUE),
+            Map.entry(".htm", MediaType.APPLICATION_XHTML_XML_VALUE),
             Map.entry(".css", "text/css"),
             Map.entry(".js", "application/javascript"),
             Map.entry(".jpg", "image/jpeg"),
@@ -386,12 +387,12 @@ public class EpubReaderService {
     }
 
     private String guessContentType(String path) {
-        if (path == null) return "application/octet-stream";
+        if (path == null) return MediaType.APPLICATION_OCTET_STREAM_VALUE;
 
         int lastDot = path.lastIndexOf('.');
-        if (lastDot < 0) return "application/octet-stream";
+        if (lastDot < 0) return MediaType.APPLICATION_OCTET_STREAM_VALUE;
 
         String extension = path.substring(lastDot).toLowerCase();
-        return CONTENT_TYPE_MAP.getOrDefault(extension, "application/octet-stream");
+        return CONTENT_TYPE_MAP.getOrDefault(extension, MediaType.APPLICATION_OCTET_STREAM_VALUE);
     }
 }

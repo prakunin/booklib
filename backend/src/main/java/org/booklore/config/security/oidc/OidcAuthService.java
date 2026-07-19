@@ -44,6 +44,7 @@ public class OidcAuthService {
     private static final String LEGACY_BOOKLORE_MOBILE_REDIRECT_URI = "booklore://oauth2-callback";
     private static final String OAUTH2_CALLBACK_PATH = "/oauth2-callback";
     private static final Pattern TRAILING_SLASH_PATTERN = Pattern.compile("/+$");
+    private static final String HTTPS_SCHEME = "https";
 
     private final AppSettingService appSettingService;
     private final OidcTokenClient oidcTokenClient;
@@ -137,7 +138,7 @@ public class OidcAuthService {
         try {
             URI uri = URI.create(redirectUri);
             String scheme = uri.getScheme();
-            if (!"https".equals(scheme) && !"http".equals(scheme)) {
+            if (!HTTPS_SCHEME.equals(scheme) && !"http".equals(scheme)) {
                 throw ApiError.OIDC_INVALID_REDIRECT_URI.createException();
             }
             if (uri.getPath() == null || !uri.getPath().endsWith(OAUTH2_CALLBACK_PATH)) {
@@ -165,7 +166,7 @@ public class OidcAuthService {
         String scheme = request.getScheme();
         String host = request.getServerName();
         int port = request.getServerPort();
-        if ((port == 80 && "http".equals(scheme)) || (port == 443 && "https".equals(scheme))) {
+        if ((port == 80 && "http".equals(scheme)) || (port == 443 && HTTPS_SCHEME.equals(scheme))) {
             return scheme + "://" + host;
         }
         return scheme + "://" + host + ":" + port;
@@ -211,7 +212,7 @@ public class OidcAuthService {
             return scheme != null
                     && !scheme.isBlank()
                     && !"http".equalsIgnoreCase(scheme)
-                    && !"https".equalsIgnoreCase(scheme)
+                    && !HTTPS_SCHEME.equalsIgnoreCase(scheme)
                     && uri.getFragment() == null;
         } catch (IllegalArgumentException _) {
             return false;

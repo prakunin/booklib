@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 public class VersionService {
     private static final Pattern VERSION_PATTERN = Pattern.compile("^\\d+\\.\\d+\\.\\d+$");
     private static final String DEVELOPMENT_VERSION = "development";
+    private static final String UNKNOWN_VERSION = "unknown";
     private static final String GITHUB_REPO = "prakunin/booklib";
     private static final String BASE_URI = "https://api.github.com/repos/" + GITHUB_REPO;
     private static final int MAX_RELEASES = 15;
@@ -46,7 +47,7 @@ public class VersionService {
     }
 
     public VersionInfo getVersionInfo() {
-        String latest = "unknown";
+        String latest = UNKNOWN_VERSION;
         try {
             latest = fetchLatestGitHubReleaseVersion();
         } catch (Exception _) {
@@ -69,11 +70,11 @@ public class VersionService {
                     .body(String.class);
 
             JsonNode root = objectMapper.readTree(response);
-            return root.path("tag_name").asString("unknown");
+            return root.path("tag_name").asString(UNKNOWN_VERSION);
 
         } catch (Exception _) {
             log.warn("Failed to fetch latest release version");
-            return "unknown";
+            return UNKNOWN_VERSION;
         }
     }
 

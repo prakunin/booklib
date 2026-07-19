@@ -14,6 +14,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class KoboUrlBuilder {
 
+    private static final String BOOKS_PATH_SEGMENT = "books";
+
     public UriComponentsBuilder baseBuilder() {
         UriComponentsBuilder builder = ServletUriComponentsBuilder
                 .fromCurrentContextPath()
@@ -58,14 +60,14 @@ public class KoboUrlBuilder {
     }
 
     public String downloadUrl(String token, Long bookId) {
-        return withBaseUrl(token, "v1", "books", bookId.toString(), "download");
+        return withBaseUrl(token, "v1", BOOKS_PATH_SEGMENT, bookId.toString(), "download");
     }
 
     public String imageUrlTemplate(String token) {
-        return withBaseUrl( token, "v1", "books", "{ImageId}", "thumbnail", "{Width}", "{Height}", "false", "image.jpg");
+        return withBaseUrl( token, "v1", BOOKS_PATH_SEGMENT, "{ImageId}", "thumbnail", "{Width}", "{Height}", "false", "image.jpg");
     }
 
     public String imageUrlQualityTemplate(String token) {
-        return withBaseUrl( token,  "v1", "books", "{ImageId}", "thumbnail", "{Width}", "{Height}", "{Quality}", "{IsGreyscale}", "image.jpg");
+        return withBaseUrl( token,  "v1", BOOKS_PATH_SEGMENT, "{ImageId}", "thumbnail", "{Width}", "{Height}", "{Quality}", "{IsGreyscale}", "image.jpg");
     }
 }

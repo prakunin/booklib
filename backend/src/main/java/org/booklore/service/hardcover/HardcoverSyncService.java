@@ -34,6 +34,14 @@ public class HardcoverSyncService {
     private static final String HARDCOVER_API_URL = "https://api.hardcover.app/v1/graphql";
     private static final int STATUS_CURRENTLY_READING = 2;
     private static final int STATUS_READ = 3;
+    private static final String JSON_KEY_PAGES = "pages";
+    private static final String JSON_KEY_EDITION_ID = "edition_id";
+    private static final String JSON_KEY_STATUS_ID = "status_id";
+    private static final String JSON_KEY_ERRORS = "errors";
+    private static final String JSON_KEY_ERROR = "error";
+    private static final String JSON_KEY_STARTED_AT = "started_at";
+    private static final String JSON_KEY_PROGRESS_PAGES = "progress_pages";
+    private static final String JSON_KEY_FINISHED_AT = "finished_at";
 
     private final RestClient restClient;
     private final HardcoverSyncSettingsService hardcoverSyncSettingsService;
@@ -319,7 +327,7 @@ public class HardcoverSyncService {
             if (editions != null && !editions.isEmpty()) {
                 Map<String, Object> bestEdition = editions.getFirst();
                 info.editionId = extractInteger(bestEdition.get("id"));
-                info.pages = extractInteger(bestEdition.get("pages"));
+                info.pages = extractInteger(bestEdition.get(JSON_KEY_PAGES));
                 log.debug("Found edition by ISBN: editionId={}, pages={}", 
                     info.editionId, info.pages);
             }
@@ -329,7 +337,7 @@ public class HardcoverSyncService {
                 Map<String, Object> defaultEbookEdition = (Map<String, Object>) book.get("default_ebook_edition");
                 if (defaultEbookEdition != null && defaultEbookEdition.get("id") != null) {
                     info.editionId = extractInteger(defaultEbookEdition.get("id"));
-                    info.pages = extractInteger(defaultEbookEdition.get("pages"));
+                    info.pages = extractInteger(defaultEbookEdition.get(JSON_KEY_PAGES));
                     log.debug("Using default_ebook_edition: editionId={}, pages={}", info.editionId, info.pages);
                 }
             }
@@ -339,14 +347,14 @@ public class HardcoverSyncService {
                 Map<String, Object> defaultPhysicalEdition = (Map<String, Object>) book.get("default_physical_edition");
                 if (defaultPhysicalEdition != null && defaultPhysicalEdition.get("id") != null) {
                     info.editionId = extractInteger(defaultPhysicalEdition.get("id"));
-                    info.pages = extractInteger(defaultPhysicalEdition.get("pages"));
+                    info.pages = extractInteger(defaultPhysicalEdition.get(JSON_KEY_PAGES));
                     log.debug("Using default_physical_edition: editionId={}, pages={}", info.editionId, info.pages);
                 }
             }
 
             // Fallback to book-level pages if edition has no pages
             if (info.pages == null) {
-                info.pages = extractInteger(book.get("pages"));
+                info.pages = extractInteger(book.get(JSON_KEY_PAGES));
             }
 
             if (info.editionId == null) {
@@ -433,11 +441,11 @@ public class HardcoverSyncService {
             HardcoverBookInfo info = new HardcoverBookInfo();
             info.bookId = String.valueOf(extractInteger(book.get("id")));
             info.editionId = extractInteger(edition.get("id"));
-            info.pages = extractInteger(edition.get("pages"));
+            info.pages = extractInteger(edition.get(JSON_KEY_PAGES));
 
             // Fallback to book-level pages if edition has no pages
             if (info.pages == null) {
-                info.pages = extractInteger(book.get("pages"));
+                info.pages = extractInteger(book.get(JSON_KEY_PAGES));
             }
 
             log.info("Resolved Hardcover book by ISBN: bookId={}, editionId={}, pages={}", 
@@ -547,8 +555,8 @@ public class HardcoverSyncService {
 
         Map<String, Object> bookInput = new HashMap<>();
         bookInput.put("book_id", bookId);
-        bookInput.put("edition_id", editionId);
-        bookInput.put("status_id", STATUS_CURRENTLY_READING);
+        bookInput.put(JSON_KEY_EDITION_ID, editionId);
+        bookInput.put(JSON_KEY_STATUS_ID, STATUS_CURRENTLY_READING);
         
         GraphQLRequest request = new GraphQLRequest();
         request.setQuery(mutation);
@@ -561,8 +569,8 @@ public class HardcoverSyncService {
             log.trace("insert_user_book response: {}", response);
             if (response == null) return null;
 
-            if (response.containsKey("errors")) {
-                log.warn("Failed to insert user_book: {}", response.get("errors"));
+            if (response.containsKey(JSON_KEY_ERRORS)) {
+                log.warn("Failed to insert user_book: {}", response.get(JSON_KEY_ERRORS));
                 return null;
             }
 
@@ -572,7 +580,7 @@ public class HardcoverSyncService {
             Map<String, Object> insertResult = (Map<String, Object>) data.get("insert_user_book");
             if (insertResult == null) return null;
 
-            String error = (String) insertResult.get("error");
+            String error = (String) insertResult.get(JSON_KEY_ERROR);
             if (error != null && !error.isBlank()) {
                 log.warn("Error inserting user_book: {}", error);
                 return null;
@@ -624,8 +632,8 @@ public class HardcoverSyncService {
             """;
 
         Map<String, Object> bookInput = new HashMap<>();
-        bookInput.put("edition_id", editionId);
-        bookInput.put("status_id", STATUS_CURRENTLY_READING);
+        bookInput.put(JSON_KEY_EDITION_ID, editionId);
+        bookInput.put(JSON_KEY_STATUS_ID, STATUS_CURRENTLY_READING);
 
         GraphQLRequest request = new GraphQLRequest();
         request.setQuery(mutation);
@@ -639,8 +647,8 @@ public class HardcoverSyncService {
             log.trace("update_user_book response: {}", response);
             if (response == null) return null;
 
-            if (response.containsKey("errors")) {
-                log.warn("update_user_book returned errors: {}", response.get("errors"));
+            if (response.containsKey(JSON_KEY_ERRORS)) {
+                log.warn("update_user_book returned errors: {}", response.get(JSON_KEY_ERRORS));
                 return null;
             }
             Map<String, Object> data = (Map<String, Object>) response.get("data");
@@ -648,7 +656,7 @@ public class HardcoverSyncService {
 
             Map<String, Object> updateResult = (Map<String, Object>) data.get("update_user_book");
             if (updateResult == null) return null;
-            String error = (String) updateResult.get("error");
+            String error = (String) updateResult.get(JSON_KEY_ERROR);
 
             if (error != null && !error.isBlank()) {
                 log.warn("update_user_book returned error: {}", error);
@@ -690,17 +698,17 @@ public class HardcoverSyncService {
             """;
 
         Map<String, Object> bookInput = new HashMap<>();
-        bookInput.put("edition_id", editionId);
-        bookInput.put("status_id", isFinished ? STATUS_READ : STATUS_CURRENTLY_READING);
+        bookInput.put(JSON_KEY_EDITION_ID, editionId);
+        bookInput.put(JSON_KEY_STATUS_ID, isFinished ? STATUS_READ : STATUS_CURRENTLY_READING);
 
         Map<String, Object> readInput = new HashMap<>();
-        readInput.put("started_at", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
-        readInput.put("progress_pages", progressPages);
+        readInput.put(JSON_KEY_STARTED_AT, LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
+        readInput.put(JSON_KEY_PROGRESS_PAGES, progressPages);
         if (isFinished) {
-            readInput.put("finished_at", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
+            readInput.put(JSON_KEY_FINISHED_AT, LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
         }
         if (editionId != null) {
-            readInput.put("edition_id", editionId);
+            readInput.put(JSON_KEY_EDITION_ID, editionId);
         }
 
         GraphQLRequest request = new GraphQLRequest();
@@ -715,8 +723,8 @@ public class HardcoverSyncService {
             log.trace("insert_user_book_read response: {}", response);
             if (response == null) return false;
 
-            if (response.containsKey("errors")) {
-                log.warn("insert_user_book_read returned errors: {}", response.get("errors"));
+            if (response.containsKey(JSON_KEY_ERRORS)) {
+                log.warn("insert_user_book_read returned errors: {}", response.get(JSON_KEY_ERRORS));
                 return false;
             }
 
@@ -724,7 +732,7 @@ public class HardcoverSyncService {
             if (data == null) return false;
             Map<String, Object> insertResult = (Map<String, Object>) data.get("insert_user_book_read");
             if (insertResult == null) return false;
-            String error = (String) insertResult.get("error");
+            String error = (String) insertResult.get(JSON_KEY_ERROR);
             if (error != null && !error.isBlank()) {
                 log.warn("insert_user_book_read returned error: {}", error);
                 return false;
@@ -755,11 +763,11 @@ public class HardcoverSyncService {
             """;
 
         Map<String, Object> readInput = new HashMap<>();
-        readInput.put("edition_id", readInfo.editionId);
-        readInput.put("started_at", readInfo.startedAt);
-        readInput.put("progress_pages", readInfo.progressPages);
+        readInput.put(JSON_KEY_EDITION_ID, readInfo.editionId);
+        readInput.put(JSON_KEY_STARTED_AT, readInfo.startedAt);
+        readInput.put(JSON_KEY_PROGRESS_PAGES, readInfo.progressPages);
         if (readInfo.finishedAt != null) {
-            readInput.put("finished_at", readInfo.finishedAt);
+            readInput.put(JSON_KEY_FINISHED_AT, readInfo.finishedAt);
         }
         
 
@@ -774,8 +782,8 @@ public class HardcoverSyncService {
 
         log.trace("update_user_book_read response: {}", response);
         if (response == null) return false;
-        if (response.containsKey("errors")) {
-            log.warn("update_user_book_read returned errors: {}", response.get("errors"));
+        if (response.containsKey(JSON_KEY_ERRORS)) {
+            log.warn("update_user_book_read returned errors: {}", response.get(JSON_KEY_ERRORS));
             return false;
         }
 
@@ -783,8 +791,8 @@ public class HardcoverSyncService {
             Map<String, Object> data = (Map<String, Object>) response.get("data");
             if (data != null) {
                 Map<String, Object> updateUserBookReadResult = (Map<String, Object>) data.get("update_user_book_read");
-                if (updateUserBookReadResult != null && updateUserBookReadResult.get("error") != null) {
-                    log.warn("update_user_book_read returned error: {}", updateUserBookReadResult.get("error"));
+                if (updateUserBookReadResult != null && updateUserBookReadResult.get(JSON_KEY_ERROR) != null) {
+                    log.warn("update_user_book_read returned error: {}", updateUserBookReadResult.get(JSON_KEY_ERROR));
                     return false;
                 }
             }
@@ -867,19 +875,19 @@ public class HardcoverSyncService {
             UserBookWithReads result = new UserBookWithReads();
             result.reads = new ArrayList<>();
             result.id = extractInteger(userBook.get("id"));
-            result.statusId = extractInteger(userBook.get("status_id"));
-            result.editionId = extractInteger(userBook.get("edition_id"));
+            result.statusId = extractInteger(userBook.get(JSON_KEY_STATUS_ID));
+            result.editionId = extractInteger(userBook.get(JSON_KEY_EDITION_ID));
 
             List<Map<String, Object>> reads = (List<Map<String, Object>>) userBook.get("user_book_reads");
             if (reads != null) {
                 for (Map<String, Object> read : reads) {
                     UserBookReadInfo readInfo = new UserBookReadInfo();
                     readInfo.id = extractInteger(read.get("id"));
-                    readInfo.editionId = extractInteger(read.get("edition_id"));
-                    readInfo.startedAt = (String) read.get("started_at");
-                    readInfo.finishedAt = (String) read.get("finished_at");
+                    readInfo.editionId = extractInteger(read.get(JSON_KEY_EDITION_ID));
+                    readInfo.startedAt = (String) read.get(JSON_KEY_STARTED_AT);
+                    readInfo.finishedAt = (String) read.get(JSON_KEY_FINISHED_AT);
                     readInfo.progress = extractFloat(read.get("progress"));
-                    readInfo.progressPages = extractInteger(read.get("progress_pages"));
+                    readInfo.progressPages = extractInteger(read.get(JSON_KEY_PROGRESS_PAGES));
                     result.reads.add(readInfo);
                 }
             }

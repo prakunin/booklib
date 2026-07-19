@@ -38,6 +38,8 @@ import java.util.Set;
 @Tag(name = "Kobo Integration", description = "Endpoints for Kobo device and library integration")
 public class KoboController {
 
+    private static final String NOT_FOUND_MESSAGE = "Not Found";
+
     private final AppSettingService appSettingService;
     private final KoboServerProxy koboServerProxy;
     private final KoboInitializationService koboInitializationService;
@@ -103,7 +105,7 @@ public class KoboController {
                     .build();
         }
 
-        throw ApiError.GENERIC_NOT_FOUND.createException("Not Found");
+        throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
     }
 
     @Operation(summary = "Authenticate Kobo device", description = "Authenticate a Kobo device.")
@@ -133,7 +135,7 @@ public class KoboController {
             return koboServerProxy.proxyCurrentRequest(null, false);
         }
 
-        throw ApiError.GENERIC_NOT_FOUND.createException("Not Found");
+        throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
     }
 
     @Operation(summary = "Get reading state", description = "Retrieve the reading state for a book.")
@@ -145,7 +147,7 @@ public class KoboController {
         } else if (isForwardingToKoboStore()) {
             return koboServerProxy.proxyCurrentRequest(null, false);
         } else {
-            throw ApiError.GENERIC_NOT_FOUND.createException("Not Found");
+            throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
         }
     }
 
@@ -160,7 +162,7 @@ public class KoboController {
         } else if (isForwardingToKoboStore()) {
             return koboServerProxy.proxyCurrentRequest(body, false);
         } else {
-            throw ApiError.GENERIC_NOT_FOUND.createException("Not Found");
+            throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
         }
     }
 
@@ -188,7 +190,7 @@ public class KoboController {
     @GetMapping("/v1/books/{bookId}/download")
     public void downloadBook(@Parameter(description = "Book ID") @PathVariable String bookId, HttpServletResponse response) {
         if (!StringUtils.isNumeric(bookId)) {
-            throw ApiError.GENERIC_NOT_FOUND.createException("Not Found");
+            throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
         }
 
         bookDownloadService.downloadKoboBook(Long.parseLong(bookId), response);
@@ -207,7 +209,7 @@ public class KoboController {
         } else if (isForwardingToKoboStore()) {
             return koboServerProxy.proxyCurrentRequest(null, false);
         } else {
-            throw ApiError.GENERIC_NOT_FOUND.createException("Not Found");
+            throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
         }
     }
 

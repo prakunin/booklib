@@ -20,6 +20,7 @@ import java.util.List;
 @Slf4j
 public class EpubContentReader {
 
+    private static final String UTF8_ENCODING = "UTF-8";
     private static final List<MediaType> MEDIA_TYPES = new ArrayList<>();
     static {
         MEDIA_TYPES.addAll(Arrays.asList(MediaTypes.mediaTypes));
@@ -31,7 +32,7 @@ public class EpubContentReader {
 
     public static String getSpineItemContent(File epubFile, int spineIndex) {
         try {
-            Book epub = new EpubReader().readEpubLazy(epubFile.toPath(), "UTF-8", MEDIA_TYPES);
+            Book epub = new EpubReader().readEpubLazy(epubFile.toPath(), UTF8_ENCODING, MEDIA_TYPES);
 
             Spine spine = epub.getSpine();
             if (spine == null || spine.size() == 0) {
@@ -64,7 +65,7 @@ public class EpubContentReader {
 
     public static int getSpineSize(File epubFile) {
         try {
-            Book epub = new EpubReader().readEpubLazy(epubFile.toPath(), "UTF-8", MEDIA_TYPES);
+            Book epub = new EpubReader().readEpubLazy(epubFile.toPath(), UTF8_ENCODING, MEDIA_TYPES);
             Spine spine = epub.getSpine();
             return spine != null ? spine.size() : 0;
         } catch (IOException e) {
@@ -74,7 +75,7 @@ public class EpubContentReader {
 
     public static String getSpineItemHref(File epubFile, int spineIndex) {
         try {
-            Book epub = new EpubReader().readEpubLazy(epubFile.toPath(), "UTF-8", MEDIA_TYPES);
+            Book epub = new EpubReader().readEpubLazy(epubFile.toPath(), UTF8_ENCODING, MEDIA_TYPES);
 
             Spine spine = epub.getSpine();
             if (spine == null || spineIndex < 0 || spineIndex >= spine.size()) {
@@ -92,7 +93,7 @@ public class EpubContentReader {
     public static List<String> getAllSpineItemHrefs(File epubFile) {
         List<String> hrefs = new ArrayList<>();
         try {
-            Book epub = new EpubReader().readEpubLazy(epubFile.toPath(), "UTF-8", MEDIA_TYPES);
+            Book epub = new EpubReader().readEpubLazy(epubFile.toPath(), UTF8_ENCODING, MEDIA_TYPES);
 
             Spine spine = epub.getSpine();
             if (spine != null) {

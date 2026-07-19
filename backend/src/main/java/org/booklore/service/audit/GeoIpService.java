@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 public class GeoIpService {
 
     private static final String GEO_API_URL = "http://ip-api.com/json/%s?fields=countryCode";
+    private static final String FIELD_COUNTRY_CODE = "countryCode";
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
     static final long CACHE_MAX_SIZE = 10_000;
     static final Duration CACHE_TTL = Duration.ofHours(24);
@@ -64,8 +65,8 @@ public class GeoIpService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
                 JsonNode node = objectMapper.readTree(response.body());
-                if (node.has("countryCode") && !node.get("countryCode").asString().isBlank()) {
-                    return node.get("countryCode").asString();
+                if (node.has(FIELD_COUNTRY_CODE) && !node.get(FIELD_COUNTRY_CODE).asString().isBlank()) {
+                    return node.get(FIELD_COUNTRY_CODE).asString();
                 }
             }
         } catch (InterruptedException _) {

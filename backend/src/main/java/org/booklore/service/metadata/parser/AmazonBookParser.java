@@ -59,33 +59,41 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
             "MMM. d, yyyy", "d MMM yyyy", "d MMM. yyyy", "d. MMM yyyy",
             "yyyy/M/d", "yyyy/MM/dd", "yyyy年M月d日"
     };
+    private static final String ACCEPT_LANGUAGE_EN_US = "en-US,en;q=0.9";
+    private static final String ACCEPT_LANGUAGE_EN_GB = "en-GB,en;q=0.9";
+    private static final String ACCEPT_LANGUAGE_EN_US_AR = "en-US,en;q=0.9,ar;q=0.8";
+    private static final String AMAZON_BASE_URL_PREFIX = "https://www.amazon.";
+    private static final String AUTHOR_LINK_SELECTOR = ".author a";
+    private static final String DETAIL_BULLETS_FEATURE_DIV_ID = "detailBullets_feature_div";
+    private static final String BOLD_TEXT_SELECTOR = "span.a-text-bold";
+    private static final String HTML_CLASS_ATTR = "class";
 
     private static final Map<String, LocaleInfo> DOMAIN_LOCALE_MAP = Map.ofEntries(
-            Map.entry("com", new LocaleInfo("en-US,en;q=0.9", Locale.US)),
-            Map.entry("co.uk", new LocaleInfo("en-GB,en;q=0.9", Locale.UK)),
+            Map.entry("com", new LocaleInfo(ACCEPT_LANGUAGE_EN_US, Locale.US)),
+            Map.entry("co.uk", new LocaleInfo(ACCEPT_LANGUAGE_EN_GB, Locale.UK)),
             Map.entry("de", new LocaleInfo("en-GB,en;q=0.9,de;q=0.8", Locale.GERMANY)),
             Map.entry("fr", new LocaleInfo("en-GB,en;q=0.9,fr;q=0.8", Locale.FRANCE)),
             Map.entry("it", new LocaleInfo("en-GB,en;q=0.9,it;q=0.8", Locale.ITALY)),
             Map.entry("es", new LocaleInfo("en-GB,en;q=0.9,es;q=0.8", new Locale.Builder().setLanguage("es").setRegion("ES").build())),
-            Map.entry("ca", new LocaleInfo("en-US,en;q=0.9", Locale.CANADA)),
-            Map.entry("com.au", new LocaleInfo("en-GB,en;q=0.9", new Locale.Builder().setLanguage("en").setRegion("AU").build())),
+            Map.entry("ca", new LocaleInfo(ACCEPT_LANGUAGE_EN_US, Locale.CANADA)),
+            Map.entry("com.au", new LocaleInfo(ACCEPT_LANGUAGE_EN_GB, new Locale.Builder().setLanguage("en").setRegion("AU").build())),
             Map.entry("co.jp", new LocaleInfo("en-GB,en;q=0.9,ja;q=0.8", Locale.JAPAN)),
-            Map.entry("in", new LocaleInfo("en-GB,en;q=0.9", new Locale.Builder().setLanguage("en").setRegion("IN").build())),
+            Map.entry("in", new LocaleInfo(ACCEPT_LANGUAGE_EN_GB, new Locale.Builder().setLanguage("en").setRegion("IN").build())),
             Map.entry("com.br", new LocaleInfo("en-GB,en;q=0.9,pt;q=0.8", new Locale.Builder().setLanguage("pt").setRegion("BR").build())),
             Map.entry("com.mx", new LocaleInfo("en-US,en;q=0.9,es;q=0.8", new Locale.Builder().setLanguage("es").setRegion("MX").build())),
             Map.entry("nl", new LocaleInfo("en-GB,en;q=0.9,nl;q=0.8", new Locale.Builder().setLanguage("nl").setRegion("NL").build())),
             Map.entry("se", new LocaleInfo("en-GB,en;q=0.9,sv;q=0.8", new Locale.Builder().setLanguage("sv").setRegion("SE").build())),
             Map.entry("pl", new LocaleInfo("en-GB,en;q=0.9,pl;q=0.8", new Locale.Builder().setLanguage("pl").setRegion("PL").build())),
-            Map.entry("ae", new LocaleInfo("en-US,en;q=0.9,ar;q=0.8", new Locale.Builder().setLanguage("en").setRegion("AE").build())),
-            Map.entry("sa", new LocaleInfo("en-US,en;q=0.9,ar;q=0.8", new Locale.Builder().setLanguage("en").setRegion("SA").build())),
+            Map.entry("ae", new LocaleInfo(ACCEPT_LANGUAGE_EN_US_AR, new Locale.Builder().setLanguage("en").setRegion("AE").build())),
+            Map.entry("sa", new LocaleInfo(ACCEPT_LANGUAGE_EN_US_AR, new Locale.Builder().setLanguage("en").setRegion("SA").build())),
             Map.entry("cn", new LocaleInfo("zh-CN,zh;q=0.9", Locale.CHINA)),
-            Map.entry("sg", new LocaleInfo("en-GB,en;q=0.9", new Locale.Builder().setLanguage("en").setRegion("SG").build())),
+            Map.entry("sg", new LocaleInfo(ACCEPT_LANGUAGE_EN_GB, new Locale.Builder().setLanguage("en").setRegion("SG").build())),
             Map.entry("tr", new LocaleInfo("en-GB,en;q=0.9,tr;q=0.8", new Locale.Builder().setLanguage("tr").setRegion("TR").build())),
-            Map.entry("eg", new LocaleInfo("en-US,en;q=0.9,ar;q=0.8", new Locale.Builder().setLanguage("en").setRegion("EG").build())),
+            Map.entry("eg", new LocaleInfo(ACCEPT_LANGUAGE_EN_US_AR, new Locale.Builder().setLanguage("en").setRegion("EG").build())),
             Map.entry("com.be", new LocaleInfo("en-GB,en;q=0.9,fr;q=0.8,nl;q=0.8", new Locale.Builder().setLanguage("fr").setRegion("BE").build()))
     );
 
-    private static final LocaleInfo DEFAULT_LOCALE_INFO = new LocaleInfo("en-US,en;q=0.9", Locale.US);
+    private static final LocaleInfo DEFAULT_LOCALE_INFO = new LocaleInfo(ACCEPT_LANGUAGE_EN_US, Locale.US);
 
     private final AppSettingService appSettingService;
 
@@ -265,7 +273,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         String domain = appSettingService.getAppSettings().getMetadataProviderSettings().getAmazon().getDomain();
         Document doc;
         try {
-            doc = fetchDocument("https://www.amazon." + domain + BASE_BOOK_URL_SUFFIX + amazonBookId);
+            doc = fetchDocument(AMAZON_BASE_URL_PREFIX + domain + BASE_BOOK_URL_SUFFIX + amazonBookId);
         } catch (AmazonAntiScrapingException _) {
             log.debug("Aborting metadata fetch for ID {} due to status code (503).", amazonBookId);
             return null;
@@ -315,7 +323,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         String domain = appSettingService.getAppSettings().getMetadataProviderSettings().getAmazon().getDomain();
         String isbnCleaned = ParserUtils.cleanIsbn(fetchMetadataRequest.getIsbn());
         if (isbnCleaned != null && !isbnCleaned.isEmpty()) {
-            String url = "https://www.amazon." + domain + "/s?k=" + fetchMetadataRequest.getIsbn();
+            String url = AMAZON_BASE_URL_PREFIX + domain + "/s?k=" + fetchMetadataRequest.getIsbn();
             log.info("Amazon Query URL (ISBN): {}", url);
             return url;
         }
@@ -345,7 +353,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         }
 
         String encodedSearchTerm = searchTerm.toString().replace(" ", "+");
-        String url = "https://www.amazon." + domain + "/s?k=" + encodedSearchTerm;
+        String url = AMAZON_BASE_URL_PREFIX + domain + "/s?k=" + encodedSearchTerm;
         log.info("Amazon Query URL: {}", url);
         return url;
     }
@@ -388,18 +396,18 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         try {
             Element bylineDiv = doc.selectFirst("#bylineInfo_feature_div");
             if (bylineDiv != null) {
-                authors.addAll(bylineDiv.select(".author a").stream().map(Element::text).toList());
+                authors.addAll(bylineDiv.select(AUTHOR_LINK_SELECTOR).stream().map(Element::text).toList());
             }
 
             if (authors.isEmpty()) {
                 Element bylineInfo = doc.selectFirst("#bylineInfo");
                 if (bylineInfo != null) {
-                    authors.addAll(bylineInfo.select(".author a").stream().map(Element::text).toList());
+                    authors.addAll(bylineInfo.select(AUTHOR_LINK_SELECTOR).stream().map(Element::text).toList());
                 }
             }
 
             if (authors.isEmpty()) {
-                authors.addAll(doc.select(".author a").stream().map(Element::text).toList());
+                authors.addAll(doc.select(AUTHOR_LINK_SELECTOR).stream().map(Element::text).toList());
             }
 
             if (authors.isEmpty()) {
@@ -459,11 +467,11 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
 
     private String getPublisher(Document doc) {
         try {
-            Element featureElement = doc.getElementById("detailBullets_feature_div");
+            Element featureElement = doc.getElementById(DETAIL_BULLETS_FEATURE_DIV_ID);
             if (featureElement != null) {
                 Elements listItems = featureElement.select("li");
                 for (Element listItem : listItems) {
-                    Element boldText = listItem.selectFirst("span.a-text-bold");
+                    Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
                     if (boldText != null) {
                         String header = boldText.text().toLowerCase();
                         if (header.contains("publisher") ||
@@ -506,11 +514,11 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         }
 
         try {
-            Element featureElement = doc.getElementById("detailBullets_feature_div");
+            Element featureElement = doc.getElementById(DETAIL_BULLETS_FEATURE_DIV_ID);
             if (featureElement != null) {
                 Elements listItems = featureElement.select("li");
                 for (Element listItem : listItems) {
-                    Element boldText = listItem.selectFirst("span.a-text-bold");
+                    Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
                     Element valueSpan = boldText != null ? boldText.nextElementSibling() : null;
                     
                     if (valueSpan != null) {
@@ -533,11 +541,11 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
     }
 
     private String extractFromDetailBullets(Document doc, String keyPart) {
-        Element featureElement = doc.getElementById("detailBullets_feature_div");
+        Element featureElement = doc.getElementById(DETAIL_BULLETS_FEATURE_DIV_ID);
         if (featureElement != null) {
             Elements listItems = featureElement.select("li");
             for (Element listItem : listItems) {
-                Element boldText = listItem.selectFirst("span.a-text-bold");
+                Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
                 if (boldText != null && boldText.text().contains(keyPart)) {
                     Element valueSpan = boldText.nextElementSibling();
                     if (valueSpan != null) {
@@ -807,7 +815,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                     .header("downlink", "10")
                     .header("dpr", "2")
                     .header("ect", "4g")
-                    .header("origin", "https://www.amazon." + domain)
+                    .header("origin", AMAZON_BASE_URL_PREFIX + domain)
                     .header("priority", "u=1, i")
                     .header("rtt", "50")
                     .header("sec-ch-device-memory", "8")
@@ -901,13 +909,13 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
     private String cleanDescriptionHtml(String html) {
         try {
             Document document = Jsoup.parse(html);
-            document.select("span.a-text-bold").tagName("b").removeAttr("class");
-            document.select("span.a-text-italic").tagName("i").removeAttr("class");
+            document.select(BOLD_TEXT_SELECTOR).tagName("b").removeAttr(HTML_CLASS_ATTR);
+            document.select("span.a-text-italic").tagName("i").removeAttr(HTML_CLASS_ATTR);
             for (Element span : document.select("span.a-list-item")) {
                 span.unwrap();
             }
-            document.select("ol.a-ordered-list.a-vertical").tagName("ol").removeAttr("class");
-            document.select("ul.a-unordered-list.a-vertical").tagName("ul").removeAttr("class");
+            document.select("ol.a-ordered-list.a-vertical").tagName("ol").removeAttr(HTML_CLASS_ATTR);
+            document.select("ul.a-unordered-list.a-vertical").tagName("ul").removeAttr(HTML_CLASS_ATTR);
             for (Element span : document.select("span")) {
                 span.unwrap();
             }

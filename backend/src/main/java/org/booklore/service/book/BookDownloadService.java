@@ -45,6 +45,8 @@ public class BookDownloadService {
 
     private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^a-zA-Z0-9\\-_]");
     private static final Pattern ASCII_ONLY_PATTERN = Pattern.compile("\\p{ASCII}*");
+    private static final String CACHE_CONTROL_NO_STORE = "no-cache, no-store, must-revalidate";
+    private static final String PRAGMA_NO_CACHE = "no-cache";
     private final BookRepository bookRepository;
     private final BookFileRepository bookFileRepository;
     private final KepubConversionService kepubConversionService;
@@ -124,8 +126,8 @@ public class BookDownloadService {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .contentLength(file.toFile().length())
                 .header(HttpHeaders.CONTENT_DISPOSITION, getContentDisposition(file))
-                .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                .header(HttpHeaders.PRAGMA, "no-cache")
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_NO_STORE)
+                .header(HttpHeaders.PRAGMA, PRAGMA_NO_CACHE)
                 .header(HttpHeaders.EXPIRES, "0")
                 .body(body);
     }
@@ -218,8 +220,8 @@ public class BookDownloadService {
         return ResponseEntity.ok()
                 .contentType(MediaType.valueOf("application/zip"))
                 .header(HttpHeaders.CONTENT_DISPOSITION, getContentDisposition(zipFileName))
-                .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                .header(HttpHeaders.PRAGMA, "no-cache")
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_NO_STORE)
+                .header(HttpHeaders.PRAGMA, PRAGMA_NO_CACHE)
                 .header(HttpHeaders.EXPIRES, "0")
                 .body(body);
     }
@@ -352,8 +354,8 @@ public class BookDownloadService {
         return ResponseEntity.ok()
                 .contentType(MediaType.valueOf("application/zip"))
                 .header(HttpHeaders.CONTENT_DISPOSITION, getContentDisposition(folderName + ".zip"))
-                .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                .header(HttpHeaders.PRAGMA, "no-cache")
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_NO_STORE)
+                .header(HttpHeaders.PRAGMA, PRAGMA_NO_CACHE)
                 .header(HttpHeaders.EXPIRES, "0")
                 .body(body);
     }

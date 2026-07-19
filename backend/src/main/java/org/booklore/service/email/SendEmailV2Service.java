@@ -38,6 +38,10 @@ import java.util.concurrent.Executor;
 @AllArgsConstructor
 public class SendEmailV2Service {
 
+    private static final String PROPERTY_VALUE_FALSE = "false";
+    private static final String MAIL_TRANSPORT_PROTOCOL_KEY = "mail.transport.protocol";
+    private static final String DEFAULT_MAIL_TIMEOUT_MS = "60000";
+
     private final EmailProviderV2Repository emailProviderRepository;
     private final UserEmailProviderPreferenceRepository preferenceRepository;
     private final BookRepository bookRepository;
@@ -143,7 +147,7 @@ public class SendEmailV2Service {
         configureConnectionType(mailProps, connectionType, emailProvider);
         configureTimeouts(mailProps, prefix);
 
-        String debugMode = System.getProperty("mail.debug", "false");
+        String debugMode = System.getProperty("mail.debug", PROPERTY_VALUE_FALSE);
         mailProps.put("mail.debug", debugMode);
 
         log.info("Email configuration: Host={}, Port={}, Type={}, Timeouts=60s", emailProvider.getHost(), emailProvider.getPort(), connectionType);
@@ -173,24 +177,24 @@ public class SendEmailV2Service {
     private void configureConnectionType(Properties mailProps, ConnectionType connectionType, EmailProviderV2Entity emailProvider) {
         switch (connectionType) {
             case SSL -> {
-                mailProps.put("mail.transport.protocol", "smtps");
+                mailProps.put(MAIL_TRANSPORT_PROTOCOL_KEY, "smtps");
                 mailProps.put("mail.smtps.ssl.enable", "true");
                 mailProps.put("mail.smtps.ssl.trust", emailProvider.getHost());
-                mailProps.put("mail.smtps.starttls.enable", "false");
+                mailProps.put("mail.smtps.starttls.enable", PROPERTY_VALUE_FALSE);
                 mailProps.put("mail.smtps.ssl.protocols", "TLSv1.2 TLSv1.3");
                 mailProps.put("mail.smtps.ssl.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
-                mailProps.put("mail.smtps.ssl.socketFactory.fallback", "false");
+                mailProps.put("mail.smtps.ssl.socketFactory.fallback", PROPERTY_VALUE_FALSE);
             }
             case STARTTLS -> {
-                mailProps.put("mail.transport.protocol", "smtp");
+                mailProps.put(MAIL_TRANSPORT_PROTOCOL_KEY, "smtp");
                 mailProps.put("mail.smtp.starttls.enable", "true");
                 mailProps.put("mail.smtp.starttls.required", "true");
-                mailProps.put("mail.smtp.ssl.enable", "false");
+                mailProps.put("mail.smtp.ssl.enable", PROPERTY_VALUE_FALSE);
             }
             case PLAIN -> {
-                mailProps.put("mail.transport.protocol", "smtp");
-                mailProps.put("mail.smtp.starttls.enable", "false");
-                mailProps.put("mail.smtp.ssl.enable", "false");
+                mailProps.put(MAIL_TRANSPORT_PROTOCOL_KEY, "smtp");
+                mailProps.put("mail.smtp.starttls.enable", PROPERTY_VALUE_FALSE);
+                mailProps.put("mail.smtp.ssl.enable", PROPERTY_VALUE_FALSE);
             }
         }
     }
@@ -206,11 +210,11 @@ public class SendEmailV2Service {
         // Prefer transport-namespaced JVM overrides (e.g. -Dmail.smtps.connectiontimeout=...)
         // and fall back to the unprefixed mail.smtp.* form for backward compatibility.
         String connectionTimeout = System.getProperty(prefix + "connectiontimeout",
-                System.getProperty("mail.smtp.connectiontimeout", "60000"));
+                System.getProperty("mail.smtp.connectiontimeout", DEFAULT_MAIL_TIMEOUT_MS));
         String socketTimeout = System.getProperty(prefix + "timeout",
-                System.getProperty("mail.smtp.timeout", "60000"));
+                System.getProperty("mail.smtp.timeout", DEFAULT_MAIL_TIMEOUT_MS));
         String writeTimeout = System.getProperty(prefix + "writetimeout",
-                System.getProperty("mail.smtp.writetimeout", "60000"));
+                System.getProperty("mail.smtp.writetimeout", DEFAULT_MAIL_TIMEOUT_MS));
 
         mailProps.put(prefix + "connectiontimeout", connectionTimeout);
         mailProps.put(prefix + "timeout", socketTimeout);

@@ -37,6 +37,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class OpdsBookService {
 
+    private static final String AUTHENTICATION_REQUIRED_MESSAGE = "Authentication required";
+
     private final BookOpdsRepository bookOpdsRepository;
     private final BookRepository bookRepository;
     private final BookMapper bookMapper;
@@ -69,7 +71,7 @@ public class OpdsBookService {
 
     public Page<Book> getBooksPage(Long userId, String query, Long libraryId, Set<Long> shelfIds, int page, int size) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findByIdWithDetails(userId)
@@ -114,7 +116,7 @@ public class OpdsBookService {
 
     public Page<Book> getRecentBooksPage(Long userId, int page, int size) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findByIdWithDetails(userId)
@@ -211,7 +213,7 @@ public class OpdsBookService {
 
     public Page<Book> getBooksByAuthorName(Long userId, String authorName, int page, int size) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findByIdWithDetails(userId)
@@ -265,7 +267,7 @@ public class OpdsBookService {
 
     public Page<Book> getBooksBySeriesName(Long userId, String seriesName, int page, int size) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findByIdWithDetails(userId)
@@ -427,7 +429,7 @@ public class OpdsBookService {
 
     public void validateBookContentAccess(Long bookId, Long userId) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findById(userId)

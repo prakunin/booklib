@@ -19,20 +19,23 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class KoboInitializationService {
 
+    private static final String PATH_SEGMENT_LIBRARY = "library";
+    private static final String PATH_SEGMENT_IDS_PLACEHOLDER = "{Ids}";
+
     private final AppSettingService appSettingService;
     private final KoboServerProxy koboServerProxy;
     private final KoboResourcesComponent koboResourcesComponent;
     private final KoboUrlBuilder koboUrlBuilder;
 
     private static final Map<String, String[]> initializationResources = Map.<String, String[]>ofEntries(
-            Map.entry("delete_entitlement", new String[]{"v1", "library", "{Ids}"}),
+            Map.entry("delete_entitlement", new String[]{"v1", PATH_SEGMENT_LIBRARY, PATH_SEGMENT_IDS_PLACEHOLDER}),
             Map.entry("get_tests_request", new String[]{"v1", "analytics", "gettests"}),
-            Map.entry("library_book", new String[]{"v1", "user", "library", "books", "{LibraryItemId}"}),
-            Map.entry("library_metadata", new String[]{"v1", "library", "{Ids}", "metadata"}),
-            Map.entry("library_search", new String[]{"v1", "library", "search"}),
-            Map.entry("library_sync", new String[]{"v1", "library", "sync"}),
+            Map.entry("library_book", new String[]{"v1", "user", PATH_SEGMENT_LIBRARY, "books", "{LibraryItemId}"}),
+            Map.entry("library_metadata", new String[]{"v1", PATH_SEGMENT_LIBRARY, PATH_SEGMENT_IDS_PLACEHOLDER, "metadata"}),
+            Map.entry("library_search", new String[]{"v1", PATH_SEGMENT_LIBRARY, "search"}),
+            Map.entry("library_sync", new String[]{"v1", PATH_SEGMENT_LIBRARY, "sync"}),
             Map.entry("post_analytics_event", new String[]{"v1", "analytics", "event"}),
-            Map.entry("reading_state", new String[]{"v1", "library", "{Ids}", "state"}),
+            Map.entry("reading_state", new String[]{"v1", PATH_SEGMENT_LIBRARY, PATH_SEGMENT_IDS_PLACEHOLDER, "state"}),
             Map.entry("user_profile", new String[]{"v1", "user", "profile"}),
             Map.entry("user_ratings", new String[]{"v1", "products", "{ProductId}", "rating", "{Rating}"}),
             Map.entry("deals", new String[]{"v1", "deals"})

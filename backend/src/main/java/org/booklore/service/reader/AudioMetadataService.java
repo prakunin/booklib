@@ -24,6 +24,7 @@ import org.jaudiotagger.audio.AudioHeader;
 import org.jaudiotagger.tag.FieldKey;
 import org.jaudiotagger.tag.Tag;
 import org.jaudiotagger.tag.images.Artwork;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -353,18 +354,18 @@ public class AudioMetadataService {
           byte[] data = artwork.getBinaryData();
           if (data != null && data.length > 2) {
             if (data[0] == (byte) 0xFF && data[1] == (byte) 0xD8) {
-              return "image/jpeg";
+              return MediaType.IMAGE_JPEG_VALUE;
             } else if (data[0] == (byte) 0x89 && data[1] == (byte) 0x50) {
               return "image/png";
             }
           }
-          return "image/jpeg";
+          return MediaType.IMAGE_JPEG_VALUE;
         }
       }
     } catch (Exception e) {
       log.debug("Could not determine cover art MIME type: {}", e.getMessage());
     }
-    return "image/jpeg";
+    return MediaType.IMAGE_JPEG_VALUE;
   }
 
   private String getTagValue(Tag tag, FieldKey... keys) {

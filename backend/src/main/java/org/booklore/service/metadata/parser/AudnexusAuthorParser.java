@@ -21,6 +21,7 @@ public class AudnexusAuthorParser implements AuthorParser {
 
     private static final String BASE_URL = "https://api.audnex.us";
     private static final long MIN_REQUEST_INTERVAL_MS = 150;
+    private static final String REGION_PARAM = "region";
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -38,7 +39,7 @@ public class AudnexusAuthorParser implements AuthorParser {
 
             URI uri = UriComponentsBuilder.fromUriString(BASE_URL + "/authors")
                     .queryParam("name", name)
-                    .queryParam("region", region)
+                    .queryParam(REGION_PARAM, region)
                     .build()
                     .toUri();
 
@@ -86,7 +87,7 @@ public class AudnexusAuthorParser implements AuthorParser {
 
             URI uri = UriComponentsBuilder.fromUriString(BASE_URL + "/authors")
                     .queryParam("name", name)
-                    .queryParam("region", region)
+                    .queryParam(REGION_PARAM, region)
                     .build()
                     .toUri();
 
@@ -122,7 +123,7 @@ public class AudnexusAuthorParser implements AuthorParser {
             waitForRateLimit();
 
             URI uri = UriComponentsBuilder.fromUriString(BASE_URL + "/authors/" + asin)
-                    .queryParam("region", region)
+                    .queryParam(REGION_PARAM, region)
                     .build()
                     .toUri();
 

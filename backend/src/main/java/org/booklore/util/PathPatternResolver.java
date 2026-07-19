@@ -27,6 +27,7 @@ public class PathPatternResolver {
 
     private final String TRUNCATION_SUFFIX = " et al.";
     private final int SUFFIX_BYTES = TRUNCATION_SUFFIX.getBytes(StandardCharsets.UTF_8).length;
+    private final String CURRENT_FILENAME_KEY = "currentFilename";
 
     private final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
     private final Pattern CONTROL_CHARACTER_PATTERN = Pattern.compile("\\p{Cntrl}");
@@ -140,7 +141,7 @@ public class PathPatternResolver {
         values.put("language", language);
         values.put("publisher", truncatePathComponent(publisher, MAX_COMPONENT_BYTES));
         values.put("isbn", isbn);
-        values.put("currentFilename", filename);
+        values.put(CURRENT_FILENAME_KEY, filename);
 
         return resolvePatternWithValues(pattern, values, filename, folderBased);
     }
@@ -210,14 +211,14 @@ public class PathPatternResolver {
 
         boolean usedFallbackFilename = false;
         if (result.isBlank()) {
-            result = values.getOrDefault("currentFilename", "untitled");
+            result = values.getOrDefault(CURRENT_FILENAME_KEY, "untitled");
             usedFallbackFilename = true;
         }
 
         // Guard against patterns like {title}.{extension} resolving to only ".ext"
         // when metadata title is blank/missing after sanitization.
         if (!usedFallbackFilename && isExtensionOnlyFilename(result)) {
-            result = values.getOrDefault("currentFilename", "untitled");
+            result = values.getOrDefault(CURRENT_FILENAME_KEY, "untitled");
             usedFallbackFilename = true;
         }
 

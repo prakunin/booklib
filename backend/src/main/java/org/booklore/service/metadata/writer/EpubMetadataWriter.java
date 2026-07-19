@@ -59,6 +59,23 @@ public class EpubMetadataWriter implements MetadataWriter {
 
     private static final String OPF_NS = "http://www.idpf.org/2007/opf";
     private static final Pattern CALIBRE_PREFIX_PATTERN = Pattern.compile("calibre:\\s*https?://[^\\s]+");
+    private static final String DC_NS = "http://purl.org/dc/elements/1.1/";
+    private static final String TAG_TITLE = "title";
+    private static final String TAG_SUBJECT = "subject";
+    private static final String TAG_IDENTIFIER = "identifier";
+    private static final String TAG_CREATOR = "creator";
+    private static final String ATTR_REFINES = "refines";
+    private static final String ATTR_CONTENT = "content";
+    private static final String ATTR_PROPERTY = "property";
+    private static final String ATTR_PREFIX = "prefix";
+    private static final String BOOKLORE_PREFIX = "booklore:";
+    private static final String PROP_BELONGS_TO_COLLECTION = "belongs-to-collection";
+    private static final String PROP_COLLECTION_TYPE = "collection-type";
+    private static final String PROP_GROUP_POSITION = "group-position";
+    private static final String META_NAME_CALIBRE_SERIES = "calibre:series";
+    private static final String META_NAME_CALIBRE_SERIES_INDEX = "calibre:series_index";
+    private static final String CALIBRE_PREFIX = "calibre:";
+    private static final String SUBTITLE = "subtitle";
     private final AppSettingService appSettingService;
     private final FileService fileService;
 
@@ -91,13 +108,12 @@ public class EpubMetadataWriter implements MetadataWriter {
 
             NodeList metadataList = opfDoc.getElementsByTagNameNS(OPF_NS, "metadata");
             Element metadataElement = (Element) metadataList.item(0);
-            final String DC_NS = "http://purl.org/dc/elements/1.1/";
 
             boolean[] hasChanges = {false};
             MetadataCopyHelper helper = new MetadataCopyHelper(metadata);
 
             helper.copyTitle(clear != null && clear.isTitle(), val -> {
-                replaceAndTrackChange(opfDoc, metadataElement, "title", DC_NS, val, hasChanges);
+                replaceAndTrackChange(opfDoc, metadataElement, TAG_TITLE, DC_NS, val, hasChanges);
                 if (StringUtils.isNotBlank(metadata.getSubtitle())) {
                     addSubtitleToTitle(metadataElement, opfDoc, metadata.getSubtitle());
                 }
@@ -123,7 +139,7 @@ public class EpubMetadataWriter implements MetadataWriter {
             });
 
             helper.copyCategories(clear != null && clear.isCategories(), categories -> {
-                removeElementsByTagNameNS(metadataElement, DC_NS, "subject");
+                removeElementsByTagNameNS(metadataElement, DC_NS, TAG_SUBJECT);
                 if (categories != null) {
                     for (String cat : categories.stream().map(String::trim).distinct().toList()) {
                         metadataElement.appendChild(createSubjectElement(opfDoc, cat));
@@ -610,7 +626,7 @@ public class EpubMetadataWriter implements MetadataWriter {
         NodeList metas = metadataElement.getElementsByTagNameNS("*", "meta");
         for (int i = metas.getLength() - 1; i >= 0; i--) {
             Element meta = (Element) metas.item(i);
-            if (refines.equals(meta.getAttribute("refines"))) {
+            if (refines.equals(meta.getAttribute(ATTR_REFINES))) {
                 metadataElement.removeChild(meta);
             }
         }
@@ -619,12 +635,12 @@ public class EpubMetadataWriter implements MetadataWriter {
     private Element createMetaElement(Document doc, String name, String content) {
         Element meta = doc.createElementNS(doc.getDocumentElement().getNamespaceURI(), "meta");
         meta.setAttribute("name", name);
-        meta.setAttribute("content", content);
+        meta.setAttribute(ATTR_CONTENT, content);
         return meta;
     }
 
     private void removeIdentifierByScheme(Element metadataElement, String scheme) {
-        NodeList identifiers = metadataElement.getElementsByTagNameNS("*", "identifier");
+        NodeList identifiers = metadataElement.getElementsByTagNameNS("*", TAG_IDENTIFIER);
         for (int i = identifiers.getLength() - 1; i >= 0; i--) {
             Element idElement = (Element) identifiers.item(i);
             if (scheme.equalsIgnoreCase(idElement.getAttributeNS(OPF_NS, "scheme"))) {
@@ -633,7 +649,7 @@ public class EpubMetadataWriter implements MetadataWriter {
         }
     }
     private void removeIdentifierByUrn(Element metadataElement, String urnScheme) {
-        NodeList identifiers = metadataElement.getElementsByTagNameNS("*", "identifier");
+        NodeList identifiers = metadataElement.getElementsByTagNameNS("*", TAG_IDENTIFIER);
         String urnPrefix = "urn:" + urnScheme.toLowerCase() + ":";
         String oldPrefix = urnScheme.toLowerCase() + ":";
         for (int i = identifiers.getLength() - 1; i >= 0; i--) {
@@ -646,7 +662,7 @@ public class EpubMetadataWriter implements MetadataWriter {
     }
 
     private Element createIdentifierElement(Document doc, String scheme, String value) {
-        Element id = doc.createElementNS("http://purl.org/dc/elements/1.1/", "identifier");
+        Element id = doc.createElementNS(DC_NS, TAG_IDENTIFIER);
         id.setPrefix("dc");
         id.setTextContent("urn:" + scheme.toLowerCase() + ":" + value);
         return id;
@@ -660,16 +676,16 @@ public class EpubMetadataWriter implements MetadataWriter {
     }
 
     private void removeCreatorsByRole(Element metadataElement, String role) {
-        NodeList creators = metadataElement.getElementsByTagNameNS("*", "creator");
+        NodeList creators = metadataElement.getElementsByTagNameNS("*", TAG_CREATOR);
         for (int i = creators.getLength() - 1; i >= 0; i--) {
             Element creatorElement = (Element) creators.item(i);
             String id = creatorElement.getAttribute("id");
             String creatorRole = creatorElement.getAttributeNS(OPF_NS, "role");
             if (StringUtils.isNotBlank(id) && StringUtils.isBlank(creatorRole)) {
                 // Finds any matching role meta tags for this creator ID
-                Element meta = getMetaElementByFilter(metadataElement, el -> ("role".equals(el.getAttribute("property")) && "#".concat(id).equals(el.getAttribute("refines"))));
+                Element meta = getMetaElementByFilter(metadataElement, el -> ("role".equals(el.getAttribute(ATTR_PROPERTY)) && "#".concat(id).equals(el.getAttribute(ATTR_REFINES))));
                 if (meta != null) {
-                    creatorRole = meta.hasAttribute("content") ? meta.getAttribute("content").trim() : meta.getTextContent().trim();
+                    creatorRole = meta.hasAttribute(ATTR_CONTENT) ? meta.getAttribute(ATTR_CONTENT).trim() : meta.getTextContent().trim();
                 }
             }
             if (role.equalsIgnoreCase(creatorRole)) {
@@ -682,7 +698,7 @@ public class EpubMetadataWriter implements MetadataWriter {
     }
 
     private Element createCreatorElement(Document doc, Element metadataElement, String fullName, String fileAs, String role) {
-        Element creator = doc.createElementNS("http://purl.org/dc/elements/1.1/", "creator");
+        Element creator = doc.createElementNS(DC_NS, TAG_CREATOR);
         creator.setPrefix("dc");
         creator.setTextContent(fullName);
 
@@ -696,16 +712,16 @@ public class EpubMetadataWriter implements MetadataWriter {
             if (fileAs != null) {
                 Element fileAsMeta = doc.createElementNS(OPF_NS, "meta");
                 fileAsMeta.setPrefix("opf");
-                fileAsMeta.setAttribute("refines", "#" + creatorId);
-                fileAsMeta.setAttribute("property", "file-as");
+                fileAsMeta.setAttribute(ATTR_REFINES, "#" + creatorId);
+                fileAsMeta.setAttribute(ATTR_PROPERTY, "file-as");
                 fileAsMeta.setTextContent(fileAs);
                 metadataElement.appendChild(fileAsMeta);
             }
             if (role != null) {
                 Element roleMeta = doc.createElementNS(OPF_NS, "meta");
                 roleMeta.setPrefix("opf");
-                roleMeta.setAttribute("refines", "#" + creatorId);
-                roleMeta.setAttribute("property", "role");
+                roleMeta.setAttribute(ATTR_REFINES, "#" + creatorId);
+                roleMeta.setAttribute(ATTR_PROPERTY, "role");
                 roleMeta.setAttribute("scheme", "marc:relators");
                 roleMeta.setTextContent(role);
                 metadataElement.appendChild(roleMeta);
@@ -723,7 +739,7 @@ public class EpubMetadataWriter implements MetadataWriter {
     }
 
     private Element createSubjectElement(Document doc, String subject) {
-        Element subj = doc.createElementNS("http://purl.org/dc/elements/1.1/", "subject");
+        Element subj = doc.createElementNS(DC_NS, TAG_SUBJECT);
         subj.setPrefix("dc");
         subj.setTextContent(subject);
         return subj;
@@ -743,7 +759,7 @@ public class EpubMetadataWriter implements MetadataWriter {
     private String getMetaContentByName(Element metadataElement, String name) {
         Element meta = getMetaElementByFilter(metadataElement, el -> name.equals(el.getAttribute("name")));
         if (meta != null) {
-            return meta.getAttribute("content");
+            return meta.getAttribute(ATTR_CONTENT);
         }
         return null;
     }
@@ -806,11 +822,11 @@ public class EpubMetadataWriter implements MetadataWriter {
         NodeList metas = metadataElement.getElementsByTagNameNS("*", "meta");
         for (int i = 0; i < metas.getLength(); i++) {
             Element meta = (Element) metas.item(i);
-            String property = meta.getAttribute("property");
+            String property = meta.getAttribute(ATTR_PROPERTY);
             String name = meta.getAttribute("name");
-            String key = property.startsWith("booklore:") ? property : (name.startsWith("booklore:") ? name : null);
+            String key = property.startsWith(BOOKLORE_PREFIX) ? property : (name.startsWith(BOOKLORE_PREFIX) ? name : null);
             if (key != null) {
-                String value = meta.getAttribute("content").isEmpty() ? meta.getTextContent() : meta.getAttribute("content");
+                String value = meta.getAttribute(ATTR_CONTENT).isEmpty() ? meta.getTextContent() : meta.getAttribute(ATTR_CONTENT);
                 if (!isEffectivelyZeroOrBlank(value)) {
                     existing.put(key, value);
                 }
@@ -888,9 +904,9 @@ public class EpubMetadataWriter implements MetadataWriter {
         NodeList metas = metadataElement.getElementsByTagNameNS("*", "meta");
         for (int i = metas.getLength() - 1; i >= 0; i--) {
             Element meta = (Element) metas.item(i);
-            String property = meta.getAttribute("property");
+            String property = meta.getAttribute(ATTR_PROPERTY);
             String name = meta.getAttribute("name");
-            if (property.startsWith("booklore:") || name.startsWith("booklore:")) {
+            if (property.startsWith(BOOKLORE_PREFIX) || name.startsWith(BOOKLORE_PREFIX)) {
                 metadataElement.removeChild(meta);
             }
         }
@@ -903,9 +919,9 @@ public class EpubMetadataWriter implements MetadataWriter {
         NodeList metas = metadataElement.getElementsByTagNameNS("*", "meta");
         for (int i = metas.getLength() - 1; i >= 0; i--) {
             Element meta = (Element) metas.item(i);
-            String property = meta.getAttribute("property");
+            String property = meta.getAttribute(ATTR_PROPERTY);
             String name = meta.getAttribute("name");
-            if ("belongs-to-collection".equals(property) || "collection-type".equals(property) || "group-position".equals(property)) {
+            if (PROP_BELONGS_TO_COLLECTION.equals(property) || PROP_COLLECTION_TYPE.equals(property) || PROP_GROUP_POSITION.equals(property)) {
                 String id = meta.getAttribute("id");
                 metadataElement.removeChild(meta);
                 if (StringUtils.isNotBlank(id)) {
@@ -913,7 +929,7 @@ public class EpubMetadataWriter implements MetadataWriter {
                 }
             }
             // Also remove EPUB2-style series metas
-            if ("calibre:series".equals(name) || "calibre:series_index".equals(name)) {
+            if (META_NAME_CALIBRE_SERIES.equals(name) || META_NAME_CALIBRE_SERIES_INDEX.equals(name)) {
                 metadataElement.removeChild(meta);
             }
         }
@@ -926,22 +942,22 @@ public class EpubMetadataWriter implements MetadataWriter {
                 Element collectionMeta = doc.createElementNS(OPF_NS, "meta");
                 collectionMeta.setPrefix("opf");
                 collectionMeta.setAttribute("id", collectionId);
-                collectionMeta.setAttribute("property", "belongs-to-collection");
+                collectionMeta.setAttribute(ATTR_PROPERTY, PROP_BELONGS_TO_COLLECTION);
                 collectionMeta.setTextContent(seriesName);
                 metadataElement.appendChild(collectionMeta);
 
                 Element typeMeta = doc.createElementNS(OPF_NS, "meta");
                 typeMeta.setPrefix("opf");
-                typeMeta.setAttribute("property", "collection-type");
-                typeMeta.setAttribute("refines", "#" + collectionId);
+                typeMeta.setAttribute(ATTR_PROPERTY, PROP_COLLECTION_TYPE);
+                typeMeta.setAttribute(ATTR_REFINES, "#" + collectionId);
                 typeMeta.setTextContent("series");
                 metadataElement.appendChild(typeMeta);
 
                 if (seriesNumber != null && seriesNumber > 0) {
                     Element positionMeta = doc.createElementNS(OPF_NS, "meta");
                     positionMeta.setPrefix("opf");
-                    positionMeta.setAttribute("property", "group-position");
-                    positionMeta.setAttribute("refines", "#" + collectionId);
+                    positionMeta.setAttribute(ATTR_PROPERTY, PROP_GROUP_POSITION);
+                    positionMeta.setAttribute(ATTR_REFINES, "#" + collectionId);
                     if (seriesNumber % 1.0f == 0) {
                         positionMeta.setTextContent(String.format("%.0f", seriesNumber));
                     } else {
@@ -952,17 +968,17 @@ public class EpubMetadataWriter implements MetadataWriter {
             } else {
                 // EPUB2: use calibre:series convention (widely supported by e-readers)
                 Element seriesMeta = doc.createElementNS(doc.getDocumentElement().getNamespaceURI(), "meta");
-                seriesMeta.setAttribute("name", "calibre:series");
-                seriesMeta.setAttribute("content", seriesName);
+                seriesMeta.setAttribute("name", META_NAME_CALIBRE_SERIES);
+                seriesMeta.setAttribute(ATTR_CONTENT, seriesName);
                 metadataElement.appendChild(seriesMeta);
 
                 if (seriesNumber != null && seriesNumber > 0) {
                     Element indexMeta = doc.createElementNS(doc.getDocumentElement().getNamespaceURI(), "meta");
-                    indexMeta.setAttribute("name", "calibre:series_index");
+                    indexMeta.setAttribute("name", META_NAME_CALIBRE_SERIES_INDEX);
                     if (seriesNumber % 1.0f == 0) {
-                        indexMeta.setAttribute("content", String.format("%.0f", seriesNumber));
+                        indexMeta.setAttribute(ATTR_CONTENT, String.format("%.0f", seriesNumber));
                     } else {
-                        indexMeta.setAttribute("content", String.valueOf(seriesNumber));
+                        indexMeta.setAttribute(ATTR_CONTENT, String.valueOf(seriesNumber));
                     }
                     metadataElement.appendChild(indexMeta);
                 }
@@ -973,18 +989,17 @@ public class EpubMetadataWriter implements MetadataWriter {
     }
 
     private void addSubtitleToTitle(Element metadataElement, Document doc, String subtitle) {
-        final String DC_NS = "http://purl.org/dc/elements/1.1/";
         boolean epub3 = isEpub3(doc);
 
         // Remove existing subtitle elements (both EPUB2 and EPUB3 forms)
         NodeList metas = metadataElement.getElementsByTagNameNS("*", "meta");
         for (int i = metas.getLength() - 1; i >= 0; i--) {
             Element meta = (Element) metas.item(i);
-            String property = meta.getAttribute("property");
-            String refines = meta.getAttribute("refines");
-            if ("title-type".equals(property) && "subtitle".equals(meta.getTextContent())) {
+            String property = meta.getAttribute(ATTR_PROPERTY);
+            String refines = meta.getAttribute(ATTR_REFINES);
+            if ("title-type".equals(property) && SUBTITLE.equals(meta.getTextContent())) {
                 if (StringUtils.isNotBlank(refines)) {
-                    NodeList titles = metadataElement.getElementsByTagNameNS(DC_NS, "title");
+                    NodeList titles = metadataElement.getElementsByTagNameNS(DC_NS, TAG_TITLE);
                     for (int j = titles.getLength() - 1; j >= 0; j--) {
                         Element title = (Element) titles.item(j);
                         if (("#" + title.getAttribute("id")).equals(refines)) {
@@ -1000,7 +1015,7 @@ public class EpubMetadataWriter implements MetadataWriter {
         if (epub3) {
             // EPUB3: add subtitle as separate dc:title with title-type refinement
             String subtitleId = "subtitle-" + UUID.randomUUID().toString().substring(0, 8);
-            Element subtitleElement = doc.createElementNS(DC_NS, "title");
+            Element subtitleElement = doc.createElementNS(DC_NS, TAG_TITLE);
             subtitleElement.setPrefix("dc");
             subtitleElement.setAttribute("id", subtitleId);
             subtitleElement.setTextContent(subtitle);
@@ -1008,9 +1023,9 @@ public class EpubMetadataWriter implements MetadataWriter {
 
             Element typeMeta = doc.createElementNS(OPF_NS, "meta");
             typeMeta.setPrefix("opf");
-            typeMeta.setAttribute("refines", "#" + subtitleId);
-            typeMeta.setAttribute("property", "title-type");
-            typeMeta.setTextContent("subtitle");
+            typeMeta.setAttribute(ATTR_REFINES, "#" + subtitleId);
+            typeMeta.setAttribute(ATTR_PROPERTY, "title-type");
+            typeMeta.setTextContent(SUBTITLE);
             metadataElement.appendChild(typeMeta);
         }
         // EPUB2: subtitle is stored only via booklore:subtitle metadata (written in addBookloreMetadata).
@@ -1022,14 +1037,14 @@ public class EpubMetadataWriter implements MetadataWriter {
 
         if (epub3) {
             Element packageElement = doc.getDocumentElement();
-            String existingPrefix = packageElement.getAttribute("prefix");
+            String existingPrefix = packageElement.getAttribute(ATTR_PREFIX);
             String bookloreNamespace = "booklore: http://booklore.org/metadata/1.0/";
 
-            if (!existingPrefix.contains("booklore:")) {
+            if (!existingPrefix.contains(BOOKLORE_PREFIX)) {
                 if (existingPrefix.isEmpty()) {
-                    packageElement.setAttribute("prefix", bookloreNamespace);
+                    packageElement.setAttribute(ATTR_PREFIX, bookloreNamespace);
                 } else {
-                    packageElement.setAttribute("prefix", existingPrefix.trim() + " " + bookloreNamespace);
+                    packageElement.setAttribute(ATTR_PREFIX, existingPrefix.trim() + " " + bookloreNamespace);
                 }
             }
         }
@@ -1037,7 +1052,7 @@ public class EpubMetadataWriter implements MetadataWriter {
         removeAllBookloreMetadata(metadataElement);
         
         if (StringUtils.isNotBlank(metadata.getSubtitle())) {
-            metadataElement.appendChild(createBookloreMetaElement(doc, "subtitle", metadata.getSubtitle(), epub3));
+            metadataElement.appendChild(createBookloreMetaElement(doc, SUBTITLE, metadata.getSubtitle(), epub3));
         }
         
         if (metadata.getPageCount() != null && metadata.getPageCount() > 0) {
@@ -1109,42 +1124,41 @@ public class EpubMetadataWriter implements MetadataWriter {
         if (epub3) {
             Element meta = doc.createElementNS(OPF_NS, "meta");
             meta.setPrefix("opf");
-            meta.setAttribute("property", "booklore:" + property);
+            meta.setAttribute(ATTR_PROPERTY, BOOKLORE_PREFIX + property);
             meta.setTextContent(value);
             return meta;
         } else {
             // EPUB2: use name/content attribute form
             Element meta = doc.createElementNS(doc.getDocumentElement().getNamespaceURI(), "meta");
-            meta.setAttribute("name", "booklore:" + property);
-            meta.setAttribute("content", value);
+            meta.setAttribute("name", BOOKLORE_PREFIX + property);
+            meta.setAttribute(ATTR_CONTENT, value);
             return meta;
         }
     }
 
     private void cleanupCalibreArtifacts(Element metadataElement, Document doc) {
         Element packageElement = doc.getDocumentElement();
-        if (packageElement.hasAttribute("prefix")) {
-            String prefix = packageElement.getAttribute("prefix");
-            if (prefix.contains("calibre:")) {
+        if (packageElement.hasAttribute(ATTR_PREFIX)) {
+            String prefix = packageElement.getAttribute(ATTR_PREFIX);
+            if (prefix.contains(CALIBRE_PREFIX)) {
                 prefix = CALIBRE_PREFIX_PATTERN.matcher(prefix).replaceAll("").trim();
                 if (prefix.isEmpty()) {
-                    packageElement.removeAttribute("prefix");
+                    packageElement.removeAttribute(ATTR_PREFIX);
                 } else {
-                    packageElement.setAttribute("prefix", prefix);
+                    packageElement.setAttribute(ATTR_PREFIX, prefix);
                 }
             }
         }
-        
+
         if (metadataElement.hasAttribute("xmlns:calibre")) {
             metadataElement.removeAttribute("xmlns:calibre");
         }
-        
-        final String DC_NS = "http://purl.org/dc/elements/1.1/";
-        NodeList identifiers = metadataElement.getElementsByTagNameNS(DC_NS, "identifier");
+
+        NodeList identifiers = metadataElement.getElementsByTagNameNS(DC_NS, TAG_IDENTIFIER);
         for (int i = identifiers.getLength() - 1; i >= 0; i--) {
             Element idElement = (Element) identifiers.item(i);
             String content = idElement.getTextContent().trim().toLowerCase();
-            if (content.startsWith("calibre:") || content.startsWith("urn:calibre:")) {
+            if (content.startsWith(CALIBRE_PREFIX) || content.startsWith("urn:calibre:")) {
                 metadataElement.removeChild(idElement);
             }
         }
@@ -1165,18 +1179,17 @@ public class EpubMetadataWriter implements MetadataWriter {
         NodeList metas = metadataElement.getElementsByTagNameNS("*", "meta");
         for (int i = metas.getLength() - 1; i >= 0; i--) {
             Element meta = (Element) metas.item(i);
-            String property = meta.getAttribute("property");
+            String property = meta.getAttribute(ATTR_PROPERTY);
             String name = meta.getAttribute("name");
-            
-            boolean isCalibreSeries = !isEpub3(doc) && ("calibre:series".equals(name) || "calibre:series_index".equals(name));
-            if (!isCalibreSeries && (property.startsWith("calibre:") || name.startsWith("calibre:"))) {
+
+            boolean isCalibreSeries = !isEpub3(doc) && (META_NAME_CALIBRE_SERIES.equals(name) || META_NAME_CALIBRE_SERIES_INDEX.equals(name));
+            if (!isCalibreSeries && (property.startsWith(CALIBRE_PREFIX) || name.startsWith(CALIBRE_PREFIX))) {
                 metadataElement.removeChild(meta);
             }
         }
     }
 
     private void organizeMetadataElements(Element metadataElement) {
-        final String DC_NS = "http://purl.org/dc/elements/1.1/";
         List<Element> identifiers = new ArrayList<>();
         List<Element> titles = new ArrayList<>();
         List<Element> creators = new ArrayList<>();
@@ -1201,25 +1214,25 @@ public class EpubMetadataWriter implements MetadataWriter {
             
             if (DC_NS.equals(ns)) {
                 switch (localName) {
-                    case "identifier" -> identifiers.add(elem);
-                    case "title" -> titles.add(elem);
-                    case "creator" -> creators.add(elem);
+                    case TAG_IDENTIFIER -> identifiers.add(elem);
+                    case TAG_TITLE -> titles.add(elem);
+                    case TAG_CREATOR -> creators.add(elem);
                     case "contributor" -> contributors.add(elem);
                     case "language" -> languages.add(elem);
                     case "date" -> dates.add(elem);
                     case "publisher" -> publishers.add(elem);
                     case "description" -> descriptions.add(elem);
-                    case "subject" -> subjects.add(elem);
+                    case TAG_SUBJECT -> subjects.add(elem);
                 }
             } else if ("meta".equals(localName)) {
-                String property = elem.getAttribute("property");
+                String property = elem.getAttribute(ATTR_PROPERTY);
                 String name = elem.getAttribute("name");
-                if (property.startsWith("booklore:") || name.startsWith("booklore:")) {
+                if (property.startsWith(BOOKLORE_PREFIX) || name.startsWith(BOOKLORE_PREFIX)) {
                     bookloreMetas.add(elem);
                 } else if (property.equals("dcterms:modified") || property.equals("calibre:timestamp")) {
                     modifiedMetas.add(elem);
-                } else if (property.equals("belongs-to-collection") || property.equals("collection-type") || property.equals("group-position")
-                        || "calibre:series".equals(name) || "calibre:series_index".equals(name)) {
+                } else if (property.equals(PROP_BELONGS_TO_COLLECTION) || property.equals(PROP_COLLECTION_TYPE) || property.equals(PROP_GROUP_POSITION)
+                        || META_NAME_CALIBRE_SERIES.equals(name) || META_NAME_CALIBRE_SERIES_INDEX.equals(name)) {
                     seriesMetas.add(elem);
                 } else {
                     otherMetas.add(elem);

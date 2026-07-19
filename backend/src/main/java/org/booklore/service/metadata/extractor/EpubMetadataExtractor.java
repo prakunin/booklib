@@ -53,6 +53,8 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
     private static final Pattern ISBN_SEPARATOR_PATTERN = Pattern.compile("[- ]");
 
     private static final Set<Integer> VALID_AGE_RATINGS = Set.of(0, 6, 10, 13, 16, 18, 21);
+    private static final String COVER_KEYWORD = "cover";
+    private static final String CONTENT_ATTR = "content";
 
     private final ObjectMapper objectMapper;
 
@@ -165,8 +167,8 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                 String href = item.getAttribute("href");
                 String mediaType = item.getAttribute("media-type");
                 if (mediaType != null && mediaType.startsWith("image/")
-                        && ((id != null && id.toLowerCase().contains("cover")) ||
-                            (href != null && href.toLowerCase().contains("cover")))) {
+                        && ((id != null && id.toLowerCase().contains(COVER_KEYWORD)) ||
+                            (href != null && href.toLowerCase().contains(COVER_KEYWORD)))) {
                     String decodedHref = URLDecoder.decode(href, StandardCharsets.UTF_8);
                     String fullPath = resolvePath(opfName, decodedHref);
                     if (container.exists(fullPath)) {
@@ -180,7 +182,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
             // Scan all files for cover-named images
             for (String name : container.listAllFiles()) {
                 String lower = name.toLowerCase();
-                if (lower.contains("cover") && (lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+                if (lower.contains(COVER_KEYWORD) && (lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
                         lower.endsWith(".png") || lower.endsWith(".webp"))) {
                     ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
                     container.streamTo(name, baos);
@@ -245,7 +247,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                         String prop = el.getAttribute("property").trim();
                         String name = el.getAttribute("name").trim();
                         String refines = el.getAttribute("refines").trim();
-                        String content = el.hasAttribute("content") ? el.getAttribute("content").trim() : text;
+                        String content = el.hasAttribute(CONTENT_ATTR) ? el.getAttribute(CONTENT_ATTR).trim() : text;
 
                         if ("title-type".equals(prop) && StringUtils.isNotBlank(refines)) {
                             titleTypeById.put(refines.substring(1), content.toLowerCase());
@@ -435,7 +437,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                     if (!(children.item(i) instanceof Element el)) continue;
                     if (!"meta".equals(el.getLocalName())) continue;
                     String prop = el.getAttribute("property").trim().toLowerCase();
-                    String content = el.hasAttribute("content") ? el.getAttribute("content").trim() : el.getTextContent().trim();
+                    String content = el.hasAttribute(CONTENT_ATTR) ? el.getAttribute(CONTENT_ATTR).trim() : el.getTextContent().trim();
                     if ("dcterms:modified".equals(prop)) {
                         LocalDate parsed = parseDate(content);
                         if (parsed != null) {

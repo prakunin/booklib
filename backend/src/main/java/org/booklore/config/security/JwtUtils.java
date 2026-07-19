@@ -38,6 +38,7 @@ public class JwtUtils {
     private static final String TOKEN_TYPE_ACCESS = "access";
     private static final String TOKEN_TYPE_REFRESH = "refresh";
     private static final String TOKEN_TYPE_MEDIA = "media";
+    private static final String CLAIM_USER_ID = "userId";
 
     private DefaultJWTClaimsVerifier<?> claimsVerifier;
 
@@ -53,7 +54,7 @@ public class JwtUtils {
         validateSecret();
         this.claimsVerifier = new DefaultJWTClaimsVerifier<>(
                 new JWTClaimsSet.Builder().issuer(JWT_ISSUER).build(),
-                Set.of("exp", "iat", "iss", "sub", "userId")
+                Set.of("exp", "iat", "iss", "sub", CLAIM_USER_ID)
         );
     }
 
@@ -92,7 +93,7 @@ public class JwtUtils {
             JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                     .issuer(JWT_ISSUER)
                     .subject(user.getUsername())
-                    .claim("userId", user.getId())
+                    .claim(CLAIM_USER_ID, user.getId())
                     .claim("isDefaultPassword", user.isDefaultPassword())
                     .claim(TOKEN_TYPE_CLAIM, tokenType)
                     .issueTime(Date.from(now))
@@ -173,7 +174,7 @@ public class JwtUtils {
      */
     private void validateClaims(JWTClaimsSet claims) throws BadJWTException {
         claimsVerifier.verify(claims, null);
-        Object userId = claims.getClaim("userId");
+        Object userId = claims.getClaim(CLAIM_USER_ID);
         if (!(userId instanceof Number)) {
             throw new BadJWTException("Invalid userId claim type");
         }
@@ -231,7 +232,7 @@ public class JwtUtils {
      * @throws RuntimeException if token is invalid or expired.
      */
     public Long extractUserId(String token) {
-        Object userIdClaim = extractClaims(token).getClaim("userId");
+        Object userIdClaim = extractClaims(token).getClaim(CLAIM_USER_ID);
         if (userIdClaim instanceof Number number) {
             return number.longValue();
         }

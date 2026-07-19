@@ -22,6 +22,8 @@ import java.util.Optional;
 @AllArgsConstructor
 public class SidecarController {
 
+    private static final String FIELD_MESSAGE = "message";
+
     private final SidecarService sidecarService;
 
     @Operation(summary = "Get sidecar content", description = "Get the content of the sidecar JSON file for a book")
@@ -53,7 +55,7 @@ public class SidecarController {
     @PostMapping("/books/{bookId}/sidecar/export")
     public ResponseEntity<Map<String, String>> exportToSidecar(@Parameter(description = "Book ID") @PathVariable Long bookId) {
         sidecarService.exportToSidecar(bookId);
-        return ResponseEntity.ok(Map.of("message", "Sidecar metadata exported successfully"));
+        return ResponseEntity.ok(Map.of(FIELD_MESSAGE, "Sidecar metadata exported successfully"));
     }
 
     @Operation(summary = "Import metadata from sidecar", description = "Import book metadata from a sidecar JSON file")
@@ -64,7 +66,7 @@ public class SidecarController {
     @PostMapping("/books/{bookId}/sidecar/import")
     public ResponseEntity<Map<String, String>> importFromSidecar(@Parameter(description = "Book ID") @PathVariable Long bookId) {
         sidecarService.importFromSidecar(bookId);
-        return ResponseEntity.ok(Map.of("message", "Sidecar metadata imported successfully"));
+        return ResponseEntity.ok(Map.of(FIELD_MESSAGE, "Sidecar metadata imported successfully"));
     }
 
     @Operation(summary = "Bulk export sidecar for library", description = "Generate sidecar JSON files for all books in a library")
@@ -75,7 +77,7 @@ public class SidecarController {
     public ResponseEntity<Map<String, Object>> bulkExport(@Parameter(description = "Library ID") @PathVariable Long libraryId) {
         int exported = sidecarService.bulkExport(libraryId);
         return ResponseEntity.ok(Map.of(
-                "message", "Bulk export completed",
+                FIELD_MESSAGE, "Bulk export completed",
                 "exported", exported
         ));
     }
@@ -88,7 +90,7 @@ public class SidecarController {
     public ResponseEntity<Map<String, Object>> bulkImport(@Parameter(description = "Library ID") @PathVariable Long libraryId) {
         int imported = sidecarService.bulkImport(libraryId);
         return ResponseEntity.ok(Map.of(
-                "message", "Bulk import completed",
+                FIELD_MESSAGE, "Bulk import completed",
                 "imported", imported
         ));
     }

@@ -18,6 +18,9 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class MagicShelfService {
 
+    private static final String SHELF_NOT_FOUND_MESSAGE = "Shelf not found";
+    private static final String AUDIT_ENTITY_MAGIC_SHELF = "MagicShelf";
+
     private final MagicShelfRepository magicShelfRepository;
     private final AuthenticationService authenticationService;
     private final AuditService auditService;
@@ -51,7 +54,7 @@ public class MagicShelfService {
     public MagicShelf createOrUpdateShelf(MagicShelf dto) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         if (dto.getId() != null) {
-            MagicShelfEntity existing = magicShelfRepository.findById(dto.getId()).orElseThrow(() -> new IllegalArgumentException("Shelf not found"));
+            MagicShelfEntity existing = magicShelfRepository.findById(dto.getId()).orElseThrow(() -> new IllegalArgumentException(SHELF_NOT_FOUND_MESSAGE));
             if (!existing.getUserId().equals(userId)) {
                 throw new SecurityException("You are not authorized to update this shelf");
             }
@@ -64,27 +67,27 @@ public class MagicShelfService {
             existing.setFilterJson(dto.getFilterJson());
             existing.setPublic(dto.getIsPublic());
             MagicShelf result = toDto(magicShelfRepository.save(existing));
-            auditService.log(AuditAction.MAGIC_SHELF_UPDATED, "MagicShelf", dto.getId(), "Updated magic shelf: " + dto.getName());
+            auditService.log(AuditAction.MAGIC_SHELF_UPDATED, AUDIT_ENTITY_MAGIC_SHELF, dto.getId(), "Updated magic shelf: " + dto.getName());
             return result;
         }
         if (magicShelfRepository.existsByUserIdAndName(userId, dto.getName())) {
             throw new IllegalArgumentException("A shelf with the same name already exists for this user.");
         }
         MagicShelf result = toDto(magicShelfRepository.save(toEntity(dto, userId)));
-        auditService.log(AuditAction.MAGIC_SHELF_CREATED, "MagicShelf", result.getId(), "Created magic shelf: " + dto.getName());
+        auditService.log(AuditAction.MAGIC_SHELF_CREATED, AUDIT_ENTITY_MAGIC_SHELF, result.getId(), "Created magic shelf: " + dto.getName());
         return result;
     }
 
     @Transactional
     public void deleteShelf(Long id) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
-        MagicShelfEntity shelf = magicShelfRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Shelf not found"));
+        MagicShelfEntity shelf = magicShelfRepository.findById(id).orElseThrow(() -> new IllegalArgumentException(SHELF_NOT_FOUND_MESSAGE));
         if (!shelf.getUserId().equals(userId)) {
             throw new SecurityException("You are not authorized to delete this shelf");
         }
         String shelfName = shelf.getName();
         magicShelfRepository.deleteById(id);
-        auditService.log(AuditAction.MAGIC_SHELF_DELETED, "MagicShelf", id, "Deleted magic shelf: " + shelfName);
+        auditService.log(AuditAction.MAGIC_SHELF_DELETED, AUDIT_ENTITY_MAGIC_SHELF, id, "Deleted magic shelf: " + shelfName);
     }
 
     private MagicShelf toDto(MagicShelfEntity entity) {
@@ -111,7 +114,7 @@ public class MagicShelfService {
     }
 
     public MagicShelf getShelf(Long id) {
-        MagicShelfEntity shelf = magicShelfRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Shelf not found"));
+        MagicShelfEntity shelf = magicShelfRepository.findById(id).orElseThrow(() -> new IllegalArgumentException(SHELF_NOT_FOUND_MESSAGE));
         return toDto(shelf);
     }
 }

@@ -39,6 +39,7 @@ import java.util.zip.ZipOutputStream;
 @RequiredArgsConstructor
 public class CbxMetadataWriter implements MetadataWriter {
     private static final String DEFAULT_COMICINFO_XML = "ComicInfo.xml";
+    private static final String BOOKLORE_NOTE_PREFIX = "[BookLore:";
 
     // Cache JAXBContext for performance
     private static final JAXBContext JAXB_CONTEXT;
@@ -254,7 +255,7 @@ public class CbxMetadataWriter implements MetadataWriter {
         if (existingNotes != null && !existingNotes.isBlank()) {
             String preservedRules = existingNotes.lines()
                     .map(String::trim)
-                    .filter(line -> !line.startsWith("[BookLore:") && !line.startsWith("[BookLore]"))
+                    .filter(line -> !line.startsWith(BOOKLORE_NOTE_PREFIX) && !line.startsWith("[BookLore]"))
                     .collect(Collectors.joining("\n"));
              if (!preservedRules.isEmpty()) {
                  notesBuilder.append(preservedRules);
@@ -643,7 +644,7 @@ public class CbxMetadataWriter implements MetadataWriter {
     private void appendBookLoreTag(StringBuilder sb, String tag, String value) {
         if (value != null && !value.isBlank()) {
             if (sb.length() > 0) sb.append("\n");
-            sb.append("[BookLore:").append(tag).append("] ").append(value);
+            sb.append(BOOKLORE_NOTE_PREFIX).append(tag).append("] ").append(value);
         }
     }
 
@@ -653,7 +654,7 @@ public class CbxMetadataWriter implements MetadataWriter {
             String formatted = (value instanceof Double || value instanceof Float) 
                     ? String.format(Locale.US, "%.2f", value.doubleValue())
                     : value.toString();
-            sb.append("[BookLore:").append(tag).append("] ").append(formatted);
+            sb.append(BOOKLORE_NOTE_PREFIX).append(tag).append("] ").append(formatted);
         }
     }
 }

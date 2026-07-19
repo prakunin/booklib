@@ -27,6 +27,12 @@ public class OidcDiagnosticService {
 
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS = 10_000;
+    private static final String CHECK_DISCOVERY_DOCUMENT = "Discovery Document";
+    private static final String NOT_FOUND_IN_DISCOVERY_DOCUMENT = "Not found in discovery document";
+    private static final String CHECK_JWKS_KEYS = "JWKS Keys";
+    private static final String CHECK_REQUIRED_SCOPES = "Required Scopes";
+    private static final String CHECK_RESPONSE_TYPE_CODE = "Response Type 'code'";
+    private static final String CHECK_PKCE_S256 = "PKCE (S256)";
 
     @SuppressWarnings("unchecked")
     public OidcTestResult testConnection(OidcProviderDetails providerDetails) {
@@ -47,12 +53,12 @@ public class OidcDiagnosticService {
             doc = restClient.get().uri(discoveryUrl).retrieve().body(Map.class);
 
             if (doc == null) {
-                checks.add(new OidcTestCheck("Discovery Document", CheckStatus.FAIL, "Empty response from discovery endpoint"));
+                checks.add(new OidcTestCheck(CHECK_DISCOVERY_DOCUMENT, CheckStatus.FAIL, "Empty response from discovery endpoint"));
                 return new OidcTestResult(false, checks);
             }
-            checks.add(new OidcTestCheck("Discovery Document", CheckStatus.PASS, "Successfully fetched from " + discoveryUrl));
+            checks.add(new OidcTestCheck(CHECK_DISCOVERY_DOCUMENT, CheckStatus.PASS, "Successfully fetched from " + discoveryUrl));
         } catch (Exception e) {
-            checks.add(new OidcTestCheck("Discovery Document", CheckStatus.FAIL, "Failed to fetch: " + e.getMessage()));
+            checks.add(new OidcTestCheck(CHECK_DISCOVERY_DOCUMENT, CheckStatus.FAIL, "Failed to fetch: " + e.getMessage()));
             return new OidcTestResult(false, checks);
         }
 
@@ -61,7 +67,7 @@ public class OidcDiagnosticService {
         if (authEndpoint != null && !authEndpoint.isBlank()) {
             checks.add(new OidcTestCheck("Authorization Endpoint", CheckStatus.PASS, authEndpoint));
         } else {
-            checks.add(new OidcTestCheck("Authorization Endpoint", CheckStatus.FAIL, "Not found in discovery document"));
+            checks.add(new OidcTestCheck("Authorization Endpoint", CheckStatus.FAIL, NOT_FOUND_IN_DISCOVERY_DOCUMENT));
             hasFailure = true;
         }
 
@@ -69,7 +75,7 @@ public class OidcDiagnosticService {
         if (tokenEndpoint != null && !tokenEndpoint.isBlank()) {
             checks.add(new OidcTestCheck("Token Endpoint", CheckStatus.PASS, tokenEndpoint));
         } else {
-            checks.add(new OidcTestCheck("Token Endpoint", CheckStatus.FAIL, "Not found in discovery document"));
+            checks.add(new OidcTestCheck("Token Endpoint", CheckStatus.FAIL, NOT_FOUND_IN_DISCOVERY_DOCUMENT));
             hasFailure = true;
         }
 
@@ -77,7 +83,7 @@ public class OidcDiagnosticService {
         if (jwksUri != null && !jwksUri.isBlank()) {
             checks.add(new OidcTestCheck("JWKS URI", CheckStatus.PASS, jwksUri));
         } else {
-            checks.add(new OidcTestCheck("JWKS URI", CheckStatus.FAIL, "Not found in discovery document"));
+            checks.add(new OidcTestCheck("JWKS URI", CheckStatus.FAIL, NOT_FOUND_IN_DISCOVERY_DOCUMENT));
             hasFailure = true;
         }
 
@@ -86,13 +92,13 @@ public class OidcDiagnosticService {
             try {
                 JWKSet jwkSet = JWKSet.load(URI.create(jwksUri).toURL());
                 int keyCount = jwkSet.getKeys().size();
-                checks.add(new OidcTestCheck("JWKS Keys", CheckStatus.PASS, keyCount + " key(s) found"));
+                checks.add(new OidcTestCheck(CHECK_JWKS_KEYS, CheckStatus.PASS, keyCount + " key(s) found"));
             } catch (Exception e) {
-                checks.add(new OidcTestCheck("JWKS Keys", CheckStatus.FAIL, "Failed to fetch JWKS: " + e.getMessage()));
+                checks.add(new OidcTestCheck(CHECK_JWKS_KEYS, CheckStatus.FAIL, "Failed to fetch JWKS: " + e.getMessage()));
                 hasFailure = true;
             }
         } else {
-            checks.add(new OidcTestCheck("JWKS Keys", CheckStatus.SKIP, "Skipped (no JWKS URI)"));
+            checks.add(new OidcTestCheck(CHECK_JWKS_KEYS, CheckStatus.SKIP, "Skipped (no JWKS URI)"));
         }
 
         // 4. Check scopes
@@ -101,33 +107,33 @@ public class OidcDiagnosticService {
             List<String> required = List.of("openid", "profile", "email");
             List<String> missing = required.stream().filter(s -> !scopes.contains(s)).toList();
             if (missing.isEmpty()) {
-                checks.add(new OidcTestCheck("Required Scopes", CheckStatus.PASS, "openid, profile, email all supported"));
+                checks.add(new OidcTestCheck(CHECK_REQUIRED_SCOPES, CheckStatus.PASS, "openid, profile, email all supported"));
             } else {
-                checks.add(new OidcTestCheck("Required Scopes", CheckStatus.WARN, "Missing scopes: " + String.join(", ", missing)));
+                checks.add(new OidcTestCheck(CHECK_REQUIRED_SCOPES, CheckStatus.WARN, "Missing scopes: " + String.join(", ", missing)));
             }
         } else {
-            checks.add(new OidcTestCheck("Required Scopes", CheckStatus.WARN, "scopes_supported not listed in discovery document"));
+            checks.add(new OidcTestCheck(CHECK_REQUIRED_SCOPES, CheckStatus.WARN, "scopes_supported not listed in discovery document"));
         }
 
         // 5. Check response types
         List<String> responseTypes = (List<String>) doc.get("response_types_supported");
         if (responseTypes != null && responseTypes.contains("code")) {
-            checks.add(new OidcTestCheck("Response Type 'code'", CheckStatus.PASS, "Authorization code flow supported"));
+            checks.add(new OidcTestCheck(CHECK_RESPONSE_TYPE_CODE, CheckStatus.PASS, "Authorization code flow supported"));
         } else if (responseTypes != null) {
-            checks.add(new OidcTestCheck("Response Type 'code'", CheckStatus.FAIL, "Authorization code flow not supported"));
+            checks.add(new OidcTestCheck(CHECK_RESPONSE_TYPE_CODE, CheckStatus.FAIL, "Authorization code flow not supported"));
             hasFailure = true;
         } else {
-            checks.add(new OidcTestCheck("Response Type 'code'", CheckStatus.WARN, "response_types_supported not listed"));
+            checks.add(new OidcTestCheck(CHECK_RESPONSE_TYPE_CODE, CheckStatus.WARN, "response_types_supported not listed"));
         }
 
         // 6. Check PKCE
         List<String> codeChallengeMethodsSupported = (List<String>) doc.get("code_challenge_methods_supported");
         if (codeChallengeMethodsSupported != null && codeChallengeMethodsSupported.contains("S256")) {
-            checks.add(new OidcTestCheck("PKCE (S256)", CheckStatus.PASS, "S256 code challenge method supported"));
+            checks.add(new OidcTestCheck(CHECK_PKCE_S256, CheckStatus.PASS, "S256 code challenge method supported"));
         } else if (codeChallengeMethodsSupported != null) {
-            checks.add(new OidcTestCheck("PKCE (S256)", CheckStatus.WARN, "S256 not listed, available: " + String.join(", ", codeChallengeMethodsSupported)));
+            checks.add(new OidcTestCheck(CHECK_PKCE_S256, CheckStatus.WARN, "S256 not listed, available: " + String.join(", ", codeChallengeMethodsSupported)));
         } else {
-            checks.add(new OidcTestCheck("PKCE (S256)", CheckStatus.WARN, "code_challenge_methods_supported not listed (PKCE may still work)"));
+            checks.add(new OidcTestCheck(CHECK_PKCE_S256, CheckStatus.WARN, "code_challenge_methods_supported not listed (PKCE may still work)"));
         }
 
         // 7. Logout endpoints (informational)

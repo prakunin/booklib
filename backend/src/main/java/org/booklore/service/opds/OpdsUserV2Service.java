@@ -30,6 +30,7 @@ import java.util.List;
 public class OpdsUserV2Service {
 
     private static final String AUDIT_ENTITY_TYPE = "OpdsUser";
+    private static final String USER_NOT_FOUND_MESSAGE = "User not found with ID: ";
 
     private final OpdsUserV2Repository opdsUserV2Repository;
     private final AuthenticationService authenticationService;
@@ -51,7 +52,7 @@ public class OpdsUserV2Service {
         try {
             BookLoreUser bookLoreUser = authenticationService.getAuthenticatedUser();
             BookLoreUserEntity userEntity = userRepository.findById(bookLoreUser.getId())
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found with ID: " + bookLoreUser.getId()));
+                    .orElseThrow(() -> new UsernameNotFoundException(USER_NOT_FOUND_MESSAGE + bookLoreUser.getId()));
 
             OpdsUserV2Entity opdsUserV2 = OpdsUserV2Entity.builder()
                     .user(userEntity)
@@ -88,7 +89,7 @@ public class OpdsUserV2Service {
 
     public void deleteOpdsUser(Long userId) {
         BookLoreUser bookLoreUser = authenticationService.getAuthenticatedUser();
-        OpdsUserV2Entity user = opdsUserV2Repository.findByIdWithUser(userId).orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        OpdsUserV2Entity user = opdsUserV2Repository.findByIdWithUser(userId).orElseThrow(() -> new RuntimeException(USER_NOT_FOUND_MESSAGE + userId));
         if (!user.getUser().getId().equals(bookLoreUser.getId())) {
             throw new AccessDeniedException("You are not allowed to delete this user");
         }
@@ -100,7 +101,7 @@ public class OpdsUserV2Service {
     public OpdsUserV2 updateOpdsUser(Long userId, OpdsUserV2UpdateRequest request) {
         BookLoreUser bookLoreUser = authenticationService.getAuthenticatedUser();
         OpdsUserV2Entity user = opdsUserV2Repository.findByIdWithUser(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+                .orElseThrow(() -> new RuntimeException(USER_NOT_FOUND_MESSAGE + userId));
         
         if (!user.getUser().getId().equals(bookLoreUser.getId())) {
             throw new AccessDeniedException("You are not allowed to update this user");

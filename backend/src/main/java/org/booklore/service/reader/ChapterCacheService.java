@@ -32,6 +32,7 @@ public class ChapterCacheService {
     private static final long MTIME_TOLERANCE_MS = 2000;
     static final int CACHE_LOCK_MAX_ENTRIES = 1024;
     static final Duration CACHE_LOCK_TTL = Duration.ofMinutes(30);
+    private static final String PAGE_FILE_PREFIX = "page_";
 
     private final AppProperties appProperties;
     private final ArchiveService archiveService;
@@ -60,7 +61,7 @@ public class ChapterCacheService {
                 log.info("Populating disk cache for {}: {} pages", cacheKey, entries.size());
 
                 for (int i = 0; i < entries.size(); i++) {
-                    Path target = cacheDir.resolve("page_" + (i + 1) + ".jpg");
+                    Path target = cacheDir.resolve(PAGE_FILE_PREFIX + (i + 1) + ".jpg");
                     if (!Files.exists(target) || Files.size(target) == 0) {
                         String entryName = entries.get(i);
                         writeAtomically(target, out ->
@@ -99,7 +100,7 @@ public class ChapterCacheService {
     }
 
     public Path getCachedPage(String cacheKey, int pageNumber) {
-        return getCacheDir(cacheKey).resolve("page_" + pageNumber + ".jpg");
+        return getCacheDir(cacheKey).resolve(PAGE_FILE_PREFIX + pageNumber + ".jpg");
     }
 
     public boolean hasPage(String cacheKey, int pageNumber) {
@@ -163,7 +164,7 @@ public class ChapterCacheService {
         if (!Files.exists(cacheDir)) return true;
 
         for (int i = 1; i <= expectedPages; i++) {
-            Path page = cacheDir.resolve("page_" + i + ".jpg");
+            Path page = cacheDir.resolve(PAGE_FILE_PREFIX + i + ".jpg");
             if (!Files.exists(page) || Files.size(page) == 0) return true;
         }
 

@@ -33,6 +33,8 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     private static final Pattern KEYWORD_SEPARATOR_PATTERN = Pattern.compile("[,;]");
     private static final Pattern ISBN_CLEANER_PATTERN = Pattern.compile("[^0-9Xx]");
     private static final Pattern ISO_DATE_PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+    private static final String TITLE_INFO_ELEMENT = "title-info";
+    private static final String BINARY_ELEMENT = "binary";
 
     /**
      * {@inheritDoc}
@@ -78,7 +80,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                         }
 
                         String localName = reader.getLocalName();
-                        if ("title-info".equals(localName)) {
+                        if (TITLE_INFO_ELEMENT.equals(localName)) {
                             titleInfoDepth = 1;
                         } else if (titleInfoDepth > 0 && "coverpage".equals(localName)) {
                             coverpageDepth = 1;
@@ -87,7 +89,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                             if (href != null && href.startsWith("#")) {
                                 referencedImageId = href.substring(1);
                             }
-                        } else if ("binary".equals(localName) && coverBinaryId == null) {
+                        } else if (BINARY_ELEMENT.equals(localName) && coverBinaryId == null) {
                             String id = reader.getAttributeValue(null, "id");
                             String contentType = reader.getAttributeValue(null, "content-type");
                             if (Strings.CI.contains(id, "cover")
@@ -124,7 +126,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                     if (event == XMLStreamConstants.START_ELEMENT) {
                         if (base64 != null) {
                             targetDepth++;
-                        } else if ("binary".equals(reader.getLocalName())
+                        } else if (BINARY_ELEMENT.equals(reader.getLocalName())
                                 && binaryId.equals(reader.getAttributeValue(null, "id"))) {
                             base64 = new StringBuilder();
                             targetDepth = 1;
@@ -135,7 +137,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                             && base64 != null) {
                         base64.append(reader.getText());
                     } else if (event == XMLStreamConstants.END_ELEMENT && base64 != null) {
-                        if (targetDepth == 1 && "binary".equals(reader.getLocalName())) {
+                        if (targetDepth == 1 && BINARY_ELEMENT.equals(reader.getLocalName())) {
                             return Base64.getMimeDecoder().decode(base64.toString().trim());
                         }
                         targetDepth--;
@@ -197,7 +199,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
             int event = reader.next();
             if (event == XMLStreamConstants.START_ELEMENT) {
                 switch (reader.getLocalName()) {
-                    case "title-info" -> extractTitleInfo(reader, builder, authors, categories);
+                    case TITLE_INFO_ELEMENT -> extractTitleInfo(reader, builder, authors, categories);
                     case "publish-info" -> extractPublishInfo(reader, builder);
                     case "document-info" -> extractDocumentInfo(reader);
                     default -> {
@@ -247,7 +249,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                         // ignore other elements
                     }
                 }
-            } else if (event == XMLStreamConstants.END_ELEMENT && "title-info".equals(reader.getLocalName())) {
+            } else if (event == XMLStreamConstants.END_ELEMENT && TITLE_INFO_ELEMENT.equals(reader.getLocalName())) {
                 return;
             }
         }

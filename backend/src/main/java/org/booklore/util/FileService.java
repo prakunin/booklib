@@ -92,6 +92,8 @@ public class FileService {
     private static final int    SQUARE_THUMBNAIL_SIZE         = 250;
     private static final int    MAX_SQUARE_SIZE               = 1000;
     private static final String IMAGE_FORMAT                  = "JPEG";
+    private static final String FAILED_TO_SAVE_COVER_IMAGES_MESSAGE           = "Failed to save cover images";
+    private static final String FAILED_TO_SAVE_AUDIOBOOK_COVER_IMAGES_MESSAGE = "Failed to save audiobook cover images";
     // @formatter:on
 
     // ========================================
@@ -479,7 +481,7 @@ public class FileService {
             }
             boolean success = saveCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush(); // Release resources after processing
             log.info("Cover images created and saved for book ID: {}", bookId);
@@ -498,7 +500,7 @@ public class FileService {
             }
             boolean success = saveCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Cover images created and saved from bytes for book ID: {}", bookId);
@@ -596,7 +598,7 @@ public class FileService {
             }
             boolean success = saveCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Cover images created and saved from URL for book ID: {}", bookId);
@@ -733,7 +735,7 @@ public class FileService {
             }
             boolean success = saveAudiobookCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save audiobook cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_AUDIOBOOK_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Audiobook cover images created and saved for book ID: {}", bookId);
@@ -752,7 +754,7 @@ public class FileService {
             }
             boolean success = saveAudiobookCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save audiobook cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_AUDIOBOOK_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Audiobook cover images created and saved from bytes for book ID: {}", bookId);
@@ -771,7 +773,7 @@ public class FileService {
             }
             boolean success = saveAudiobookCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save audiobook cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_AUDIOBOOK_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Audiobook cover images created and saved from URL for book ID: {}", bookId);

@@ -67,6 +67,11 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
 
     static final Duration VOLUME_CACHE_TTL = Duration.ofMinutes(10);
     static final int VOLUME_CACHE_MAX_ENTRIES = 500;
+
+    private static final String API_KEY_PARAM = "api_key";
+    private static final String FORMAT_PARAM = "format";
+    private static final String LIMIT_PARAM = "limit";
+    private static final String FIELD_LIST_PARAM = "field_list";
     private static final int MAX_VOLUMES_TO_CHECK = 3;
     private static final int SEARCH_LIMIT_DEFAULT = 25;
     private static final int FILTER_LIMIT_DEFAULT = 20;
@@ -316,12 +321,12 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         log.debug("Searching for volumes via /search/ endpoint: '{}'", seriesName);
         URI uri = UriComponentsBuilder.fromUriString(COMICVINE_URL)
                 .path("/search/")
-                .queryParam("api_key", apiToken)
-                .queryParam("format", "json")
+                .queryParam(API_KEY_PARAM, apiToken)
+                .queryParam(FORMAT_PARAM, "json")
                 .queryParam("resources", "volume")
                 .queryParam("query", seriesName)
-                .queryParam("limit", SEARCH_LIMIT_DEFAULT)
-                .queryParam("field_list", VOLUME_FIELDS)
+                .queryParam(LIMIT_PARAM, SEARCH_LIMIT_DEFAULT)
+                .queryParam(FIELD_LIST_PARAM, VOLUME_FIELDS)
                 .build()
                 .toUri();
 
@@ -347,11 +352,11 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
     private List<Comic> searchVolumesViaFilter(String seriesName, String apiToken) {
         URI uri = UriComponentsBuilder.fromUriString(COMICVINE_URL)
                 .path("/volumes/")
-                .queryParam("api_key", apiToken)
-                .queryParam("format", "json")
+                .queryParam(API_KEY_PARAM, apiToken)
+                .queryParam(FORMAT_PARAM, "json")
                 .queryParam("filter", "name:" + seriesName)
-                .queryParam("limit", FILTER_LIMIT_DEFAULT)
-                .queryParam("field_list", VOLUME_FIELDS)
+                .queryParam(LIMIT_PARAM, FILTER_LIMIT_DEFAULT)
+                .queryParam(FIELD_LIST_PARAM, VOLUME_FIELDS)
                 .build()
                 .toUri();
 
@@ -369,11 +374,11 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
 
         URI uri = UriComponentsBuilder.fromUriString(COMICVINE_URL)
                 .path("/issues/")
-                .queryParam("api_key", apiToken)
-                .queryParam("format", "json")
+                .queryParam(API_KEY_PARAM, apiToken)
+                .queryParam(FORMAT_PARAM, "json")
                 .queryParam("filter", "volume:" + volume.getId() + ",issue_number:" + normalizedIssue)
-                .queryParam("field_list", ISSUE_LIST_FIELDS)
-                .queryParam("limit", ISSUE_LIMIT_DEFAULT)
+                .queryParam(FIELD_LIST_PARAM, ISSUE_LIST_FIELDS)
+                .queryParam(LIMIT_PARAM, ISSUE_LIMIT_DEFAULT)
                 .build()
                 .toUri();
 
@@ -439,9 +444,9 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
 
         URI uri = UriComponentsBuilder.fromUriString(COMICVINE_URL)
                 .path("/volume/{type}-{id}/")
-                .queryParam("api_key", apiToken)
-                .queryParam("format", "json")
-                .queryParam("field_list", VOLUME_FIELDS)
+                .queryParam(API_KEY_PARAM, apiToken)
+                .queryParam(FORMAT_PARAM, "json")
+                .queryParam(FIELD_LIST_PARAM, VOLUME_FIELDS)
                 .buildAndExpand(RESOURCE_TYPE_VOLUME, volumeId)
                 .toUri();
 
@@ -458,9 +463,9 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
 
         URI uri = UriComponentsBuilder.fromUriString(COMICVINE_URL)
                 .path("/issue/{type}-{id}/")
-                .queryParam("api_key", apiToken)
-                .queryParam("format", "json")
-                .queryParam("field_list", ISSUE_DETAIL_FIELDS)
+                .queryParam(API_KEY_PARAM, apiToken)
+                .queryParam(FORMAT_PARAM, "json")
+                .queryParam(FIELD_LIST_PARAM, ISSUE_DETAIL_FIELDS)
                 .buildAndExpand(RESOURCE_TYPE_ISSUE, issueId)
                 .toUri();
 
@@ -477,12 +482,12 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
 
         URI uri = UriComponentsBuilder.fromUriString(COMICVINE_URL)
                 .path("/search/")
-                .queryParam("api_key", apiToken)
-                .queryParam("format", "json")
+                .queryParam(API_KEY_PARAM, apiToken)
+                .queryParam(FORMAT_PARAM, "json")
                 .queryParam("resources", "volume,issue")
                 .queryParam("query", term)
-                .queryParam("limit", GENERAL_SEARCH_LIMIT)
-                .queryParam("field_list", SEARCH_FIELDS)
+                .queryParam(LIMIT_PARAM, GENERAL_SEARCH_LIMIT)
+                .queryParam(FIELD_LIST_PARAM, SEARCH_FIELDS)
                 .build()
                 .toUri();
 

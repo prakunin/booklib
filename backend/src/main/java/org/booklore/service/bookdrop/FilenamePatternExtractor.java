@@ -29,6 +29,9 @@ import java.time.MonthDay;
 public class FilenamePatternExtractor {
 
     private static final Pattern PATTERN = Pattern.compile("[,;&]");
+    private static final String NON_GREEDY_TEXT_PATTERN = "(.+?)";
+    private static final String PLACEHOLDER_PUBLISHED = "Published";
+    private static final String TWO_DIGIT_PATTERN = "\\d{2}";
     private final BookdropFileRepository bookdropFileRepository;
     private final BookdropMetadataHelper metadataHelper;
     private final ExecutorService regexExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -42,13 +45,13 @@ public class FilenamePatternExtractor {
     private static final int COMPACT_DATE_LENGTH = 8;
 
     private static final Map<String, PlaceholderConfig> PLACEHOLDER_CONFIGS = Map.ofEntries(
-            Map.entry("SeriesName", new PlaceholderConfig("(.+?)", "seriesName")),
-            Map.entry("Title", new PlaceholderConfig("(.+?)", "title")),
-            Map.entry("Subtitle", new PlaceholderConfig("(.+?)", "subtitle")),
-            Map.entry("Authors", new PlaceholderConfig("(.+?)", "authors")),
+            Map.entry("SeriesName", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "seriesName")),
+            Map.entry("Title", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "title")),
+            Map.entry("Subtitle", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "subtitle")),
+            Map.entry("Authors", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "authors")),
             Map.entry("SeriesNumber", new PlaceholderConfig("(\\d+(?:\\.\\d+)?)", "seriesNumber")),
-            Map.entry("Published", new PlaceholderConfig("(.+?)", "publishedDate")),
-            Map.entry("Publisher", new PlaceholderConfig("(.+?)", "publisher")),
+            Map.entry(PLACEHOLDER_PUBLISHED, new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "publishedDate")),
+            Map.entry("Publisher", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "publisher")),
             Map.entry("Language", new PlaceholderConfig("([a-zA-Z]+)", "language")),
             Map.entry("SeriesTotal", new PlaceholderConfig("(\\d+)", "seriesTotal")),
             Map.entry("ISBN10", new PlaceholderConfig("(\\d{9}[0-9Xx])", "isbn10")),
@@ -59,7 +62,7 @@ public class FilenamePatternExtractor {
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{(\\w+)(?::(.*?))?}|\\*");
     
     private static final Pattern FOUR_DIGIT_YEAR_PATTERN = Pattern.compile("\\d{4}");
-    private static final Pattern TWO_DIGIT_YEAR_PATTERN = Pattern.compile("\\d{2}");
+    private static final Pattern TWO_DIGIT_YEAR_PATTERN = Pattern.compile(TWO_DIGIT_PATTERN);
     private static final Pattern COMPACT_DATE_PATTERN = Pattern.compile("\\d{8}");
     private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("(\\d{4})([^\\d])(\\d{1,2})");
     private static final Pattern MONTH_YEAR_PATTERN = Pattern.compile("(\\d{1,2})([^\\d])(\\d{4})");
@@ -274,8 +277,8 @@ public class FilenamePatternExtractor {
 
             String regexForPlaceholder;
             if ("*".equals(placeholderName)) {
-                regexForPlaceholder = shouldUseGreedyMatching ? "(.+)" : "(.+?)";
-            } else if ("Published".equals(placeholderName) && formatParameter != null) {
+                regexForPlaceholder = shouldUseGreedyMatching ? "(.+)" : NON_GREEDY_TEXT_PATTERN;
+            } else if (PLACEHOLDER_PUBLISHED.equals(placeholderName) && formatParameter != null) {
                 regexForPlaceholder = buildRegexForDateFormat(formatParameter);
             } else {
                 PlaceholderConfig config = PLACEHOLDER_CONFIGS.get(placeholderName);
@@ -336,16 +339,16 @@ public class FilenamePatternExtractor {
                 result.append("\\d{4}");
                 i += 4;
             } else if (dateFormat.startsWith("yy", i)) {
-                result.append("\\d{2}");
+                result.append(TWO_DIGIT_PATTERN);
                 i += 2;
             } else if (dateFormat.startsWith("MM", i)) {
-                result.append("\\d{2}");
+                result.append(TWO_DIGIT_PATTERN);
                 i += 2;
             } else if (i < dateFormat.length() && dateFormat.charAt(i) == 'M') {
                 result.append("\\d{1,2}");
                 i += 1;
             } else if (dateFormat.startsWith("dd", i)) {
-                result.append("\\d{2}");
+                result.append(TWO_DIGIT_PATTERN);
                 i += 2;
             } else if (i < dateFormat.length() && dateFormat.charAt(i) == 'd') {
                 result.append("\\d{1,2}");
@@ -362,7 +365,7 @@ public class FilenamePatternExtractor {
     private String determineRegexForPlaceholder(PlaceholderConfig config, boolean shouldUseGreedyMatching) {
         if (config != null) {
             String configuredRegex = config.regex();
-            boolean isNonGreedyTextPattern = "(.+?)".equals(configuredRegex);
+            boolean isNonGreedyTextPattern = NON_GREEDY_TEXT_PATTERN.equals(configuredRegex);
             
             if (shouldUseGreedyMatching && isNonGreedyTextPattern) {
                 return "(.+)";
@@ -370,7 +373,7 @@ public class FilenamePatternExtractor {
             return configuredRegex;
         }
         
-        return shouldUseGreedyMatching ? "(.+)" : "(.+?)";
+        return shouldUseGreedyMatching ? "(.+)" : NON_GREEDY_TEXT_PATTERN;
     }
 
     private BookMetadata buildMetadataFromMatch(Matcher matcher, List<String> placeholderOrder) {
@@ -404,7 +407,7 @@ public class FilenamePatternExtractor {
             case "Subtitle" -> metadata.setSubtitle(value);
             case "Authors" -> metadata.setAuthors(parseAuthors(value));
             case "SeriesNumber" -> setSeriesNumber(metadata, value);
-            case "Published" -> setPublishedDate(metadata, value, formatParameter);
+            case PLACEHOLDER_PUBLISHED -> setPublishedDate(metadata, value, formatParameter);
             case "Publisher" -> metadata.setPublisher(value);
             case "Language" -> metadata.setLanguage(value);
             case "SeriesTotal" -> setSeriesTotal(metadata, value);

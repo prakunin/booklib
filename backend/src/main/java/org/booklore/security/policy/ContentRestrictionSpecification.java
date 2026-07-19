@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 
 public final class ContentRestrictionSpecification {
 
+    private static final String FIELD_BOOK_ID = "bookId";
+
     private ContentRestrictionSpecification() {
     }
 
@@ -74,8 +76,8 @@ public final class ContentRestrictionSpecification {
             Subquery<Long> sq = query.subquery(Long.class);
             Root<BookMetadataEntity> m = sq.from(BookMetadataEntity.class);
             Join<Object, Object> value = m.join(collectionAttribute);
-            sq.select(m.get("bookId")).where(
-                    cb.equal(m.get("bookId"), root.get("id")),
+            sq.select(m.get(FIELD_BOOK_ID)).where(
+                    cb.equal(m.get(FIELD_BOOK_ID), root.get("id")),
                     cb.lower(value.get("name")).in(loweredValues));
             return cb.exists(sq);
         };
@@ -85,8 +87,8 @@ public final class ContentRestrictionSpecification {
         return (root, query, cb) -> {
             Subquery<Long> sq = query.subquery(Long.class);
             Root<BookMetadataEntity> m = sq.from(BookMetadataEntity.class);
-            sq.select(m.get("bookId")).where(
-                    cb.equal(m.get("bookId"), root.get("id")),
+            sq.select(m.get(FIELD_BOOK_ID)).where(
+                    cb.equal(m.get(FIELD_BOOK_ID), root.get("id")),
                     cb.lower(m.get("contentRating")).in(loweredValues));
             return cb.exists(sq);
         };
@@ -96,8 +98,8 @@ public final class ContentRestrictionSpecification {
         return (root, query, cb) -> {
             Subquery<Long> sq = query.subquery(Long.class);
             Root<BookMetadataEntity> m = sq.from(BookMetadataEntity.class);
-            sq.select(m.get("bookId")).where(
-                    cb.equal(m.get("bookId"), root.get("id")),
+            sq.select(m.get(FIELD_BOOK_ID)).where(
+                    cb.equal(m.get(FIELD_BOOK_ID), root.get("id")),
                     cb.greaterThanOrEqualTo(m.get("ageRating"), threshold));
             return cb.exists(sq);
         };

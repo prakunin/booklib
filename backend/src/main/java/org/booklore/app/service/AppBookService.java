@@ -63,6 +63,9 @@ public class AppBookService {
     private static final String DEFAULT_SORT = "addedOn";
     private static final int ISBN_QUERY_BATCH_SIZE = 500;
     private static final int MAX_SHELL_IDS_IN_CLAUSE = 1_000;
+    private static final String ACCESS_DENIED_TO_LIBRARY_MESSAGE = "Access denied to library ";
+    private static final String METADATA_JOIN_CLAUSE = "JOIN b.metadata m";
+    private static final String PARAM_USER_ID = "userId";
 
     private final BookRepository bookRepository;
     private final UserBookProgressRepository userBookProgressRepository;
@@ -409,7 +412,7 @@ public class AppBookService {
         int pageNum = validatePageNumber(page);
         int pageSize = validatePageSize(size);
 
-        Pageable pageable = PageRequest.of(pageNum, pageSize, Sort.by(Sort.Direction.DESC, "addedOn"));
+        Pageable pageable = PageRequest.of(pageNum, pageSize, Sort.by(Sort.Direction.DESC, DEFAULT_SORT));
 
         Specification<BookEntity> spec = BookSpecifications.combine(
                 BookSpecifications.notDeleted(),
@@ -484,7 +487,7 @@ public class AppBookService {
                 contentRestrictions(userId, user.getPermissions().isAdmin())
         );
 
-        Pageable pageable = PageRequest.of(0, maxItems, Sort.by(Sort.Direction.DESC, "addedOn"));
+        Pageable pageable = PageRequest.of(0, maxItems, Sort.by(Sort.Direction.DESC, DEFAULT_SORT));
         Page<BookEntity> bookPage = bookRepository.findAll(spec, pageable);
         Map<Long, UserBookProgressEntity> progressMap = getProgressMapForBooks(userId, bookPage.getContent());
 
@@ -588,7 +591,7 @@ public class AppBookService {
 
         // Validate library access
         if (libraryId != null && accessibleLibraryIds != null && !accessibleLibraryIds.contains(libraryId)) {
-            throw ApiError.FORBIDDEN.createException("Access denied to library " + libraryId);
+            throw ApiError.FORBIDDEN.createException(ACCESS_DENIED_TO_LIBRARY_MESSAGE + libraryId);
         }
 
         // Validate shelf access
@@ -648,7 +651,7 @@ public class AppBookService {
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.LanguageOption> languages = queryCountedOptions(
-                "m.language", "JOIN b.metadata m",
+                "m.language", METADATA_JOIN_CLAUSE,
                 "AND m.language IS NOT NULL AND m.language <> ''",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId).stream()
                 .map(c -> new AppFilterOptions.LanguageOption(
@@ -666,12 +669,12 @@ public class AppBookService {
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> publishers = queryCountedOptions(
-                "m.publisher", "JOIN b.metadata m",
+                "m.publisher", METADATA_JOIN_CLAUSE,
                 "AND m.publisher IS NOT NULL AND m.publisher <> ''",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> seriesOptions = queryCountedOptions(
-                "m.seriesName", "JOIN b.metadata m",
+                "m.seriesName", METADATA_JOIN_CLAUSE,
                 "AND m.seriesName IS NOT NULL AND m.seriesName <> ''",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
@@ -684,7 +687,7 @@ public class AppBookService {
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> narrators = queryCountedOptions(
-                "m.narrator", "JOIN b.metadata m",
+                "m.narrator", METADATA_JOIN_CLAUSE,
                 "AND m.narrator IS NOT NULL AND m.narrator <> ''",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
@@ -701,11 +704,11 @@ public class AppBookService {
                 "  WHEN m.ageRating >= 18 AND m.ageRating < 21 THEN '18' " +
                 "  WHEN m.ageRating >= 21 THEN '21' " +
                 "END",
-                "JOIN b.metadata m", "AND m.ageRating IS NOT NULL",
+                METADATA_JOIN_CLAUSE, "AND m.ageRating IS NOT NULL",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> contentRatings = queryCountedOptions(
-                "m.contentRating", "JOIN b.metadata m",
+                "m.contentRating", METADATA_JOIN_CLAUSE,
                 "AND m.contentRating IS NOT NULL AND m.contentRating <> ''",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
@@ -723,7 +726,7 @@ public class AppBookService {
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> publishedYears = queryCountedOptions(
-                "CAST(YEAR(m.publishedDate) AS string)", "JOIN b.metadata m",
+                "CAST(YEAR(m.publishedDate) AS string)", METADATA_JOIN_CLAUSE,
                 "AND m.publishedDate IS NOT NULL",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
@@ -748,7 +751,7 @@ public class AppBookService {
                 scopeClause + ") " +
                 "GROUP BY 1 ORDER BY 1 DESC";
         var prQ = entityManager.createQuery(personalRatingQuery, Tuple.class);
-        prQ.setParameter("userId", userId);
+        prQ.setParameter(PARAM_USER_ID, userId);
         setFilterQueryParams(prQ, accessibleLibraryIds, libraryId, shelfId);
         List<AppFilterOptions.CountedOption> personalRatings = prQ.getResultList().stream()
                 .map(t -> new AppFilterOptions.CountedOption(t.get(0, String.class), t.get(1, Long.class)))
@@ -771,7 +774,7 @@ public class AppBookService {
                 "  WHEN m.pageCount < 1000 THEN '5' " +
                 "  ELSE '6' " +
                 "END",
-                "JOIN b.metadata m", "AND m.pageCount IS NOT NULL",
+                METADATA_JOIN_CLAUSE, "AND m.pageCount IS NOT NULL",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> shelfStatuses = queryGroupedCount(
@@ -921,7 +924,7 @@ public class AppBookService {
             if (req.libraryId() != null && accessibleLibraryIds.contains(req.libraryId())) {
                 specs.add(BookSpecifications.inLibrary(req.libraryId()));
             } else if (req.libraryId() != null) {
-                throw ApiError.FORBIDDEN.createException("Access denied to library " + req.libraryId());
+                throw ApiError.FORBIDDEN.createException(ACCESS_DENIED_TO_LIBRARY_MESSAGE + req.libraryId());
             } else {
                 specs.add(BookSpecifications.inLibraries(accessibleLibraryIds));
             }
@@ -1214,7 +1217,7 @@ public class AppBookService {
 
         if (accessibleLibraryIds != null) {
             if (libraryId != null && !accessibleLibraryIds.contains(libraryId)) {
-                throw ApiError.FORBIDDEN.createException("Access denied to library " + libraryId);
+                throw ApiError.FORBIDDEN.createException(ACCESS_DENIED_TO_LIBRARY_MESSAGE + libraryId);
             }
             specs.add(libraryId != null
                     ? BookSpecifications.inLibrary(libraryId)
@@ -1379,7 +1382,7 @@ public class AppBookService {
                 + " )"
                 + " GROUP BY ubp.readStatus ORDER BY COUNT(DISTINCT ubp.book.id) DESC";
         var q = entityManager.createQuery(jpql, Tuple.class);
-        q.setParameter("userId", userId);
+        q.setParameter(PARAM_USER_ID, userId);
         setFilterQueryParams(q, accessibleLibraryIds, libraryId, shelfId);
         List<AppFilterOptions.CountedOption> options = q.getResultList().stream()
                 .map(t -> new AppFilterOptions.CountedOption(
@@ -1394,7 +1397,7 @@ public class AppBookService {
                 + " )"
                 + " " + scopeClause;
         var baseQ = entityManager.createQuery(baseQuery, Long.class);
-        baseQ.setParameter("userId", userId);
+        baseQ.setParameter(PARAM_USER_ID, userId);
         setFilterQueryParams(baseQ, accessibleLibraryIds, libraryId, shelfId);
         long unsetCount = baseQ.getSingleResult();
 
@@ -1418,7 +1421,7 @@ public class AppBookService {
                 "  WHEN " + ratingExpr + " >= 1.0 THEN '1' " +
                 "  ELSE '0' " +
                 "END",
-                "JOIN b.metadata m", "AND " + ratingExpr + " IS NOT NULL",
+                METADATA_JOIN_CLAUSE, "AND " + ratingExpr + " IS NOT NULL",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
     }
 

@@ -48,6 +48,7 @@ public class DoubanBookParser implements BookParser {
     private static final Pattern SUBJECT_ID_PATTERN = Pattern.compile("/subject/(\\d+)/");
     // Pattern to extract rating number from class names like 'rating40' -> 40
     private static final Pattern RATING_NUMBER_PATTERN = Pattern.compile("rating(\\d+)");
+    private static final String INFO_SELECTOR = "#info";
     // Pattern for yyyy-MM-dd (or yyyy/M/d) date formats
     private static final Pattern DATE_YMD_PATTERN = Pattern.compile("(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})");
     private final AppSettingService appSettingService;
@@ -363,7 +364,7 @@ public class DoubanBookParser implements BookParser {
     private List<String> getAuthors(Document doc) {
         List<String> authors = new ArrayList<>();
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 // Collect authors from "作者" span
                 Element authorSpan = infoElement.selectFirst("span:contains(作者)");
@@ -410,7 +411,7 @@ public class DoubanBookParser implements BookParser {
 
     private String getIsbn10(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Element span = infoElement.selectFirst("span:contains(ISBN)");
                 if (span != null) {
@@ -433,7 +434,7 @@ public class DoubanBookParser implements BookParser {
 
     private String getIsbn13(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Element span = infoElement.selectFirst("span:contains(ISBN)");
                 if (span != null) {
@@ -456,7 +457,7 @@ public class DoubanBookParser implements BookParser {
 
     private String getPublisher(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Elements spans = infoElement.select("span");
                 for (Element span : spans) {
@@ -477,7 +478,7 @@ public class DoubanBookParser implements BookParser {
 
     private LocalDate getPublicationDate(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Element span = infoElement.selectFirst("span:contains(出版年)");
                 if (span != null) {
@@ -497,7 +498,7 @@ public class DoubanBookParser implements BookParser {
 
     private String getSeriesName(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Element seriesSpan = infoElement.selectFirst("span:contains(丛书)");
                 if (seriesSpan != null) {
@@ -660,7 +661,7 @@ public class DoubanBookParser implements BookParser {
 
     private Integer getPageCount(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Element span = infoElement.selectFirst("span:contains(页数)");
                 if (span != null) {

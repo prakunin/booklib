@@ -36,6 +36,8 @@ import java.util.stream.Collectors;
 @Service
 public class BookFileAttachmentService {
 
+    private static final String SOURCE_BOOK_PREFIX = "Source book ";
+
     private final BookRepository bookRepository;
     private final BookFileRepository bookFileRepository;
     private final UserBookProgressRepository userBookProgressRepository;
@@ -71,7 +73,7 @@ public class BookFileAttachmentService {
 
         for (BookEntity sourceBook : sourceBooks) {
             if (!targetBook.getLibrary().getId().equals(sourceBook.getLibrary().getId())) {
-                throw ApiError.GENERIC_BAD_REQUEST.createException("Source book " + sourceBook.getId() + " must be in the same library as target");
+                throw ApiError.GENERIC_BAD_REQUEST.createException(SOURCE_BOOK_PREFIX + sourceBook.getId() + " must be in the same library as target");
             }
 
             List<BookFileEntity> sourceBookFiles = sourceBook.getBookFiles().stream()
@@ -79,12 +81,12 @@ public class BookFileAttachmentService {
                     .toList();
 
             if (sourceBookFiles.isEmpty()) {
-                throw ApiError.GENERIC_BAD_REQUEST.createException("Source book " + sourceBook.getId() + " has no book format files to attach");
+                throw ApiError.GENERIC_BAD_REQUEST.createException(SOURCE_BOOK_PREFIX + sourceBook.getId() + " has no book format files to attach");
             }
 
             for (BookFileEntity fileToMove : sourceBookFiles) {
                 if (fileToMove.isFolderBased()) {
-                    throw ApiError.GENERIC_BAD_REQUEST.createException("Source book " + sourceBook.getId() + " contains a folder-based audiobook. Folder-based books cannot be attached.");
+                    throw ApiError.GENERIC_BAD_REQUEST.createException(SOURCE_BOOK_PREFIX + sourceBook.getId() + " contains a folder-based audiobook. Folder-based books cannot be attached.");
                 }
 
                 Path sourceFilePath = fileToMove.getFullFilePath();

@@ -41,6 +41,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
 
     private static final Pattern CHAPTER_PATTERN = Pattern.compile("(?i)^(chp?|chapter)?\\d+$");
     private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("[^0-9]");
+    private static final String TIME_BASE_FIELD = "time_base";
     private final ObjectMapper mapper;
     private final FfprobeService ffprobeService;
 
@@ -397,7 +398,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                     startTime = chapterNode.get("start_time").asDouble();
                 } else if (chapterNode.has("start")) {
                     long start = chapterNode.get("start").asLong();
-                    String timeBase = chapterNode.has("time_base") ? chapterNode.get("time_base").asString() : "1/1000";
+                    String timeBase = chapterNode.has(TIME_BASE_FIELD) ? chapterNode.get(TIME_BASE_FIELD).asString() : "1/1000";
                     startTime = convertTimebaseToSeconds(start, timeBase);
                 }
 
@@ -405,7 +406,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
                     endTime = chapterNode.get("end_time").asDouble();
                 } else if (chapterNode.has("end")) {
                     long end = chapterNode.get("end").asLong();
-                    String timeBase = chapterNode.has("time_base") ? chapterNode.get("time_base").asString() : "1/1000";
+                    String timeBase = chapterNode.has(TIME_BASE_FIELD) ? chapterNode.get(TIME_BASE_FIELD).asString() : "1/1000";
                     endTime = convertTimebaseToSeconds(end, timeBase);
                 }
 

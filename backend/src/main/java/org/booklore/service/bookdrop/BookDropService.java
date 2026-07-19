@@ -62,6 +62,8 @@ import java.util.stream.Stream;
 @Transactional
 public class BookDropService {
 
+    private static final String BOOKDROP_TEMP_DIR = "bookdrop_temp";
+
     private final BookdropFileRepository bookdropFileRepository;
     private final LibraryRepository libraryRepository;
     private final BookRepository bookRepository;
@@ -94,7 +96,7 @@ public class BookDropService {
     }
 
     public Resource getBookdropCover(long bookdropId) {
-        String coverPath = Paths.get(appProperties.getPathConfig(), "bookdrop_temp", bookdropId + ".jpg").toString();
+        String coverPath = Paths.get(appProperties.getPathConfig(), BOOKDROP_TEMP_DIR, bookdropId + ".jpg").toString();
         File coverFile = new File(coverPath);
         if (coverFile.exists() && coverFile.isFile()) {
             return new FileSystemResource(coverFile.toPath());
@@ -504,7 +506,7 @@ public class BookDropService {
         bookdropFileRepository.deleteById(bookdropFile.getId());
         bookdropNotificationService.sendBookdropFileSummaryNotification();
 
-        Path cachedCoverPath = Paths.get(appProperties.getPathConfig(), "bookdrop_temp", bookdropFile.getId() + ".jpg");
+        Path cachedCoverPath = Paths.get(appProperties.getPathConfig(), BOOKDROP_TEMP_DIR, bookdropFile.getId() + ".jpg");
         if (Files.exists(cachedCoverPath)) {
             try {
                 Files.delete(cachedCoverPath);
@@ -579,7 +581,7 @@ public class BookDropService {
                     log.warn("Failed to delete file from disk for bookdropId={}: {}", entity.getId(), e.getMessage());
                 }
             }
-            Path coverPath = Paths.get(appProperties.getPathConfig(), "bookdrop_temp", entity.getId() + ".jpg");
+            Path coverPath = Paths.get(appProperties.getPathConfig(), BOOKDROP_TEMP_DIR, entity.getId() + ".jpg");
             if (Files.exists(coverPath)) {
                 try {
                     Files.delete(coverPath);

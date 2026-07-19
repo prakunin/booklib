@@ -40,6 +40,8 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
     private static final long STABILITY_MAX_WAIT_MS = 120000L;
     private static final int MIN_AUDIO_FILES_FOR_FOLDER_AUDIOBOOK = 2;
     static final int EVENT_QUEUE_CAPACITY = 10_000;
+    private static final String IGNORE_FILE_NAME = ".ignore";
+    private static final String WALKING_FOLDER_ERROR_LOG = "[ERROR] Walking folder '{}': {}";
 
     private final BlockingQueue<FileEvent> eventQueue = new LinkedBlockingQueue<>(EVENT_QUEUE_CAPACITY);
     private final Set<FileEvent> queuedEvents = ConcurrentHashMap.newKeySet();
@@ -315,7 +317,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
     }
 
     private void processFilesInFolderIndividually(LibraryEntity library, Path folderPath) {
-        if (Files.exists(folderPath.resolve(".ignore"))) {
+        if (Files.exists(folderPath.resolve(IGNORE_FILE_NAME))) {
             log.debug("[SKIP] Folder has .ignore file: '{}'", folderPath);
             clearTrackedFilesFor(folderPath);
             return;
@@ -334,12 +336,12 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
                         }
                     });
         } catch (IOException e) {
-            log.warn("[ERROR] Walking folder '{}': {}", folderPath, e.getMessage());
+            log.warn(WALKING_FOLDER_ERROR_LOG, folderPath, e.getMessage());
         }
     }
 
     private void processFilesInFolderAsOneBook(LibraryEntity library, Path folderPath) {
-        if (Files.exists(folderPath.resolve(".ignore"))) {
+        if (Files.exists(folderPath.resolve(IGNORE_FILE_NAME))) {
             log.debug("[SKIP] Folder has .ignore file: '{}'", folderPath);
             clearTrackedFilesFor(folderPath);
             return;
@@ -354,7 +356,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
                     .filter(this::fileHasContent)
                     .forEach(bookFiles::add);
         } catch (IOException e) {
-            log.warn("[ERROR] Walking folder '{}': {}", folderPath, e.getMessage());
+            log.warn(WALKING_FOLDER_ERROR_LOG, folderPath, e.getMessage());
         }
 
         if (bookFiles.isEmpty()) {
@@ -482,7 +484,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
                         }
                     });
         } catch (IOException e) {
-            log.warn("[ERROR] Walking folder '{}': {}", folderPath, e.getMessage());
+            log.warn(WALKING_FOLDER_ERROR_LOG, folderPath, e.getMessage());
         }
     }
 
@@ -563,7 +565,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
     private boolean isUnderIgnoredDirectory(Path filePath, Path root) {
         Path parent = filePath.getParent();
         while (parent != null && !parent.equals(root)) {
-            if (Files.exists(parent.resolve(".ignore"))) {
+            if (Files.exists(parent.resolve(IGNORE_FILE_NAME))) {
                 return true;
             }
             parent = parent.getParent();

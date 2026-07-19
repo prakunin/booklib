@@ -35,6 +35,9 @@ public class OpdsFeedService {
     private static final List<String> PAGINATION_QUERY_WHITELIST = List.of(
             "q", "libraryId", "shelfId", "shelfIds", "magicShelfId", "author", "series"
     );
+    private static final String FEED_CLOSING_TAG = "</feed>";
+    private static final String ACQUISITION_LINK_TYPE_SUFFIX = "\" type=\"application/atom+xml;profile=opds-catalog;kind=acquisition\"/>\n";
+    private static final String COMICBOOK_ZIP_MEDIA_TYPE = "application/vnd.comicbook+zip";
 
     private final AuthenticationService authenticationService;
     private final OpdsBookService opdsBookService;
@@ -124,7 +127,7 @@ public class OpdsFeedService {
                             <content type="text">25 random books from the catalog</content>
                           </entry>
                         """.formatted(now()) +
-                "</feed>";
+                FEED_CLOSING_TAG;
         return feed;
     }
 
@@ -161,7 +164,7 @@ public class OpdsFeedService {
             ));
         }
 
-        feed.append("</feed>");
+        feed.append(FEED_CLOSING_TAG);
         return feed.toString();
     }
 
@@ -202,7 +205,7 @@ public class OpdsFeedService {
             }
         }
 
-        feed.append("</feed>");
+        feed.append(FEED_CLOSING_TAG);
         return feed.toString();
     }
 
@@ -243,7 +246,7 @@ public class OpdsFeedService {
             }
         }
 
-        feed.append("</feed>");
+        feed.append(FEED_CLOSING_TAG);
         return feed.toString();
     }
 
@@ -280,7 +283,7 @@ public class OpdsFeedService {
             ));
         }
 
-        feed.append("</feed>");
+        feed.append(FEED_CLOSING_TAG);
         return feed.toString();
     }
 
@@ -317,7 +320,7 @@ public class OpdsFeedService {
             ));
         }
 
-        feed.append("</feed>");
+        feed.append(FEED_CLOSING_TAG);
         return feed.toString();
     }
 
@@ -378,7 +381,7 @@ public class OpdsFeedService {
         String downloadToken = authenticationService.generateDownloadToken(userId);
         booksPage.getContent().forEach(book -> appendBookEntry(feed, book, downloadToken));
 
-        feed.append("</feed>");
+        feed.append(FEED_CLOSING_TAG);
         return feed.toString();
     }
 
@@ -412,7 +415,7 @@ public class OpdsFeedService {
         String downloadToken = authenticationService.generateDownloadToken(userId);
         booksPage.getContent().forEach(book -> appendBookEntry(feed, book, downloadToken));
 
-        feed.append("</feed>");
+        feed.append(FEED_CLOSING_TAG);
         return feed.toString();
     }
 
@@ -438,7 +441,7 @@ public class OpdsFeedService {
         String downloadToken = authenticationService.generateDownloadToken(userId);
         books.forEach(book -> appendBookEntry(feed, book, downloadToken));
 
-        feed.append("</feed>");
+        feed.append(FEED_CLOSING_TAG);
         return feed.toString();
     }
 
@@ -458,22 +461,22 @@ public class OpdsFeedService {
         if (totalPages > 0) {
             feed.append("  <link rel=\"first\" href=\"")
                     .append(escapeXml(buildPaginationUrl(request, 1, size)))
-                    .append("\" type=\"application/atom+xml;profile=opds-catalog;kind=acquisition\"/>\n");
+                    .append(ACQUISITION_LINK_TYPE_SUFFIX);
         }
         if (currentPage > 1) {
             feed.append("  <link rel=\"previous\" href=\"")
                     .append(escapeXml(buildPaginationUrl(request, currentPage - 1, size)))
-                    .append("\" type=\"application/atom+xml;profile=opds-catalog;kind=acquisition\"/>\n");
+                    .append(ACQUISITION_LINK_TYPE_SUFFIX);
         }
         if (currentPage < totalPages) {
             feed.append("  <link rel=\"next\" href=\"")
                     .append(escapeXml(buildPaginationUrl(request, currentPage + 1, size)))
-                    .append("\" type=\"application/atom+xml;profile=opds-catalog;kind=acquisition\"/>\n");
+                    .append(ACQUISITION_LINK_TYPE_SUFFIX);
         }
         if (totalPages > 0) {
             feed.append("  <link rel=\"last\" href=\"")
                     .append(escapeXml(buildPaginationUrl(request, totalPages, size)))
-                    .append("\" type=\"application/atom+xml;profile=opds-catalog;kind=acquisition\"/>\n");
+                    .append(ACQUISITION_LINK_TYPE_SUFFIX);
         }
     }
 
@@ -695,7 +698,7 @@ public class OpdsFeedService {
                         yield "application/vnd.comicbook-rar";
                     }
                     if (bookFile.getArchiveType() == ArchiveUtils.ArchiveType.ZIP) {
-                        yield "application/vnd.comicbook+zip";
+                        yield COMICBOOK_ZIP_MEDIA_TYPE;
                     }
                     if (bookFile.getArchiveType() == ArchiveUtils.ArchiveType.SEVEN_ZIP) {
                         yield "application/x-7z-compressed";
@@ -707,13 +710,13 @@ public class OpdsFeedService {
                     if (type != ArchiveUtils.ArchiveType.UNKNOWN) {
                         yield switch (type) {
                             case RAR -> "application/vnd.comicbook-rar";
-                            case ZIP -> "application/vnd.comicbook+zip";
+                            case ZIP -> COMICBOOK_ZIP_MEDIA_TYPE;
                             case SEVEN_ZIP -> "application/x-7z-compressed";
-                            default -> "application/vnd.comicbook+zip";
+                            default -> COMICBOOK_ZIP_MEDIA_TYPE;
                         };
                     }
                 }
-                yield "application/vnd.comicbook+zip";
+                yield COMICBOOK_ZIP_MEDIA_TYPE;
             }
             case AUDIOBOOK -> {
                 String lower = bookFile.getFileName().toLowerCase();

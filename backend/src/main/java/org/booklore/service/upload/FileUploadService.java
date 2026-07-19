@@ -49,6 +49,7 @@ public class FileUploadService {
     private static final String BOOKDROP_TEMP_PREFIX = "bookdrop-";
     private static final long BYTES_TO_KB_DIVISOR = 1024L;
     private static final long MB_TO_BYTES_MULTIPLIER = 1024L * 1024L;
+    private static final String INVALID_UPLOAD_TARGET_PATH_MESSAGE = "Invalid upload target path";
 
     private final LibraryRepository libraryRepository;
     private final BookRepository bookRepository;
@@ -292,7 +293,7 @@ public class FileUploadService {
     }
 
     private void validateFinalPath(Path finalPath, Path expectedRoot) {
-        Path safeFinalPath = requirePathWithinRoot(finalPath, expectedRoot, "Invalid upload target path");
+        Path safeFinalPath = requirePathWithinRoot(finalPath, expectedRoot, INVALID_UPLOAD_TARGET_PATH_MESSAGE);
         if (Files.exists(safeFinalPath)) {
             throw ApiError.FILE_ALREADY_EXISTS.createException();
         }
@@ -300,7 +301,7 @@ public class FileUploadService {
 
     private void moveFileToFinalLocation(Path sourcePath, Path targetPath, Path expectedRoot) throws IOException {
         Path safeSourcePath = requirePathWithinSystemTemp(sourcePath);
-        Path safeTargetPath = requirePathWithinRoot(targetPath, expectedRoot, "Invalid upload target path");
+        Path safeTargetPath = requirePathWithinRoot(targetPath, expectedRoot, INVALID_UPLOAD_TARGET_PATH_MESSAGE);
 
         Files.createDirectories(safeTargetPath.getParent());
         Files.move(safeSourcePath, safeTargetPath);
@@ -337,36 +338,36 @@ public class FileUploadService {
         try {
             return FileUtils.resolvePathWithinBase(rootPath, relativePath);
         } catch (IllegalArgumentException _) {
-            throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid upload target path");
+            throw ApiError.GENERIC_BAD_REQUEST.createException(INVALID_UPLOAD_TARGET_PATH_MESSAGE);
         }
     }
 
     private Path toSafeRelativePath(String relativePath) {
         if (!StringUtils.hasText(relativePath)) {
-            throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid upload target path");
+            throw ApiError.GENERIC_BAD_REQUEST.createException(INVALID_UPLOAD_TARGET_PATH_MESSAGE);
         }
 
         try {
             Path parsed = Path.of(relativePath);
             if (parsed.isAbsolute()) {
-                throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid upload target path");
+                throw ApiError.GENERIC_BAD_REQUEST.createException(INVALID_UPLOAD_TARGET_PATH_MESSAGE);
             }
             Path normalized = parsed.normalize();
             if (normalized.getNameCount() == 0 || normalized.startsWith("..")) {
-                throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid upload target path");
+                throw ApiError.GENERIC_BAD_REQUEST.createException(INVALID_UPLOAD_TARGET_PATH_MESSAGE);
             }
             return normalized;
         } catch (APIException e) {
             throw e;
         } catch (RuntimeException _) {
-            throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid upload target path");
+            throw ApiError.GENERIC_BAD_REQUEST.createException(INVALID_UPLOAD_TARGET_PATH_MESSAGE);
         }
     }
 
     private String buildSafeRelativePath(String subPath, String fileName) {
         Path safeFileNamePath = toSafeRelativePath(fileName);
         if (safeFileNamePath.getNameCount() != 1) {
-            throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid upload target path");
+            throw ApiError.GENERIC_BAD_REQUEST.createException(INVALID_UPLOAD_TARGET_PATH_MESSAGE);
         }
 
         if (!StringUtils.hasText(subPath)) {
@@ -376,7 +377,7 @@ public class FileUploadService {
         Path safeSubPath = toSafeRelativePath(subPath);
         Path combined = safeSubPath.resolve(safeFileNamePath).normalize();
         if (combined.isAbsolute() || combined.startsWith("..")) {
-            throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid upload target path");
+            throw ApiError.GENERIC_BAD_REQUEST.createException(INVALID_UPLOAD_TARGET_PATH_MESSAGE);
         }
 
         return combined.toString();

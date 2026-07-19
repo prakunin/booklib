@@ -28,6 +28,10 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class AppNotebookService {
 
+    private static final String ENTRY_TYPE_HIGHLIGHT = "HIGHLIGHT";
+    private static final String ENTRY_TYPE_BOOKMARK = "BOOKMARK";
+    private static final String FIELD_CREATED_AT = "createdAt";
+
     private final NotebookEntryRepository notebookEntryRepository;
     private final AuthorRepository authorRepository;
     private final AuthenticationService authenticationService;
@@ -76,7 +80,7 @@ public class AppNotebookService {
                                                                       Set<String> types, String search, String sort) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
         Set<String> entryTypes = (types == null || types.isEmpty())
-                ? Set.of("HIGHLIGHT", "NOTE", "BOOKMARK")
+                ? Set.of(ENTRY_TYPE_HIGHLIGHT, "NOTE", ENTRY_TYPE_BOOKMARK)
                 : types;
         Pageable pageable = PageRequest.of(page, size, toSort(sort));
 
@@ -93,14 +97,14 @@ public class AppNotebookService {
     @Transactional
     public AppNotebookEntry updateEntry(Long entryId, String type, AppNotebookUpdateRequest request) {
         return switch (type.toUpperCase()) {
-            case "HIGHLIGHT" -> {
+            case ENTRY_TYPE_HIGHLIGHT -> {
                 var updateReq = new UpdateAnnotationRequest();
                 if (request.getNote() != null) updateReq.setNote(request.getNote());
                 if (request.getColor() != null) updateReq.setColor(request.getColor());
                 var result = annotationService.updateAnnotation(entryId, updateReq);
                 yield AppNotebookEntry.builder()
                         .id(result.getId())
-                        .type("HIGHLIGHT")
+                        .type(ENTRY_TYPE_HIGHLIGHT)
                         .bookId(result.getBookId())
                         .text(result.getText())
                         .note(result.getNote())
@@ -130,14 +134,14 @@ public class AppNotebookService {
                         .updatedAt(result.getUpdatedAt())
                         .build();
             }
-            case "BOOKMARK" -> {
+            case ENTRY_TYPE_BOOKMARK -> {
                 var updateReq = new UpdateBookMarkRequest();
                 if (request.getNote() != null) updateReq.setNotes(request.getNote());
                 if (request.getColor() != null) updateReq.setColor(request.getColor());
                 var result = bookMarkService.updateBookmark(entryId, updateReq);
                 yield AppNotebookEntry.builder()
                         .id(result.getId())
-                        .type("BOOKMARK")
+                        .type(ENTRY_TYPE_BOOKMARK)
                         .bookId(result.getBookId())
                         .text(result.getTitle())
                         .note(result.getNotes())
@@ -157,9 +161,9 @@ public class AppNotebookService {
     @Transactional
     public void deleteEntry(Long entryId, String type) {
         switch (type.toUpperCase()) {
-            case "HIGHLIGHT" -> annotationService.deleteAnnotation(entryId);
+            case ENTRY_TYPE_HIGHLIGHT -> annotationService.deleteAnnotation(entryId);
             case "NOTE" -> bookNoteV2Service.deleteNote(entryId);
-            case "BOOKMARK" -> bookMarkService.deleteBookmark(entryId);
+            case ENTRY_TYPE_BOOKMARK -> bookMarkService.deleteBookmark(entryId);
             default -> throw new IllegalArgumentException("Unknown entry type: " + type);
         }
     }
@@ -178,12 +182,12 @@ public class AppNotebookService {
 
     private static Sort toSort(String sort) {
         if ("chapter".equalsIgnoreCase(sort)) {
-            return Sort.by(Sort.Order.asc("chapterTitle"), Sort.Order.asc("createdAt"));
+            return Sort.by(Sort.Order.asc("chapterTitle"), Sort.Order.asc(FIELD_CREATED_AT));
         }
         if ("date_asc".equalsIgnoreCase(sort)) {
-            return Sort.by("createdAt").ascending();
+            return Sort.by(FIELD_CREATED_AT).ascending();
         }
-        return Sort.by("createdAt").descending();
+        return Sort.by(FIELD_CREATED_AT).descending();
     }
 
     private static AppNotebookEntry toMobileEntry(NotebookEntryRepository.EntryProjection p) {

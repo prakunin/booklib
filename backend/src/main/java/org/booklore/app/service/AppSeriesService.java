@@ -33,6 +33,7 @@ public class AppSeriesService {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 50;
+    private static final String PARAM_USER_ID = "userId";
 
     private final EntityManager entityManager;
     private final AuthenticationService authenticationService;
@@ -93,7 +94,7 @@ public class AppSeriesService {
                 + " ORDER BY " + orderBy;
 
         var aggregateQ = entityManager.createQuery(aggregateQuery, Tuple.class);
-        aggregateQ.setParameter("userId", userId);
+        aggregateQ.setParameter(PARAM_USER_ID, userId);
         setLibraryParams(aggregateQ, accessibleLibraryIds, libraryId);
         if (searchPattern != null) {
             aggregateQ.setParameter(searchParam, searchPattern);
@@ -124,7 +125,7 @@ public class AppSeriesService {
                     + " GROUP BY m.seriesName"
                     + " HAVING SUM(CASE WHEN p.readStatus IN (org.booklore.model.enums.ReadStatus.READING, org.booklore.model.enums.ReadStatus.RE_READING) THEN 1 ELSE 0 END) > 0";
             var countQ = entityManager.createQuery(countAlt, String.class);
-            countQ.setParameter("userId", userId);
+            countQ.setParameter(PARAM_USER_ID, userId);
             setLibraryParams(countQ, accessibleLibraryIds, libraryId);
             if (searchPattern != null) {
                 countQ.setParameter(searchParam, searchPattern);
@@ -135,7 +136,7 @@ public class AppSeriesService {
 
         var countQ = entityManager.createQuery(countQuery, Long.class);
         if (inProgressOnly) {
-            countQ.setParameter("userId", userId);
+            countQ.setParameter(PARAM_USER_ID, userId);
         }
         setLibraryParams(countQ, accessibleLibraryIds, libraryId);
         if (searchPattern != null) {
