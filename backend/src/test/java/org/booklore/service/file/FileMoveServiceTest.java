@@ -543,8 +543,12 @@ class FileMoveServiceTest {
             FileMoveResult result = service.moveSingleFile(book);
 
             assertThat(result.isMoved()).isFalse();
-            // Should attempt to rollback the remaining uncommitted file
-            verify(fileMoveHelper, atLeastOnce()).rollbackMove(any(), any());
+            verify(fileMoveHelper).moveFile(
+                    Paths.get("/library/new/path/NewName.epub"),
+                    Paths.get("/library/path/Book.epub"));
+            verify(fileMoveHelper).rollbackMove(
+                    Paths.get("/library/path/temp"),
+                    Paths.get("/library/path/Book.pdf"));
         }
 
         @Test
@@ -1052,6 +1056,56 @@ class FileMoveServiceTest {
             service.bulkMoveFiles(request);
 
             verify(fileMoveHelper, never()).moveFileWithBackup(any());
+        }
+
+        @Test
+        @DisplayName("rolls back committed files when later bulk commit fails")
+        void rollsBackCommittedFilesWhenLaterBulkCommitFails() throws IOException {
+            BookFileEntity epub = createBookFile(1L, "Book.epub", "path", true, false);
+            BookFileEntity pdf = createBookFile(2L, "Book.pdf", "path", true, false);
+            BookEntity book = createBook(List.of(epub, pdf));
+
+            LibraryEntity targetLibrary = new LibraryEntity();
+            targetLibrary.setId(2L);
+            LibraryPathEntity targetPath = new LibraryPathEntity();
+            targetPath.setId(20L);
+            targetPath.setPath("/target");
+            targetPath.setLibrary(targetLibrary);
+            targetLibrary.setLibraryPaths(List.of(targetPath));
+
+            Path target = Paths.get("/target/new/NewName.epub");
+            when(bookRepository.findById(100L)).thenReturn(Optional.of(book));
+            when(bookRepository.findByIdWithBookFiles(100L)).thenReturn(Optional.of(book));
+            when(libraryRepository.findByIdWithPaths(2L)).thenReturn(Optional.of(targetLibrary));
+            when(fileMoveHelper.getFileNamingPattern(targetLibrary)).thenReturn("{title}");
+            when(fileMoveHelper.generateNewFilePath(eq(book), eq(targetPath), anyString())).thenReturn(target);
+            when(fileMoveHelper.generateNewFilePath(eq(book), any(BookFileEntity.class), eq(targetPath), anyString()))
+                    .thenAnswer(inv -> {
+                        BookFileEntity bookFile = inv.getArgument(1);
+                        String extension = bookFile.getFileName().substring(bookFile.getFileName().lastIndexOf('.'));
+                        return target.getParent().resolve("NewName" + extension);
+                    });
+            when(fileMoveHelper.extractSubPath(any(), eq(targetPath))).thenReturn("new");
+            when(fileMoveHelper.validateSourceExists(any(), anyBoolean())).thenReturn(true);
+            when(fileMoveHelper.moveFileWithBackup(any())).thenAnswer(inv -> ((Path) inv.getArgument(0)).resolveSibling("temp"));
+            doNothing().doThrow(new IOException("fail")).when(fileMoveHelper).commitMove(any(), any());
+
+            FileMoveRequest request = new FileMoveRequest();
+            FileMoveRequest.Move move = new FileMoveRequest.Move();
+            move.setBookId(100L);
+            move.setTargetLibraryId(2L);
+            move.setTargetLibraryPathId(20L);
+            request.setMoves(List.of(move));
+
+            service.bulkMoveFiles(request);
+
+            verify(fileMoveHelper).moveFile(
+                    Paths.get("/target/new/NewName.epub"),
+                    Paths.get("/library/path/Book.epub"));
+            verify(fileMoveHelper).rollbackMove(
+                    Paths.get("/library/path/temp"),
+                    Paths.get("/library/path/Book.pdf"));
+            verify(bookRepository, never()).updateLibrary(anyLong(), anyLong(), any());
         }
     }
 
