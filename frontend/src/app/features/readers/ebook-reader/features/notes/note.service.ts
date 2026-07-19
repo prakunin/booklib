@@ -96,9 +96,10 @@ export class ReaderNoteService {
     this.bookNoteV2Service.createNote(createRequest)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: note => {
           this.closeDialog();
           this.viewManager.clearSelection();
+          this.leftSidebarService.addOrUpdateNoteHighlight(note);
           this.leftSidebarService.refreshNotes();
           this.messageService.add({
             severity: 'success',
@@ -125,8 +126,9 @@ export class ReaderNoteService {
     this.bookNoteV2Service.updateNote(noteId, updateRequest)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: note => {
           this.closeDialog();
+          this.leftSidebarService.addOrUpdateNoteHighlight(note);
           this.leftSidebarService.refreshNotes();
           this.messageService.add({
             severity: 'success',

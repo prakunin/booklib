@@ -1,5 +1,5 @@
-<div class="quick-settings-overlay" tabindex="0" (click)="onOverlayClick()" (keydown.escape)="onOverlayClick()">
-  <dialog class="quick-settings-panel" tabindex="0" open (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+<div class="quick-settings-overlay" role="button" tabindex="0" (click)="onOverlayClick($event)" (keydown.escape)="onOverlayClick($event)">
+  <dialog class="quick-settings-panel" open>
     <div class="pointer"></div>
     <div class="panel-body">
       <!-- Fit Mode -->

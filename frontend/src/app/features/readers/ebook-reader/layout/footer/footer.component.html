@@ -1,34 +1,33 @@
 <ng-container *transloco="let t; prefix: 'readerEbook.footer'">
 <div class="reader-navbar" [class.is-visible]="navbarVisible"
   (mouseenter)="hoverChange.emit(true)" (mouseleave)="hoverChange.emit(false)">
-  <button class="icon-btn" [title]="t('previousSection')" [disabled]="!canGoPrevious" (click)="onPreviousSection()">
-    <app-reader-icon name="chevron-left"></app-reader-icon>
-  </button>
-
-  <div class="progress-section">
-    <button class="location-btn" (click)="toggleLocationPopover()" [title]="t('location')">
-      <span class="location-text">{{ currentPercentage }}%</span>
-    </button>
-
-    <div class="progress-slider-wrapper">
-      <input
-        type="range"
-        class="progress-slider"
-        [min]="0"
-        [max]="100"
-        [value]="currentPercentage"
-        (input)="onProgressChange($event)"
-        [title]="t('progress')"/>
-      <div class="progress-ticks">
-        @for (frac of displaySectionFractions; track frac) {
-          <span class="progress-tick" [style.left.%]="frac * 100"></span>
-        }
-      </div>
+  <div class="progress-slider-wrapper">
+    <input
+      type="range"
+      class="progress-slider"
+      [min]="0"
+      [max]="100"
+      [step]="0.1"
+      [value]="progressPercentage"
+      (input)="onProgressChange($event)"
+      [title]="t('progress')"/>
+    <div class="progress-track" aria-hidden="true">
+      <span class="progress-fill" [style.width.%]="progressPercentage"></span>
+      @for (frac of displaySectionFractions; track frac) {
+        <span class="progress-tick" [style.left.%]="frac * 100"></span>
+      }
     </div>
   </div>
 
-  <button class="icon-btn" [title]="t('nextSection')" [disabled]="!canGoNext" (click)="onNextSection()">
-    <app-reader-icon name="chevron-right"></app-reader-icon>
+  <button type="button" class="status-bar" (click)="toggleLocationPopover()" [title]="t('location')">
+    <span class="status-left">
+      @if (compactPosition) {
+        <span class="position">{{ compactPosition }}</span>
+      }
+      <span class="clock">{{ currentClock() }}</span>
+    </span>
+    <span class="status-title">{{ compactTitle }}</span>
+    <span class="status-progress">{{ precisePercentage }}</span>
   </button>
 </div>
 

@@ -1,4 +1,5 @@
 import {TestBed} from '@angular/core/testing';
+import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ReaderAnnotationService} from '../features/annotations/annotation-renderer.service';
@@ -8,12 +9,23 @@ import {ReaderViewManagerService} from './view-manager.service';
 
 describe('ReaderViewManagerService', () => {
   let service: ReaderViewManagerService;
+  const annotationService = {
+    addAnnotation: vi.fn(),
+    deleteAnnotation: vi.fn(),
+    showAnnotation: vi.fn(),
+    addAnnotations: vi.fn(),
+  };
 
   beforeEach(() => {
+    annotationService.addAnnotation.mockReset();
+    annotationService.deleteAnnotation.mockReset();
+    annotationService.showAnnotation.mockReset();
+    annotationService.addAnnotations.mockReset();
+
     TestBed.configureTestingModule({
       providers: [
         ReaderViewManagerService,
-        {provide: ReaderAnnotationService, useValue: {}},
+        {provide: ReaderAnnotationService, useValue: annotationService},
         {provide: ReaderEventService, useValue: {events$: {}}},
         {provide: EpubStreamingService, useValue: {}},
       ],
@@ -66,5 +78,30 @@ describe('ReaderViewManagerService', () => {
       index: 8,
     });
     expect(selection?.range).toBe(selectedRange);
+  });
+
+  it('shows an annotation when navigating directly to a CFI', () => {
+    const view = {
+      goTo: vi.fn(() => Promise.resolve()),
+    };
+    annotationService.showAnnotation.mockReturnValue(of(void 0));
+    Reflect.set(service, 'view', view);
+
+    service.goToAnnotation('epubcfi(/6/10)').subscribe();
+
+    expect(annotationService.showAnnotation).toHaveBeenCalledWith(view, 'epubcfi(/6/10)');
+    expect(view.goTo).not.toHaveBeenCalled();
+  });
+
+  it('falls back to plain navigation when showing an annotation fails', () => {
+    const view = {
+      goTo: vi.fn(() => Promise.resolve()),
+    };
+    annotationService.showAnnotation.mockReturnValue(throwError(() => new Error('missing overlay')));
+    Reflect.set(service, 'view', view);
+
+    service.goToAnnotation('epubcfi(/6/12)').subscribe();
+
+    expect(view.goTo).toHaveBeenCalledWith('epubcfi(/6/12)');
   });
 });

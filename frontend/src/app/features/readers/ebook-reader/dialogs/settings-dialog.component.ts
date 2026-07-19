@@ -25,6 +25,12 @@ export class ReaderSettingsDialogComponent implements OnInit {
 
   @Output() closed = new EventEmitter<void>();
 
+  onOverlayClick(event: Event): void {
+    if ((event.target as HTMLElement).classList.contains('dialog-overlay')) {
+      this.closed.emit();
+    }
+  }
+
   activeTab: 'theme' | 'typography' | 'layout' = 'theme';
 
   selectedAnnotationColor: string = '#FFFF00';

@@ -28,6 +28,7 @@ describe('ReaderSidebarService', () => {
   const viewManager = {
     getChapters: vi.fn(),
     goTo: vi.fn(() => of(void 0)),
+    goToAnnotation: vi.fn(() => of(void 0)),
     addAnnotations: vi.fn(),
     deleteAnnotation: vi.fn(() => of(void 0)),
   };
@@ -91,6 +92,8 @@ describe('ReaderSidebarService', () => {
     viewManager.getChapters.mockReturnValue(chapters);
     viewManager.goTo.mockReset();
     viewManager.goTo.mockReturnValue(of(void 0));
+    viewManager.goToAnnotation.mockReset();
+    viewManager.goToAnnotation.mockReturnValue(of(void 0));
     viewManager.addAnnotations.mockReset();
     viewManager.deleteAnnotation.mockReset();
     viewManager.deleteAnnotation.mockReturnValue(of(void 0));
@@ -194,7 +197,7 @@ describe('ReaderSidebarService', () => {
 
     expect(viewManager.goTo).toHaveBeenNthCalledWith(1, '/ops/chapter-1.xhtml');
     expect(viewManager.goTo).toHaveBeenNthCalledWith(2, 'epubcfi(/6/8)');
-    expect(viewManager.goTo).toHaveBeenNthCalledWith(3, 'epubcfi(/6/10)');
+    expect(viewManager.goToAnnotation).toHaveBeenCalledWith('epubcfi(/6/10)');
     expect(service.isOpen()).toBe(false);
   });
 

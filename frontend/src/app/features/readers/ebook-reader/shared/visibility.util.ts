@@ -4,7 +4,7 @@ export interface HeaderFooterVisibilityState {
 }
 
 export class ReaderHeaderFooterVisibilityManager {
-  private isPinned = false;
+  private headerPinned = false;
   private isImmersive = false;
   private mouseY: number;
 
@@ -41,22 +41,22 @@ export class ReaderHeaderFooterVisibilityManager {
   handleMouseLeave(): void {
     this.headerHovered = false;
     this.footerHovered = false;
-    if (!this.isPinned && !this.isImmersive) {
-      this.setHeaderVisible(false);
+    if (!this.isImmersive) {
+      this.setHeaderVisible(this.headerPinned);
       this.setFooterVisible(false);
       this.notifyStateChange();
     }
   }
 
   handleHeaderZoneEnter(): void {
-    if (!this.isPinned && !this.isImmersive) {
+    if (!this.headerPinned && !this.isImmersive) {
       this.setHeaderVisible(true);
       this.notifyStateChange();
     }
   }
 
   handleFooterZoneEnter(): void {
-    if (!this.isPinned && !this.isImmersive) {
+    if (!this.isImmersive) {
       this.setFooterVisible(true);
       this.notifyStateChange();
     }
@@ -77,21 +77,25 @@ export class ReaderHeaderFooterVisibilityManager {
   }
 
   togglePinned(): void {
-    this.isPinned = !this.isPinned;
+    this.headerPinned = !this.headerPinned;
     this.updateVisibility();
   }
 
   unpinIfPinned(): void {
-    if (this.isPinned) {
-      this.isPinned = false;
+    if (this.headerPinned) {
+      this.headerPinned = false;
       this.updateVisibility();
     }
+  }
+
+  isPinned(): boolean {
+    return this.headerPinned;
   }
 
   setImmersive(immersive: boolean): void {
     this.isImmersive = immersive;
     if (immersive) {
-      this.isPinned = false;
+      this.headerPinned = false;
       this.headerHovered = false;
       this.footerHovered = false;
       this.setHeaderVisible(false);
@@ -125,21 +129,20 @@ export class ReaderHeaderFooterVisibilityManager {
     if (
       this.mouseY <= this.HEADER_TRIGGER_ZONE ||
       this.headerHovered ||
-      this.isPinned
+      this.headerPinned
     ) {
       this.setHeaderVisible(true);
     } else {
-      this.setHeaderVisible(this.isPinned);
+      this.setHeaderVisible(this.headerPinned);
     }
 
     if (
       this.mouseY >= this.windowHeight - this.FOOTER_TRIGGER_ZONE ||
-      this.footerHovered ||
-      this.isPinned
+      this.footerHovered
     ) {
       this.setFooterVisible(true);
     } else {
-      this.setFooterVisible(this.isPinned);
+      this.setFooterVisible(false);
     }
 
     this.notifyStateChange();

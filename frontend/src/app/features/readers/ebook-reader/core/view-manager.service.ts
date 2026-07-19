@@ -201,6 +201,16 @@ export class ReaderViewManagerService {
     );
   }
 
+  goToAnnotation(cfi: string): Observable<void> {
+    if (!this.view) {
+      return of(undefined);
+    }
+
+    return this.annotationService.showAnnotation(this.view, cfi).pipe(
+      catchError(() => this.goTo(cfi))
+    );
+  }
+
   goToSection(index: number): Observable<void> {
     return this.goTo(index);
   }
@@ -267,6 +277,10 @@ export class ReaderViewManagerService {
 
   deleteAnnotation(cfi: string): Observable<void> {
     return this.annotationService.deleteAnnotation(this.view, cfi);
+  }
+
+  showAnnotation(cfi: string): Observable<void> {
+    return this.annotationService.showAnnotation(this.view, cfi);
   }
 
   addAnnotations(annotations: Annotation[]): void {

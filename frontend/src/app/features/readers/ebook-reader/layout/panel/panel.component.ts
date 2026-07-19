@@ -85,8 +85,10 @@ export class ReaderLeftSidebarComponent {
     }
   }
 
-  onOverlayClick(): void {
-    this.leftSidebarService.close();
+  onOverlayClick(event: Event): void {
+    if ((event.target as HTMLElement).classList.contains('sidebar-overlay')) {
+      this.leftSidebarService.close();
+    }
   }
 
   setActiveTab(tab: LeftSidebarTab): void {

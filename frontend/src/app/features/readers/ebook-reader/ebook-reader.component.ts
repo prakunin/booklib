@@ -230,6 +230,10 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.showShortcutsHelp.set(true));
 
+    this.headerService.toggleHeaderPinned$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.toggleHeaderNavbarPinned());
+
     // Enable wake lock after a short delay
     setTimeout(() => this.wakeLockService.enable(), 1000);
 
@@ -432,7 +436,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
 
     const requestedCfi = this.route.snapshot.queryParamMap.get('cfi');
     if (requestedCfi) {
-      return this.viewManager.goTo(requestedCfi);
+      return this.viewManager.goToAnnotation(requestedCfi);
     }
 
     const progress = book.epubProgress;
@@ -940,6 +944,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
 
   private toggleHeaderNavbarPinned(): void {
     this.visibilityManager.togglePinned();
+    this.headerService.setHeaderPinned(this.visibilityManager.isPinned());
   }
 
   @HostListener('document:mousemove', ['$event'])
@@ -978,6 +983,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
     const newValue = !this.immersiveMode();
     this.immersiveMode.set(newValue);
     this.visibilityManager.setImmersive(newValue);
+    this.headerService.setHeaderPinned(this.visibilityManager.isPinned());
   }
 
   private immersiveTemporaryShow(): void {

@@ -35,6 +35,10 @@ describe('ReaderLeftSidebarService', () => {
 
   const viewManager = {
     goTo: vi.fn(() => of(void 0)),
+    goToAnnotation: vi.fn(() => of(void 0)),
+    addAnnotation: vi.fn(() => of(void 0)),
+    addAnnotations: vi.fn(),
+    deleteAnnotation: vi.fn(() => of(void 0)),
     search: vi.fn(() => asyncSearch()),
     clearSearch: vi.fn(),
   };
@@ -46,6 +50,13 @@ describe('ReaderLeftSidebarService', () => {
     bookNoteV2Service.deleteNote.mockReturnValue(of(void 0));
     viewManager.goTo.mockReset();
     viewManager.goTo.mockReturnValue(of(void 0));
+    viewManager.goToAnnotation.mockReset();
+    viewManager.goToAnnotation.mockReturnValue(of(void 0));
+    viewManager.addAnnotation.mockReset();
+    viewManager.addAnnotation.mockReturnValue(of(void 0));
+    viewManager.addAnnotations.mockReset();
+    viewManager.deleteAnnotation.mockReset();
+    viewManager.deleteAnnotation.mockReturnValue(of(void 0));
     viewManager.search.mockReset();
     viewManager.search.mockImplementation(() => asyncSearch());
     viewManager.clearSearch.mockReset();
@@ -70,6 +81,10 @@ describe('ReaderLeftSidebarService', () => {
   it('initializes and filters notes', () => {
     expect(bookNoteV2Service.getNotesForBook).toHaveBeenCalledWith(9);
     expect(service.notes()).toEqual(notes);
+    expect(viewManager.addAnnotations).toHaveBeenCalledWith([
+      {value: 'epubcfi(/6/2)', color: '#60A5FA', style: 'highlight'},
+      {value: 'epubcfi(/6/4)', color: '#60A5FA', style: 'highlight'},
+    ]);
 
     service.setNotesSearchQuery('quote');
     expect(service.filteredNotes()).toEqual([notes[0]]);
@@ -147,13 +162,21 @@ describe('ReaderLeftSidebarService', () => {
     service.open();
     service.navigateToNote('epubcfi(/6/2)');
     service.navigateToSearchResult('epubcfi(/6/8)');
-    expect(viewManager.goTo).toHaveBeenNthCalledWith(1, 'epubcfi(/6/2)');
-    expect(viewManager.goTo).toHaveBeenNthCalledWith(2, 'epubcfi(/6/8)');
+    expect(viewManager.goToAnnotation).toHaveBeenNthCalledWith(1, 'epubcfi(/6/2)');
+    expect(viewManager.goToAnnotation).toHaveBeenNthCalledWith(2, 'epubcfi(/6/8)');
     expect(service.isOpen()).toBe(false);
 
     service.deleteNote(1);
     expect(bookNoteV2Service.deleteNote).toHaveBeenCalledWith(1);
     expect(service.notes()).toEqual([notes[1]]);
+    expect(viewManager.deleteAnnotation).toHaveBeenCalledWith('epubcfi(/6/2)');
+
+    service.addOrUpdateNoteHighlight({...notes[1], color: '#0EA5E9'});
+    expect(viewManager.addAnnotation).toHaveBeenCalledWith({
+      value: 'epubcfi(/6/4)',
+      color: '#0EA5E9',
+      style: 'highlight',
+    });
 
     service.open();
     service.editNote(notes[1]);

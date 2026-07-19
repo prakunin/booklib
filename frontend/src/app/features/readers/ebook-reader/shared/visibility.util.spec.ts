@@ -21,17 +21,18 @@ describe('ReaderHeaderFooterVisibilityManager', () => {
     expect(callback).toHaveBeenCalled();
   });
 
-  it('keeps both zones visible while pinned', () => {
+  it('keeps the header visible while pinned without pinning the footer', () => {
     const manager = new ReaderHeaderFooterVisibilityManager(1000);
 
     manager.togglePinned();
     manager.handleMouseMove(500);
 
-    expect(manager.getVisibilityState()).toEqual({headerVisible: true, footerVisible: true});
+    expect(manager.isPinned()).toBe(true);
+    expect(manager.getVisibilityState()).toEqual({headerVisible: true, footerVisible: false});
 
     manager.handleMouseLeave();
 
-    expect(manager.getVisibilityState()).toEqual({headerVisible: true, footerVisible: true});
+    expect(manager.getVisibilityState()).toEqual({headerVisible: true, footerVisible: false});
   });
 
   it('shows each zone independently when the explicit enter handlers run', () => {

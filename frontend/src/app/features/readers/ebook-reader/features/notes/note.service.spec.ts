@@ -41,6 +41,7 @@ describe('ReaderNoteService', () => {
 
   const leftSidebarService = {
     editNote$,
+    addOrUpdateNoteHighlight: vi.fn(),
     refreshNotes: vi.fn(),
   };
 
@@ -60,6 +61,7 @@ describe('ReaderNoteService', () => {
     messageService.add.mockReset();
     selectionService.getCurrentSelection.mockReset();
     selectionService.hidePopup.mockReset();
+    leftSidebarService.addOrUpdateNoteHighlight.mockReset();
     leftSidebarService.refreshNotes.mockReset();
     viewManager.clearSelection.mockReset();
     translocoService.translate.mockClear();
@@ -114,7 +116,16 @@ describe('ReaderNoteService', () => {
   });
 
   it('creates a note, clears selection, refreshes notes, and shows a success toast', () => {
-    bookNoteV2Service.createNote.mockReturnValue(of({id: 9}));
+    const createdNote = {
+      id: 9,
+      bookId: 14,
+      cfi: 'epubcfi(/6/2)',
+      selectedText: 'Quoted text',
+      noteContent: 'Important thought',
+      color: '#FFC107',
+      createdAt: '2026-03-26T00:00:00Z',
+    };
+    bookNoteV2Service.createNote.mockReturnValue(of(createdNote));
     service.openEditDialog({
       cfi: 'epubcfi(/6/2)',
       selectedText: 'Quoted text',
@@ -132,6 +143,7 @@ describe('ReaderNoteService', () => {
       chapterTitle: 'Chapter 4',
     });
     expect(viewManager.clearSelection).toHaveBeenCalledOnce();
+    expect(leftSidebarService.addOrUpdateNoteHighlight).toHaveBeenCalledWith(createdNote);
     expect(leftSidebarService.refreshNotes).toHaveBeenCalledOnce();
     expect(messageService.add).toHaveBeenCalledWith({
       severity: 'success',
@@ -142,7 +154,15 @@ describe('ReaderNoteService', () => {
   });
 
   it('updates an existing note and shows the update toast', () => {
-    bookNoteV2Service.updateNote.mockReturnValue(of({id: 12}));
+    const updatedNote = {
+      id: 12,
+      bookId: 14,
+      cfi: 'epubcfi(/6/4)',
+      noteContent: 'New content',
+      color: '#4CAF50',
+      createdAt: '2026-03-26T00:00:00Z',
+    };
+    bookNoteV2Service.updateNote.mockReturnValue(of(updatedNote));
     service.openEditDialog({
       cfi: 'epubcfi(/6/4)',
       noteId: 12,
@@ -156,6 +176,7 @@ describe('ReaderNoteService', () => {
       noteContent: 'New content',
       color: '#4CAF50',
     });
+    expect(leftSidebarService.addOrUpdateNoteHighlight).toHaveBeenCalledWith(updatedNote);
     expect(leftSidebarService.refreshNotes).toHaveBeenCalledOnce();
     expect(messageService.add).toHaveBeenCalledWith({
       severity: 'success',

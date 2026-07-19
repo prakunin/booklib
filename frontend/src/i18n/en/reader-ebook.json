@@ -96,6 +96,8 @@
     "fullscreen": "Fullscreen",
     "exitFullscreen": "Exit Fullscreen",
     "keyboardShortcuts": "Keyboard Shortcuts",
+    "pinHeader": "Keep toolbar visible",
+    "unpinHeader": "Auto-hide toolbar",
     "decreaseFontSize": "Decrease Font Size",
     "increaseFontSize": "Increase Font Size",
     "enableJustify": "Justify Text",

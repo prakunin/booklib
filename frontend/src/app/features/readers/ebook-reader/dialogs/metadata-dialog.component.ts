@@ -15,6 +15,12 @@ export class ReaderBookMetadataDialogComponent {
   @Input() book: Book | null = null;
   @Output() closed = new EventEmitter<void>();
 
+  onOverlayClick(event: Event): void {
+    if ((event.target as HTMLElement).classList.contains('dialog-overlay')) {
+      this.closed.emit();
+    }
+  }
+
   private readonly urlHelperService = inject(UrlHelperService);
   private readonly t = inject(TranslocoService);
 
