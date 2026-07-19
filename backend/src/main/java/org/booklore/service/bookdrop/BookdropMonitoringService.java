@@ -230,34 +230,44 @@ public class BookdropMonitoringService implements SmartLifecycle {
         log.info("Detected {} event on: {}", kind.name(), fullPath);
 
         if (kind == StandardWatchEventKinds.ENTRY_CREATE || kind == StandardWatchEventKinds.ENTRY_MODIFY) {
-            if (Files.isDirectory(fullPath)) {
-                log.info("New directory detected, scanning recursively: {}", fullPath);
-                try (Stream<Path> pathStream = Files.walk(fullPath)) {
-                    pathStream
-                            .filter(Files::isRegularFile)
-                            .filter(path -> !FileUtils.shouldIgnore(path))
-                            .filter(path -> BookFileExtension.fromFileName(path.getFileName().toString()).isPresent())
-                            .forEach(path -> eventHandler.enqueueFile(path, StandardWatchEventKinds.ENTRY_CREATE));
-                } catch (IOException e) {
-                    log.error("Failed to scan new directory: {}", fullPath, e);
-                }
-            } else {
-                if (!FileUtils.shouldIgnore(fullPath)) {
-                    if (BookFileExtension.fromFileName(fullPath.getFileName().toString()).isPresent()) {
-                        eventHandler.enqueueFile(fullPath, kind);
-                    } else {
-                        log.info("Ignored unsupported file type: {}", fullPath);
-                    }
-                }
-            }
+            handleCreateOrModifyEvent(fullPath, kind);
         } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
-            if (Files.isDirectory(fullPath)) {
-                log.info("Directory deleted: {}, performing bulk DB cleanup", fullPath);
-            } else {
-                log.info("File deleted: {}", fullPath);
-            }
-            eventHandler.enqueueFile(fullPath, kind);
+            handleDeleteEvent(fullPath, kind);
         }
+    }
+
+    private void handleCreateOrModifyEvent(Path fullPath, WatchEvent.Kind<?> kind) {
+        if (Files.isDirectory(fullPath)) {
+            scanNewDirectory(fullPath);
+        } else if (!FileUtils.shouldIgnore(fullPath)) {
+            if (BookFileExtension.fromFileName(fullPath.getFileName().toString()).isPresent()) {
+                eventHandler.enqueueFile(fullPath, kind);
+            } else {
+                log.info("Ignored unsupported file type: {}", fullPath);
+            }
+        }
+    }
+
+    private void scanNewDirectory(Path fullPath) {
+        log.info("New directory detected, scanning recursively: {}", fullPath);
+        try (Stream<Path> pathStream = Files.walk(fullPath)) {
+            pathStream
+                    .filter(Files::isRegularFile)
+                    .filter(path -> !FileUtils.shouldIgnore(path))
+                    .filter(path -> BookFileExtension.fromFileName(path.getFileName().toString()).isPresent())
+                    .forEach(path -> eventHandler.enqueueFile(path, StandardWatchEventKinds.ENTRY_CREATE));
+        } catch (IOException e) {
+            log.error("Failed to scan new directory: {}", fullPath, e);
+        }
+    }
+
+    private void handleDeleteEvent(Path fullPath, WatchEvent.Kind<?> kind) {
+        if (Files.isDirectory(fullPath)) {
+            log.info("Directory deleted: {}, performing bulk DB cleanup", fullPath);
+        } else {
+            log.info("File deleted: {}", fullPath);
+        }
+        eventHandler.enqueueFile(fullPath, kind);
     }
 
     public void rescanBookdropFolder() {

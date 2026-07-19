@@ -840,13 +840,14 @@ public class ReadingSessionService {
 
         for (var dto : progressList) {
             float maxProg = dto.getMaxProgress() != null ? dto.getMaxProgress() : 0f;
-            if (maxProg > 0f) {
-                totalStarted++;
-                if (maxProg >= 0.25f) reached25++;
-                if (maxProg >= 0.50f) reached50++;
-                if (maxProg >= 0.75f) reached75++;
-                if (maxProg >= 0.98f) completed++;
+            if (!(maxProg > 0f)) {
+                continue;
             }
+            totalStarted++;
+            if (maxProg >= 0.25f) reached25++;
+            if (maxProg >= 0.50f) reached50++;
+            if (maxProg >= 0.75f) reached75++;
+            if (maxProg >= 0.98f) completed++;
         }
 
         return ListeningFinishFunnelResponse.builder()

@@ -176,27 +176,31 @@ public class BookFileGroupingUtils {
 
         // Process each folder
         for (Map.Entry<String, List<LibraryFile>> folderEntry : byFolder.entrySet()) {
-            List<LibraryFile> filesInFolder = folderEntry.getValue();
-
-            if (!filesInFolder.isEmpty()) {
-                String fileSubPath = filesInFolder.getFirst().getFileSubPath();
-                Long libraryPathId = filesInFolder.getFirst().getLibraryPathEntity().getId();
-
-                // Root-level files: use exact grouping
-                if (fileSubPath == null || fileSubPath.isEmpty()) {
-                    for (LibraryFile file : filesInFolder) {
-                        String key = libraryPathId + "::" + extractGroupingKey(file.getFileName());
-                        result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
-                    }
-                } else {
-                    // Files in subfolder: use folder-centric grouping
-                    Map<String, List<LibraryFile>> folderGroups = groupFilesInFolder(filesInFolder, fileSubPath, libraryPathId);
-                    result.putAll(folderGroups);
-                }
-            }
+            addFolderGroups(folderEntry.getValue(), result);
         }
 
         return result;
+    }
+
+    private void addFolderGroups(List<LibraryFile> filesInFolder, Map<String, List<LibraryFile>> result) {
+        if (filesInFolder.isEmpty()) {
+            return;
+        }
+
+        String fileSubPath = filesInFolder.getFirst().getFileSubPath();
+        Long libraryPathId = filesInFolder.getFirst().getLibraryPathEntity().getId();
+
+        // Root-level files: use exact grouping
+        if (fileSubPath == null || fileSubPath.isEmpty()) {
+            for (LibraryFile file : filesInFolder) {
+                String key = libraryPathId + "::" + extractGroupingKey(file.getFileName());
+                result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
+            }
+        } else {
+            // Files in subfolder: use folder-centric grouping
+            Map<String, List<LibraryFile>> folderGroups = groupFilesInFolder(filesInFolder, fileSubPath, libraryPathId);
+            result.putAll(folderGroups);
+        }
     }
 
     /**
@@ -332,6 +336,15 @@ public class BookFileGroupingUtils {
      * Extracts series information (base title and number) from a grouping key.
      */
     private SeriesInfo extractSeriesInfo(String key) {
+        SeriesInfo labeled = extractLabeledSeriesInfo(key);
+        if (labeled != null) {
+            return labeled;
+        }
+        // Fallback: bare-number prefix like "1. title" or "01 - title"
+        return extractBareNumberSeriesInfo(key);
+    }
+
+    private SeriesInfo extractLabeledSeriesInfo(String key) {
         Matcher matcher = SERIES_NUMBER_PATTERN.matcher(key);
         if (matcher.find()) {
             String number = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
@@ -345,8 +358,10 @@ public class BookFileGroupingUtils {
                 }
             }
         }
+        return null;
+    }
 
-        // Fallback: bare-number prefix like "1. title" or "01 - title"
+    private SeriesInfo extractBareNumberSeriesInfo(String key) {
         Matcher bareMatcher = BARE_NUMBER_PREFIX_PATTERN.matcher(key);
         if (bareMatcher.matches()) {
             String number = bareMatcher.group(1);
@@ -356,7 +371,6 @@ public class BookFileGroupingUtils {
                 return new SeriesInfo(baseTitle, number);
             }
         }
-
         return null;
     }
 

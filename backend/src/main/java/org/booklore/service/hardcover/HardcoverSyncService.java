@@ -134,23 +134,17 @@ public class HardcoverSyncService {
                 // Check if user already has the book in their library and get existing reading progress
                 UserBookWithReads userBook = getUserBookAndReads(hardcoverBookIdInt);
                 
-                // If user doesn't have the book in their library, insert it with the matching edition.
-                if (userBook == null) {
-                    // Inserting the user_book will automatically create a user_book_read entry with 0 progress and in the "Currently Reading" status, which we will then update with the correct progress below.
-                    userBook = insertUserBook(hardcoverBookIdInt, hardcoverBook.editionId);
-                } else if (userBook.statusId == STATUS_READ && isFinished) {
+                if (userBook != null && userBook.statusId == STATUS_READ && isFinished) {
                     // If the user already has the book marked as read and the progress is finished, we can skip syncing to avoid creating duplicate reads for finished books.
                     // This also prevents accidentally resetting the finished date if the user had already marked it as read with a finished date.
-                    log.info("User {} has book {} marked as read on Hardcover and progress is finished, skipping progress update", 
+                    log.info("User {} has book {} marked as read on Hardcover and progress is finished, skipping progress update",
                         userId, bookId);
                     return;
-                } else {
-                    // If the user already has the book in their library, check if it is not Currently Reading status or if the edition is different from the one we are syncing.
-                    // If it's not Currently Reading, we need to update the user_book status to Currently Reading to be able to update the reading progress. This will create a new user_book_read entry with 0 progress, which we will then update with the correct progress below.
-                    if (userBook.statusId != STATUS_CURRENTLY_READING || userBook.editionId == null || !userBook.editionId.equals(hardcoverBook.editionId)) {
-                        userBook = updateUserBook(userBook.id, hardcoverBook.editionId);
-                    }
                 }
+
+                // If user doesn't have the book in their library, insert it with the matching edition; otherwise
+                // ensure the user_book is in Currently Reading status on the edition we are syncing.
+                userBook = resolveOrCreateUserBook(userBook, hardcoverBookIdInt, hardcoverBook);
 
                 // If we couldn't get the existing user_book and we also failed to create it, we cannot proceed with syncing progress
                 if (userBook == null) {
@@ -158,48 +152,7 @@ public class HardcoverSyncService {
                     return;
                 }
 
-                boolean requiresNewReadEntry = true;
-
-                // If the user already has the book in their library and is currently reading, check if the current reading activity matches the edition we want to update. 
-                // If so, we can update the existing reading progress instead of creating a new one, which will keep the user's reading history cleaner.
-                if (userBook.statusId == STATUS_CURRENTLY_READING && userBook.reads != null && !userBook.reads.isEmpty()) {
-                    // Get the last reading activity, which matches the most recent reading activity. The user might have multiple reads if they restarted the book, but we want to update the most recent one.
-                    UserBookReadInfo readInfo = userBook.reads.getLast();
-
-                    // Only update if the edition matches (to avoid updating progress on a different edition if the user restarted the book with a different edition). If edition is missing, we assume it's the same edition and update it.
-                    if (readInfo.editionId == null || (readInfo.editionId != null && readInfo.editionId.equals(hardcoverBook.editionId))) {
-                        readInfo.progressPages = progressPages;
-                        if (isFinished) {
-                            readInfo.finishedAt = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
-                        }
-
-                        // Update existing reading progress and the user book to match the edition and status based on the new progress
-                        log.info("Updating existing reading progress for book {} (user {}), hardcoverBookId={}, hardcoverEditionId={}, progress={}% ({}pages)", 
-                            bookId, userId, hardcoverBook.bookId, hardcoverBook.editionId, Math.round(progressPercent), progressPages);
-
-                        boolean updatedRead = updateUserBookRead(readInfo);
-
-                        if (!updatedRead) {
-                          log.warn("Failed to update existing user_book_read entry for book {} (user {})", bookId, userId);
-                          return;
-                        }
-                        requiresNewReadEntry = false;
-                    }
-                }
-
-                // If the book is not being currently read or there is no matching reading activity, we want to create a new one
-                // This should only happen if the user already has the book in their library and without a reading activity, or the latest reading activity is for another edition.
-                if (requiresNewReadEntry) {
-                    boolean insertedRead = insertUserBookRead(userBook.id, hardcoverBook.editionId, progressPages, isFinished);
-                    requiresNewReadEntry = !insertedRead;
-                }
-
-                if (requiresNewReadEntry) {
-                    log.warn("Hardcover sync failed: could not update user_book_read entry for book {} (user {})", bookId, userId);
-                } else {
-                    log.info("Synced progress to Hardcover: userId={}, book={}, hardcoverBookId={}, hardcoverEditionId={}, progress={}% ({}pages)", 
-                        userId, bookId, hardcoverBook.bookId, hardcoverBook.editionId, Math.round(progressPercent), progressPages);
-                }
+                applyReadingProgress(userBook, hardcoverBook, progressPages, isFinished, progressPercent, bookId, userId);
             } finally {
                 // Clean up thread-local
                 currentApiToken.remove();
@@ -208,6 +161,75 @@ public class HardcoverSyncService {
         } catch (Exception e) {
             log.error("Failed to sync progress to Hardcover for book {} (user {}): {}", 
                     bookId, userId, e.getMessage());
+        }
+    }
+
+    /**
+     * Resolve the user's existing user_book for the given Hardcover book, or create/update it so it is in
+     * Currently Reading status on the edition we are syncing. Returns null if it could not be obtained or created.
+     */
+    private UserBookWithReads resolveOrCreateUserBook(UserBookWithReads userBook, Integer hardcoverBookId, HardcoverBookInfo hardcoverBook) {
+        // If user doesn't have the book in their library, insert it with the matching edition.
+        if (userBook == null) {
+            // Inserting the user_book will automatically create a user_book_read entry with 0 progress and in the "Currently Reading" status, which we will then update with the correct progress below.
+            return insertUserBook(hardcoverBookId, hardcoverBook.editionId);
+        }
+
+        // If the user already has the book in their library, check if it is not Currently Reading status or if the edition is different from the one we are syncing.
+        // If it's not Currently Reading, we need to update the user_book status to Currently Reading to be able to update the reading progress. This will create a new user_book_read entry with 0 progress, which we will then update with the correct progress below.
+        if (userBook.statusId != STATUS_CURRENTLY_READING || userBook.editionId == null || !userBook.editionId.equals(hardcoverBook.editionId)) {
+            return updateUserBook(userBook.id, hardcoverBook.editionId);
+        }
+        return userBook;
+    }
+
+    /**
+     * Apply the reading progress to Hardcover, either by updating the most recent matching reading activity
+     * or by inserting a new user_book_read entry.
+     */
+    private void applyReadingProgress(UserBookWithReads userBook, HardcoverBookInfo hardcoverBook, Integer progressPages,
+                                      boolean isFinished, Float progressPercent, Long bookId, Long userId) {
+        boolean requiresNewReadEntry = true;
+
+        // If the user already has the book in their library and is currently reading, check if the current reading activity matches the edition we want to update.
+        // If so, we can update the existing reading progress instead of creating a new one, which will keep the user's reading history cleaner.
+        if (userBook.statusId == STATUS_CURRENTLY_READING && userBook.reads != null && !userBook.reads.isEmpty()) {
+            // Get the last reading activity, which matches the most recent reading activity. The user might have multiple reads if they restarted the book, but we want to update the most recent one.
+            UserBookReadInfo readInfo = userBook.reads.getLast();
+
+            // Only update if the edition matches (to avoid updating progress on a different edition if the user restarted the book with a different edition). If edition is missing, we assume it's the same edition and update it.
+            if (readInfo.editionId == null || (readInfo.editionId != null && readInfo.editionId.equals(hardcoverBook.editionId))) {
+                readInfo.progressPages = progressPages;
+                if (isFinished) {
+                    readInfo.finishedAt = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+                }
+
+                // Update existing reading progress and the user book to match the edition and status based on the new progress
+                log.info("Updating existing reading progress for book {} (user {}), hardcoverBookId={}, hardcoverEditionId={}, progress={}% ({}pages)",
+                    bookId, userId, hardcoverBook.bookId, hardcoverBook.editionId, Math.round(progressPercent), progressPages);
+
+                boolean updatedRead = updateUserBookRead(readInfo);
+
+                if (!updatedRead) {
+                  log.warn("Failed to update existing user_book_read entry for book {} (user {})", bookId, userId);
+                  return;
+                }
+                requiresNewReadEntry = false;
+            }
+        }
+
+        // If the book is not being currently read or there is no matching reading activity, we want to create a new one
+        // This should only happen if the user already has the book in their library and without a reading activity, or the latest reading activity is for another edition.
+        if (requiresNewReadEntry) {
+            boolean insertedRead = insertUserBookRead(userBook.id, hardcoverBook.editionId, progressPages, isFinished);
+            requiresNewReadEntry = !insertedRead;
+        }
+
+        if (requiresNewReadEntry) {
+            log.warn("Hardcover sync failed: could not update user_book_read entry for book {} (user {})", bookId, userId);
+        } else {
+            log.info("Synced progress to Hardcover: userId={}, book={}, hardcoverBookId={}, hardcoverEditionId={}, progress={}% ({}pages)",
+                userId, bookId, hardcoverBook.bookId, hardcoverBook.editionId, Math.round(progressPercent), progressPages);
         }
     }
 
@@ -322,53 +344,62 @@ public class HardcoverSyncService {
             HardcoverBookInfo info = new HardcoverBookInfo();
             info.bookId = String.valueOf(bookId);
 
-            // Try to get edition by ISBN
-            List<Map<String, Object>> editions = (List<Map<String, Object>>) book.get("editions");
-            if (editions != null && !editions.isEmpty()) {
-                Map<String, Object> bestEdition = editions.getFirst();
-                info.editionId = extractInteger(bestEdition.get("id"));
-                info.pages = extractInteger(bestEdition.get(JSON_KEY_PAGES));
-                log.debug("Found edition by ISBN: editionId={}, pages={}", 
-                    info.editionId, info.pages);
-            }
-
-            // Fallback to default_ebook_edition
-            if (info.editionId == null) {
-                Map<String, Object> defaultEbookEdition = (Map<String, Object>) book.get("default_ebook_edition");
-                if (defaultEbookEdition != null && defaultEbookEdition.get("id") != null) {
-                    info.editionId = extractInteger(defaultEbookEdition.get("id"));
-                    info.pages = extractInteger(defaultEbookEdition.get(JSON_KEY_PAGES));
-                    log.debug("Using default_ebook_edition: editionId={}, pages={}", info.editionId, info.pages);
-                }
-            }
-
-            // Fallback to default_physical_edition
-            if (info.editionId == null) {
-                Map<String, Object> defaultPhysicalEdition = (Map<String, Object>) book.get("default_physical_edition");
-                if (defaultPhysicalEdition != null && defaultPhysicalEdition.get("id") != null) {
-                    info.editionId = extractInteger(defaultPhysicalEdition.get("id"));
-                    info.pages = extractInteger(defaultPhysicalEdition.get(JSON_KEY_PAGES));
-                    log.debug("Using default_physical_edition: editionId={}, pages={}", info.editionId, info.pages);
-                }
-            }
-
-            // Fallback to book-level pages if edition has no pages
-            if (info.pages == null) {
-                info.pages = extractInteger(book.get(JSON_KEY_PAGES));
-            }
+            resolveEditionForBook(book, info);
 
             if (info.editionId == null) {
                 log.warn("No edition found for book ID {}", bookId);
                 return null;
             }
 
-            log.info("Resolved Hardcover book: bookId={}, editionId={}, pages={}", 
+            log.info("Resolved Hardcover book: bookId={}, editionId={}, pages={}",
                 info.bookId, info.editionId, info.pages);
             return info;
 
         } catch (Exception e) {
             log.error("Failed to resolve Hardcover book by ID {}: {}", bookId, e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Populates {@code info.editionId} and {@code info.pages} from a book map, preferring the
+     * ISBN-matched edition and falling back to the default ebook/physical editions, then to the
+     * book-level page count.
+     */
+    private void resolveEditionForBook(Map<String, Object> book, HardcoverBookInfo info) {
+        // Try to get edition by ISBN
+        List<Map<String, Object>> editions = (List<Map<String, Object>>) book.get("editions");
+        if (editions != null && !editions.isEmpty()) {
+            Map<String, Object> bestEdition = editions.getFirst();
+            info.editionId = extractInteger(bestEdition.get("id"));
+            info.pages = extractInteger(bestEdition.get(JSON_KEY_PAGES));
+            log.debug("Found edition by ISBN: editionId={}, pages={}",
+                info.editionId, info.pages);
+        }
+
+        // Fallback to default_ebook_edition
+        if (info.editionId == null) {
+            Map<String, Object> defaultEbookEdition = (Map<String, Object>) book.get("default_ebook_edition");
+            if (defaultEbookEdition != null && defaultEbookEdition.get("id") != null) {
+                info.editionId = extractInteger(defaultEbookEdition.get("id"));
+                info.pages = extractInteger(defaultEbookEdition.get(JSON_KEY_PAGES));
+                log.debug("Using default_ebook_edition: editionId={}, pages={}", info.editionId, info.pages);
+            }
+        }
+
+        // Fallback to default_physical_edition
+        if (info.editionId == null) {
+            Map<String, Object> defaultPhysicalEdition = (Map<String, Object>) book.get("default_physical_edition");
+            if (defaultPhysicalEdition != null && defaultPhysicalEdition.get("id") != null) {
+                info.editionId = extractInteger(defaultPhysicalEdition.get("id"));
+                info.pages = extractInteger(defaultPhysicalEdition.get(JSON_KEY_PAGES));
+                log.debug("Using default_physical_edition: editionId={}, pages={}", info.editionId, info.pages);
+            }
+        }
+
+        // Fallback to book-level pages if edition has no pages
+        if (info.pages == null) {
+            info.pages = extractInteger(book.get(JSON_KEY_PAGES));
         }
     }
     

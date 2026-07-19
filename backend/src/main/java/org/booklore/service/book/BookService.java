@@ -431,36 +431,7 @@ public class BookService {
         List<Long> failedFileDeletions = new ArrayList<>();
         for (BookEntity book : books) {
             for (BookFileEntity bookFile : book.getBookFiles()) {
-                Path fullFilePath = bookFile.getFullFilePath();
-                try {
-                    if (Files.exists(fullFilePath)) {
-                        unregisterMonitoringQuietly(fullFilePath.getParent());
-
-                        // Handle folder-based audiobooks (delete directory recursively)
-                        if (bookFile.isFolderBased() && Files.isDirectory(fullFilePath)) {
-                            deleteDirectoryRecursively(fullFilePath);
-                            log.info("Deleted folder-based audiobook: {}", fullFilePath);
-                        } else {
-                            Files.delete(fullFilePath);
-                            log.info("Deleted book file: {}", fullFilePath);
-                        }
-
-                        Set<Path> libraryRoots = book.getLibrary().getLibraryPaths().stream()
-                                .map(LibraryPathEntity::getPath)
-                                .map(Paths::get)
-                                .map(Path::normalize)
-                                .collect(Collectors.toSet());
-
-                        deleteEmptyParentDirsUpToLibraryFolders(fullFilePath.getParent(), libraryRoots);
-
-                        deleteSidecarFilesQuietly(fullFilePath);
-                    }
-                } catch (IOException e) {
-                    log.warn("Failed to delete book file: {}", fullFilePath, e);
-                    failedFileDeletions.add(book.getId());
-                } finally {
-                    monitoringRegistrationService.registerSpecificPath(fullFilePath.getParent(), book.getLibrary().getId());
-                }
+                deleteBookFileFromDisk(book, bookFile, failedFileDeletions);
             }
         }
 
@@ -476,6 +447,39 @@ public class BookService {
         return failedFileDeletions.isEmpty()
                 ? ResponseEntity.ok(response)
                 : ResponseEntity.status(HttpStatus.MULTI_STATUS).body(response);
+    }
+
+    private void deleteBookFileFromDisk(BookEntity book, BookFileEntity bookFile, List<Long> failedFileDeletions) {
+        Path fullFilePath = bookFile.getFullFilePath();
+        try {
+            if (Files.exists(fullFilePath)) {
+                unregisterMonitoringQuietly(fullFilePath.getParent());
+
+                // Handle folder-based audiobooks (delete directory recursively)
+                if (bookFile.isFolderBased() && Files.isDirectory(fullFilePath)) {
+                    deleteDirectoryRecursively(fullFilePath);
+                    log.info("Deleted folder-based audiobook: {}", fullFilePath);
+                } else {
+                    Files.delete(fullFilePath);
+                    log.info("Deleted book file: {}", fullFilePath);
+                }
+
+                Set<Path> libraryRoots = book.getLibrary().getLibraryPaths().stream()
+                        .map(LibraryPathEntity::getPath)
+                        .map(Paths::get)
+                        .map(Path::normalize)
+                        .collect(Collectors.toSet());
+
+                deleteEmptyParentDirsUpToLibraryFolders(fullFilePath.getParent(), libraryRoots);
+
+                deleteSidecarFilesQuietly(fullFilePath);
+            }
+        } catch (IOException e) {
+            log.warn("Failed to delete book file: {}", fullFilePath, e);
+            failedFileDeletions.add(book.getId());
+        } finally {
+            monitoringRegistrationService.registerSpecificPath(fullFilePath.getParent(), book.getLibrary().getId());
+        }
     }
 
     private void unregisterMonitoringQuietly(Path path) {

@@ -192,27 +192,7 @@ public class BookDownloadService {
 
         StreamingResponseBody body = outputStream -> {
             try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
-                for (ZipSource source : sources) {
-                    if (!Files.exists(source.path())) {
-                        log.warn("Skipping missing file during ZIP creation: {}", source.path());
-                        continue;
-                    }
-
-                    // Handle folder-based audiobooks - add all files from the folder
-                    if (source.folderBased() && Files.isDirectory(source.path())) {
-                        String folderPrefix = source.name() + "/";
-                        try (var audioFiles = Files.list(source.path())) {
-                            for (Path audioFile : audioFiles
-                                    .filter(Files::isRegularFile)
-                                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
-                                    .toList()) {
-                                addZipEntry(zos, folderPrefix + audioFile.getFileName().toString(), audioFile);
-                            }
-                        }
-                    } else {
-                        addZipEntry(zos, source.name(), source.path());
-                    }
-                }
+                writeZipEntries(zos, sources);
             }
             log.info("Successfully streamed ZIP for book {} with {} files", bookId, sources.size());
         };
@@ -224,6 +204,30 @@ public class BookDownloadService {
                 .header(HttpHeaders.PRAGMA, PRAGMA_NO_CACHE)
                 .header(HttpHeaders.EXPIRES, "0")
                 .body(body);
+    }
+
+    private void writeZipEntries(ZipOutputStream zos, List<ZipSource> sources) throws IOException {
+        for (ZipSource source : sources) {
+            if (!Files.exists(source.path())) {
+                log.warn("Skipping missing file during ZIP creation: {}", source.path());
+                continue;
+            }
+
+            // Handle folder-based audiobooks - add all files from the folder
+            if (source.folderBased() && Files.isDirectory(source.path())) {
+                String folderPrefix = source.name() + "/";
+                try (var audioFiles = Files.list(source.path())) {
+                    for (Path audioFile : audioFiles
+                            .filter(Files::isRegularFile)
+                            .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                            .toList()) {
+                        addZipEntry(zos, folderPrefix + audioFile.getFileName().toString(), audioFile);
+                    }
+                }
+            } else {
+                addZipEntry(zos, source.name(), source.path());
+            }
+        }
     }
 
     private void addZipEntry(ZipOutputStream zos, String entryName, Path file) throws IOException {

@@ -52,30 +52,34 @@ public class TaskHistoryService {
         Object bookIds = options.get("bookIds");
         Object libraryId = options.get("libraryId");
         if (bookIds instanceof Collection<?> ids && !ids.isEmpty()) {
-            sb.append(" (").append(ids.size()).append(" books, IDs: ");
-            String truncationSuffix = "...)";
-            Iterator<?> it = ids.iterator();
-            boolean truncated = false;
-            while (it.hasNext()) {
-                String id = it.next().toString();
-                boolean isLast = !it.hasNext();
-                String separator = sb.charAt(sb.length() - 1) == ' ' ? "" : ", ";
-                if (isLast && sb.length() + separator.length() + id.length() + 1 <= MAX_DESCRIPTION_LENGTH) {
-                    sb.append(separator).append(id).append(")");
-                } else if (!isLast && sb.length() + separator.length() + id.length() + truncationSuffix.length() <= MAX_DESCRIPTION_LENGTH) {
-                    sb.append(separator).append(id);
-                } else {
-                    truncated = true;
-                    break;
-                }
-            }
-            if (truncated) {
-                sb.append(truncationSuffix);
-            }
+            appendBookIds(sb, ids);
         } else if (libraryId != null) {
             sb.append(" (Library ID: ").append(libraryId).append(")");
         }
         return sb.toString();
+    }
+
+    private void appendBookIds(StringBuilder sb, Collection<?> ids) {
+        sb.append(" (").append(ids.size()).append(" books, IDs: ");
+        String truncationSuffix = "...)";
+        Iterator<?> it = ids.iterator();
+        boolean truncated = false;
+        while (it.hasNext()) {
+            String id = it.next().toString();
+            boolean isLast = !it.hasNext();
+            String separator = sb.charAt(sb.length() - 1) == ' ' ? "" : ", ";
+            if (isLast && sb.length() + separator.length() + id.length() + 1 <= MAX_DESCRIPTION_LENGTH) {
+                sb.append(separator).append(id).append(")");
+            } else if (!isLast && sb.length() + separator.length() + id.length() + truncationSuffix.length() <= MAX_DESCRIPTION_LENGTH) {
+                sb.append(separator).append(id);
+            } else {
+                truncated = true;
+                break;
+            }
+        }
+        if (truncated) {
+            sb.append(truncationSuffix);
+        }
     }
 
     @Transactional

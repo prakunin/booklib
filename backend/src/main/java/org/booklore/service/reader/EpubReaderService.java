@@ -285,15 +285,7 @@ public class EpubReaderService {
         String title = md.getFirstTitle();
         if (title != null && !title.isEmpty()) metadata.put("title", title);
 
-        List<Author> authors = md.getAuthors();
-        if (authors != null && !authors.isEmpty()) {
-            Author first = authors.getFirst();
-            String name = first.getFirstname();
-            if (first.getLastname() != null && !first.getLastname().isEmpty()) {
-                name = (name != null && !name.isEmpty()) ? name + " " + first.getLastname() : first.getLastname();
-            }
-            if (name != null && !name.isEmpty()) metadata.put("creator", name);
-        }
+        putCreator(metadata, md.getAuthors());
 
         String language = md.getLanguage();
         if (language != null && !language.isEmpty()) metadata.put("language", language);
@@ -307,6 +299,24 @@ public class EpubReaderService {
         List<String> descriptions = md.getDescriptions();
         if (descriptions != null && !descriptions.isEmpty()) metadata.put("description", descriptions.getFirst());
 
+        putRenditionProperties(metadata, md, book);
+
+        return metadata;
+    }
+
+    private void putCreator(Map<String, Object> metadata, List<Author> authors) {
+        if (authors == null || authors.isEmpty()) {
+            return;
+        }
+        Author first = authors.getFirst();
+        String name = first.getFirstname();
+        if (first.getLastname() != null && !first.getLastname().isEmpty()) {
+            name = (name != null && !name.isEmpty()) ? name + " " + first.getLastname() : first.getLastname();
+        }
+        if (name != null && !name.isEmpty()) metadata.put("creator", name);
+    }
+
+    private void putRenditionProperties(Map<String, Object> metadata, Metadata md, Book book) {
         // EPUB3 rendition properties
         if (md.getRenditionLayout() != null) metadata.put("rendition:layout", md.getRenditionLayout());
         if (md.getRenditionOrientation() != null) metadata.put("rendition:orientation", md.getRenditionOrientation());
@@ -316,8 +326,6 @@ public class EpubReaderService {
         // Page progression direction from spine
         String ppd = book.getSpine().getPageProgressionDirection();
         if (ppd != null && !ppd.isEmpty()) metadata.put("page-progression-direction", ppd);
-
-        return metadata;
     }
 
     private EpubTocItem mapToc(TableOfContents toc, String rootPath) {

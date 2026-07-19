@@ -103,30 +103,11 @@ public class AudioFileUtilityService {
             char c2 = s2.charAt(i2);
 
             if (Character.isDigit(c1) && Character.isDigit(c2)) {
-                StringBuilder b1 = new StringBuilder();
-                while (i1 < s1.length() && Character.isDigit(s1.charAt(i1))) {
-                    b1.append(s1.charAt(i1++));
-                }
-                StringBuilder b2 = new StringBuilder();
-                while (i2 < s2.length() && Character.isDigit(s2.charAt(i2))) {
-                    b2.append(s2.charAt(i2++));
-                }
-                String n1 = b1.toString();
-                String n2 = b2.toString();
-
-                // Strip leading zeros for numeric comparison
-                int start1 = 0;
-                while (start1 < n1.length() - 1 && n1.charAt(start1) == '0') start1++;
-                int start2 = 0;
-                while (start2 < n2.length() - 1 && n2.charAt(start2) == '0') start2++;
-
-                String s1Norm = n1.substring(start1);
-                String s2Norm = n2.substring(start2);
-
-                if (s1Norm.length() != s2Norm.length()) {
-                    return s1Norm.length() - s2Norm.length();
-                }
-                int cmp = s1Norm.compareTo(s2Norm);
+                DigitRun r1 = readDigitRun(s1, i1);
+                DigitRun r2 = readDigitRun(s2, i2);
+                i1 = r1.nextIndex();
+                i2 = r2.nextIndex();
+                int cmp = compareNumeric(r1.normalized(), r2.normalized());
                 if (cmp != 0) return cmp;
             } else {
                 int cmp = Character.compare(Character.toLowerCase(c1), Character.toLowerCase(c2));
@@ -136,5 +117,32 @@ public class AudioFileUtilityService {
             }
         }
         return s1.length() - s2.length();
+    }
+
+    private record DigitRun(String normalized, int nextIndex) {}
+
+    /**
+     * Read a run of consecutive digits starting at {@code start}, returning the run with leading
+     * zeros stripped (keeping at least one digit) and the index just past the run.
+     */
+    private DigitRun readDigitRun(String s, int start) {
+        int i = start;
+        StringBuilder b = new StringBuilder();
+        while (i < s.length() && Character.isDigit(s.charAt(i))) {
+            b.append(s.charAt(i++));
+        }
+        String n = b.toString();
+
+        int strip = 0;
+        while (strip < n.length() - 1 && n.charAt(strip) == '0') strip++;
+
+        return new DigitRun(n.substring(strip), i);
+    }
+
+    private int compareNumeric(String n1, String n2) {
+        if (n1.length() != n2.length()) {
+            return n1.length() - n2.length();
+        }
+        return n1.compareTo(n2);
     }
 }

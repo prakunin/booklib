@@ -69,6 +69,27 @@ public class BookSpecifications {
         return result;
     }
 
+    private static List<ReadStatus> parseReadStatuses(List<String> statuses) {
+        List<String> unknown = new ArrayList<>();
+        List<ReadStatus> parsed = statuses.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(s -> {
+                    String trimmed = s.trim().toUpperCase();
+                    try {
+                        return ReadStatus.valueOf(trimmed);
+                    } catch (IllegalArgumentException _) {
+                        unknown.add(s.trim());
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
+        if (!unknown.isEmpty()) {
+            throw new APIException("Invalid status values: " + unknown + ". Valid values: " + List.of(ReadStatus.values()), HttpStatus.BAD_REQUEST);
+        }
+        return parsed;
+    }
+
     @SuppressWarnings("unchecked")
     private static <X, Y> Join<X, Y> getOrCreateJoin(From<?, X> from, String attribute, JoinType joinType) {
         for (Join<X, ?> join : from.getJoins()) {
@@ -316,23 +337,7 @@ public class BookSpecifications {
     public static Specification<BookEntity> withReadStatuses(List<String> statuses, Long userId, String mode) {
         return (root, query, cb) -> {
             if (userId == null) return cb.conjunction();
-            List<String> unknown = new ArrayList<>();
-            List<ReadStatus> parsed = statuses.stream()
-                    .filter(s -> s != null && !s.isBlank())
-                    .map(s -> {
-                        String trimmed = s.trim().toUpperCase();
-                        try {
-                            return ReadStatus.valueOf(trimmed);
-                        } catch (IllegalArgumentException _) {
-                            unknown.add(s.trim());
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull)
-                    .toList();
-            if (!unknown.isEmpty()) {
-                throw new APIException("Invalid status values: " + unknown + ". Valid values: " + List.of(ReadStatus.values()), HttpStatus.BAD_REQUEST);
-            }
+            List<ReadStatus> parsed = parseReadStatuses(statuses);
             if (parsed.isEmpty()) return cb.conjunction();
 
             boolean hasUnset = parsed.contains(ReadStatus.UNSET);

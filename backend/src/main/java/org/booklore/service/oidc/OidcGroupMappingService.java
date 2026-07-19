@@ -22,6 +22,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
 @Slf4j
 @Service
@@ -82,6 +83,22 @@ public class OidcGroupMappingService {
         List<OidcGroupMappingEntity> matchingMappings = repository.findByOidcGroupClaimIn(groups);
         if (matchingMappings.isEmpty()) return;
 
+        MergedGroupSettings merged = mergeMappings(matchingMappings);
+        UserPermissionsEntity perms = ensureUserPermissions(user);
+
+        switch (syncMode) {
+            case "ON_LOGIN" -> applyOnLoginMode(user, perms, merged);
+            case "ON_LOGIN_ADDITIVE" -> applyOnLoginAdditiveMode(user, perms, merged);
+            default -> {
+                return;
+            }
+        }
+
+        userRepository.save(user);
+        log.info("Synced OIDC group permissions for user '{}' (mode: {})", user.getUsername(), syncMode);
+    }
+
+    private MergedGroupSettings mergeMappings(List<OidcGroupMappingEntity> matchingMappings) {
         boolean mergedAdmin = false;
         Set<String> mergedPermissions = new HashSet<>();
         Set<Long> mergedLibraryIds = new HashSet<>();
@@ -95,7 +112,10 @@ public class OidcGroupMappingService {
                 mergedLibraryIds.addAll(mappingDto.libraryIds());
             }
         }
+        return new MergedGroupSettings(mergedAdmin, mergedPermissions, mergedLibraryIds);
+    }
 
+    private UserPermissionsEntity ensureUserPermissions(BookLoreUserEntity user) {
         UserPermissionsEntity perms = user.getPermissions();
         if (perms == null) {
             perms = new UserPermissionsEntity();
@@ -104,92 +124,83 @@ public class OidcGroupMappingService {
         } else if (perms.getUser() == null) {
             perms.setUser(user);
         }
+        return perms;
+    }
 
-        switch (syncMode) {
-            case "ON_LOGIN" -> {
-                applyPermissions(perms, mergedPermissions, mergedAdmin, false);
-                List<LibraryEntity> libraries = libraryRepository.findAllById(mergedLibraryIds);
-                user.setLibraries(new HashSet<>(libraries));
-            }
-            case "ON_LOGIN_ADDITIVE" -> {
-                applyPermissions(perms, mergedPermissions, mergedAdmin, true);
-                Set<Long> existingLibIds = new HashSet<>();
-                if (user.getLibraries() != null) {
-                    user.getLibraries().forEach(lib -> existingLibIds.add(lib.getId()));
-                }
-                Set<Long> allLibIds = new HashSet<>(existingLibIds);
-                allLibIds.addAll(mergedLibraryIds);
-                if (!allLibIds.equals(existingLibIds)) {
-                    List<LibraryEntity> libraries = libraryRepository.findAllById(allLibIds);
-                    user.setLibraries(new HashSet<>(libraries));
-                }
-            }
-            default -> {
-                return;
-            }
+    private void applyOnLoginMode(BookLoreUserEntity user, UserPermissionsEntity perms, MergedGroupSettings merged) {
+        applyPermissions(perms, merged.permissions(), merged.admin(), false);
+        List<LibraryEntity> libraries = libraryRepository.findAllById(merged.libraryIds());
+        user.setLibraries(new HashSet<>(libraries));
+    }
+
+    private void applyOnLoginAdditiveMode(BookLoreUserEntity user, UserPermissionsEntity perms, MergedGroupSettings merged) {
+        applyPermissions(perms, merged.permissions(), merged.admin(), true);
+        Set<Long> existingLibIds = new HashSet<>();
+        if (user.getLibraries() != null) {
+            user.getLibraries().forEach(lib -> existingLibIds.add(lib.getId()));
         }
+        Set<Long> allLibIds = new HashSet<>(existingLibIds);
+        allLibIds.addAll(merged.libraryIds());
+        if (!allLibIds.equals(existingLibIds)) {
+            List<LibraryEntity> libraries = libraryRepository.findAllById(allLibIds);
+            user.setLibraries(new HashSet<>(libraries));
+        }
+    }
 
-        userRepository.save(user);
-        log.info("Synced OIDC group permissions for user '{}' (mode: {})", user.getUsername(), syncMode);
+    private record MergedGroupSettings(boolean admin, Set<String> permissions, Set<Long> libraryIds) {
     }
 
     private void applyPermissions(UserPermissionsEntity perms, Set<String> permissions, boolean isAdmin, boolean additive) {
-        if (!additive) {
-            perms.setPermissionAdmin(isAdmin);
-            perms.setPermissionUpload(permissions.contains("permissionUpload"));
-            perms.setPermissionDownload(permissions.contains("permissionDownload"));
-            perms.setPermissionEditMetadata(permissions.contains("permissionEditMetadata"));
-            perms.setPermissionManageLibrary(permissions.contains("permissionManageLibrary"));
-            perms.setPermissionEmailBook(permissions.contains("permissionEmailBook"));
-            perms.setPermissionDeleteBook(permissions.contains("permissionDeleteBook"));
-            perms.setPermissionAccessOpds(permissions.contains("permissionAccessOpds"));
-            perms.setPermissionSyncKoreader(permissions.contains("permissionSyncKoreader"));
-            perms.setPermissionSyncKobo(permissions.contains("permissionSyncKobo"));
-            perms.setPermissionManageMetadataConfig(permissions.contains("permissionManageMetadataConfig"));
-            perms.setPermissionAccessBookdrop(permissions.contains("permissionAccessBookdrop"));
-            perms.setPermissionAccessLibraryStats(permissions.contains("permissionAccessLibraryStats"));
-            perms.setPermissionAccessUserStats(permissions.contains("permissionAccessUserStats"));
-            perms.setPermissionAccessTaskManager(permissions.contains("permissionAccessTaskManager"));
-            perms.setPermissionManageGlobalPreferences(permissions.contains("permissionManageGlobalPreferences"));
-            perms.setPermissionManageIcons(permissions.contains("permissionManageIcons"));
-            perms.setPermissionManageFonts(permissions.contains("permissionManageFonts"));
-            perms.setPermissionBulkAutoFetchMetadata(permissions.contains("permissionBulkAutoFetchMetadata"));
-            perms.setPermissionBulkCustomFetchMetadata(permissions.contains("permissionBulkCustomFetchMetadata"));
-            perms.setPermissionBulkEditMetadata(permissions.contains("permissionBulkEditMetadata"));
-            perms.setPermissionBulkRegenerateCover(permissions.contains("permissionBulkRegenerateCover"));
-            perms.setPermissionMoveOrganizeFiles(permissions.contains("permissionMoveOrganizeFiles"));
-            perms.setPermissionBulkLockUnlockMetadata(permissions.contains("permissionBulkLockUnlockMetadata"));
-            perms.setPermissionBulkResetBookloreReadProgress(permissions.contains("permissionBulkResetBookloreReadProgress"));
-            perms.setPermissionBulkResetKoReaderReadProgress(permissions.contains("permissionBulkResetKoReaderReadProgress"));
-            perms.setPermissionBulkResetBookReadStatus(permissions.contains("permissionBulkResetBookReadStatus"));
+        if (additive) {
+            applyPermissionsAdditive(perms, permissions, isAdmin);
         } else {
-            if (isAdmin) perms.setPermissionAdmin(true);
-            if (permissions.contains("permissionUpload")) perms.setPermissionUpload(true);
-            if (permissions.contains("permissionDownload")) perms.setPermissionDownload(true);
-            if (permissions.contains("permissionEditMetadata")) perms.setPermissionEditMetadata(true);
-            if (permissions.contains("permissionManageLibrary")) perms.setPermissionManageLibrary(true);
-            if (permissions.contains("permissionEmailBook")) perms.setPermissionEmailBook(true);
-            if (permissions.contains("permissionDeleteBook")) perms.setPermissionDeleteBook(true);
-            if (permissions.contains("permissionAccessOpds")) perms.setPermissionAccessOpds(true);
-            if (permissions.contains("permissionSyncKoreader")) perms.setPermissionSyncKoreader(true);
-            if (permissions.contains("permissionSyncKobo")) perms.setPermissionSyncKobo(true);
-            if (permissions.contains("permissionManageMetadataConfig")) perms.setPermissionManageMetadataConfig(true);
-            if (permissions.contains("permissionAccessBookdrop")) perms.setPermissionAccessBookdrop(true);
-            if (permissions.contains("permissionAccessLibraryStats")) perms.setPermissionAccessLibraryStats(true);
-            if (permissions.contains("permissionAccessUserStats")) perms.setPermissionAccessUserStats(true);
-            if (permissions.contains("permissionAccessTaskManager")) perms.setPermissionAccessTaskManager(true);
-            if (permissions.contains("permissionManageGlobalPreferences")) perms.setPermissionManageGlobalPreferences(true);
-            if (permissions.contains("permissionManageIcons")) perms.setPermissionManageIcons(true);
-            if (permissions.contains("permissionManageFonts")) perms.setPermissionManageFonts(true);
-            if (permissions.contains("permissionBulkAutoFetchMetadata")) perms.setPermissionBulkAutoFetchMetadata(true);
-            if (permissions.contains("permissionBulkCustomFetchMetadata")) perms.setPermissionBulkCustomFetchMetadata(true);
-            if (permissions.contains("permissionBulkEditMetadata")) perms.setPermissionBulkEditMetadata(true);
-            if (permissions.contains("permissionBulkRegenerateCover")) perms.setPermissionBulkRegenerateCover(true);
-            if (permissions.contains("permissionMoveOrganizeFiles")) perms.setPermissionMoveOrganizeFiles(true);
-            if (permissions.contains("permissionBulkLockUnlockMetadata")) perms.setPermissionBulkLockUnlockMetadata(true);
-            if (permissions.contains("permissionBulkResetBookloreReadProgress")) perms.setPermissionBulkResetBookloreReadProgress(true);
-            if (permissions.contains("permissionBulkResetKoReaderReadProgress")) perms.setPermissionBulkResetKoReaderReadProgress(true);
-            if (permissions.contains("permissionBulkResetBookReadStatus")) perms.setPermissionBulkResetBookReadStatus(true);
+            applyPermissionsReplace(perms, permissions, isAdmin);
         }
     }
+
+    private void applyPermissionsReplace(UserPermissionsEntity perms, Set<String> permissions, boolean isAdmin) {
+        perms.setPermissionAdmin(isAdmin);
+        for (PermissionBinding binding : PERMISSION_BINDINGS) {
+            binding.setter().accept(perms, permissions.contains(binding.key()));
+        }
+    }
+
+    private void applyPermissionsAdditive(UserPermissionsEntity perms, Set<String> permissions, boolean isAdmin) {
+        if (isAdmin) perms.setPermissionAdmin(true);
+        for (PermissionBinding binding : PERMISSION_BINDINGS) {
+            if (permissions.contains(binding.key())) binding.setter().accept(perms, true);
+        }
+    }
+
+    private record PermissionBinding(String key, BiConsumer<UserPermissionsEntity, Boolean> setter) {
+    }
+
+    private static final List<PermissionBinding> PERMISSION_BINDINGS = List.of(
+            new PermissionBinding("permissionUpload", UserPermissionsEntity::setPermissionUpload),
+            new PermissionBinding("permissionDownload", UserPermissionsEntity::setPermissionDownload),
+            new PermissionBinding("permissionEditMetadata", UserPermissionsEntity::setPermissionEditMetadata),
+            new PermissionBinding("permissionManageLibrary", UserPermissionsEntity::setPermissionManageLibrary),
+            new PermissionBinding("permissionEmailBook", UserPermissionsEntity::setPermissionEmailBook),
+            new PermissionBinding("permissionDeleteBook", UserPermissionsEntity::setPermissionDeleteBook),
+            new PermissionBinding("permissionAccessOpds", UserPermissionsEntity::setPermissionAccessOpds),
+            new PermissionBinding("permissionSyncKoreader", UserPermissionsEntity::setPermissionSyncKoreader),
+            new PermissionBinding("permissionSyncKobo", UserPermissionsEntity::setPermissionSyncKobo),
+            new PermissionBinding("permissionManageMetadataConfig", UserPermissionsEntity::setPermissionManageMetadataConfig),
+            new PermissionBinding("permissionAccessBookdrop", UserPermissionsEntity::setPermissionAccessBookdrop),
+            new PermissionBinding("permissionAccessLibraryStats", UserPermissionsEntity::setPermissionAccessLibraryStats),
+            new PermissionBinding("permissionAccessUserStats", UserPermissionsEntity::setPermissionAccessUserStats),
+            new PermissionBinding("permissionAccessTaskManager", UserPermissionsEntity::setPermissionAccessTaskManager),
+            new PermissionBinding("permissionManageGlobalPreferences", UserPermissionsEntity::setPermissionManageGlobalPreferences),
+            new PermissionBinding("permissionManageIcons", UserPermissionsEntity::setPermissionManageIcons),
+            new PermissionBinding("permissionManageFonts", UserPermissionsEntity::setPermissionManageFonts),
+            new PermissionBinding("permissionBulkAutoFetchMetadata", UserPermissionsEntity::setPermissionBulkAutoFetchMetadata),
+            new PermissionBinding("permissionBulkCustomFetchMetadata", UserPermissionsEntity::setPermissionBulkCustomFetchMetadata),
+            new PermissionBinding("permissionBulkEditMetadata", UserPermissionsEntity::setPermissionBulkEditMetadata),
+            new PermissionBinding("permissionBulkRegenerateCover", UserPermissionsEntity::setPermissionBulkRegenerateCover),
+            new PermissionBinding("permissionMoveOrganizeFiles", UserPermissionsEntity::setPermissionMoveOrganizeFiles),
+            new PermissionBinding("permissionBulkLockUnlockMetadata", UserPermissionsEntity::setPermissionBulkLockUnlockMetadata),
+            new PermissionBinding("permissionBulkResetBookloreReadProgress", UserPermissionsEntity::setPermissionBulkResetBookloreReadProgress),
+            new PermissionBinding("permissionBulkResetKoReaderReadProgress", UserPermissionsEntity::setPermissionBulkResetKoReaderReadProgress),
+            new PermissionBinding("permissionBulkResetBookReadStatus", UserPermissionsEntity::setPermissionBulkResetBookReadStatus)
+    );
 }

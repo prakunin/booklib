@@ -137,17 +137,7 @@ public class DuplicateDetectionService {
 
         forEachDuplicateDetectionBatch(libraryId, books -> {
             for (BookEntity book : books) {
-                if (alreadyGrouped.contains(book.getId()) || book.getMetadata() == null) continue;
-                bookMap.put(book.getId(), book);
-                parent.put(book.getId(), book.getId());
-
-                for (String extId : extractExternalIds(book.getMetadata())) {
-                    if (idToBook.containsKey(extId)) {
-                        union(parent, book.getId(), idToBook.get(extId));
-                    } else {
-                        idToBook.put(extId, book.getId());
-                    }
-                }
+                collectExternalIdUnion(book, alreadyGrouped, bookMap, parent, idToBook);
             }
         });
 
@@ -164,6 +154,22 @@ public class DuplicateDetectionService {
             result.add(toDuplicateGroup(group, "EXTERNAL_ID", formatPriority));
         }
         return result;
+    }
+
+    private void collectExternalIdUnion(BookEntity book, Set<Long> alreadyGrouped,
+                                        Map<Long, BookEntity> bookMap, Map<Long, Long> parent,
+                                        Map<String, Long> idToBook) {
+        if (alreadyGrouped.contains(book.getId()) || book.getMetadata() == null) return;
+        bookMap.put(book.getId(), book);
+        parent.put(book.getId(), book.getId());
+
+        for (String extId : extractExternalIds(book.getMetadata())) {
+            if (idToBook.containsKey(extId)) {
+                union(parent, book.getId(), idToBook.get(extId));
+            } else {
+                idToBook.put(extId, book.getId());
+            }
+        }
     }
 
     private List<String> extractExternalIds(BookMetadataEntity meta) {
@@ -247,6 +253,23 @@ public class DuplicateDetectionService {
             normalizedAuthors.put(book.getId(), names);
         }
 
+        Map<Long, Long> parent = unionByAuthorOverlap(withAuthors, normalizedAuthors);
+
+        Map<Long, List<BookEntity>> subGroups = new HashMap<>();
+        for (BookEntity book : withAuthors) {
+            Long root = find(parent, book.getId());
+            subGroups.computeIfAbsent(root, k -> new ArrayList<>()).add(book);
+        }
+
+        for (List<BookEntity> subGroup : subGroups.values()) {
+            if (subGroup.size() < 2) continue;
+            subGroup.forEach(b -> alreadyGrouped.add(b.getId()));
+            result.add(toDuplicateGroup(subGroup, "TITLE_AUTHOR", formatPriority));
+        }
+    }
+
+    private Map<Long, Long> unionByAuthorOverlap(List<BookEntity> withAuthors,
+                                                 Map<Long, Set<String>> normalizedAuthors) {
         Map<Long, Long> parent = new HashMap<>();
         for (BookEntity book : withAuthors) {
             parent.put(book.getId(), book.getId());
@@ -262,18 +285,7 @@ public class DuplicateDetectionService {
                 }
             }
         }
-
-        Map<Long, List<BookEntity>> subGroups = new HashMap<>();
-        for (BookEntity book : withAuthors) {
-            Long root = find(parent, book.getId());
-            subGroups.computeIfAbsent(root, k -> new ArrayList<>()).add(book);
-        }
-
-        for (List<BookEntity> subGroup : subGroups.values()) {
-            if (subGroup.size() < 2) continue;
-            subGroup.forEach(b -> alreadyGrouped.add(b.getId()));
-            result.add(toDuplicateGroup(subGroup, "TITLE_AUTHOR", formatPriority));
-        }
+        return parent;
     }
 
     private List<DuplicateGroup> findByDirectory(Long libraryId, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {

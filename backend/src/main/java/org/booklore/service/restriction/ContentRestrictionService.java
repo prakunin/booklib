@@ -199,49 +199,53 @@ public class ContentRestrictionService {
             return false;
         }
 
-        if (!allowedCategories.isEmpty()) {
-            if (metadata.getCategories() == null || metadata.getCategories().isEmpty()) {
-                return false;
-            }
-            boolean hasAllowedCategory = metadata.getCategories().stream()
-                    .anyMatch(c -> allowedCategories.contains(c.getName().toLowerCase()));
-            if (!hasAllowedCategory) {
-                return false;
-            }
-        }
+        return matchesAllowedCategories(metadata, allowedCategories)
+                && matchesAllowedTags(metadata, allowedTags)
+                && matchesAllowedMoods(metadata, allowedMoods)
+                && matchesAllowedContentRating(metadata, allowedContentRatings);
+    }
 
-        if (!allowedTags.isEmpty()) {
-            if (metadata.getTags() == null || metadata.getTags().isEmpty()) {
-                return false;
-            }
-            boolean hasAllowedTag = metadata.getTags().stream()
-                    .anyMatch(t -> allowedTags.contains(t.getName().toLowerCase()));
-            if (!hasAllowedTag) {
-                return false;
-            }
+    private boolean matchesAllowedCategories(BookMetadataEntity metadata, Set<String> allowedCategories) {
+        if (allowedCategories.isEmpty()) {
+            return true;
         }
-
-        if (!allowedMoods.isEmpty()) {
-            if (metadata.getMoods() == null || metadata.getMoods().isEmpty()) {
-                return false;
-            }
-            boolean hasAllowedMood = metadata.getMoods().stream()
-                    .anyMatch(m -> allowedMoods.contains(m.getName().toLowerCase()));
-            if (!hasAllowedMood) {
-                return false;
-            }
+        if (metadata.getCategories() == null || metadata.getCategories().isEmpty()) {
+            return false;
         }
+        return metadata.getCategories().stream()
+                .anyMatch(c -> allowedCategories.contains(c.getName().toLowerCase()));
+    }
 
-        if (!allowedContentRatings.isEmpty()) {
-            if (metadata.getContentRating() == null) {
-                return false;
-            }
-            if (!allowedContentRatings.contains(metadata.getContentRating().toLowerCase())) {
-                return false;
-            }
+    private boolean matchesAllowedTags(BookMetadataEntity metadata, Set<String> allowedTags) {
+        if (allowedTags.isEmpty()) {
+            return true;
         }
+        if (metadata.getTags() == null || metadata.getTags().isEmpty()) {
+            return false;
+        }
+        return metadata.getTags().stream()
+                .anyMatch(t -> allowedTags.contains(t.getName().toLowerCase()));
+    }
 
-        return true;
+    private boolean matchesAllowedMoods(BookMetadataEntity metadata, Set<String> allowedMoods) {
+        if (allowedMoods.isEmpty()) {
+            return true;
+        }
+        if (metadata.getMoods() == null || metadata.getMoods().isEmpty()) {
+            return false;
+        }
+        return metadata.getMoods().stream()
+                .anyMatch(m -> allowedMoods.contains(m.getName().toLowerCase()));
+    }
+
+    private boolean matchesAllowedContentRating(BookMetadataEntity metadata, Set<String> allowedContentRatings) {
+        if (allowedContentRatings.isEmpty()) {
+            return true;
+        }
+        if (metadata.getContentRating() == null) {
+            return false;
+        }
+        return allowedContentRatings.contains(metadata.getContentRating().toLowerCase());
     }
 
     private boolean isWithinAgeRating(BookEntity book, Integer maxAgeRating) {

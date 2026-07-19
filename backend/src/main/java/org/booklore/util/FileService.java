@@ -377,22 +377,9 @@ public class FileService {
 
         while (redirectCount <= MAX_REDIRECTS) {
             URI uri = URI.create(currentUrl);
-            if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
-                throw new IOException("Only HTTP and HTTPS protocols are allowed");
-            }
+            String host = validateImageRequestUri(uri, currentUrl);
 
-            String host = uri.getHost();
-            if (host == null) {
-                throw new IOException("Invalid URL: no host found in " + currentUrl);
-            }
-
-            NetworkAddressValidator.validateExternalHttpUrl(currentUrl);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.set(HttpHeaders.USER_AGENT, "BookLore/1.0 (Book and Comic Metadata Fetcher; +https://github.com/booklore-app/booklore)");
-            headers.set(HttpHeaders.ACCEPT, "image/*");
-
-            HttpEntity<String> entity = new HttpEntity<>(headers);
+            HttpEntity<String> entity = buildImageRequestEntity();
 
             log.debug("Downloading image from: {}", currentUrl);
 
@@ -406,34 +393,7 @@ public class FileService {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return readImage(response.getBody());
             } else if (response.getStatusCode().is3xxRedirection()) {
-                String location = response.getHeaders().getFirst(HttpHeaders.LOCATION);
-                if (location == null) {
-                    throw new IOException("Redirection response without Location header");
-                }
-                URI redirectUri = uri.resolve(location);
-                NetworkAddressValidator.validateExternalHttpUrl(redirectUri.toString());
-
-                // When a CDN redirects to a raw IP (e.g. CloudFront -> 3.168.64.124),
-                // the Host header would become the bare IP, which the CDN rejects with
-                // 400. Rewrite the URL to keep the previous hostname so the JDK
-                // HttpClient sets the correct Host header automatically.
-                if (isRawIpAddress(redirectUri.getHost())) {
-                    try {
-                        redirectUri = new URI(
-                                redirectUri.getScheme(),
-                                redirectUri.getUserInfo(),
-                                host,
-                                redirectUri.getPort(),
-                                redirectUri.getPath(),
-                                redirectUri.getQuery(),
-                                redirectUri.getFragment()
-                        );
-                    } catch (URISyntaxException e) {
-                        throw new IOException("Invalid redirect URI: " + e.getMessage(), e);
-                    }
-                }
-
-                currentUrl = redirectUri.toString();
+                currentUrl = resolveRedirectUrl(uri, response, host);
                 redirectCount++;
             } else {
                 throw new IOException("Failed to download image. HTTP Status: " + response.getStatusCode());
@@ -441,6 +401,58 @@ public class FileService {
         }
 
         throw new IOException("Too many redirects (max " + MAX_REDIRECTS + ")");
+    }
+
+    private String validateImageRequestUri(URI uri, String currentUrl) throws IOException {
+        if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IOException("Only HTTP and HTTPS protocols are allowed");
+        }
+
+        String host = uri.getHost();
+        if (host == null) {
+            throw new IOException("Invalid URL: no host found in " + currentUrl);
+        }
+
+        NetworkAddressValidator.validateExternalHttpUrl(currentUrl);
+        return host;
+    }
+
+    private HttpEntity<String> buildImageRequestEntity() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.USER_AGENT, "BookLore/1.0 (Book and Comic Metadata Fetcher; +https://github.com/booklore-app/booklore)");
+        headers.set(HttpHeaders.ACCEPT, "image/*");
+        return new HttpEntity<>(headers);
+    }
+
+    private String resolveRedirectUrl(URI uri, ResponseEntity<byte[]> response, String host) throws IOException {
+        String location = response.getHeaders().getFirst(HttpHeaders.LOCATION);
+        if (location == null) {
+            throw new IOException("Redirection response without Location header");
+        }
+        URI redirectUri = uri.resolve(location);
+        NetworkAddressValidator.validateExternalHttpUrl(redirectUri.toString());
+
+        // When a CDN redirects to a raw IP (e.g. CloudFront -> 3.168.64.124),
+        // the Host header would become the bare IP, which the CDN rejects with
+        // 400. Rewrite the URL to keep the previous hostname so the JDK
+        // HttpClient sets the correct Host header automatically.
+        if (isRawIpAddress(redirectUri.getHost())) {
+            try {
+                redirectUri = new URI(
+                        redirectUri.getScheme(),
+                        redirectUri.getUserInfo(),
+                        host,
+                        redirectUri.getPort(),
+                        redirectUri.getPath(),
+                        redirectUri.getQuery(),
+                        redirectUri.getFragment()
+                );
+            } catch (URISyntaxException e) {
+                throw new IOException("Invalid redirect URI: " + e.getMessage(), e);
+            }
+        }
+
+        return redirectUri.toString();
     }
 
     private boolean isRawIpAddress(String host) {

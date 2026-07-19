@@ -104,14 +104,15 @@ public class AppSeriesService {
 
         List<Tuple> aggregateResults = aggregateQ.getResultList();
 
-        // Count query
-        String countQuery = "SELECT COUNT(DISTINCT m.seriesName) FROM BookEntity b JOIN b.metadata m"
-                + (inProgressOnly ? " LEFT JOIN b.userBookProgress p ON p.user.id = :userId" : "")
-                + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
-                + " AND m.seriesName IS NOT NULL"
-                + libraryClause
-                + searchClause;
+        long totalElements = countSeries(inProgressOnly, accessibleLibraryIds, libraryId, userId,
+                searchPattern, searchClause, libraryClause);
+
+        return buildSeriesPage(aggregateResults, accessibleLibraryIds, libraryId, pageNum, pageSize, totalElements);
+    }
+
+    private long countSeries(boolean inProgressOnly, Set<Long> accessibleLibraryIds, Long libraryId, Long userId,
+                             String searchPattern, String searchClause, String libraryClause) {
+        final String searchParam = "searchPattern";
 
         if (inProgressOnly) {
             // JPQL doesn't support subqueries in FROM — count via result list size instead
@@ -130,21 +131,22 @@ public class AppSeriesService {
             if (searchPattern != null) {
                 countQ.setParameter(searchParam, searchPattern);
             }
-            long totalElements = countQ.getResultList().size();
-            return buildSeriesPage(aggregateResults, accessibleLibraryIds, libraryId, pageNum, pageSize, totalElements);
+            return countQ.getResultList().size();
         }
 
+        String countQuery = "SELECT COUNT(DISTINCT m.seriesName) FROM BookEntity b JOIN b.metadata m"
+                + " WHERE (b.deleted IS NULL OR b.deleted = false)"
+                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
+                + " AND m.seriesName IS NOT NULL"
+                + libraryClause
+                + searchClause;
+
         var countQ = entityManager.createQuery(countQuery, Long.class);
-        if (inProgressOnly) {
-            countQ.setParameter(PARAM_USER_ID, userId);
-        }
         setLibraryParams(countQ, accessibleLibraryIds, libraryId);
         if (searchPattern != null) {
             countQ.setParameter(searchParam, searchPattern);
         }
-        long totalElements = countQ.getSingleResult();
-
-        return buildSeriesPage(aggregateResults, accessibleLibraryIds, libraryId, pageNum, pageSize, totalElements);
+        return countQ.getSingleResult();
     }
 
     private AppPageResponse<AppSeriesSummary> buildSeriesPage(

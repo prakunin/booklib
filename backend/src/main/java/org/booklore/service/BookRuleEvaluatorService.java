@@ -76,26 +76,7 @@ public class BookRuleEvaluatorService {
         List<Predicate> predicates = new ArrayList<>();
 
         for (Object ruleObj : group.getRules()) {
-            if (ruleObj == null) continue;
-
-            Map<String, Object> ruleMap = objectMapper.convertValue(ruleObj, new TypeReference<>() {
-            });
-            String type = (String) ruleMap.get("type");
-
-            if ("group".equals(type)) {
-                GroupRule subGroup = objectMapper.convertValue(ruleObj, GroupRule.class);
-                predicates.add(buildPredicate(subGroup, query, cb, root, progressJoin, userId));
-            } else {
-                try {
-                    Rule rule = objectMapper.convertValue(ruleObj, Rule.class);
-                    Predicate rulePredicate = buildRulePredicate(rule, query, cb, root, progressJoin, userId);
-                    if (rulePredicate != null) {
-                        predicates.add(rulePredicate);
-                    }
-                } catch (Exception e) {
-                    log.error("Failed to parse rule: {}, error: {}", ruleObj, e.getMessage(), e);
-                }
-            }
+            addRulePredicate(ruleObj, predicates, query, cb, root, progressJoin, userId);
         }
 
         if (predicates.isEmpty()) {
@@ -105,6 +86,29 @@ public class BookRuleEvaluatorService {
         return group.getJoin() == org.booklore.model.dto.JoinType.AND
                 ? cb.and(predicates.toArray(Predicate[]::new))
                 : cb.or(predicates.toArray(Predicate[]::new));
+    }
+
+    private void addRulePredicate(Object ruleObj, List<Predicate> predicates, CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, Join<BookEntity, UserBookProgressEntity> progressJoin, Long userId) {
+        if (ruleObj == null) return;
+
+        Map<String, Object> ruleMap = objectMapper.convertValue(ruleObj, new TypeReference<>() {
+        });
+        String type = (String) ruleMap.get("type");
+
+        if ("group".equals(type)) {
+            GroupRule subGroup = objectMapper.convertValue(ruleObj, GroupRule.class);
+            predicates.add(buildPredicate(subGroup, query, cb, root, progressJoin, userId));
+        } else {
+            try {
+                Rule rule = objectMapper.convertValue(ruleObj, Rule.class);
+                Predicate rulePredicate = buildRulePredicate(rule, query, cb, root, progressJoin, userId);
+                if (rulePredicate != null) {
+                    predicates.add(rulePredicate);
+                }
+            } catch (Exception e) {
+                log.error("Failed to parse rule: {}, error: {}", ruleObj, e.getMessage(), e);
+            }
+        }
     }
 
     private Predicate buildRulePredicate(Rule rule, CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, Join<BookEntity, UserBookProgressEntity> progressJoin, Long userId) {

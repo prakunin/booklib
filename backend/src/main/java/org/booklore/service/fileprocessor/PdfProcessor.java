@@ -166,105 +166,114 @@ public class PdfProcessor extends AbstractFileProcessor implements BookFileProce
         try {
             BookMetadata extracted = pdfMetadataExtractor.extractMetadata(FileUtils.getBookFullPath(bookEntity).toFile());
 
-            if (StringUtils.isNotBlank(extracted.getTitle())) {
-                bookEntity.getMetadata().setTitle(truncate(extracted.getTitle(), 1000));
-            }
-            if (StringUtils.isNotBlank(extracted.getSubtitle())) {
-                bookEntity.getMetadata().setSubtitle(truncate(extracted.getSubtitle(), 1000));
-            }
-            if (StringUtils.isNotBlank(extracted.getSeriesName())) {
-                bookEntity.getMetadata().setSeriesName(truncate(extracted.getSeriesName(), 1000));
-            }
-            if (extracted.getSeriesNumber() != null) {
-                bookEntity.getMetadata().setSeriesNumber(extracted.getSeriesNumber());
-            }
-            if (extracted.getSeriesTotal() != null) {
-                bookEntity.getMetadata().setSeriesTotal(extracted.getSeriesTotal());
-            }
-            if (extracted.getAuthors() != null) {
-                bookCreatorService.addAuthorsToBook(extracted.getAuthors(), bookEntity);
-            }
-            if (StringUtils.isNotBlank(extracted.getPublisher())) {
-                bookEntity.getMetadata().setPublisher(extracted.getPublisher());
-            }
-            if (StringUtils.isNotBlank(extracted.getDescription())) {
-                bookEntity.getMetadata().setDescription(truncate(extracted.getDescription(), 5000));
-            }
-            if (extracted.getPublishedDate() != null) {
-                bookEntity.getMetadata().setPublishedDate(extracted.getPublishedDate());
-            }
-            if (StringUtils.isNotBlank(extracted.getLanguage())) {
-                bookEntity.getMetadata().setLanguage(truncate(extracted.getLanguage(), 10));
-            }
-            if (extracted.getPageCount() != null) {
-                bookEntity.getMetadata().setPageCount(extracted.getPageCount());
-            }
-            
-            // External IDs
-            if (StringUtils.isNotBlank(extracted.getAsin())) {
-                bookEntity.getMetadata().setAsin(truncate(extracted.getAsin(), 10));
-            }
-            if (StringUtils.isNotBlank(extracted.getGoogleId())) {
-                bookEntity.getMetadata().setGoogleId(extracted.getGoogleId());
-            }
-            if (StringUtils.isNotBlank(extracted.getHardcoverId())) {
-                bookEntity.getMetadata().setHardcoverId(extracted.getHardcoverId());
-            }
-            if (StringUtils.isNotBlank(extracted.getHardcoverBookId())) {
-                bookEntity.getMetadata().setHardcoverBookId(extracted.getHardcoverBookId());
-            }
-            if (StringUtils.isNotBlank(extracted.getGoodreadsId())) {
-                bookEntity.getMetadata().setGoodreadsId(extracted.getGoodreadsId());
-            }
-            if (StringUtils.isNotBlank(extracted.getComicvineId())) {
-                bookEntity.getMetadata().setComicvineId(extracted.getComicvineId());
-            }
-            if (StringUtils.isNotBlank(extracted.getRanobedbId())) {
-                bookEntity.getMetadata().setRanobedbId(extracted.getRanobedbId());
-            }
-            if (StringUtils.isNotBlank(extracted.getLubimyczytacId())) {
-                bookEntity.getMetadata().setLubimyczytacId(extracted.getLubimyczytacId());
-            }
-            if (StringUtils.isNotBlank(extracted.getIsbn10())) {
-                bookEntity.getMetadata().setIsbn10(truncate(extracted.getIsbn10(), 10));
-            }
-            if (StringUtils.isNotBlank(extracted.getIsbn13())) {
-                bookEntity.getMetadata().setIsbn13(truncate(extracted.getIsbn13(), 13));
-            }
-            
-            // Categories, moods, and tags
-            if (extracted.getCategories() != null && !extracted.getCategories().isEmpty()) {
-                bookCreatorService.addCategoriesToBook(extracted.getCategories(), bookEntity);
-            }
-            if (extracted.getMoods() != null && !extracted.getMoods().isEmpty()) {
-                bookCreatorService.addMoodsToBook(extracted.getMoods(), bookEntity);
-            }
-            if (extracted.getTags() != null && !extracted.getTags().isEmpty()) {
-                bookCreatorService.addTagsToBook(extracted.getTags(), bookEntity);
-            }
-            
-            // Ratings
-            if (extracted.getAmazonRating() != null) {
-                bookEntity.getMetadata().setAmazonRating(extracted.getAmazonRating());
-            }
-            if (extracted.getGoodreadsRating() != null) {
-                bookEntity.getMetadata().setGoodreadsRating(extracted.getGoodreadsRating());
-            }
-            if (extracted.getHardcoverRating() != null) {
-                bookEntity.getMetadata().setHardcoverRating(extracted.getHardcoverRating());
-            }
-            if (extracted.getLubimyczytacRating() != null) {
-                bookEntity.getMetadata().setLubimyczytacRating(extracted.getLubimyczytacRating());
-            }
-            if (extracted.getRanobedbRating() != null) {
-                bookEntity.getMetadata().setRanobedbRating(extracted.getRanobedbRating());
-            }
-            if (extracted.getRating() != null) {
-                bookEntity.getMetadata().setRating(extracted.getRating());
-            }
+            applyBasicMetadata(extracted, bookEntity);
+            applyExternalIds(extracted, bookEntity);
+            applyClassificationsAndRatings(extracted, bookEntity);
 
         } catch (Exception e) {
             log.warn("Failed to extract PDF metadata for '{}': {}", bookEntity.getPrimaryBookFile().getFileName(), e.getMessage());
+        }
+    }
+
+    private void applyBasicMetadata(BookMetadata extracted, BookEntity bookEntity) {
+        if (StringUtils.isNotBlank(extracted.getTitle())) {
+            bookEntity.getMetadata().setTitle(truncate(extracted.getTitle(), 1000));
+        }
+        if (StringUtils.isNotBlank(extracted.getSubtitle())) {
+            bookEntity.getMetadata().setSubtitle(truncate(extracted.getSubtitle(), 1000));
+        }
+        if (StringUtils.isNotBlank(extracted.getSeriesName())) {
+            bookEntity.getMetadata().setSeriesName(truncate(extracted.getSeriesName(), 1000));
+        }
+        if (extracted.getSeriesNumber() != null) {
+            bookEntity.getMetadata().setSeriesNumber(extracted.getSeriesNumber());
+        }
+        if (extracted.getSeriesTotal() != null) {
+            bookEntity.getMetadata().setSeriesTotal(extracted.getSeriesTotal());
+        }
+        if (extracted.getAuthors() != null) {
+            bookCreatorService.addAuthorsToBook(extracted.getAuthors(), bookEntity);
+        }
+        if (StringUtils.isNotBlank(extracted.getPublisher())) {
+            bookEntity.getMetadata().setPublisher(extracted.getPublisher());
+        }
+        if (StringUtils.isNotBlank(extracted.getDescription())) {
+            bookEntity.getMetadata().setDescription(truncate(extracted.getDescription(), 5000));
+        }
+        if (extracted.getPublishedDate() != null) {
+            bookEntity.getMetadata().setPublishedDate(extracted.getPublishedDate());
+        }
+        if (StringUtils.isNotBlank(extracted.getLanguage())) {
+            bookEntity.getMetadata().setLanguage(truncate(extracted.getLanguage(), 10));
+        }
+        if (extracted.getPageCount() != null) {
+            bookEntity.getMetadata().setPageCount(extracted.getPageCount());
+        }
+    }
+
+    private void applyExternalIds(BookMetadata extracted, BookEntity bookEntity) {
+        if (StringUtils.isNotBlank(extracted.getAsin())) {
+            bookEntity.getMetadata().setAsin(truncate(extracted.getAsin(), 10));
+        }
+        if (StringUtils.isNotBlank(extracted.getGoogleId())) {
+            bookEntity.getMetadata().setGoogleId(extracted.getGoogleId());
+        }
+        if (StringUtils.isNotBlank(extracted.getHardcoverId())) {
+            bookEntity.getMetadata().setHardcoverId(extracted.getHardcoverId());
+        }
+        if (StringUtils.isNotBlank(extracted.getHardcoverBookId())) {
+            bookEntity.getMetadata().setHardcoverBookId(extracted.getHardcoverBookId());
+        }
+        if (StringUtils.isNotBlank(extracted.getGoodreadsId())) {
+            bookEntity.getMetadata().setGoodreadsId(extracted.getGoodreadsId());
+        }
+        if (StringUtils.isNotBlank(extracted.getComicvineId())) {
+            bookEntity.getMetadata().setComicvineId(extracted.getComicvineId());
+        }
+        if (StringUtils.isNotBlank(extracted.getRanobedbId())) {
+            bookEntity.getMetadata().setRanobedbId(extracted.getRanobedbId());
+        }
+        if (StringUtils.isNotBlank(extracted.getLubimyczytacId())) {
+            bookEntity.getMetadata().setLubimyczytacId(extracted.getLubimyczytacId());
+        }
+        if (StringUtils.isNotBlank(extracted.getIsbn10())) {
+            bookEntity.getMetadata().setIsbn10(truncate(extracted.getIsbn10(), 10));
+        }
+        if (StringUtils.isNotBlank(extracted.getIsbn13())) {
+            bookEntity.getMetadata().setIsbn13(truncate(extracted.getIsbn13(), 13));
+        }
+    }
+
+    private void applyClassificationsAndRatings(BookMetadata extracted, BookEntity bookEntity) {
+        // Categories, moods, and tags
+        if (extracted.getCategories() != null && !extracted.getCategories().isEmpty()) {
+            bookCreatorService.addCategoriesToBook(extracted.getCategories(), bookEntity);
+        }
+        if (extracted.getMoods() != null && !extracted.getMoods().isEmpty()) {
+            bookCreatorService.addMoodsToBook(extracted.getMoods(), bookEntity);
+        }
+        if (extracted.getTags() != null && !extracted.getTags().isEmpty()) {
+            bookCreatorService.addTagsToBook(extracted.getTags(), bookEntity);
+        }
+
+        // Ratings
+        if (extracted.getAmazonRating() != null) {
+            bookEntity.getMetadata().setAmazonRating(extracted.getAmazonRating());
+        }
+        if (extracted.getGoodreadsRating() != null) {
+            bookEntity.getMetadata().setGoodreadsRating(extracted.getGoodreadsRating());
+        }
+        if (extracted.getHardcoverRating() != null) {
+            bookEntity.getMetadata().setHardcoverRating(extracted.getHardcoverRating());
+        }
+        if (extracted.getLubimyczytacRating() != null) {
+            bookEntity.getMetadata().setLubimyczytacRating(extracted.getLubimyczytacRating());
+        }
+        if (extracted.getRanobedbRating() != null) {
+            bookEntity.getMetadata().setRanobedbRating(extracted.getRanobedbRating());
+        }
+        if (extracted.getRating() != null) {
+            bookEntity.getMetadata().setRating(extracted.getRating());
         }
     }
 

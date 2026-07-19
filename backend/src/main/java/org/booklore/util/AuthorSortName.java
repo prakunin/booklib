@@ -83,14 +83,8 @@ public final class AuthorSortName {
         }
 
         var deque = new ArrayDeque<>(tokens);
-        while (!deque.isEmpty() && config.prefixes().contains(deque.peekFirst().toLowerCase(Locale.ROOT))) {
-            deque.removeFirst();
-        }
-
-        var suffix = new ArrayDeque<String>();
-        while (!deque.isEmpty() && config.suffixes().contains(deque.peekLast().toLowerCase(Locale.ROOT))) {
-            suffix.addFirst(deque.removeLast());
-        }
+        stripLeadingPrefixes(deque, config);
+        var suffix = stripTrailingSuffixes(deque, config);
 
         if (deque.isEmpty()) {
             return trimmed;
@@ -101,12 +95,7 @@ public final class AuthorSortName {
             return trimmed;
         }
 
-        // Absorb consecutive surname prefixes into the surname, e.g. "van der Berg" stays together
-        while (config.useSurnamePrefixes() && remaining.size() > 1
-                && config.surnamePrefixes().contains(remaining.get(remaining.size() - 2).toLowerCase(Locale.ROOT))) {
-            var merged = remaining.remove(remaining.size() - 2) + " " + remaining.get(remaining.size() - 1);
-            remaining.set(remaining.size() - 1, merged);
-        }
+        absorbSurnamePrefixes(remaining, config);
 
         if (remaining.size() < 2) {
             // Only a surname survives after stripping prefixes/suffixes
@@ -121,6 +110,29 @@ public final class AuthorSortName {
         result.addAll(remaining);
         result.addAll(suffix);
         return String.join(" ", result);
+    }
+
+    private static void stripLeadingPrefixes(ArrayDeque<String> deque, Config config) {
+        while (!deque.isEmpty() && config.prefixes().contains(deque.peekFirst().toLowerCase(Locale.ROOT))) {
+            deque.removeFirst();
+        }
+    }
+
+    private static ArrayDeque<String> stripTrailingSuffixes(ArrayDeque<String> deque, Config config) {
+        var suffix = new ArrayDeque<String>();
+        while (!deque.isEmpty() && config.suffixes().contains(deque.peekLast().toLowerCase(Locale.ROOT))) {
+            suffix.addFirst(deque.removeLast());
+        }
+        return suffix;
+    }
+
+    private static void absorbSurnamePrefixes(List<String> remaining, Config config) {
+        // Absorb consecutive surname prefixes into the surname, e.g. "van der Berg" stays together
+        while (config.useSurnamePrefixes() && remaining.size() > 1
+                && config.surnamePrefixes().contains(remaining.get(remaining.size() - 2).toLowerCase(Locale.ROOT))) {
+            var merged = remaining.remove(remaining.size() - 2) + " " + remaining.get(remaining.size() - 1);
+            remaining.set(remaining.size() - 1, merged);
+        }
     }
 
     private static boolean intersects(Set<String> a, Set<String> b) {

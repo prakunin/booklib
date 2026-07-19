@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntPredicate;
 
 @Service
 @RequiredArgsConstructor
@@ -31,18 +32,17 @@ public class PasswordPolicyService {
         if (password != null && password.length() > PasswordPolicy.MAX_PASSWORD_LENGTH) {
             violations.add("must be no more than " + PasswordPolicy.MAX_PASSWORD_LENGTH + " characters long");
         }
-        if (policy.isRequireUppercase() && (password == null || password.chars().noneMatch(Character::isUpperCase))) {
-            violations.add("must contain an uppercase letter");
-        }
-        if (policy.isRequireLowercase() && (password == null || password.chars().noneMatch(Character::isLowerCase))) {
-            violations.add("must contain a lowercase letter");
-        }
-        if (policy.isRequireDigit() && (password == null || password.chars().noneMatch(Character::isDigit))) {
-            violations.add("must contain a digit");
-        }
-        if (policy.isRequireSpecialCharacter() && (password == null || password.chars().noneMatch(c -> !Character.isLetterOrDigit(c)))) {
-            violations.add("must contain a special character");
-        }
+        addCharClassViolation(violations, policy.isRequireUppercase(), password, Character::isUpperCase, "must contain an uppercase letter");
+        addCharClassViolation(violations, policy.isRequireLowercase(), password, Character::isLowerCase, "must contain a lowercase letter");
+        addCharClassViolation(violations, policy.isRequireDigit(), password, Character::isDigit, "must contain a digit");
+        addCharClassViolation(violations, policy.isRequireSpecialCharacter(), password, c -> !Character.isLetterOrDigit(c), "must contain a special character");
         return violations;
+    }
+
+    private void addCharClassViolation(List<String> violations, boolean required, String password,
+                                       IntPredicate matcher, String message) {
+        if (required && (password == null || password.chars().noneMatch(matcher))) {
+            violations.add(message);
+        }
     }
 }

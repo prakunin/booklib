@@ -210,24 +210,20 @@ public class KomgaMapper {
         String summary = null;
         
         BookEntity firstBook = books.getFirst();
-            for (BookEntity book : books) {
+        for (BookEntity book : books) {
             BookMetadataEntity metadata = book.getMetadata();
-            if (metadata != null) {
-                if (metadata.getAuthors() != null) {
-                    metadata.getAuthors().forEach(author -> authorNames.add(author.getName()));
-                }
-                
-                if (metadata.getTags() != null) {
-                    metadata.getTags().forEach(tag -> allTags.add(tag.getName()));
-                }
-                
-                if (releaseDate == null && metadata.getPublishedDate() != null) {
-                    releaseDate = metadata.getPublishedDate().format(DATE_FORMATTER);
-                }
-                
-                if (summary == null && metadata.getDescription() != null) {
-                    summary = metadata.getDescription();
-                }
+            if (metadata == null) {
+                continue;
+            }
+
+            collectAuthorsAndTags(metadata, authorNames, allTags);
+
+            if (releaseDate == null && metadata.getPublishedDate() != null) {
+                releaseDate = metadata.getPublishedDate().format(DATE_FORMATTER);
+            }
+
+            if (summary == null && metadata.getDescription() != null) {
+                summary = metadata.getDescription();
             }
         }
         
@@ -246,6 +242,16 @@ public class KomgaMapper {
                 .summaryNumber(nullIfEmptyInCleanMode(null, ""))
                 .summaryLock(false)
                 .build();
+    }
+
+    private void collectAuthorsAndTags(BookMetadataEntity metadata, Set<String> authorNames, Set<String> allTags) {
+        if (metadata.getAuthors() != null) {
+            metadata.getAuthors().forEach(author -> authorNames.add(author.getName()));
+        }
+
+        if (metadata.getTags() != null) {
+            metadata.getTags().forEach(tag -> allTags.add(tag.getName()));
+        }
     }
 
     public String getBookSeriesName(BookEntity book) {

@@ -120,53 +120,69 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
         Path path = fullPath.toAbsolutePath().normalize();
 
         if (eventKind == StandardWatchEventKinds.ENTRY_DELETE) {
-            ScheduledFuture<?> existing = pendingDeletes.put(path, scheduler.schedule(() -> {
-                enqueueEvent(new FileEvent(eventKind, libraryId, path, isDirectory));
-                pendingDeletes.remove(path);
-            }, DEBOUNCE_MS, TimeUnit.MILLISECONDS));
-
-            if (existing != null) existing.cancel(false);
+            scheduleDeleteDebounce(eventKind, libraryId, path, isDirectory);
         } else if (eventKind == StandardWatchEventKinds.ENTRY_CREATE) {
-            ScheduledFuture<?> pendingDelete = pendingDeletes.remove(path);
-            if (pendingDelete != null) {
-                pendingDelete.cancel(false);
-                log.debug("[DEBOUNCE] CREATE after pending DELETE for '{}', treating as file modification", path);
-            }
-
-            if (isDirectory) {
-                log.debug("[DEBOUNCE] Scheduling folder create for '{}' with {}ms delay", path, FOLDER_CREATE_DEBOUNCE_MS);
-                ScheduledFuture<?> existingFolder = pendingFolderCreates.put(path, scheduler.schedule(() -> {
-                    enqueueEvent(new FileEvent(eventKind, libraryId, path, true));
-                    pendingFolderCreates.remove(path);
-                    filesFromPendingFolder.removeIf(f -> f.startsWith(path));
-                }, FOLDER_CREATE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
-
-                if (existingFolder != null) existingFolder.cancel(false);
-            } else {
-                boolean insidePendingFolder = false;
-                for (var entry : pendingFolderCreates.entrySet()) {
-                    if (path.startsWith(entry.getKey())) {
-                        insidePendingFolder = true;
-                        filesFromPendingFolder.add(path);
-                        ScheduledFuture<?> oldTimer = entry.getValue();
-                        if (oldTimer != null) oldTimer.cancel(false);
-                        Path folderPath = entry.getKey();
-                        pendingFolderCreates.put(folderPath, scheduler.schedule(() -> {
-                            enqueueEvent(new FileEvent(eventKind, libraryId, folderPath, true));
-                            pendingFolderCreates.remove(folderPath);
-                            filesFromPendingFolder.removeIf(f -> f.startsWith(folderPath));
-                        }, FOLDER_CREATE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
-                        log.debug("[DEBOUNCE] File '{}' tracked, reset folder debounce for '{}'", path.getFileName(), folderPath);
-                        break;
-                    }
-                }
-                if (!insidePendingFolder) {
-                    scheduleWithStabilityCheck(path, () ->
-                            enqueueEvent(new FileEvent(eventKind, libraryId, path, false)));
-                }
-            }
+            handleCreateEvent(eventKind, libraryId, path, isDirectory);
         } else {
             enqueueEvent(new FileEvent(eventKind, libraryId, path, false));
+        }
+    }
+
+    private void scheduleDeleteDebounce(WatchEvent.Kind<?> eventKind, long libraryId, Path path, boolean isDirectory) {
+        ScheduledFuture<?> existing = pendingDeletes.put(path, scheduler.schedule(() -> {
+            enqueueEvent(new FileEvent(eventKind, libraryId, path, isDirectory));
+            pendingDeletes.remove(path);
+        }, DEBOUNCE_MS, TimeUnit.MILLISECONDS));
+
+        if (existing != null) existing.cancel(false);
+    }
+
+    private void handleCreateEvent(WatchEvent.Kind<?> eventKind, long libraryId, Path path, boolean isDirectory) {
+        ScheduledFuture<?> pendingDelete = pendingDeletes.remove(path);
+        if (pendingDelete != null) {
+            pendingDelete.cancel(false);
+            log.debug("[DEBOUNCE] CREATE after pending DELETE for '{}', treating as file modification", path);
+        }
+
+        if (isDirectory) {
+            scheduleFolderCreate(eventKind, libraryId, path);
+        } else {
+            trackOrScheduleFileCreate(eventKind, libraryId, path);
+        }
+    }
+
+    private void scheduleFolderCreate(WatchEvent.Kind<?> eventKind, long libraryId, Path path) {
+        log.debug("[DEBOUNCE] Scheduling folder create for '{}' with {}ms delay", path, FOLDER_CREATE_DEBOUNCE_MS);
+        ScheduledFuture<?> existingFolder = pendingFolderCreates.put(path, scheduler.schedule(() -> {
+            enqueueEvent(new FileEvent(eventKind, libraryId, path, true));
+            pendingFolderCreates.remove(path);
+            filesFromPendingFolder.removeIf(f -> f.startsWith(path));
+        }, FOLDER_CREATE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
+
+        if (existingFolder != null) existingFolder.cancel(false);
+    }
+
+    private void trackOrScheduleFileCreate(WatchEvent.Kind<?> eventKind, long libraryId, Path path) {
+        boolean insidePendingFolder = false;
+        for (var entry : pendingFolderCreates.entrySet()) {
+            if (path.startsWith(entry.getKey())) {
+                insidePendingFolder = true;
+                filesFromPendingFolder.add(path);
+                ScheduledFuture<?> oldTimer = entry.getValue();
+                if (oldTimer != null) oldTimer.cancel(false);
+                Path folderPath = entry.getKey();
+                pendingFolderCreates.put(folderPath, scheduler.schedule(() -> {
+                    enqueueEvent(new FileEvent(eventKind, libraryId, folderPath, true));
+                    pendingFolderCreates.remove(folderPath);
+                    filesFromPendingFolder.removeIf(f -> f.startsWith(folderPath));
+                }, FOLDER_CREATE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
+                log.debug("[DEBOUNCE] File '{}' tracked, reset folder debounce for '{}'", path.getFileName(), folderPath);
+                break;
+            }
+        }
+        if (!insidePendingFolder) {
+            scheduleWithStabilityCheck(path, () ->
+                    enqueueEvent(new FileEvent(eventKind, libraryId, path, false)));
         }
     }
 
@@ -373,18 +389,7 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
             }
         }
 
-        Optional<PendingDeletionPool.FolderMatchResult> folderMatch = pendingDeletionPool.matchFolderByHashes(fileHashes);
-        if (folderMatch.isPresent()) {
-            var match = folderMatch.get();
-            String matchedLibPath = bookFilePersistenceService.findMatchingLibraryPath(library, folderPath);
-            LibraryPathEntity matchedLibPathEntity = bookFilePersistenceService.getLibraryPathEntityForFile(library, matchedLibPath);
-
-            for (var bookEntry : match.pending().affectedBooks().entrySet()) {
-                var bookSnap = bookEntry.getValue();
-                bookFilePersistenceService.recoverFolderBook(bookSnap, matchedLibPathEntity, folderPath, fileHashes);
-            }
-            log.info("[FOLDER_CREATE] Folder '{}' matched pending deletion, recovered {} books",
-                    folderPath, match.pending().affectedBooks().size());
+        if (recoverFolderFromPool(library, folderPath, fileHashes)) {
             return;
         }
 
@@ -398,6 +403,29 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
             return;
         }
 
+        processUnmatchedAsNewBooks(library, folderPath, unmatched);
+    }
+
+    private boolean recoverFolderFromPool(LibraryEntity library, Path folderPath, Map<Path, String> fileHashes) {
+        Optional<PendingDeletionPool.FolderMatchResult> folderMatch = pendingDeletionPool.matchFolderByHashes(fileHashes);
+        if (folderMatch.isEmpty()) {
+            return false;
+        }
+
+        var match = folderMatch.get();
+        String matchedLibPath = bookFilePersistenceService.findMatchingLibraryPath(library, folderPath);
+        LibraryPathEntity matchedLibPathEntity = bookFilePersistenceService.getLibraryPathEntityForFile(library, matchedLibPath);
+
+        for (var bookEntry : match.pending().affectedBooks().entrySet()) {
+            var bookSnap = bookEntry.getValue();
+            bookFilePersistenceService.recoverFolderBook(bookSnap, matchedLibPathEntity, folderPath, fileHashes);
+        }
+        log.info("[FOLDER_CREATE] Folder '{}' matched pending deletion, recovered {} books",
+                folderPath, match.pending().affectedBooks().size());
+        return true;
+    }
+
+    private void processUnmatchedAsNewBooks(LibraryEntity library, Path folderPath, List<Path> unmatched) {
         String libraryPath = bookFilePersistenceService.findMatchingLibraryPath(library, folderPath);
         LibraryPathEntity libPathEntity = bookFilePersistenceService.getLibraryPathEntityForFile(library, libraryPath);
 
