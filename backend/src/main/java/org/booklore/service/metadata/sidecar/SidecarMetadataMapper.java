@@ -146,29 +146,33 @@ public class SidecarMetadataMapper {
         return baseName + ".cover.jpg";
     }
 
+    @SuppressWarnings("java:S1168") // null keeps @JsonInclude(NON_NULL) omitting the key in exported sidecar JSON (wire format)
     private List<String> extractNames(List<AuthorEntity> entities) {
-        if (entities == null) return List.of();
+        if (entities == null) return null;
         return entities.stream()
                 .map(AuthorEntity::getName)
                 .toList();
     }
 
+    @SuppressWarnings("java:S1168") // null keeps @JsonInclude(NON_NULL) omitting the key in exported sidecar JSON (wire format)
     private Set<String> extractCategoryNames(Set<CategoryEntity> entities) {
-        if (entities == null) return Set.of();
+        if (entities == null) return null;
         return entities.stream()
                 .map(CategoryEntity::getName)
                 .collect(Collectors.toSet());
     }
 
+    @SuppressWarnings("java:S1168") // null keeps @JsonInclude(NON_NULL) omitting the key in exported sidecar JSON (wire format)
     private Set<String> extractMoodNames(Set<MoodEntity> entities) {
-        if (entities == null) return Set.of();
+        if (entities == null) return null;
         return entities.stream()
                 .map(MoodEntity::getName)
                 .collect(Collectors.toSet());
     }
 
+    @SuppressWarnings("java:S1168") // null keeps @JsonInclude(NON_NULL) omitting the key in exported sidecar JSON (wire format)
     private Set<String> extractTagNames(Set<TagEntity> entities) {
-        if (entities == null) return Set.of();
+        if (entities == null) return null;
         return entities.stream()
                 .map(TagEntity::getName)
                 .collect(Collectors.toSet());

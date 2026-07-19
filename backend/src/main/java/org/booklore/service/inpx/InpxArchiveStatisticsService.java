@@ -89,6 +89,7 @@ public class InpxArchiveStatisticsService {
         inFlight.remove(libraryId);
     }
 
+    @SuppressWarnings("java:S1181") // Error must still complete the future and free the dedup slot below, same as Exception - otherwise concurrent awaiters of this in-flight computation would hang forever
     private void compute(long libraryId, long generation,
                          CompletableFuture<Map<String, ArchiveStatistics>> future) {
         try {
@@ -99,6 +100,9 @@ public class InpxArchiveStatisticsService {
             inFlight.remove(libraryId, future);
             future.complete(statistics);
         } catch (Exception e) {
+            inFlight.remove(libraryId, future);
+            future.completeExceptionally(e);
+        } catch (Error e) {
             inFlight.remove(libraryId, future);
             future.completeExceptionally(e);
         }
