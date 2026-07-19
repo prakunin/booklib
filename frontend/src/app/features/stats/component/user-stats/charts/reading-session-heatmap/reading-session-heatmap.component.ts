@@ -9,6 +9,7 @@ import {ReadingSessionHeatmapResponse, UserStatsService} from '../../../../../se
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {AsyncPipe} from '@angular/common';
 import {readStatsChartThemeColors} from '../../../shared/stats-chart-theme.service';
+import {parseLocalDateOnly} from './reading-session-heatmap-date.util';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -85,7 +86,7 @@ export class ReadingSessionHeatmapComponent implements OnInit, OnDestroy {
           callbacks: {
             title: (context) => {
               const point = context[0].raw as MatrixDataPoint;
-              const date = new Date(point.date);
+              const date = parseLocalDateOnly(point.date);
               return date.toLocaleDateString('en-US', {
                 weekday: 'short',
                 year: 'numeric',

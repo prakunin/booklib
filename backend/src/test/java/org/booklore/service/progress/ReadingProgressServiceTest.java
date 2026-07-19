@@ -245,6 +245,43 @@ class ReadingProgressServiceTest {
     }
 
     @Test
+    void updateReadProgress_preservesManualTerminalStatusWhenReadingProgressAdvances() {
+        long bookId = 1L;
+        BookEntity book = new BookEntity();
+        book.setId(bookId);
+        BookFileEntity primaryFile = new BookFileEntity();
+        primaryFile.setId(1L);
+        primaryFile.setBook(book);
+        primaryFile.setBookType(BookFileType.PDF);
+        book.setBookFiles(List.of(primaryFile));
+
+        BookLoreUser user = mock(BookLoreUser.class);
+        when(user.getId()).thenReturn(2L);
+        when(authenticationService.getAuthenticatedUser()).thenReturn(user);
+        when(bookRepository.findByIdWithBookFiles(bookId)).thenReturn(Optional.of(book));
+
+        BookLoreUserEntity userEntity = new BookLoreUserEntity();
+        userEntity.setId(2L);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(userEntity));
+
+        Instant existingModifiedTime = Instant.parse("2026-01-01T00:00:00Z");
+        UserBookProgressEntity progress = new UserBookProgressEntity();
+        progress.setReadStatus(ReadStatus.WONT_READ);
+        progress.setReadStatusModifiedTime(existingModifiedTime);
+        when(userBookProgressRepository.findByUserIdAndBookId(2L, bookId)).thenReturn(Optional.of(progress));
+        when(userBookFileProgressRepository.findByUserIdAndBookFileId(2L, 1L)).thenReturn(Optional.empty());
+
+        ReadProgressRequest req = new ReadProgressRequest();
+        req.setBookId(bookId);
+        req.setPdfProgress(PdfProgress.builder().page(5).percentage(50f).build());
+
+        readingProgressService.updateReadProgress(req);
+
+        assertEquals(ReadStatus.WONT_READ, progress.getReadStatus());
+        assertEquals(existingModifiedTime, progress.getReadStatusModifiedTime());
+    }
+
+    @Test
     void updateReadProgress_keepsReadStatusModifiedTimeWhenStatusDoesNotChange() {
         long bookId = 1L;
         BookEntity book = new BookEntity();

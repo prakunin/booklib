@@ -28,8 +28,12 @@ public enum BookFileExtension {
 
     public static Optional<BookFileExtension> fromFileName(String fileName) {
         String lower = fileName.toLowerCase();
+        if (lower.endsWith(".fb2.zip")) {
+            lower = lower.substring(0, lower.length() - ".zip".length());
+        }
+        String normalizedFileName = lower;
         return Arrays.stream(values())
-                .filter(e -> lower.endsWith("." + e.extension))
+                .filter(e -> normalizedFileName.endsWith("." + e.extension))
                 .findFirst();
     }
 }

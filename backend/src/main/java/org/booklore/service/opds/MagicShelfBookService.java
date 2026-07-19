@@ -14,9 +14,10 @@ import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.entity.MagicShelfEntity;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.MagicShelfRepository;
+import org.booklore.repository.UserContentRestrictionRepository;
 import org.booklore.repository.UserRepository;
+import org.booklore.security.policy.ContentRestrictionSpecification;
 import org.booklore.service.BookRuleEvaluatorService;
-import org.booklore.service.restriction.ContentRestrictionService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -43,7 +44,7 @@ public class MagicShelfBookService {
     private final UserRepository userRepository;
     private final BookLoreUserTransformer bookLoreUserTransformer;
     private final BookRuleEvaluatorService ruleEvaluatorService;
-    private final ContentRestrictionService contentRestrictionService;
+    private final UserContentRestrictionRepository restrictionRepository;
     private final ObjectMapper objectMapper;
 
     private record ShelfAccess(MagicShelfEntity shelf, BookLoreUserEntity user) {}
@@ -56,8 +57,7 @@ public class MagicShelfBookService {
 
             Page<BookEntity> booksPage = bookRepository.findAll(specification, pageable);
 
-            List<BookEntity> filteredEntities = contentRestrictionService.applyRestrictions(booksPage.getContent(), userId);
-            List<Book> books = filteredEntities.stream()
+            List<Book> books = booksPage.getContent().stream()
                     .map(bookMapper::toBook)
                     .map(book -> filterBook(book, userId))
                     .toList();
@@ -75,7 +75,9 @@ public class MagicShelfBookService {
         try {
             GroupRule groupRule = objectMapper.readValue(access.shelf().getFilterJson(), GroupRule.class);
             Specification<BookEntity> specification = ruleEvaluatorService.toSpecification(groupRule, userId);
-            return specification.and(createLibraryFilterSpecification(access.user()));
+            return specification
+                    .and(createLibraryFilterSpecification(access.user()))
+                    .and(createContentRestrictionSpecification(access.user()));
         } catch (APIException e) {
             throw e;
         } catch (Exception e) {
@@ -93,12 +95,13 @@ public class MagicShelfBookService {
         try {
             GroupRule groupRule = objectMapper.readValue(access.shelf().getFilterJson(), GroupRule.class);
             Specification<BookEntity> specification = ruleEvaluatorService.toSpecification(groupRule, userId);
-            specification = specification.and(createLibraryFilterSpecification(access.user()));
+            specification = specification
+                    .and(createLibraryFilterSpecification(access.user()))
+                    .and(createContentRestrictionSpecification(access.user()));
 
             Pageable pageable = PageRequest.of(0, limit);
             Page<BookEntity> booksPage = bookRepository.findAll(specification, pageable);
-            List<BookEntity> filtered = contentRestrictionService.applyRestrictions(booksPage.getContent(), userId);
-            return filtered.stream().map(BookEntity::getId).toList();
+            return booksPage.getContent().stream().map(BookEntity::getId).toList();
         } catch (APIException e) {
             throw e;
         } catch (Exception e) {
@@ -159,6 +162,13 @@ public class MagicShelfBookService {
                 .collect(Collectors.toSet());
 
         return (root, query, cb) -> root.get("library").get("id").in(userLibraryIds);
+    }
+
+    private Specification<BookEntity> createContentRestrictionSpecification(BookLoreUserEntity entity) {
+        if (entity == null || entity.getPermissions().isPermissionAdmin()) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+        return ContentRestrictionSpecification.from(restrictionRepository.findByUserId(entity.getId()));
     }
 
     private Book filterBook(Book dto, Long userId) {

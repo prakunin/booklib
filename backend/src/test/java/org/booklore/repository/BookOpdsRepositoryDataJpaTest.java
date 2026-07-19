@@ -4,9 +4,14 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.booklore.BookloreApplication;
 import org.booklore.model.entity.BookEntity;
+import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.entity.BookMetadataEntity;
+import org.booklore.model.entity.CategoryEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
+import org.booklore.model.entity.UserContentRestrictionEntity;
+import org.booklore.model.enums.ContentRestrictionMode;
+import org.booklore.model.enums.ContentRestrictionType;
 import org.booklore.model.enums.OpdsSortOrder;
 import org.booklore.service.task.TaskCronService;
 import org.flywaydb.core.Flyway;
@@ -23,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -142,6 +148,29 @@ class BookOpdsRepositoryDataJpaTest {
         }
     }
 
+    @Test
+    void findBookIdsByLibraryIds_appliesRestrictionsBeforePagination() {
+        LibraryEntity library = persistLibrary("Restricted Library");
+        LibraryPathEntity libraryPath = persistLibraryPath(library);
+        CategoryEntity blocked = CategoryEntity.builder().name("Blocked").build();
+        entityManager.persist(blocked);
+
+        persistBook(library, libraryPath, "Hidden Newest", Instant.parse("2026-01-03T00:00:00Z"), Set.of(blocked));
+        Long visibleId = persistBook(library, libraryPath, "Visible Older", Instant.parse("2026-01-02T00:00:00Z"), Set.of());
+        UserContentRestrictionEntity restriction = persistRestriction("Blocked");
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<Long> firstPage = bookOpdsRepository.findBookIdsByLibraryIds(
+                Set.of(library.getId()),
+                OpdsSortOrder.RECENT,
+                PageRequest.of(0, 1),
+                List.of(restriction));
+
+        assertThat(firstPage.getContent()).containsExactly(visibleId);
+        assertThat(firstPage.getTotalElements()).isEqualTo(1);
+    }
+
     private LibraryEntity persistLibrary(String name) {
         LibraryEntity library = LibraryEntity.builder()
                 .name(name)
@@ -162,6 +191,10 @@ class BookOpdsRepositoryDataJpaTest {
     }
 
     private Long persistBook(LibraryEntity library, LibraryPathEntity libraryPath, String title, Instant addedOn) {
+        return persistBook(library, libraryPath, title, addedOn, Set.of());
+    }
+
+    private Long persistBook(LibraryEntity library, LibraryPathEntity libraryPath, String title, Instant addedOn, Set<CategoryEntity> categories) {
         BookEntity book = BookEntity.builder()
                 .library(library)
                 .libraryPath(libraryPath)
@@ -175,8 +208,17 @@ class BookOpdsRepositoryDataJpaTest {
                 .book(book)
                 .bookId(book.getId())
                 .title(title)
+                .categories(categories)
                 .build();
         entityManager.persist(metadata);
         return book.getId();
+    }
+
+    private UserContentRestrictionEntity persistRestriction(String category) {
+        return UserContentRestrictionEntity.builder()
+                .restrictionType(ContentRestrictionType.CATEGORY)
+                .mode(ContentRestrictionMode.EXCLUDE)
+                .value(category)
+                .build();
     }
 }

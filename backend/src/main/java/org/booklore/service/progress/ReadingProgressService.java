@@ -440,19 +440,18 @@ public class ReadingProgressService {
             newStatus = ReadStatus.UNREAD;
         }
 
-        // Only allow automatic status changes that represent progress upgrades
-        // Don't downgrade from manually set or higher progress statuses
-        if (newStatus == ReadStatus.UNREAD) {
-            // Preserve any status that indicates the user has engaged with the book
-            if (currentStatus == ReadStatus.READING ||
-                currentStatus == ReadStatus.RE_READING ||
-                currentStatus == ReadStatus.READ ||
-                currentStatus == ReadStatus.PARTIALLY_READ ||
-                currentStatus == ReadStatus.PAUSED ||
-                currentStatus == ReadStatus.ABANDONED ||
-                currentStatus == ReadStatus.WONT_READ) {
-                return currentStatus;
-            }
+        if (currentStatus == ReadStatus.PAUSED ||
+            currentStatus == ReadStatus.ABANDONED ||
+            currentStatus == ReadStatus.WONT_READ) {
+            return currentStatus;
+        }
+
+        if (newStatus == ReadStatus.UNREAD &&
+            (currentStatus == ReadStatus.READING ||
+             currentStatus == ReadStatus.RE_READING ||
+             currentStatus == ReadStatus.READ ||
+             currentStatus == ReadStatus.PARTIALLY_READ)) {
+            return currentStatus;
         }
 
         return newStatus;
