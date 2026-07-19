@@ -15,7 +15,7 @@ import java.util.Collection;
 import java.util.List;
 
 @Repository
-public interface BookOpdsRepository extends JpaRepository<BookEntity, Long>, JpaSpecificationExecutor<BookEntity> {
+public interface BookOpdsRepository extends JpaRepository<BookEntity, Long>, JpaSpecificationExecutor<BookEntity>, BookOpdsRepositoryCustom {
 
     // ============================================
     // ALL BOOKS - Two Query Pattern

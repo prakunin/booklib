@@ -244,18 +244,11 @@ public class ReadingProgressService {
                 }
             }
 
-            if (percentage != null) {
-                progress.setReadStatus(calculateReadStatus(percentage, progress.getReadStatus()));
-                BookFileEntity primaryFile = book.getPrimaryBookFile();
-                if (primaryFile != null) {
-                    setProgressPercent(progress, primaryFile.getBookType(), percentage);
-                }
-            }
         }
 
         if (percentage != null) {
             ReadStatus newStatus = calculateReadStatus(percentage, progress.getReadStatus());
-            progress.setReadStatus(newStatus);
+            updateReadStatus(progress, newStatus, now);
             BookFileEntity primaryFile = book.getPrimaryBookFile();
             if (primaryFile != null) {
                 setProgressPercent(progress, primaryFile.getBookType(), percentage);
@@ -274,6 +267,14 @@ public class ReadingProgressService {
         if (percentage != null) {
             koreaderService.syncProgressToKoreader(book.getId(), percentage, user.getId());
             hardcoverSyncService.syncProgressToHardcover(book.getId(), percentage, user.getId());
+        }
+    }
+
+    private void updateReadStatus(UserBookProgressEntity progress, ReadStatus newStatus, Instant modifiedTime) {
+        ReadStatus previousStatus = progress.getReadStatus();
+        progress.setReadStatus(newStatus);
+        if (previousStatus != newStatus) {
+            progress.setReadStatusModifiedTime(modifiedTime);
         }
     }
 
