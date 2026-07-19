@@ -183,7 +183,7 @@ class BookMetadataUpdaterTest {
     }
 
     @Test
-    void setBookMetadata_replaceAll_setsNullWhenNewValueNull() {
+    void setBookMetadata_replaceAll_keepsExistingWhenNewValueNull() {
         metadataEntity.setPublisher("Old Publisher");
         BookMetadata newMeta = BookMetadata.builder().title("T").publisher(null).build();
         MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
@@ -193,7 +193,22 @@ class BookMetadataUpdaterTest {
 
             updater.setBookMetadata(context);
 
-            assertThat(metadataEntity.getPublisher()).isNull();
+            assertThat(metadataEntity.getPublisher()).isEqualTo("Old Publisher");
+        }
+    }
+
+    @Test
+    void setBookMetadata_replaceAll_keepsExistingWhenNewValueBlank() {
+        metadataEntity.setPublisher("Old Publisher");
+        BookMetadata newMeta = BookMetadata.builder().title("T").publisher(" ").build();
+        MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
+
+        try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+            mockSettingsAndChangeDetector(mcd, true, true);
+
+            updater.setBookMetadata(context);
+
+            assertThat(metadataEntity.getPublisher()).isEqualTo("Old Publisher");
         }
     }
 
@@ -350,6 +365,23 @@ class BookMetadataUpdaterTest {
             updater.setBookMetadata(context);
 
             assertThat(metadataEntity.getAuthors()).containsExactly(newAuthor);
+        }
+    }
+
+    @Test
+    void setBookMetadata_authorsReplaceAll_keepsExistingWhenIncomingEmpty() {
+        AuthorEntity existing = AuthorEntity.builder().id(1L).name("Old Author").build();
+        metadataEntity.setAuthors(new ArrayList<>(List.of(existing)));
+
+        BookMetadata newMeta = BookMetadata.builder().title("T").authors(List.of()).build();
+        MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
+
+        try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+            mockSettingsAndChangeDetector(mcd, true, true);
+
+            updater.setBookMetadata(context);
+
+            assertThat(metadataEntity.getAuthors()).containsExactly(existing);
         }
     }
 
@@ -531,7 +563,7 @@ class BookMetadataUpdaterTest {
     }
 
     @Test
-    void setBookMetadata_authorsReplaceAll_emptyNewAuthors_clearsExisting() {
+    void setBookMetadata_authorsReplaceAll_emptyNewAuthors_keepsExisting() {
         AuthorEntity existing = AuthorEntity.builder().id(1L).name("Author").build();
         metadataEntity.setAuthors(new ArrayList<>(List.of(existing)));
 
@@ -543,7 +575,7 @@ class BookMetadataUpdaterTest {
 
             updater.setBookMetadata(context);
 
-            assertThat(metadataEntity.getAuthors()).isEmpty();
+            assertThat(metadataEntity.getAuthors()).containsExactly(existing);
         }
     }
 
@@ -1201,7 +1233,7 @@ class BookMetadataUpdaterTest {
         }
 
         @Test
-        void emptyCharacters_replaceAll_clearsExisting() {
+        void emptyCharacters_replaceAll_keepsExisting() {
             ComicMetadataEntity existing = ComicMetadataEntity.builder().bookId(1L).build();
             existing.getCharacters().add(ComicCharacterEntity.builder().id(1L).name("Batman").build());
             metadataEntity.setComicMetadata(existing);
@@ -1216,7 +1248,7 @@ class BookMetadataUpdaterTest {
                 mockSettingsAndChangeDetector(mcd, true, true);
                 updater.setBookMetadata(context);
 
-                assertThat(existing.getCharacters()).isEmpty();
+                assertThat(existing.getCharacters()).extracting("name").containsExactly("Batman");
             }
         }
 
@@ -1263,7 +1295,7 @@ class BookMetadataUpdaterTest {
         }
 
         @Test
-        void emptyCreators_replaceAll_removesExistingForRole() {
+        void emptyCreators_replaceAll_keepsExistingForRole() {
             ComicMetadataEntity existing = ComicMetadataEntity.builder().bookId(1L).build();
             ComicCreatorEntity creator = ComicCreatorEntity.builder().id(1L).name("Artist").build();
             ComicCreatorMappingEntity mapping = ComicCreatorMappingEntity.builder()
@@ -1281,7 +1313,7 @@ class BookMetadataUpdaterTest {
                 mockSettingsAndChangeDetector(mcd, true, true);
                 updater.setBookMetadata(context);
 
-                assertThat(existing.getCreatorMappings()).isEmpty();
+                assertThat(existing.getCreatorMappings()).containsExactly(mapping);
             }
         }
 
@@ -1601,7 +1633,7 @@ class BookMetadataUpdaterTest {
         }
 
         @Test
-        void emptyCategories_replaceAll_clearsExisting() {
+        void emptyCategories_replaceAll_keepsExisting() {
             CategoryEntity existing = CategoryEntity.builder().id(1L).name("Cat").build();
             metadataEntity.setCategories(new HashSet<>(Set.of(existing)));
 
@@ -1611,12 +1643,12 @@ class BookMetadataUpdaterTest {
             try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
                 mockSettingsAndChangeDetector(mcd, true, true);
                 updater.setBookMetadata(context);
-                assertThat(metadataEntity.getCategories()).isEmpty();
+                assertThat(metadataEntity.getCategories()).containsExactly(existing);
             }
         }
 
         @Test
-        void emptyMoods_replaceAll_clearsExisting() {
+        void emptyMoods_replaceAll_keepsExisting() {
             MoodEntity existing = MoodEntity.builder().id(1L).name("Mood").build();
             metadataEntity.setMoods(new HashSet<>(Set.of(existing)));
 
@@ -1626,12 +1658,12 @@ class BookMetadataUpdaterTest {
             try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
                 mockSettingsAndChangeDetector(mcd, true, true);
                 updater.setBookMetadata(context);
-                assertThat(metadataEntity.getMoods()).isEmpty();
+                assertThat(metadataEntity.getMoods()).containsExactly(existing);
             }
         }
 
         @Test
-        void emptyTags_replaceAll_clearsExisting() {
+        void emptyTags_replaceAll_keepsExisting() {
             TagEntity existing = TagEntity.builder().id(1L).name("Tag").build();
             metadataEntity.setTags(new HashSet<>(Set.of(existing)));
 
@@ -1641,7 +1673,7 @@ class BookMetadataUpdaterTest {
             try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
                 mockSettingsAndChangeDetector(mcd, true, true);
                 updater.setBookMetadata(context);
-                assertThat(metadataEntity.getTags()).isEmpty();
+                assertThat(metadataEntity.getTags()).containsExactly(existing);
             }
         }
     }

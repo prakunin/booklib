@@ -23,6 +23,7 @@ import org.booklore.service.audit.AuditService;
 import org.booklore.service.metadata.DuckDuckGoCoverService;
 import org.booklore.service.metadata.parser.AuthorParser;
 import org.booklore.util.FileService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.web.multipart.MultipartFile;
@@ -61,6 +62,7 @@ public class AuthorMetadataService {
     private final DuckDuckGoCoverService duckDuckGoCoverService;
     private final AuthenticationService authenticationService;
     private final AppSettingService appSettingService;
+    private final ObjectProvider<AuthorMetadataService> selfProvider;
 
     public List<AuthorSummary> getAllAuthors() {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
@@ -163,7 +165,7 @@ public class AuthorMetadataService {
                         Mono.fromCallable(() -> {
                             AuthorEntity author = authorRepository.findById(authorId).orElse(null);
                             if (author == null) return null;
-                            AuthorDetails details = quickMatchAuthor(authorId, "us");
+                            AuthorDetails details = selfProvider.getObject().quickMatchAuthor(authorId, "us");
                             return AuthorSummary.builder()
                                     .id(details.getId())
                                     .name(details.getName())

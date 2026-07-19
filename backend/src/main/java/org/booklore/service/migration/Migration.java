@@ -6,4 +6,8 @@ public interface Migration {
     String getDescription();
 
     void execute();
+
+    default boolean isTransactional() {
+        return true;
+    }
 }

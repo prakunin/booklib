@@ -35,6 +35,11 @@ public class PopulateCoversAndResizeThumbnailsMigration implements Migration {
     }
 
     @Override
+    public boolean isTransactional() {
+        return false;
+    }
+
+    @Override
     public void execute() {
         long start = System.nanoTime();
         log.info("Starting migration: {}", getKey());
@@ -106,4 +111,3 @@ public class PopulateCoversAndResizeThumbnailsMigration implements Migration {
         log.info("Completed migration: {} in {} ms", getKey(), elapsedMs);
     }
 }
-
