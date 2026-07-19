@@ -12,7 +12,6 @@ import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.BadJWTException;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import jakarta.annotation.PostConstruct;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.exception.ApiError;
@@ -42,12 +41,9 @@ public class JwtUtils {
 
     private DefaultJWTClaimsVerifier<?> claimsVerifier;
 
-    @Getter
-    public static final long accessTokenExpirationMs = 1000L * 60 * 60 * 2;  // 2 hours
-    @Getter
-    public static final long refreshTokenExpirationMs = 1000L * 60 * 60 * 24 * 30; // 30 days
-    @Getter
-    public static final long mediaTokenExpirationMs = 1000L * 60 * 10; // 10 minutes
+    public static final long ACCESS_TOKEN_EXPIRATION_MS = 1000L * 60 * 60 * 2;  // 2 hours
+    public static final long REFRESH_TOKEN_EXPIRATION_MS = 1000L * 60 * 60 * 24 * 30; // 30 days
+    public static final long MEDIA_TOKEN_EXPIRATION_MS = 1000L * 60 * 10; // 10 minutes
 
     @PostConstruct
     public void init() {
@@ -79,7 +75,7 @@ public class JwtUtils {
     }
 
     public String generateToken(BookLoreUserEntity user, boolean isRefreshToken) {
-        long expirationTime = isRefreshToken ? refreshTokenExpirationMs : accessTokenExpirationMs;
+        long expirationTime = isRefreshToken ? REFRESH_TOKEN_EXPIRATION_MS : ACCESS_TOKEN_EXPIRATION_MS;
         String tokenType = isRefreshToken ? TOKEN_TYPE_REFRESH : TOKEN_TYPE_ACCESS;
         return generateToken(user, expirationTime, tokenType);
     }
@@ -122,7 +118,7 @@ public class JwtUtils {
     }
 
     public String generateMediaToken(BookLoreUserEntity user) {
-        return generateToken(user, mediaTokenExpirationMs, TOKEN_TYPE_MEDIA);
+        return generateToken(user, MEDIA_TOKEN_EXPIRATION_MS, TOKEN_TYPE_MEDIA);
     }
 
     /**

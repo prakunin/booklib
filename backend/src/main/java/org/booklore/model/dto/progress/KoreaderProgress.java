@@ -1,5 +1,6 @@
 package org.booklore.model.dto.progress;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 @Data
@@ -13,5 +14,6 @@ public class KoreaderProgress {
     private Float percentage;
     private String progress;
     private String device;
-    private String device_id;
+    @JsonProperty("device_id") // KOReader Sync protocol wire field name; kept stable while Java field follows naming conventions
+    private String deviceId;
 }

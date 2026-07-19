@@ -63,7 +63,7 @@ public class KoreaderService {
                 .progress(progress.getKoreaderProgress())
                 .percentage(progress.getKoreaderProgressPercent())
                 .device("BookLore")
-                .device_id("BookLore")
+                .deviceId("BookLore")
                 .build();
     }
 
@@ -184,7 +184,7 @@ public class KoreaderService {
         userProgress.setKoreaderProgress(koProgress.getProgress());
         userProgress.setKoreaderProgressPercent(koProgress.getPercentage());
         userProgress.setKoreaderDevice(koProgress.getDevice());
-        userProgress.setKoreaderDeviceId(koProgress.getDevice_id());
+        userProgress.setKoreaderDeviceId(koProgress.getDeviceId());
         userProgress.setKoreaderLastSyncTime(Instant.now());
         userProgress.setLastReadTime(Instant.now());
         if (syncWithWebReader && koProgress.getProgress() != null) {

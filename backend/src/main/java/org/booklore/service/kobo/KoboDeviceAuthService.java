@@ -40,9 +40,9 @@ public class KoboDeviceAuthService {
                 .body(auth);
     }
 
-    public byte[] toJsonBytes(KoboAuthentication KoboAuthentication) {
+    public byte[] toJsonBytes(KoboAuthentication koboAuthentication) {
         try {
-            return objectMapper.writeValueAsString(KoboAuthentication).getBytes(StandardCharsets.UTF_8);
+            return objectMapper.writeValueAsString(koboAuthentication).getBytes(StandardCharsets.UTF_8);
         } catch (JacksonException e) {
             log.error("Failed to serialize AuthDto to JSON", e);
             throw ApiError.INTERNAL_SERVER_ERROR.createException("Failed to serialize AuthDto");

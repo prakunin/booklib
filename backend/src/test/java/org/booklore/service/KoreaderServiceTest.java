@@ -232,7 +232,7 @@ class KoreaderServiceTest {
                 .thenReturn(Optional.empty());
 
         var dto = KoreaderProgress.builder()
-                .document("h").progress("x").percentage(0.6F).device("d").device_id("id").build();
+                .document("h").progress("x").percentage(0.6F).device("d").deviceId("id").build();
         service.saveProgress("h", dto);
 
         ArgumentCaptor<UserBookProgressEntity> cap = ArgumentCaptor.forClass(UserBookProgressEntity.class);
@@ -259,7 +259,7 @@ class KoreaderServiceTest {
                 .thenReturn(Optional.of(existing));
 
         var dto = KoreaderProgress.builder()
-                .document("h").progress("y").percentage(0.4F).device("d").device_id("id").build();
+                .document("h").progress("y").percentage(0.4F).device("d").deviceId("id").build();
         service.saveProgress("h", dto);
 
         verify(progressRepo).save(existing);
@@ -283,7 +283,7 @@ class KoreaderServiceTest {
                 .thenReturn(Optional.of(existing));
 
         var dto = KoreaderProgress.builder()
-                .document("h").progress("y").percentage(0.4F).device("d").device_id("id").build();
+                .document("h").progress("y").percentage(0.4F).device("d").deviceId("id").build();
         service.saveProgress("h", dto);
 
         verify(progressRepo).save(existing);

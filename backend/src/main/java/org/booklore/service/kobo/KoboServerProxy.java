@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 public class KoboServerProxy {
 
     private static final Pattern KOBO_API_PREFIX_PATTERN = Pattern.compile("^/api/kobo/[^/]+");
+    @SuppressWarnings("java:S116") // static final constant already follows S115's SCREAMING_SNAKE_CASE convention; camelCase per S116 would conflict with it
     private static final String KOBO_BOOK_IMAGE_CDN_URL = "https://cdn.kobo.com/book-images/{ImageId}/{Width}/{Height}/{IsGreyscale}/image.jpg";
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(1)).build();
     private final ObjectMapper objectMapper;

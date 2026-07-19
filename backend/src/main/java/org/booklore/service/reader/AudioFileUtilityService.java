@@ -120,13 +120,13 @@ public class AudioFileUtilityService {
                 int start2 = 0;
                 while (start2 < n2.length() - 1 && n2.charAt(start2) == '0') start2++;
 
-                String s1_norm = n1.substring(start1);
-                String s2_norm = n2.substring(start2);
+                String s1Norm = n1.substring(start1);
+                String s2Norm = n2.substring(start2);
 
-                if (s1_norm.length() != s2_norm.length()) {
-                    return s1_norm.length() - s2_norm.length();
+                if (s1Norm.length() != s2Norm.length()) {
+                    return s1Norm.length() - s2Norm.length();
                 }
-                int cmp = s1_norm.compareTo(s2_norm);
+                int cmp = s1Norm.compareTo(s2Norm);
                 if (cmp != 0) return cmp;
             } else {
                 int cmp = Character.compare(Character.toLowerCase(c1), Character.toLowerCase(c2));

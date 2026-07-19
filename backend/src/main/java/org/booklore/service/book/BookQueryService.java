@@ -46,11 +46,11 @@ public class BookQueryService {
         return mapBooksToDto(books, includeDescription, null, stripForListView);
     }
 
-    public List<Book> getAllBooksByLibraryIds(Set<Long> libraryIds, boolean includeDescription, boolean StripForListView, Long userId) {
+    public List<Book> getAllBooksByLibraryIds(Set<Long> libraryIds, boolean includeDescription, boolean stripForListView, Long userId) {
         List<BookEntity> books = bookRepository.findAllWithMetadataByLibraryIdsPage(libraryIds, LEGACY_FULL_CATALOG_PAGE)
                 .getContent();
         books = contentRestrictionService.applyRestrictions(books, userId);
-        return mapBooksToDto(books, includeDescription, userId, StripForListView);
+        return mapBooksToDto(books, includeDescription, userId, stripForListView);
     }
 
     public Page<Book> getAllBooksPaged(Pageable pageable) {

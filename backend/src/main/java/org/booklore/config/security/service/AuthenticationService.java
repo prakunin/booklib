@@ -200,7 +200,7 @@ public class AuthenticationService {
     public ResponseEntity<AccessTokenDto> loginUser(BookLoreUserEntity user, Long customRefreshTokenExpirationMs) {
         String refreshToken = jwtUtils.generateRefreshToken(user);
 
-        long expirationMs = customRefreshTokenExpirationMs != null ? customRefreshTokenExpirationMs : JwtUtils.getRefreshTokenExpirationMs();
+        long expirationMs = customRefreshTokenExpirationMs != null ? customRefreshTokenExpirationMs : JwtUtils.REFRESH_TOKEN_EXPIRATION_MS;
 
         RefreshTokenEntity refreshTokenEntity = RefreshTokenEntity.builder()
                 .user(user)
@@ -217,7 +217,7 @@ public class AuthenticationService {
                 AccessTokenDto.builder()
                         .accessToken(jwtUtils.generateAccessToken(user))
                         .refreshToken(refreshTokenEntity.getToken())
-                        .expires(JwtUtils.getAccessTokenExpirationMs() / 1000)
+                        .expires(JwtUtils.ACCESS_TOKEN_EXPIRATION_MS / 1000)
                         .isDefaultPassword(user.isDefaultPassword())
                         .build()
         );
@@ -248,7 +248,7 @@ public class AuthenticationService {
         RefreshTokenEntity newRefreshTokenEntity = RefreshTokenEntity.builder()
                 .user(user)
                 .token(newRefreshToken)
-                .expiryDate(Instant.now().plusMillis(JwtUtils.getRefreshTokenExpirationMs()))
+                .expiryDate(Instant.now().plusMillis(JwtUtils.REFRESH_TOKEN_EXPIRATION_MS))
                 .revoked(false)
                 .build();
 
@@ -260,7 +260,7 @@ public class AuthenticationService {
                 AccessTokenDto.builder()
                         .accessToken(jwtUtils.generateAccessToken(user))
                         .refreshToken(newRefreshToken)
-                        .expires(JwtUtils.getAccessTokenExpirationMs() / 1000)
+                        .expires(JwtUtils.ACCESS_TOKEN_EXPIRATION_MS / 1000)
                         .build()
         );
     }
