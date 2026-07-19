@@ -236,6 +236,23 @@ public class AudibleParserTest {
     }
 
     @Test
+    public void fetchTopMetadata_closesResponseBodyOnErrorStatus() throws Exception {
+        CloseTrackingInputStream stream = new CloseTrackingInputStream("{}".getBytes(StandardCharsets.UTF_8));
+        HttpResponse<InputStream> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(503);
+        when(response.body()).thenReturn(stream);
+        doReturn(response).when(mockHttpClient).send(any(), any());
+
+        Book book = getBook("EXAMPLESKU");
+        FetchMetadataRequest fetchMetadataRequest = FetchMetadataRequest.builder().build();
+
+        BookMetadata actual = audibleParser.fetchTopMetadata(book, fetchMetadataRequest);
+
+        assertThat(actual).isNull();
+        assertThat(stream.isClosed()).isTrue();
+    }
+
+    @Test
     public void fetchTopMetadata_parsesFields() throws Exception {
         mockHttpClientResponse(
                 "https://api.audible.com/1.0/catalog/products/1705047572",
@@ -278,5 +295,23 @@ public class AudibleParserTest {
 
         assertThat(actual).hasSize(13);
         assertThat(actual.stream().map(BookMetadata::getAsin).anyMatch("B08JJSB33N"::equalsIgnoreCase)).isFalse();
+    }
+
+    private static class CloseTrackingInputStream extends ByteArrayInputStream {
+        private boolean closed;
+
+        CloseTrackingInputStream(byte[] buf) {
+            super(buf);
+        }
+
+        @Override
+        public void close() throws IOException {
+            closed = true;
+            super.close();
+        }
+
+        boolean isClosed() {
+            return closed;
+        }
     }
 }

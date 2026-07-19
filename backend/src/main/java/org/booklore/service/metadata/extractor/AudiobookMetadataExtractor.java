@@ -23,13 +23,17 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -41,6 +45,8 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
 
     private static final Pattern CHAPTER_PATTERN = Pattern.compile("(?i)^(chp?|chapter)?\\d+$");
     private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("[^0-9]");
+    private static final Duration FFPROBE_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration PROCESS_DESTROY_GRACE = Duration.ofSeconds(1);
     private final ObjectMapper mapper;
     private final FfprobeService ffprobeService;
 
@@ -357,20 +363,51 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             );
             pb.redirectErrorStream(true);
 
-            Process process = pb.start();
+            Process process = null;
+            Thread outputReader = null;
             StringBuilder output = new StringBuilder();
+            AtomicReference<IOException> outputReadFailure = new AtomicReference<>();
 
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line);
+            try {
+                process = pb.start();
+                Process ffprobeProcess = process;
+                outputReader = Thread.ofVirtual().name("ffprobe-output-reader-", 0).start(() -> {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(ffprobeProcess.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            output.append(line);
+                        }
+                    } catch (IOException e) {
+                        outputReadFailure.set(e);
+                    }
+                });
+
+                if (!process.waitFor(FFPROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
+                    log.debug("FFprobe timed out after {} seconds for {}", FFPROBE_TIMEOUT.toSeconds(), audioFile.getName());
+                    return null;
                 }
-            }
 
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                log.debug("FFprobe exited with code {} for {}", exitCode, audioFile.getName());
-                return null;
+                outputReader.join(PROCESS_DESTROY_GRACE.toMillis());
+                if (outputReader.isAlive()) {
+                    log.debug("FFprobe output reader did not finish for {}", audioFile.getName());
+                    return null;
+                }
+
+                if (outputReadFailure.get() != null) {
+                    log.debug("Failed to read FFprobe output for {}: {}", audioFile.getName(), outputReadFailure.get().getMessage());
+                    return null;
+                }
+
+                int exitCode = process.exitValue();
+                if (exitCode != 0) {
+                    log.debug("FFprobe exited with code {} for {}", exitCode, audioFile.getName());
+                    return null;
+                }
+            } finally {
+                if (outputReader != null && outputReader.isAlive()) {
+                    outputReader.interrupt();
+                }
+                stopProcess(process);
             }
 
             String jsonOutput = output.toString().trim();
@@ -427,9 +464,29 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
             }
 
             return chapters;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("Interrupted while extracting chapters with ffprobe from {}", audioFile.getName());
+            return null;
         } catch (Exception e) {
             log.debug("Failed to extract chapters with ffprobe from {}: {}", audioFile.getName(), e.getMessage());
             return null;
+        }
+    }
+
+    private void stopProcess(Process process) {
+        if (process == null || !process.isAlive()) {
+            return;
+        }
+
+        process.destroy();
+        try {
+            if (!process.waitFor(PROCESS_DESTROY_GRACE.toMillis(), TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            process.destroyForcibly();
         }
     }
 
