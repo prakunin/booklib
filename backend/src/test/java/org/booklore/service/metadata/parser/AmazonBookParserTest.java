@@ -74,6 +74,7 @@ public class AmazonBookParserTest {
 
         when(mockConnection.header(any(String.class), any(String.class))).thenReturn(mockConnection);
         when(mockConnection.method(any(Connection.Method.class))).thenReturn(mockConnection);
+        when(mockConnection.timeout(anyInt())).thenReturn(mockConnection);
         when(mockConnection.execute()).thenReturn(mockResponse);
 
         when(mockResponse.parse()).thenReturn(document);
@@ -81,12 +82,13 @@ public class AmazonBookParserTest {
         return mockConnection;
     }
 
-    private void mockJsoupConnect(String url, String html) throws Exception {
+    private Connection mockJsoupConnect(String url, String html) throws Exception {
         Document document = Parser.parse(html, "");
         Connection connection = getConnection(document);
 
         mockJsoup.when(() -> Jsoup.connect(url))
                 .thenReturn(connection);
+        return connection;
     }
 
     private void mockAmazonIDSearch(String keyword) throws Exception {
@@ -120,7 +122,7 @@ public class AmazonBookParserTest {
 
     @Test
     public void fetchTopMetadata_usesAsinFromBookWhenAvailable() throws Exception {
-        mockJsoupConnect("https://www.amazon.com/dp/EXAMPLESKU", "<html />");
+        Connection connection = mockJsoupConnect("https://www.amazon.com/dp/EXAMPLESKU", "<html />");
 
         Book book = getBook("EXAMPLESKU");
         FetchMetadataRequest fetchMetadataRequest = FetchMetadataRequest.builder().build();
@@ -128,6 +130,7 @@ public class AmazonBookParserTest {
         amazonBookParser.fetchTopMetadata(book, fetchMetadataRequest);
 
         mockJsoup.verify(() -> Jsoup.connect("https://www.amazon.com/dp/EXAMPLESKU"));
+        verify(connection).timeout(15000);
     }
 
     @Test

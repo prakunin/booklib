@@ -558,7 +558,10 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                          response.statusCode(), retriesLeft);
                 try {
                     Thread.sleep(2000);
-                } catch (InterruptedException _) {}
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                }
                 return sendRequestWithRetry(uri, responseType, retriesLeft - 1);
             } else {
                 log.error("Comicvine API returned status code {}. Body: {}", response.statusCode(), response.body());
@@ -568,7 +571,10 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
                 log.warn("IOException during ComicVine request. Retrying... ({} retries left)", retriesLeft, e);
                 try {
                     Thread.sleep(1000);
-                } catch (InterruptedException _) {}
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                }
                 return sendRequestWithRetry(uri, responseType, retriesLeft - 1);
             } else {
                 log.error("Error fetching data from Comicvine API after retries", e);
