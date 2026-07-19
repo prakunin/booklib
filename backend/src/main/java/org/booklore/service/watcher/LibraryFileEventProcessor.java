@@ -213,6 +213,11 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
     }
 
     private void handleEvent(FileEvent event) {
+        if (libraryScanListener.isScanning(event.libraryId())) {
+            deferEventDuringScan(event);
+            return;
+        }
+
         Path path = event.fullPath();
         String fileName = path.getFileName().toString();
         log.info("[PROCESS] '{}' event for '{}'{}", event.eventKind().name(), fileName,

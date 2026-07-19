@@ -188,6 +188,21 @@ class LibraryFileEventProcessorTest {
 
             assertThat(processor.hasPendingEventsForPaths(Set.of(tempDir))).isTrue();
         }
+
+        @Test
+        void queuedEventIsDeferredWhenScanStartsBeforeWorkerHandlesIt() throws Exception {
+            Path file = tempDir.resolve("queued-before-scan.epub");
+            Files.writeString(file, "book content");
+            when(libraryScanListener.isScanning(1L)).thenReturn(false, true, true, false, false);
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_MODIFY, 1L, file, false);
+
+            Thread.sleep(300);
+
+            assertThat(processor.hasPendingEventsForPaths(Set.of(tempDir))).isTrue();
+            verify(libraryRepository, never()).findByIdWithPaths(1L);
+            verify(libraryRepository, timeout(3000)).findByIdWithPaths(1L);
+        }
     }
 
     @Nested
