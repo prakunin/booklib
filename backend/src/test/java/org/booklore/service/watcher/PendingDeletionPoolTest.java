@@ -193,6 +193,44 @@ class PendingDeletionPoolTest {
     }
 
     @Test
+    void expireFolderDeletion_doesNotDeleteBookRecoveredFromSameFolderGraceWindow() {
+        BookEntity recoveredBook = book;
+        recoveredBook.setBookFiles(List.of(bookFile));
+
+        BookEntity missingBook = BookEntity.builder()
+                .id(11L)
+                .libraryPath(libraryPath)
+                .deleted(false)
+                .build();
+        BookFileEntity missingFile = BookFileEntity.builder()
+                .id(101L)
+                .book(missingBook)
+                .fileName("missing.epub")
+                .fileSubPath("subfolder")
+                .currentHash("def456")
+                .isBookFormat(true)
+                .folderBased(false)
+                .bookType(BookFileType.EPUB)
+                .build();
+        missingBook.setBookFiles(List.of(missingFile));
+
+        ScheduledFuture<?> timer = mock(ScheduledFuture.class);
+        pool.addFolderDeletion(Path.of("/library/subfolder"), 1L, List.of(recoveredBook, missingBook), timer);
+
+        Optional<PendingDeletionPool.MatchResult> recovered = pool.matchByHash("abc123");
+
+        assertThat(recovered).isPresent();
+        when(bookRepository.findById(11L)).thenReturn(Optional.of(missingBook));
+
+        pool.expireFolderDeletion(Path.of("/library/subfolder"));
+
+        assertThat(recoveredBook.getDeleted()).isFalse();
+        assertThat(missingBook.getDeleted()).isTrue();
+        verify(bookRepository, never()).findById(10L);
+        verify(bookRepository).save(missingBook);
+    }
+
+    @Test
     void hasPendingForPaths_detectsPendingDeletion() {
         ScheduledFuture<?> timer = mock(ScheduledFuture.class);
         pool.addFileDeletion(Path.of("/library/subfolder/test.epub"), 1L, bookFile, book, timer);
