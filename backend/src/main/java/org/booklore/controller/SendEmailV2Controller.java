@@ -24,7 +24,7 @@ public class SendEmailV2Controller {
     @ApiResponse(responseCode = "204", description = "Book sent successfully")
     @PreAuthorize("@securityUtil.canEmailBook() or @securityUtil.isAdmin()")
     @PostMapping("/book")
-    public ResponseEntity<?> sendEmail(
+    public ResponseEntity<Void> sendEmail(
             @Parameter(description = "Send book by email request") @Validated @RequestBody SendBookByEmailRequest request) {
         service.emailBook(request);
         return ResponseEntity.noContent().build();
@@ -34,7 +34,7 @@ public class SendEmailV2Controller {
     @ApiResponse(responseCode = "204", description = "Book sent successfully")
     @PreAuthorize("@securityUtil.canEmailBook() or @securityUtil.isAdmin()")
     @PostMapping("/book/{bookId}")
-    public ResponseEntity<?> emailBookQuick(
+    public ResponseEntity<Void> emailBookQuick(
             @Parameter(description = "ID of the book to send") @PathVariable Long bookId) {
         service.emailBookQuick(bookId);
         return ResponseEntity.noContent().build();

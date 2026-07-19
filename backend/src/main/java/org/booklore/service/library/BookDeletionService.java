@@ -52,6 +52,11 @@ public class BookDeletionService {
         log.info("Deleted {} additional files from database", additionalFileIds.size());
     }
 
+    // deleteRemovedBooks() below is called via 'this', bypassing its own REQUIRES_NEW proxy, so it
+    // runs inside this method's transaction instead of committing independently. Not fixed here:
+    // forcing a real nested transaction (e.g. via self-injection) would change commit timing for
+    // this call path and needs its own verification. Known debt (sonar java:S6809).
+    @SuppressWarnings("java:S6809")
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processDeletedLibraryFiles(List<Long> deletedBookIds, List<LibraryFile> libraryFiles) {
         if (deletedBookIds.isEmpty()) {
@@ -96,6 +101,11 @@ public class BookDeletionService {
         if (bookIds.size() > 1) log.info("Books removed: {}", bookIds);
     }
 
+    // Same self-invocation situation as processDeletedLibraryFiles() above: deleteRemovedBooks()
+    // runs inside this method's transaction rather than its own REQUIRES_NEW one. Known debt
+    // (sonar java:S6809) — not fixed to avoid changing commit-timing behavior without dedicated
+    // verification.
+    @SuppressWarnings("java:S6809")
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void purgeDisallowedFormats(LibraryEntity libraryEntity) {
         List<BookFileType> allowedFormats = libraryEntity.getAllowedFormats();

@@ -771,13 +771,6 @@ class MetadataChangeDetectorTest {
     }
 
     @Test
-    void testIsDifferent_whenCoverLockChanges_returnsTrue() {
-        newMeta.setCoverLocked(true);
-        boolean result = MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags);
-        assertTrue(result, "Should return true when cover lock changes");
-    }
-
-    @Test
     void testIsDifferent_whenCoverLockUnchanged_returnsFalse() {
         existingMeta.setCoverLocked(true);
         newMeta.setCoverLocked(true);

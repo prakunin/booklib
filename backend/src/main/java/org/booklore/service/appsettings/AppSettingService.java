@@ -96,7 +96,10 @@ public class AppSettingService {
         boolean enabling = Boolean.parseBoolean(String.valueOf(val));
         if (!enabling) return;
 
-        AppSettings current = getAppSettings();
+        // Call the uncached builder directly: calling getAppSettings() here would self-invoke
+        // past the @Cacheable proxy anyway, so this is behaviorally identical and avoids the
+        // misleading self-invocation of an annotated method.
+        AppSettings current = buildAppSettings();
         if (!current.isOidcEnabled()) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Cannot enable OIDC-only mode: OIDC must be enabled first");
         }

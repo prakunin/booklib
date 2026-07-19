@@ -282,7 +282,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void buildFetchMetadata_resolvesTitleFromPriorityProvider() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().title("Amazon Title").build());
         metadataMap.put(MetadataProvider.Google, BookMetadata.builder().title("Google Title").build());
 
@@ -300,7 +300,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void buildFetchMetadata_fallsToP2WhenP1HasNoValue() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().title("Amazon Title").build());
         metadataMap.put(MetadataProvider.Google, BookMetadata.builder().title(null).build());
 
@@ -318,7 +318,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void buildFetchMetadata_disabledFieldNotSet() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().title("Amazon Title").build());
 
         MetadataRefreshOptions options = MetadataRefreshOptions.builder()
@@ -336,7 +336,7 @@ class MetadataRefreshServiceTest {
     void buildFetchMetadata_replaceAllPreservesExistingWhenFieldDisabled() {
         BookMetadata existing = BookMetadata.builder().title("Existing Title").build();
 
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().title("New Title").build());
 
         MetadataRefreshOptions options = MetadataRefreshOptions.builder()
@@ -352,7 +352,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void buildFetchMetadata_amazonRatingFromAmazonProvider() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().amazonRating(4.5).amazonReviewCount(1000).build());
 
         MetadataRefreshOptions options = MetadataRefreshOptions.builder()
@@ -368,7 +368,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void buildFetchMetadata_goodreadsFieldsFromGoodReadsProvider() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.GoodReads, BookMetadata.builder()
                 .goodreadsRating(4.2)
                 .goodreadsReviewCount(500)
@@ -389,7 +389,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void buildFetchMetadata_categoriesMergedWhenMergeCategoriesEnabled() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().categories(Set.of("Fiction")).build());
         metadataMap.put(MetadataProvider.Google, BookMetadata.builder().categories(Set.of("Thriller")).build());
 
@@ -411,7 +411,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void buildFetchMetadata_categoriesNotMergedUsesProviderPriority() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().categories(Set.of("Fiction")).build());
         metadataMap.put(MetadataProvider.Google, BookMetadata.builder().categories(Set.of("Thriller")).build());
 
@@ -436,7 +436,7 @@ class MetadataRefreshServiceTest {
         BookReview r1 = new BookReview();
         BookReview r2 = new BookReview();
 
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().bookReviews(List.of(r1)).build());
         metadataMap.put(MetadataProvider.GoodReads, BookMetadata.builder().bookReviews(List.of(r2)).build());
 
@@ -452,7 +452,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void buildFetchMetadata_hardcoverFieldsResolved() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Hardcover, BookMetadata.builder()
                 .hardcoverRating(4.0)
                 .hardcoverReviewCount(200)
@@ -487,7 +487,7 @@ class MetadataRefreshServiceTest {
                 .allMetadataLocked(false)
                 .build();
 
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Google, BookMetadata.builder().title("New Title").build());
 
         MetadataRefreshOptions options = MetadataRefreshOptions.builder()
@@ -512,7 +512,7 @@ class MetadataRefreshServiceTest {
                 .description("Existing description")
                 .build();
 
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Google, BookMetadata.builder().title("Title").build());
 
         MetadataRefreshOptions options = MetadataRefreshOptions.builder()
@@ -548,7 +548,7 @@ class MetadataRefreshServiceTest {
                 .replaceMode(MetadataReplaceMode.REPLACE_MISSING)
                 .build();
 
-        BookMetadata result = service.buildFetchMetadata(existing, 1L, options, new HashMap<>());
+        BookMetadata result = service.buildFetchMetadata(existing, 1L, options, new EnumMap<>(MetadataProvider.class));
 
         assertThat(result.getTitle()).isEqualTo("Existing Title");
         assertThat(result.getSubtitle()).isEqualTo("Existing Sub");
@@ -561,7 +561,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void getAllCategories_mergesFromAllProviders() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().categories(Set.of("A", "B")).build());
         metadataMap.put(MetadataProvider.Google, BookMetadata.builder().categories(Set.of("B", "C")).build());
 
@@ -577,7 +577,7 @@ class MetadataRefreshServiceTest {
 
     @Test
     void getAllCategories_returnsEmptyWhenFieldProviderNull() {
-        Set<String> result = service.getAllCategories(new HashMap<>(), null, BookMetadata::getCategories);
+        Set<String> result = service.getAllCategories(new EnumMap<>(MetadataProvider.class), null, BookMetadata::getCategories);
         assertThat(result).isEmpty();
     }
 
@@ -661,21 +661,21 @@ class MetadataRefreshServiceTest {
 
     @Test
     void resolveFieldWithProviders_returnsNullWhenFieldProviderIsNull() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         String result = service.resolveFieldAsString(metadataMap, null, BookMetadata::getTitle);
         assertThat(result).isNull();
     }
 
     @Test
     void resolveFieldAsList_returnsNullWhenFieldProviderNull() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         List<String> result = service.resolveFieldAsList(metadataMap, null, BookMetadata::getCategories);
         assertThat(result).isNull();
     }
 
     @Test
     void resolveFieldAsList_skipsEmptyCollections() {
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().categories(Set.of()).build());
         metadataMap.put(MetadataProvider.Google, BookMetadata.builder().categories(Set.of("Cat")).build());
 
@@ -691,7 +691,7 @@ class MetadataRefreshServiceTest {
     @Test
     void buildFetchMetadata_comicMetadataFromComicvine() {
         ComicMetadata comic = new ComicMetadata();
-        Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+        Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
         metadataMap.put(MetadataProvider.Comicvine, BookMetadata.builder()
                 .comicvineId("cv123")
                 .comicMetadata(comic)
@@ -985,7 +985,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void lubimyczytacFields() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Lubimyczytac, BookMetadata.builder()
                     .lubimyczytacId("lc123")
                     .lubimyczytacRating(4.1)
@@ -1004,7 +1004,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void ranobedbFields() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Ranobedb, BookMetadata.builder()
                     .ranobedbId("rn456")
                     .ranobedbRating(3.8)
@@ -1023,7 +1023,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void googleIdFromGoogleProvider() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Google, BookMetadata.builder()
                     .googleId("goog123")
                     .build());
@@ -1040,7 +1040,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void asinFromAmazonProvider() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder()
                     .asin("B012345678")
                     .build());
@@ -1094,7 +1094,7 @@ class MetadataRefreshServiceTest {
                     .replaceMode(MetadataReplaceMode.REPLACE_ALL)
                     .build();
 
-            BookMetadata result = service.buildFetchMetadata(existing, 1L, options, new HashMap<>());
+            BookMetadata result = service.buildFetchMetadata(existing, 1L, options, new EnumMap<>(MetadataProvider.class));
 
             assertThat(result.getAmazonRating()).isEqualTo(3.5);
             assertThat(result.getAmazonReviewCount()).isEqualTo(100);
@@ -1120,7 +1120,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void nullFieldOptionsAndEnabledFields_usesDefaults() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder()
                     .title("A Title")
                     .amazonRating(4.0)
@@ -1166,7 +1166,7 @@ class MetadataRefreshServiceTest {
                     .replaceMode(MetadataReplaceMode.REPLACE_ALL)
                     .build();
 
-            BookMetadata result = service.buildFetchMetadata(existing, 1L, options, new HashMap<>());
+            BookMetadata result = service.buildFetchMetadata(existing, 1L, options, new EnumMap<>(MetadataProvider.class));
 
             assertThat(result.getSubtitle()).isEqualTo("Sub");
             assertThat(result.getDescription()).isEqualTo("Desc");
@@ -1184,7 +1184,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void enabledFields_resolveSubtitleDescriptionAuthorsPublisherFromProviders() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder()
                     .subtitle("Amazon Sub")
                     .description("Amazon Desc")
@@ -1235,7 +1235,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void noReviewsInMetadata_reviewsNotSet() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().title("T").bookReviews(null).build());
 
             MetadataRefreshOptions options = MetadataRefreshOptions.builder()
@@ -1255,7 +1255,7 @@ class MetadataRefreshServiceTest {
                     .enabledFields(new MetadataRefreshOptions.EnabledFields())
                     .build();
 
-            BookMetadata result = service.buildFetchMetadata(null, 1L, options, new HashMap<>());
+            BookMetadata result = service.buildFetchMetadata(null, 1L, options, new EnumMap<>(MetadataProvider.class));
 
             assertThat(result.getAmazonRating()).isNull();
             assertThat(result.getGoodreadsRating()).isNull();
@@ -1277,7 +1277,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void nullExtractedCategories_skipped() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().categories(null).build());
             metadataMap.put(MetadataProvider.Google, BookMetadata.builder().categories(Set.of("X")).build());
 
@@ -1292,7 +1292,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void providerNotInMap_skipped() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().categories(Set.of("A")).build());
 
             MetadataRefreshOptions.FieldProvider fp = MetadataRefreshOptions.FieldProvider.builder()
@@ -1310,21 +1310,21 @@ class MetadataRefreshServiceTest {
 
         @Test
         void resolveField_returnsNullWhenFieldProviderNull() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             Object result = service.resolveField(metadataMap, null, BookMetadata::getPublishedDate);
             assertThat(result).isNull();
         }
 
         @Test
         void resolveFieldAsInteger_returnsNullWhenFieldProviderNull() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             Integer result = service.resolveFieldAsInteger(metadataMap, null, BookMetadata::getPageCount);
             assertThat(result).isNull();
         }
 
         @Test
         void resolveField_providerNotInMap_returnsNull() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             MetadataRefreshOptions.FieldProvider fp = MetadataRefreshOptions.FieldProvider.builder()
                     .p1(MetadataProvider.Amazon).build();
 
@@ -1334,7 +1334,7 @@ class MetadataRefreshServiceTest {
 
         @Test
         void resolveFieldAsInteger_fallsThroughNullValues() {
-            Map<MetadataProvider, BookMetadata> metadataMap = new HashMap<>();
+            Map<MetadataProvider, BookMetadata> metadataMap = new EnumMap<>(MetadataProvider.class);
             metadataMap.put(MetadataProvider.Amazon, BookMetadata.builder().pageCount(null).build());
             metadataMap.put(MetadataProvider.Google, BookMetadata.builder().pageCount(300).build());
 

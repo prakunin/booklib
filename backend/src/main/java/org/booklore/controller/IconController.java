@@ -42,7 +42,7 @@ public class IconController {
     @ApiResponse(responseCode = "200", description = "SVG icon saved successfully")
     @PostMapping
     @PreAuthorize("@securityUtil.canManageIcons() or @securityUtil.isAdmin()")
-    public ResponseEntity<?> saveSvgIcon(@Valid @RequestBody SvgIconCreateRequest svgIconCreateRequest) {
+    public ResponseEntity<Void> saveSvgIcon(@Valid @RequestBody SvgIconCreateRequest svgIconCreateRequest) {
         iconService.saveSvgIcon(svgIconCreateRequest);
         return ResponseEntity.ok().build();
     }
@@ -91,7 +91,7 @@ public class IconController {
     @ApiResponse(responseCode = "200", description = "SVG icon deleted successfully")
     @DeleteMapping("/{svgName}")
     @PreAuthorize("@securityUtil.canManageIcons() or @securityUtil.isAdmin()")
-    public ResponseEntity<?> deleteSvgIcon(@Parameter(description = "SVG icon name") @PathVariable String svgName) {
+    public ResponseEntity<Void> deleteSvgIcon(@Parameter(description = "SVG icon name") @PathVariable String svgName) {
         iconService.deleteSvgIcon(svgName);
         return ResponseEntity.ok().build();
     }

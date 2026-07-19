@@ -102,13 +102,15 @@ class KoboUrlBuilderTest {
 
     @Test
     void testHostHeaderWithoutPort_imageUrls() {
+        // Same host-header-without-port scenario, but for the image URL template builder
+        // rather than withBaseUrl directly.
         mockRequest.setServerName("192.168.1.100");
         mockRequest.setServerPort(80);
         mockRequest.setLocalPort(6060);
 
-        String expected = "http://192.168.1.100:6060/api/kobo/testToken";
+        String expected = "http://192.168.1.100:6060/api/kobo/testToken/v1/books/{ImageId}/thumbnail/{Width}/{Height}/false/image.jpg";
 
-        String actual = koboUrlBuilder.withBaseUrl("testToken");
+        String actual = koboUrlBuilder.imageUrlTemplate("testToken");
 
         assertEquals(expected, actual);
     }

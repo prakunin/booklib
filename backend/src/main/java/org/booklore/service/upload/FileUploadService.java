@@ -205,6 +205,9 @@ public class FileUploadService {
         return book.getLibrary().getLibraryPaths().getFirst();
     }
 
+    // Each parameter is an independently-derived local at the single call site (no existing
+    // cohesive DTO groups them); a param object here would be artificial. sonar java:S107.
+    @SuppressWarnings("java:S107")
     private BookFileEntity createAdditionalFileEntityWithSubPath(BookEntity book, String fileName, String fileSubPath, boolean isBook, BookFileType bookType, long fileSize, String fileHash, String description) {
         return BookFileEntity.builder()
                 .book(book)

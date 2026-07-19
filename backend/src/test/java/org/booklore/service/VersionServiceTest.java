@@ -129,8 +129,10 @@ class VersionServiceTest {
 
             VersionInfo info = spyService.getVersionInfo();
 
+            // Test classes have no packaged Implementation-Version manifest entry, so
+            // getAppVersion() always falls back to "development" in this environment.
             assertThat(info.getCurrent())
-                    .isEqualTo(service.getAppVersion());
+                    .isEqualTo("development");
             assertThat(info.getLatest())
                     .isEqualTo("v9.9.9");
         }

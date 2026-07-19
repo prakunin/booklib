@@ -57,6 +57,13 @@ public class KoboController {
         return appSettingService.getAppSettings().getKoboSettings().isForwardToKoboStore();
     }
 
+    // Widens a concretely-typed ResponseEntity to ResponseEntity<Object> for endpoints whose
+    // branches genuinely return different body types (own payload vs. proxied Kobo-store response).
+    @SuppressWarnings("unchecked")
+    private static <T> ResponseEntity<Object> widen(ResponseEntity<T> response) {
+        return (ResponseEntity<Object>) response;
+    }
+
     @Operation(summary = "Initialize Kobo resources", description = "Initialize Kobo resources for the device.")
     @ApiResponse(responseCode = "200", description = "Initialization successful")
     @GetMapping("/v1/initialization")
@@ -111,18 +118,18 @@ public class KoboController {
     @Operation(summary = "Authenticate Kobo device", description = "Authenticate a Kobo device.")
     @ApiResponse(responseCode = "200", description = "Device authenticated successfully")
     @PostMapping("/v1/auth/device")
-    public ResponseEntity<?> authenticateDevice(@Parameter(description = "Authentication request body") @RequestBody JsonNode body) {
+    public ResponseEntity<Object> authenticateDevice(@Parameter(description = "Authentication request body") @RequestBody JsonNode body) {
         if (isForwardingToKoboStore()) {
-            return koboServerProxy.proxyCurrentRequest(body, false);
+            return widen(koboServerProxy.proxyCurrentRequest(body, false));
         }
 
-        return koboDeviceAuthService.authenticateDevice(body);
+        return widen(koboDeviceAuthService.authenticateDevice(body));
     }
 
     @Operation(summary = "Get book metadata", description = "Retrieve metadata for a book in the Kobo library.")
     @ApiResponse(responseCode = "200", description = "Metadata returned successfully")
     @GetMapping("/v1/library/{bookId}/metadata")
-    public ResponseEntity<?> getBookMetadata(
+    public ResponseEntity<Object> getBookMetadata(
             @Parameter(description = "Book ID") @PathVariable String bookId,
             @PathVariable("token") String token) {
         if (StringUtils.isNumeric(bookId)) {
@@ -132,7 +139,7 @@ public class KoboController {
                 return ResponseEntity.ok(List.of(metadata));
             }
         } else if(isForwardingToKoboStore()) {
-            return koboServerProxy.proxyCurrentRequest(null, false);
+            return widen(koboServerProxy.proxyCurrentRequest(null, false));
         }
 
         throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
@@ -141,11 +148,11 @@ public class KoboController {
     @Operation(summary = "Get reading state", description = "Retrieve the reading state for a book.")
     @ApiResponse(responseCode = "200", description = "Reading state returned successfully")
     @GetMapping("/v1/library/{bookId}/state")
-    public ResponseEntity<?> getState(@Parameter(description = "Book ID") @PathVariable String bookId) {
+    public ResponseEntity<Object> getState(@Parameter(description = "Book ID") @PathVariable String bookId) {
         if (StringUtils.isNumeric(bookId)) {
             return ResponseEntity.ok(new KoboReadingStateList(koboReadingStateService.getReadingState(bookId)));
         } else if (isForwardingToKoboStore()) {
-            return koboServerProxy.proxyCurrentRequest(null, false);
+            return widen(koboServerProxy.proxyCurrentRequest(null, false));
         } else {
             throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
         }
@@ -154,13 +161,13 @@ public class KoboController {
     @Operation(summary = "Update reading state", description = "Update the reading state for a book.")
     @ApiResponse(responseCode = "200", description = "Reading state updated successfully")
     @PutMapping("/v1/library/{bookId}/state")
-    public ResponseEntity<?> updateState(
+    public ResponseEntity<Object> updateState(
             @Parameter(description = "Book ID") @PathVariable String bookId,
             @Parameter(description = "Reading state update body") @RequestBody KoboReadingStateRequest body) {
         if (StringUtils.isNumeric(bookId)) {
             return ResponseEntity.ok(koboReadingStateService.saveReadingState(body.getReadingStates()));
         } else if (isForwardingToKoboStore()) {
-            return koboServerProxy.proxyCurrentRequest(body, false);
+            return widen(koboServerProxy.proxyCurrentRequest(body, false));
         } else {
             throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
         }
@@ -169,7 +176,7 @@ public class KoboController {
     @Operation(summary = "Get Kobo test analytics", description = "Get test analytics for Kobo.")
     @ApiResponse(responseCode = "200", description = "Test analytics returned successfully")
     @PostMapping("/v1/analytics/gettests")
-    public ResponseEntity<?> getTests(@Parameter(description = "Test analytics request body") @RequestBody Object body) {
+    public ResponseEntity<KoboTestResponse> getTests(@Parameter(description = "Test analytics request body") @RequestBody Object body) {
         return ResponseEntity.ok(KoboTestResponse.builder()
                 .result("Success")
                 .testKey(RandomStringUtils.secure().nextAlphanumeric(24))
@@ -179,7 +186,7 @@ public class KoboController {
     @Operation(summary = "Publish analytics event", description = "Publish an analytics event for Kobo.")
     @ApiResponse(responseCode = "200", description = "Analytics event pushed successfully")
     @PostMapping("/v1/analytics/event")
-    public ResponseEntity<?> pushEvent() {
+    public ResponseEntity<Void> pushEvent() {
         // Never pass along analytics events.
         return ResponseEntity.ok().build();
     }
@@ -199,7 +206,7 @@ public class KoboController {
     @Operation(summary = "Delete book from Kobo library", description = "Delete a book from the user's Kobo library.")
     @ApiResponse(responseCode = "200", description = "Book deleted successfully")
     @DeleteMapping("/v1/library/{bookId}")
-    public ResponseEntity<?> deleteBookFromLibrary(@Parameter(description = "Book ID") @PathVariable String bookId) {
+    public ResponseEntity<Object> deleteBookFromLibrary(@Parameter(description = "Book ID") @PathVariable String bookId) {
         if (StringUtils.isNumeric(bookId)) {
             Shelf userKoboShelf = shelfService.getUserKoboShelf();
             if (userKoboShelf != null) {
@@ -207,7 +214,7 @@ public class KoboController {
             }
             return ResponseEntity.ok().build();
         } else if (isForwardingToKoboStore()) {
-            return koboServerProxy.proxyCurrentRequest(null, false);
+            return widen(koboServerProxy.proxyCurrentRequest(null, false));
         } else {
             throw ApiError.GENERIC_NOT_FOUND.createException(NOT_FOUND_MESSAGE);
         }
@@ -216,9 +223,9 @@ public class KoboController {
     @Operation(summary = "Get Kobo Next to Read", description = "Retrieves the next book to read after the specified book, such as with a series.")
     @ApiResponse(responseCode = "200", description = "The next book in a series to read.")
     @PostMapping("/v1/products/{bookId}/nextread")
-    public ResponseEntity<?> getNextRead(@Parameter(description = "Book ID") @PathVariable String bookId) {
+    public ResponseEntity<Object> getNextRead(@Parameter(description = "Book ID") @PathVariable String bookId) {
         if (!StringUtils.isNumeric(bookId) && isForwardingToKoboStore()) {
-            return koboServerProxy.proxyCurrentRequest();
+            return widen(koboServerProxy.proxyCurrentRequest());
         }
 
         return ResponseEntity.ok().build();
@@ -227,9 +234,9 @@ public class KoboController {
     @Operation(summary = "Get user profile", description = "Get Kobo user configuration.")
     @ApiResponse(responseCode = "200", description = "Retrieved Kobo User configuration")
     @GetMapping("/v1/user/profile")
-    public ResponseEntity<?> getUserProfile() {
+    public ResponseEntity<Object> getUserProfile() {
         if (isForwardingToKoboStore()) {
-            return koboServerProxy.proxyCurrentRequest(null, false);
+            return widen(koboServerProxy.proxyCurrentRequest(null, false));
         }
 
         return ResponseEntity.ok()
@@ -240,9 +247,9 @@ public class KoboController {
     @Operation(summary = "Get Kobo Deals", description = "Get promotional deals on Kobo entitlements.")
     @ApiResponse(responseCode = "200", description = "Deals Retrieved successfully")
     @GetMapping("/v1/deals")
-    public ResponseEntity<?> getDeals() {
+    public ResponseEntity<Object> getDeals() {
         if (isForwardingToKoboStore()) {
-            return koboServerProxy.proxyCurrentRequest(null, false);
+            return widen(koboServerProxy.proxyCurrentRequest(null, false));
         }
 
         return ResponseEntity.ok()
@@ -253,17 +260,17 @@ public class KoboController {
     @Operation(summary = "Update Rating", description = "Updates the personal rating for a book given the Kobo star rating.")
     @ApiResponse(responseCode = "200", description = "Personal rating has been updated.")
     @PostMapping("/v1/products/{bookId}/rating/{rating}")
-    public ResponseEntity<?> putRating(
+    public ResponseEntity<Object> putRating(
             @AuthenticationPrincipal BookLoreUser user,
             @Parameter(description = "Book ID") @PathVariable String bookId,
             @Parameter(description = "Book Rating") @PathVariable int rating
     ) {
         if (StringUtils.isNumeric(bookId)) {
-            return koboRatingService.updatePersonalRating(user, Long.parseLong(bookId), rating);
+            return widen(koboRatingService.updatePersonalRating(user, Long.parseLong(bookId), rating));
         }
 
         if (isForwardingToKoboStore()) {
-            return koboServerProxy.proxyCurrentRequest();
+            return widen(koboServerProxy.proxyCurrentRequest());
         }
 
         return ResponseEntity.notFound().build();

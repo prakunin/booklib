@@ -411,7 +411,7 @@ class FileStreamingServiceTest {
 
     @Test
     void parseRange_withLeadingTrailingWhitespace_parsesCorrectly() {
-        var result = fileStreamingService.parseRange("bytes=100-199", 1000);
+        var result = fileStreamingService.parseRange("bytes=  100-199  ", 1000);
 
         assertNotNull(result);
         assertEquals(100, result.start());

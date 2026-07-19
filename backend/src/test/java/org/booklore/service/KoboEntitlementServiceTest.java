@@ -478,7 +478,8 @@ class KoboEntitlementServiceTest {
         when(shelfRepository.findByUserIdAndName(user.getId(), ShelfType.KOBO.getName()))
                 .thenReturn(Optional.of(koboShelf));
         when(koboCompatibilityService.isBookSupportedForKobo(any(BookEntity.class))).thenReturn(true);
-        when(shelfRepository.findByUserId(user.getId())).thenReturn(List.of(koboShelf));
+        // No user shelves at all (not even the Kobo shelf) and no magic shelves.
+        when(shelfRepository.findByUserId(user.getId())).thenReturn(List.of());
         when(magicShelfRepository.findAllByUserId(user.getId())).thenReturn(List.of());
 
         List<KoboTagWrapper> tags = koboEntitlementService.generateTags();

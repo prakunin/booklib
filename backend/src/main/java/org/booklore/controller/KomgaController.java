@@ -164,7 +164,7 @@ public class KomgaController {
 
     @Operation(summary = "Get book page image")
     @GetMapping("/v1/books/{bookId}/pages/{pageNumber}")
-    public ResponseEntity<?> getBookPage(
+    public ResponseEntity<StreamingResponseBody> getBookPage(
             @Parameter(description = "Book ID") @PathVariable Long bookId,
             @Parameter(description = "Page number") @PathVariable Integer pageNumber,
             @Parameter(description = "Convert image format (e.g., 'png')") @RequestParam(required = false) String convert) {

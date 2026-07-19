@@ -52,8 +52,7 @@ public class AudiobookReaderController {
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
 
-        Path audioPath = audiobookReaderService.getAudioFilePath(bookId, bookType, trackIndex);
-        audiobookReaderService.streamWithRangeSupport(audioPath, request, response);
+        streamAudio(bookId, bookType, trackIndex, request, response);
     }
 
     @Operation(summary = "Stream specific track", description = "Stream a specific track from a folder-based audiobook.")
@@ -69,6 +68,10 @@ public class AudiobookReaderController {
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
 
+        streamAudio(bookId, bookType, trackIndex, request, response);
+    }
+
+    private void streamAudio(Long bookId, String bookType, Integer trackIndex, HttpServletRequest request, HttpServletResponse response) throws IOException {
         Path audioPath = audiobookReaderService.getAudioFilePath(bookId, bookType, trackIndex);
         audiobookReaderService.streamWithRangeSupport(audioPath, request, response);
     }

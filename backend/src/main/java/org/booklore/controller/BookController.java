@@ -4,6 +4,7 @@ import org.booklore.app.dto.AppPageResponse;
 import org.booklore.config.security.annotation.CheckBookAccess;
 import org.booklore.exception.ApiError;
 import org.booklore.model.dto.Book;
+import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.BookRecommendation;
 import org.booklore.model.dto.BookViewerSettings;
 import org.booklore.model.dto.request.AttachBookFileRequest;
@@ -159,7 +160,7 @@ public class BookController {
     @ApiResponse(responseCode = "200", description = "ComicInfo metadata returned successfully")
     @GetMapping("/{bookId}/cbx/metadata/comicinfo")
     @CheckBookAccess(bookIdParam = "bookId")
-    public ResponseEntity<?> getComicInfoMetadata(
+    public ResponseEntity<BookMetadata> getComicInfoMetadata(
             @Parameter(description = "ID of the book") @PathVariable long bookId) {
         return ResponseEntity.ok(bookMetadataService.getComicInfoMetadata(bookId));
     }
@@ -168,7 +169,7 @@ public class BookController {
     @ApiResponse(responseCode = "200", description = "File metadata returned successfully")
     @GetMapping("/{bookId}/file-metadata")
     @CheckBookAccess(bookIdParam = "bookId")
-    public ResponseEntity<?> getFileMetadata(
+    public ResponseEntity<BookMetadata> getFileMetadata(
             @Parameter(description = "ID of the book") @PathVariable long bookId) {
         return ResponseEntity.ok(bookMetadataService.getFileMetadata(bookId));
     }

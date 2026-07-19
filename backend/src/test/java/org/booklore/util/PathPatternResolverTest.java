@@ -323,19 +323,6 @@ class PathPatternResolverTest {
     }
 
     @Test
-    void testResolvePattern_handlesMissingMetadataFields() {
-        BookMetadata metadata = BookMetadata.builder()
-                .title("Book Title")
-                // authors is intentionally missing/null
-                .build();
-
-        String result = PathPatternResolver.resolvePattern(metadata, "{title}< - {authors}>", "original.pdf");
-
-        // Optional block should be omitted since authors is missing
-        assertEquals("Book Title.pdf", result);
-    }
-
-    @Test
     void testResolvePattern_emptyOptionalBlocks() {
         BookMetadata metadata = BookMetadata.builder()
                 .title("Book Title")

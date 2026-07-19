@@ -49,8 +49,8 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
     private static final String BASE_BOOK_URL_SUFFIX = "/dp/";
     private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("[^\\d]");
     private static final Pattern SERIES_FORMAT_PATTERN = Pattern.compile("Book (\\d+(?:\\.\\d+)?) of (\\d+)");
-    private static final Pattern PARENTHESES_WITH_WHITESPACE_PATTERN = Pattern.compile("\\s*\\(.*?\\)");
-    private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^\\p{L}\\p{M}0-9]");
+    private static final Pattern PARENTHESES_WITH_WHITESPACE_PATTERN = Pattern.compile("\\s*\\([^\\)]*+\\)");
+    private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^\\p{L}\\p{M}0-9]", Pattern.CANON_EQ);
     private static final Pattern ASIN_PATH_PATTERN = Pattern.compile("/dp/([A-Z0-9]{10})");
     private static final Pattern REVIEWED_IN_ON_PATTERN = Pattern.compile("(?iu)(?:Reviewed in|Rezension aus|Beoordeeld in|Recensie uit|Commenté en|Recensito in|Revisado en)\\s+(.+?)\\s+(?:on|vom|op|le|il|el)\\s+(.+)");
     private static final Pattern JAPANESE_REVIEW_DATE_PATTERN = Pattern.compile("(\\d{4}年\\d{1,2}月\\d{1,2}日).+");
@@ -652,7 +652,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
             return null;
         }
         try {
-            Pattern ratingPattern = Pattern.compile("^([0-9]+([.,][0-9]+)?)");
+            Pattern ratingPattern = Pattern.compile("^(\\d+([.,]\\d+)?)");
             Matcher ratingMatcher = ratingPattern.matcher(ratingText);
             if (ratingMatcher.find()) {
                 String ratingStr = ratingMatcher.group(1).replace(',', '.');

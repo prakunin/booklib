@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
 public class AudiobookMetadataExtractor implements FileMetadataExtractor {
 
     private static final Pattern CHAPTER_PATTERN = Pattern.compile("(?i)^(chp?|chapter)?\\d+$");
-    private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("[^0-9]");
+    private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("\\D");
     private static final String TIME_BASE_FIELD = "time_base";
     private final ObjectMapper mapper;
     private final FfprobeService ffprobeService;

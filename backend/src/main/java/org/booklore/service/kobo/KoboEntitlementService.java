@@ -70,7 +70,7 @@ public class KoboEntitlementService {
                 .toList();
     }
 
-    public List<? extends Entitlement> generateChangedEntitlements(Set<Long> bookIds, String token, boolean removed) {
+    public List<Entitlement> generateChangedEntitlements(Set<Long> bookIds, String token, boolean removed) {
 
         List<BookEntity> books = bookQueryService.findAllWithMetadataByIds(bookIds);
 
@@ -78,7 +78,7 @@ public class KoboEntitlementService {
         if (removed) {
             return books.stream()
                     .filter(koboCompatibilityService::isBookSupportedForKobo)
-                    .map(book -> {
+                    .<Entitlement>map(book -> {
                         KoboBookMetadata metadata = KoboBookMetadata.builder()
                                 .coverImageId(book.getBookCoverHash())
                                 .crossRevisionId(String.valueOf(book.getId()))
@@ -99,7 +99,7 @@ public class KoboEntitlementService {
         }
         return books.stream()
                 .filter(bookEntity -> bookEntity.getPrimaryBookFile() != null && bookEntity.getPrimaryBookFile().getBookType() == BookFileType.EPUB)
-                .map(book -> ChangedProductMetadata.builder()
+                .<Entitlement>map(book -> ChangedProductMetadata.builder()
                         .changedProductMetadata(BookEntitlementContainer.builder()
                                 .bookEntitlement(buildBookEntitlement(book, false))
                                 .bookMetadata(mapToKoboMetadata(book, token))

@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class AudioMetadataService {
 
-  private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("[^0-9]");
+  private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("\\D");
   private final AudioFileUtilityService audioFileUtility;
   private final AudiobookMetadataExtractor audiobookMetadataExtractor;
   private final BookFileRepository bookFileRepository;

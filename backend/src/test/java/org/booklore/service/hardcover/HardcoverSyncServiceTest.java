@@ -239,7 +239,7 @@ class HardcoverSyncServiceTest {
                 .thenReturn(createEmptyUserBookReadsResponse())
                 .thenReturn(createInsertUserBookReadResponse());
 
-        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+        service.syncProgressToHardcover(TEST_BOOK_ID, 30.0f, TEST_USER_ID);
 
         verify(restClient, atLeastOnce()).post();
     }

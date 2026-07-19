@@ -170,7 +170,7 @@ public class RanobeDbParser implements BookParser {
         if (searchResponse.getBooks() == null) {
             return Collections.emptyList();
         }
-        if (fetchTop && !searchResponse.getBooks().isEmpty()) {
+        if (Boolean.TRUE.equals(fetchTop) && !searchResponse.getBooks().isEmpty()) {
             BookMetadata topMetadata = searchResultToBookMetadata(searchResponse.getBooks().getFirst().getId());
             return topMetadata != null ? List.of(topMetadata) : Collections.emptyList();
         } else {

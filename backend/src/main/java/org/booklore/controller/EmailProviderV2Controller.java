@@ -73,7 +73,7 @@ public class EmailProviderV2Controller {
     @ApiResponse(responseCode = "204", description = "Email provider deleted successfully")
     @PreAuthorize("@securityUtil.isAdmin() or @securityUtil.canEmailBook()")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteEmailProvider(
+    public ResponseEntity<Void> deleteEmailProvider(
             @Parameter(description = "ID of the email provider") @PathVariable Long id) {
         service.deleteEmailProvider(id);
         return ResponseEntity.noContent().build();

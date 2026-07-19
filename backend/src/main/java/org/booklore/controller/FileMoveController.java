@@ -27,7 +27,7 @@ public class FileMoveController {
     @ApiResponse(responseCode = "200", description = "Files moved successfully")
     @PostMapping("/move")
     @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
-    public ResponseEntity<?> moveFiles(@Parameter(description = "File move request") @RequestBody @Valid FileMoveRequest request) {
+    public ResponseEntity<Void> moveFiles(@Parameter(description = "File move request") @RequestBody @Valid FileMoveRequest request) {
         fileMoveService.bulkMoveFiles(request);
         return ResponseEntity.ok().build();
     }

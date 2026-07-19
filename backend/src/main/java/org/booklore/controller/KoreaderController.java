@@ -35,7 +35,7 @@ public class KoreaderController {
     @Operation(summary = "Create KoReader user (disabled)", description = "Attempt to register a user via KoReader (always forbidden).")
     @ApiResponse(responseCode = "403", description = "User registration forbidden")
     @PostMapping("/users/create")
-    public ResponseEntity<?> createUser(@Parameter(description = "User data") @RequestBody Map<String, Object> userData) {
+    public ResponseEntity<Map<String, String>> createUser(@Parameter(description = "User data") @RequestBody Map<String, Object> userData) {
         log.warn("Attempt to register user via Koreader blocked: {}", userData);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "User registration via Koreader is disabled"));
     }
@@ -53,7 +53,7 @@ public class KoreaderController {
     @Operation(summary = "Update KoReader progress", description = "Update reading progress for a book.")
     @ApiResponse(responseCode = "200", description = "Progress updated successfully")
     @PutMapping("/syncs/progress")
-    public ResponseEntity<?> updateProgress(@Parameter(description = "KoReader progress object") @Valid @RequestBody KoreaderProgress koreaderProgress) {
+    public ResponseEntity<Map<String, String>> updateProgress(@Parameter(description = "KoReader progress object") @Valid @RequestBody KoreaderProgress koreaderProgress) {
         koreaderService.saveProgress(koreaderProgress.getDocument(), koreaderProgress);
         return ResponseEntity.ok(Map.of("status", "progress updated"));
     }

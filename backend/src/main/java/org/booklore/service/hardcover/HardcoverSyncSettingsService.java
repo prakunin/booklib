@@ -24,6 +24,12 @@ public class HardcoverSyncSettingsService {
     private final AuthenticationService authenticationService;
     private final KoboUserSettingsRepository koboUserSettingsRepository;
 
+    // getSettingsForUserId() is called via 'this' here, bypassing its own @Transactional proxy,
+    // but tx semantics are unaffected: this method is itself @Transactional (REQUIRED), so the
+    // callee simply runs inside the transaction already started by this method's own proxy.
+    // getSettingsForUserId() stays public+@Transactional because it is also a direct entry point
+    // for other callers (e.g. HardcoverSyncService, KoboSettingsService).
+    @SuppressWarnings("java:S6809")
     @Transactional
     public HardcoverSyncSettings getCurrentUserSettings() {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
@@ -37,6 +43,10 @@ public class HardcoverSyncSettingsService {
         return readSettings(user, userId);
     }
 
+    // Same self-invocation situation as getCurrentUserSettings() above: this method is itself
+    // @Transactional, so updateSettingsForUserId() runs in the transaction already started here
+    // regardless of proxy bypass. It stays public+@Transactional for its own direct callers.
+    @SuppressWarnings("java:S6809")
     @Transactional
     public HardcoverSyncSettings updateCurrentUserSettings(HardcoverSyncSettings settings) {
         BookLoreUser user = authenticationService.getAuthenticatedUser();

@@ -521,7 +521,7 @@ public class OpdsBookService {
                 // Books without series come after books with series
                 if (!hasSeries1 && !hasSeries2) {
                     // Both have no series, sort by addedOn descending
-                    return compareByAddedOn(b2, b1);
+                    return compareByAddedOnDescending(b1, b2);
                 }
                 if (!hasSeries1) return 1;
                 if (!hasSeries2) return -1;
@@ -540,7 +540,7 @@ public class OpdsBookService {
                 // Books without series come after books with series
                 if (!hasSeries1 && !hasSeries2) {
                     // Both have no series, sort by addedOn descending
-                    return compareByAddedOn(b2, b1);
+                    return compareByAddedOnDescending(b1, b2);
                 }
                 if (!hasSeries1) return 1;
                 if (!hasSeries2) return -1;
@@ -556,14 +556,14 @@ public class OpdsBookService {
                 // Books with no rating go to the end
                 if (rating1 == null && rating2 == null) {
                     // Both have no rating, fall back to addedOn descending
-                    return compareByAddedOn(b2, b1);
+                    return compareByAddedOnDescending(b1, b2);
                 }
                 if (rating1 == null) return 1;
                 if (rating2 == null) return -1;
                 int ratingComp = Float.compare(rating1, rating2); // Ascending order (lowest first)
                 if (ratingComp != 0) return ratingComp;
                 // Same rating, fall back to addedOn descending
-                return compareByAddedOn(b2, b1);
+                return compareByAddedOnDescending(b1, b2);
             });
             case RATING_DESC -> sortedBooks.sort((b1, b2) -> {
                 Float rating1 = calculateRating(b1);
@@ -571,14 +571,14 @@ public class OpdsBookService {
                 // Books with no rating go to the end
                 if (rating1 == null && rating2 == null) {
                     // Both have no rating, fall back to addedOn descending
-                    return compareByAddedOn(b2, b1);
+                    return compareByAddedOnDescending(b1, b2);
                 }
                 if (rating1 == null) return 1;
                 if (rating2 == null) return -1;
                 int ratingComp = Float.compare(rating2, rating1); // Descending order (highest first)
                 if (ratingComp != 0) return ratingComp;
                 // Same rating, fall back to addedOn descending
-                return compareByAddedOn(b2, b1);
+                return compareByAddedOnDescending(b1, b2);
             });
             default -> {
                 // RECENT is already handled by the early return above; no other values exist
@@ -615,6 +615,14 @@ public class OpdsBookService {
         if (b1.getAddedOn() == null) return 1;
         if (b2.getAddedOn() == null) return -1;
         return b1.getAddedOn().compareTo(b2.getAddedOn());
+    }
+
+    // Reverses compareByAddedOn() to sort newest-first, matching the RECENT default (see
+    // applySortOrder above). Named wrapper instead of calling compareByAddedOn(b2, b1) inline at
+    // each tie-break site, since that swapped-argument pattern reads as a bug (sonar java:S2234)
+    // even though it is the intentional way to reverse a two-argument comparator.
+    private int compareByAddedOnDescending(Book b1, Book b2) {
+        return compareByAddedOn(b2, b1);
     }
 
     private Float calculateRating(Book book) {

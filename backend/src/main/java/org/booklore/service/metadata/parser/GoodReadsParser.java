@@ -87,7 +87,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
             """;
     private static final String BASE_AUTOCOMPLETE_URL = "https://www.goodreads.com/book/auto_complete?format=json&q=";
     private static final String BASE_ISBN_URL = "https://www.goodreads.com/book/isbn/";
-    private static final Pattern PATTERN_PATH_GOODREADS_ID = Pattern.compile("^/book/show/([0-9]+)[^/]+$");
+    private static final Pattern PATTERN_PATH_GOODREADS_ID = Pattern.compile("^/book/show/(\\d+)[^/]+$");
     private static final int COUNT_DETAILED_METADATA_TO_GET = 3;
 
     private final HttpClient httpClient;

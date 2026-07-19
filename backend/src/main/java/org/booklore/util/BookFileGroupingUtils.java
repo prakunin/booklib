@@ -23,6 +23,10 @@ public class BookFileGroupingUtils {
     private static final Pattern UNDERSCORE_PATTERN = Pattern.compile("_");
 
     // Matches trailing author: " - J.R.R. Tolkien", " - George Orwell", " - J.K. Rowling"
+    // Not split: the bounded repetition against a single end-anchor is not safely decomposable
+    // into independent sub-patterns without risking different match boundaries on edge-case
+    // filenames (sonar java:S5843 - accepted complexity for this file-grouping heuristic).
+    @SuppressWarnings("java:S5843")
     private static final Pattern TRAILING_AUTHOR_PATTERN = Pattern.compile(
             "\\s*[-–—]\\s+(?:[A-Z](?:\\.[A-Z])*\\.\\s+)?[A-Z][a-z]+(?:\\s+[A-Z](?:\\.[A-Z])*\\.?)?(?:\\s+[A-Z][a-z]+){0,10}\\s*$"
     );
@@ -46,6 +50,11 @@ public class BookFileGroupingUtils {
     // Part/disc indicators: "(part 1)", "[pt 2]", "- disc 1", "cd 3", etc.
     // "part" requires brackets or dash prefix to avoid conflict with series labels ("Part 1" = series entry).
     // "pt", "disc", "disk", "cd" are unambiguous and can be matched bare.
+    // Not split: splitting into independently-tried sub-patterns can change which alternative
+    // wins when more than one branch could match at different start positions in the same
+    // string, which single-pass alternation resolves via leftmost-match precedence
+    // (sonar java:S5843 - accepted complexity for this file-grouping heuristic).
+    @SuppressWarnings("java:S5843")
     private static final Pattern PART_INDICATOR_PATTERN = Pattern.compile(
             "\\s*(?:" +
                     "[\\(\\[]\\s*(?:part|pt|dis[ck]|cd)\\s*\\d+\\s*[\\)\\]]" +
@@ -62,6 +71,11 @@ public class BookFileGroupingUtils {
 
     // Edition/version patterns that should NOT prevent grouping
     // Includes format indicators (audiobook, ebook) and edition descriptors
+    // Not split: this is used with replaceAll() to strip all matches from a key; splitting into
+    // sequential independent replaceAll passes is not provably identical to single-pass
+    // alternation when branch matches are adjacent or overlapping in the input
+    // (sonar java:S5843 - accepted complexity for this file-grouping heuristic).
+    @SuppressWarnings("java:S5843")
     private static final Pattern EDITION_PATTERN = Pattern.compile(
             "(?:tenth|first|second|third|\\d+(?:st|nd|rd|th)?)\\s*(?:anniversary|edition|ed\\.?)|" +
                     "(?:unabridged|abridged|complete|full\\s*cast|deluxe|special|collector)|" +

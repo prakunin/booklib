@@ -102,14 +102,16 @@ public class StorageInfoService {
         if (isDirectory.isEmpty()) {
             return PathStatus.UNKNOWN;
         }
-        if (!isDirectory.get()) {
+        boolean directory = isDirectory.get();
+        if (!directory) {
             return PathStatus.MISSING;
         }
         Optional<Boolean> isReadable = pathProbe.isReadable(path);
         if (isReadable.isEmpty()) {
             return PathStatus.UNKNOWN;
         }
-        return isReadable.get() ? PathStatus.OK : PathStatus.UNREADABLE;
+        boolean readable = isReadable.get();
+        return readable ? PathStatus.OK : PathStatus.UNREADABLE;
     }
 
     /**

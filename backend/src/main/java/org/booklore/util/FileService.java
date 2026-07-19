@@ -972,7 +972,7 @@ public class FileService {
      * then asks to crop it to a height greater than it has.
      */
     private static int clamp(int target, int available) {
-        return Math.max(1, Math.min(target, available));
+        return Math.clamp(target, 1, available);
     }
 
     private BufferedImage cropFromTop(BufferedImage image, int targetWidth, int targetHeight, boolean smartCrop) {

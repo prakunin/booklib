@@ -322,7 +322,8 @@ public class CbxMetadataWriter implements MetadataWriter {
             
             // BlackAndWhite (Yes/No)
             if (comic.getBlackAndWhite() != null) {
-                info.setBlackAndWhite(comic.getBlackAndWhite() ? "Yes" : "No");
+                boolean blackAndWhite = comic.getBlackAndWhite();
+                info.setBlackAndWhite(blackAndWhite ? "Yes" : "No");
             }
             
             // Manga / Reading Direction

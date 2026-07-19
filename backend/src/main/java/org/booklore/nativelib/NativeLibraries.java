@@ -120,7 +120,7 @@ public final class NativeLibraries {
             sb.append(first ? " " : ", ")
                     .append(PROBES.get(entry.getKey()).name)
                     .append(": ")
-                    .append(entry.getValue() ? "loaded" : "NOT available");
+                    .append(Boolean.TRUE.equals(entry.getValue()) ? "loaded" : "NOT available");
             first = false;
         }
         log.info(sb.toString());

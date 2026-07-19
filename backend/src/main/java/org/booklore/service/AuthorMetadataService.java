@@ -164,6 +164,11 @@ public class AuthorMetadataService {
         throw ApiError.GENERIC_BAD_REQUEST.createException("No metadata found for author: " + author.getName());
     }
 
+    // quickMatchAuthor() is @Transactional, but this self-invocation bypasses the proxy so it
+    // runs without that transaction here; each repository call still commits independently.
+    // Not fixed: routing through a self-injected proxy would newly apply transactional semantics
+    // to a hot async path and risks changing behavior under load. Known debt (sonar java:S6809).
+    @SuppressWarnings("java:S6809")
     public Flux<AuthorSummary> autoMatchAuthors(List<Long> authorIds) {
         return Flux.fromIterable(authorIds)
                 .concatMap(authorId ->

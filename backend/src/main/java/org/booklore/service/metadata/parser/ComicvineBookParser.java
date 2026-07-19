@@ -674,11 +674,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
             description = comic.getDeck();
         }
 
-        ComicMetadata comicMetadata = buildComicMetadata(
-                comic.getIssueNumber(), volumeName,
-                comic.getPersonCredits(), comic.getCharacterCredits(),
-                comic.getTeamCredits(), comic.getStoryArcCredits(),
-                comic.getLocationCredits(), comic.getSiteDetailUrl());
+        ComicMetadata comicMetadata = buildComicMetadata(comic, volumeName);
 
         BookMetadata metadata = BookMetadata.builder()
                 .provider(MetadataProvider.Comicvine)
@@ -749,19 +745,19 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         return false;
     }
 
-    private ComicMetadata buildComicMetadata(
-            String issueNumber,
-            String volumeName,
-            List<Comic.PersonCredit> personCredits,
-            List<Comic.CharacterCredit> characterCredits,
-            List<Comic.TeamCredit> teamCredits,
-            List<Comic.StoryArcCredit> storyArcCredits,
-            List<Comic.LocationCredit> locationCredits,
-            String siteDetailUrl) {
+    // Groups the 8 individual credit-list/scalar parameters this used to take into the existing
+    // Comic DTO (which already owns all of them except the derived volumeName), resolving S107.
+    private ComicMetadata buildComicMetadata(Comic comic, String volumeName) {
+        List<Comic.PersonCredit> personCredits = comic.getPersonCredits();
+        List<Comic.CharacterCredit> characterCredits = comic.getCharacterCredits();
+        List<Comic.TeamCredit> teamCredits = comic.getTeamCredits();
+        List<Comic.StoryArcCredit> storyArcCredits = comic.getStoryArcCredits();
+        List<Comic.LocationCredit> locationCredits = comic.getLocationCredits();
+        String siteDetailUrl = comic.getSiteDetailUrl();
 
         ComicMetadata.ComicMetadataBuilder builder = ComicMetadata.builder();
 
-        builder.issueNumber(issueNumber);
+        builder.issueNumber(comic.getIssueNumber());
         builder.volumeName(volumeName);
 
         if (storyArcCredits != null && !storyArcCredits.isEmpty()) {
