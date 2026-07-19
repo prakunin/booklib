@@ -26,6 +26,9 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -92,13 +95,13 @@ public class AudiobookMetadataWriter implements MetadataWriter {
         boolean[] hasChanges = {false};
         MetadataCopyHelper helper = new MetadataCopyHelper(metadata);
 
-        helper.copyTitle(clear != null && clear.isTitle(), val -> {
+        helper.copyTitle(isClear(clear, MetadataClearFlags::isTitle), val -> {
             setTagField(tag, FieldKey.ALBUM, val, hasChanges);
             setTagField(tag, FieldKey.TITLE, val, hasChanges);
         });
 
-        helper.copyAuthors(clear != null && clear.isAuthors(), authors -> {
-            String authorStr = authors != null ? String.join("; ", authors) : null;
+        helper.copyAuthors(isClear(clear, MetadataClearFlags::isAuthors), authors -> {
+            String authorStr = authorsOf(authors);
             setTagField(tag, FieldKey.ALBUM_ARTIST, authorStr, hasChanges);
             setTagField(tag, FieldKey.ARTIST, authorStr, hasChanges);
         });
@@ -107,48 +110,66 @@ public class AudiobookMetadataWriter implements MetadataWriter {
             setTagField(tag, FieldKey.COMPOSER, metadata.getNarrator(), hasChanges);
         }
 
-        helper.copyDescription(clear != null && clear.isDescription(), val ->
+        helper.copyDescription(isClear(clear, MetadataClearFlags::isDescription), val ->
                 setTagField(tag, FieldKey.COMMENT, val, hasChanges));
 
-        helper.copyPublisher(clear != null && clear.isPublisher(), val ->
+        helper.copyPublisher(isClear(clear, MetadataClearFlags::isPublisher), val ->
                 setTagField(tag, FieldKey.RECORD_LABEL, val, hasChanges));
 
-        helper.copyPublishedDate(clear != null && clear.isPublishedDate(), val -> {
-            String year = val != null ? String.valueOf(val.getYear()) : null;
-            setTagField(tag, FieldKey.YEAR, year, hasChanges);
-        });
+        helper.copyPublishedDate(isClear(clear, MetadataClearFlags::isPublishedDate), val ->
+                setTagField(tag, FieldKey.YEAR, yearOf(val), hasChanges));
 
-        helper.copyCategories(clear != null && clear.isCategories(), categories -> {
-            String genre = categories != null && !categories.isEmpty()
-                    ? String.join("; ", categories)
-                    : null;
-            setTagField(tag, FieldKey.GENRE, genre, hasChanges);
-        });
+        helper.copyCategories(isClear(clear, MetadataClearFlags::isCategories), categories ->
+                setTagField(tag, FieldKey.GENRE, genreOf(categories), hasChanges));
 
-        helper.copyLanguage(clear != null && clear.isLanguage(), val ->
+        helper.copyLanguage(isClear(clear, MetadataClearFlags::isLanguage), val ->
                 setTagField(tag, FieldKey.LANGUAGE, val, hasChanges));
 
-        helper.copySeriesName(clear != null && clear.isSeriesName(), val ->
+        helper.copySeriesName(isClear(clear, MetadataClearFlags::isSeriesName), val ->
                 setTagField(tag, FieldKey.GROUPING, val, hasChanges));
 
-        helper.copySeriesNumber(clear != null && clear.isSeriesNumber(), val -> {
-            String trackNo = val != null ? String.format("%.0f", val) : null;
-            setTagField(tag, FieldKey.TRACK, trackNo, hasChanges);
-        });
+        helper.copySeriesNumber(isClear(clear, MetadataClearFlags::isSeriesNumber), val ->
+                setTagField(tag, FieldKey.TRACK, trackNumberOf(val), hasChanges));
 
-        helper.copySeriesTotal(clear != null && clear.isSeriesTotal(), val -> {
-            String trackTotal = val != null ? String.valueOf(val) : null;
-            setTagField(tag, FieldKey.TRACK_TOTAL, trackTotal, hasChanges);
-        });
+        helper.copySeriesTotal(isClear(clear, MetadataClearFlags::isSeriesTotal), val ->
+                setTagField(tag, FieldKey.TRACK_TOTAL, trackTotalOf(val), hasChanges));
 
+        applyCoverArtIfProvided(tag, thumbnailUrl, fileName, hasChanges);
+
+        return hasChanges[0];
+    }
+
+    private static boolean isClear(MetadataClearFlags clear, Predicate<MetadataClearFlags> flag) {
+        return clear != null && flag.test(clear);
+    }
+
+    private static String yearOf(LocalDate publishedDate) {
+        return publishedDate != null ? String.valueOf(publishedDate.getYear()) : null;
+    }
+
+    private static String authorsOf(Set<String> authors) {
+        return authors != null ? String.join("; ", authors) : null;
+    }
+
+    private static String genreOf(Set<String> categories) {
+        return categories != null && !categories.isEmpty() ? String.join("; ", categories) : null;
+    }
+
+    private static String trackNumberOf(Float seriesNumber) {
+        return seriesNumber != null ? String.format("%.0f", seriesNumber) : null;
+    }
+
+    private static String trackTotalOf(Integer seriesTotal) {
+        return seriesTotal != null ? String.valueOf(seriesTotal) : null;
+    }
+
+    private void applyCoverArtIfProvided(Tag tag, String thumbnailUrl, String fileName, boolean[] hasChanges) {
         if (StringUtils.isNotBlank(thumbnailUrl)) {
             byte[] coverData = loadImage(thumbnailUrl);
             if (coverData != null) {
                 setCoverArtwork(tag, coverData, fileName, hasChanges);
             }
         }
-
-        return hasChanges[0];
     }
 
     private void restoreAudiobookFromBackup(File backupFile, File audioFile) {

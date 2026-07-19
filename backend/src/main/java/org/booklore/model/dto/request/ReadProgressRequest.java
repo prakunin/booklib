@@ -45,7 +45,7 @@ public class ReadProgressRequest {
 
     @AssertTrue(message = "At least one progress field must be provided")
     // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
-    @SuppressWarnings("java:S1874")
+    @SuppressWarnings({"java:S1874", "java:S5738"})
     public boolean isProgressValid() {
         return fileProgress != null || epubProgress != null || pdfProgress != null || cbxProgress != null || audiobookProgress != null || dateFinished != null;
     }

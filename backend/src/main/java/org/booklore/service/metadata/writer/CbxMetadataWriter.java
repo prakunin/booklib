@@ -612,7 +612,7 @@ public class CbxMetadataWriter implements MetadataWriter {
         }
     }
 
-    private void rebuildArchiveWithNewXml(Path sourceArchive, Path targetZip, byte[] xmlContent) throws Exception {
+    private void rebuildArchiveWithNewXml(Path sourceArchive, Path targetZip, byte[] xmlContent) throws IOException {
         String comicInfoEntryName = findComicInfoEntryName(sourceArchive);
 
         try (

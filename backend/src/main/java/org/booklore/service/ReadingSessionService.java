@@ -840,7 +840,7 @@ public class ReadingSessionService {
 
         for (var dto : progressList) {
             float maxProg = dto.getMaxProgress() != null ? dto.getMaxProgress() : 0f;
-            if (!(maxProg > 0f)) {
+            if (maxProg <= 0f) {
                 continue;
             }
             totalStarted++;

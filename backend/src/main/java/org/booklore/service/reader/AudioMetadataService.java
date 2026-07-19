@@ -102,7 +102,7 @@ public class AudioMetadataService {
   }
 
   private AudiobookInfo buildFolderBasedAudiobookInfo(BookFileEntity bookFile, Path folderPath)
-      throws Exception {
+      throws IOException {
     AudiobookInfo.AudiobookInfoBuilder builder =
         AudiobookInfo.builder()
             .bookId(bookFile.getBook().getId())
@@ -267,9 +267,9 @@ public class AudioMetadataService {
     return scan.author();
   }
 
-  // jaudiotagger's AudioFileIO.read declares several distinct checked exception types
-  // (CannotReadException, TagException, ReadOnlyFileException, InvalidAudioFrameException, IOException);
-  // this "throws Exception" umbrella is shared with sibling methods in this class that are out of
+  // jaudiotagger's AudioFileIO.read declares several distinct checked exception types, namely
+  // CannotReadException, TagException, ReadOnlyFileException, InvalidAudioFrameException and IOException.
+  // This "throws Exception" umbrella is shared with sibling methods in this class that are out of
   // scope for this change, so narrowing only here would be inconsistent without a wider signature pass.
   @SuppressWarnings("java:S112")
   private AudiobookInfo extractSingleFileMetadata(

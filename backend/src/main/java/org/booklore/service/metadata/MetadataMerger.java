@@ -303,8 +303,8 @@ class MetadataMerger {
     }
 
     // S4276: ObjIntConsumer<BookMetadata> takes a primitive int and would NPE on unboxing when
-    // resolveFieldAsInteger()/getter legitimately resolve to null (seriesTotal/pageCount are nullable);
-    // BiConsumer<BookMetadata, Integer> is intentional here.
+    // the resolveFieldAsInteger helper or getter legitimately resolves to null (seriesTotal/pageCount
+    // are nullable); BiConsumer<BookMetadata, Integer> is intentional here.
     @SuppressWarnings("java:S4276")
     private FieldMergeSpec resolvedInteger(
             Predicate<MetadataRefreshOptions.EnabledFields> enabled,

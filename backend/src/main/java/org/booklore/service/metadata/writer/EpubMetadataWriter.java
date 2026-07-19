@@ -380,11 +380,7 @@ public class EpubMetadataWriter implements MetadataWriter {
             File tempEpub = new File(epubFile.getParentFile(), epubFile.getName() + ".tmp");
             createEpubZipFromDirectory(tempDir, tempEpub.toPath());
 
-            try {
-                Files.delete(epubFile.toPath());
-            } catch (IOException ex) {
-                throw new IOException("Could not delete original EPUB: " + ex.getMessage(), ex);
-            }
+            deleteOriginalEpub(epubFile);
             if (!tempEpub.renameTo(epubFile)) throw new IOException("Could not rename temp EPUB");
 
             log.info("Cover image updated in EPUB from {}: {}", source, epubFile.getName());
@@ -395,6 +391,14 @@ public class EpubMetadataWriter implements MetadataWriter {
             if (tempDir != null) {
                 deleteDirectoryRecursively(tempDir);
             }
+        }
+    }
+
+    private void deleteOriginalEpub(File epubFile) throws IOException {
+        try {
+            Files.delete(epubFile.toPath());
+        } catch (IOException ex) {
+            throw new IOException("Could not delete original EPUB: " + ex.getMessage(), ex);
         }
     }
 

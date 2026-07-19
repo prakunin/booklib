@@ -39,7 +39,7 @@ public class OidcDiagnosticService {
 
         // 1. Fetch discovery document (uncached)
         Map<String, Object> doc = fetchDiscoveryDocument(providerDetails, checks);
-        if (doc == null) {
+        if (doc.isEmpty()) {
             return new OidcTestResult(false, checks);
         }
 
@@ -77,13 +77,13 @@ public class OidcDiagnosticService {
 
             if (doc == null) {
                 checks.add(new OidcTestCheck(CHECK_DISCOVERY_DOCUMENT, CheckStatus.FAIL, "Empty response from discovery endpoint"));
-                return null;
+                return Map.of();
             }
             checks.add(new OidcTestCheck(CHECK_DISCOVERY_DOCUMENT, CheckStatus.PASS, "Successfully fetched from " + discoveryUrl));
             return doc;
         } catch (Exception e) {
             checks.add(new OidcTestCheck(CHECK_DISCOVERY_DOCUMENT, CheckStatus.FAIL, "Failed to fetch: " + e.getMessage()));
-            return null;
+            return Map.of();
         }
     }
 

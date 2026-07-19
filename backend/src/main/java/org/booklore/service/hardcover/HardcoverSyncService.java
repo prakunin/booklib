@@ -868,21 +868,6 @@ public class HardcoverSyncService {
         return null;
     }
 
-    private static Float extractFloat(Object obj) {
-        if (obj == null) return null;
-        if (obj instanceof Number number) {
-            return number.floatValue();
-        }
-        if (obj instanceof String string) {
-            try {
-                return Float.parseFloat(string);
-            } catch (NumberFormatException _) {
-                return null;
-            }
-        }
-        return null;
-    }
-
     /**
      * Helper class to hold Hardcover book information.
      */
@@ -920,6 +905,21 @@ public class HardcoverSyncService {
             }
 
             return result;
+        }
+
+        private static Float extractFloat(Object obj) {
+            if (obj == null) return null;
+            if (obj instanceof Number number) {
+                return number.floatValue();
+            }
+            if (obj instanceof String string) {
+                try {
+                    return Float.parseFloat(string);
+                } catch (NumberFormatException _) {
+                    return null;
+                }
+            }
+            return null;
         }
     }
 

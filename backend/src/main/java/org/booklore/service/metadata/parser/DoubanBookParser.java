@@ -217,32 +217,10 @@ public class DoubanBookParser implements BookParser {
 
             // Extract abstract information
             String abstractText = item.get("abstract").asString();
-            List<String> authors = List.of();
-            String publisher = null;
-            String pubDate = null;
-
-            if (abstractText != null && !abstractText.isEmpty()) {
-                // Parse abstract: "author0 / author1 / author 2 / ... / publisher / date (YYYY-MM or YYYY-MM-DD) / price"
-                String[] parts = SLASH_SEPARATOR_PATTERN.split(abstractText);
-                if (parts.length >= 4) {
-                    // Authors are all parts except the last three (publisher, date, price)
-                    authors = Arrays.stream(parts, 0, parts.length - 3)
-                            .map(String::trim)
-                            .filter(s -> !s.isEmpty())
-                            .toList();
-                    publisher = parts[parts.length - 3].trim();
-                    pubDate = parts[parts.length - 2].trim();
-                } else if (parts.length >= 2) {
-                    // Fallback for shorter abstracts
-                    authors = List.of(parts[1].trim());
-                    if (parts.length >= 3) {
-                        publisher = parts[2].trim();
-                    }
-                    if (parts.length >= 4) {
-                        pubDate = parts[3].trim();
-                    }
-                }
-            }
+            AbstractParts abstractParts = parseAbstract(abstractText);
+            List<String> authors = abstractParts.authors();
+            String publisher = abstractParts.publisher();
+            String pubDate = abstractParts.pubDate();
 
             // Extract rating information
             JsonNode ratingNode = item.get("rating");
@@ -276,6 +254,43 @@ public class DoubanBookParser implements BookParser {
             log.warn("Error parsing search result item: {}", e.getMessage());
             return null;
         }
+    }
+
+    private record AbstractParts(List<String> authors, String publisher, String pubDate) {
+        static final AbstractParts EMPTY = new AbstractParts(List.of(), null, null);
+    }
+
+    // Parses "author0 / author1 / author2 / ... / publisher / date (YYYY-MM or YYYY-MM-DD) / price".
+    private AbstractParts parseAbstract(String abstractText) {
+        if (abstractText == null || abstractText.isEmpty()) {
+            return AbstractParts.EMPTY;
+        }
+
+        String[] parts = SLASH_SEPARATOR_PATTERN.split(abstractText);
+        List<String> authors = List.of();
+        String publisher = null;
+        String pubDate = null;
+
+        if (parts.length >= 4) {
+            // Authors are all parts except the last three (publisher, date, price)
+            authors = Arrays.stream(parts, 0, parts.length - 3)
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+            publisher = parts[parts.length - 3].trim();
+            pubDate = parts[parts.length - 2].trim();
+        } else if (parts.length >= 2) {
+            // Fallback for shorter abstracts
+            authors = List.of(parts[1].trim());
+            if (parts.length >= 3) {
+                publisher = parts[2].trim();
+            }
+            if (parts.length >= 4) {
+                pubDate = parts[3].trim();
+            }
+        }
+
+        return new AbstractParts(authors, publisher, pubDate);
     }
 
     private LocalDate parsePublicationDateQuietly(String pubDate) {

@@ -119,7 +119,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
     public byte[] extractCover(File epubFile) {
         // Primary: use epub4j's CoverDetector with native lazy loading
         byte[] fastPathCover = extractCoverViaEpub4j(epubFile);
-        if (fastPathCover != null) {
+        if (fastPathCover.length > 0) {
             return fastPathCover;
         }
 
@@ -147,7 +147,10 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
             // that exists for exactly the files it chokes on. Only that scan gets to conclude.
             log.debug("epub4j cover detection failed for {}: {}", epubFile.getName(), e.getMessage());
         }
-        return null;
+        // Purely an internal "fast path found nothing usable, try the fallback" signal - unlike
+        // extractCover's null, this carries no external "proven absence" contract, so an empty
+        // array is a safe, equivalent sentinel.
+        return new byte[0];
     }
 
     @SuppressWarnings("java:S1168") // null (not empty array) means "proven no cover"; BookCoverGenerator/BookdropMetadataService/EpubProcessor branch on == null
@@ -270,6 +273,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
             Map<String, String> titlesById = new HashMap<>();
             Map<String, String> titleTypeById = new HashMap<>();
             boolean hasTitle = false;
+            MetaParseState metaParseState = new MetaParseState(builderMeta, moods, tags, titleTypeById, creatorRolesById);
 
             for (int i = 0; i < children.getLength(); i++) {
                 if (!(children.item(i) instanceof Element el)) continue;
@@ -278,10 +282,13 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
                 String text = el.getTextContent().trim();
 
                 switch (tag) {
-                    case "title" -> hasTitle = handleTitle(el, text, builderMeta, titlesById, hasTitle);
+                    case "title" -> {
+                        handleTitle(el, text, builderMeta, titlesById, hasTitle);
+                        hasTitle = true;
+                    }
                     case "meta" -> {
-                        SeriesFlags flags = handleMeta(el, text, builderMeta, moods, tags,
-                                titleTypeById, creatorRolesById, seriesFound, seriesIndexFound);
+                        SeriesFlags flags = handleMeta(el, text, metaParseState,
+                                new SeriesFlags(seriesFound, seriesIndexFound));
                         seriesFound = flags.seriesFound();
                         seriesIndexFound = flags.seriesIndexFound();
                     }
@@ -314,8 +321,15 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
     private record SeriesFlags(boolean seriesFound, boolean seriesIndexFound) {
     }
 
-    private boolean handleTitle(Element el, String text, BookMetadata.BookMetadataBuilder builderMeta,
-                                Map<String, String> titlesById, boolean hasTitle) {
+    // Groups the parser state that is threaded through every "meta" element for the whole
+    // document (as opposed to seriesFound/seriesIndexFound, which are per-iteration flags -
+    // see SeriesFlags), so handleMeta doesn't need one param per accumulator.
+    private record MetaParseState(BookMetadata.BookMetadataBuilder builderMeta, Set<String> moods, Set<String> tags,
+                                  Map<String, String> titleTypeById, Map<String, List<String>> creatorRolesById) {
+    }
+
+    private void handleTitle(Element el, String text, BookMetadata.BookMetadataBuilder builderMeta,
+                             Map<String, String> titlesById, boolean hasTitle) {
         String id = el.getAttribute("id");
         if (StringUtils.isNotBlank(id)) {
             titlesById.put(id, text);
@@ -323,27 +337,22 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
 
         if (!hasTitle) {
             builderMeta.title(text);
-            return true;
         }
-        return hasTitle;
     }
 
-    private SeriesFlags handleMeta(Element el, String text, BookMetadata.BookMetadataBuilder builderMeta,
-                                   Set<String> moods, Set<String> tags,
-                                   Map<String, String> titleTypeById,
-                                   Map<String, List<String>> creatorRolesById,
-                                   boolean seriesFound, boolean seriesIndexFound) {
+    private SeriesFlags handleMeta(Element el, String text, MetaParseState state, SeriesFlags flags) {
         String prop = el.getAttribute("property").trim();
         String name = el.getAttribute("name").trim();
         String refines = el.getAttribute("refines").trim();
         String content = el.hasAttribute(CONTENT_ATTR) ? el.getAttribute(CONTENT_ATTR).trim() : text;
 
-        handleRefinesAndLayout(prop, refines, content, builderMeta, titleTypeById, creatorRolesById);
-        SeriesFlags flags = updateSeries(prop, name, content, builderMeta, seriesFound, seriesIndexFound);
-        handlePageCountMeta(prop, name, content, builderMeta, moods, tags);
-        applyMetaKey(StringUtils.isNotBlank(prop) ? prop : name, content, builderMeta, moods, tags);
+        BookMetadata.BookMetadataBuilder builderMeta = state.builderMeta();
+        handleRefinesAndLayout(prop, refines, content, builderMeta, state.titleTypeById(), state.creatorRolesById());
+        SeriesFlags updatedFlags = updateSeries(prop, name, content, builderMeta, flags.seriesFound(), flags.seriesIndexFound());
+        handlePageCountMeta(prop, name, content, builderMeta, state.moods(), state.tags());
+        applyMetaKey(StringUtils.isNotBlank(prop) ? prop : name, content, builderMeta, state.moods(), state.tags());
 
-        return flags;
+        return updatedFlags;
     }
 
     private void handleRefinesAndLayout(String prop, String refines, String content,
@@ -389,6 +398,10 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
         }
     }
 
+    // S6916: the "when" guard clause syntax cannot attach to constant case labels (only to type
+    // patterns), so the single-if bodies in the switch below cannot be rewritten as guarded case
+    // labels - same known false positive as extractMetadata's switch above.
+    @SuppressWarnings("java:S6916")
     private void applyMetaKey(String key, String content, BookMetadata.BookMetadataBuilder builderMeta,
                               Set<String> moods, Set<String> tags) {
         switch (key) {

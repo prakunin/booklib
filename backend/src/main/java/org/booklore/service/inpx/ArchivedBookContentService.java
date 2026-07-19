@@ -71,10 +71,7 @@ public class ArchivedBookContentService {
             Path resolved = resolveLocked(bookFile, false);
             flight.complete(resolved);
             return resolved;
-        } catch (Exception e) {
-            flight.completeExceptionally(e);
-            throw e;
-        } catch (Error e) {
+        } catch (Exception | Error e) {
             // A JVM Error must still complete the flight and free the dedup slot below in `finally` -
             // otherwise concurrent callers awaiting `existing` would hang forever. Rethrown unchanged.
             flight.completeExceptionally(e);

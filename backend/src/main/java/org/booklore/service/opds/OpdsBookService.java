@@ -635,6 +635,9 @@ public class OpdsBookService {
     // applySortOrder above). Named wrapper instead of calling compareByAddedOn(b2, b1) inline at
     // each tie-break site, since that swapped-argument pattern reads as a bug (sonar java:S2234)
     // even though it is the intentional way to reverse a two-argument comparator.
+    // The swapped argument order is the point of this method (see comment above) - not a
+    // misordered call, so java:S2234 does not apply here.
+    @SuppressWarnings("java:S2234")
     private int compareByAddedOnDescending(Book b1, Book b2) {
         return compareByAddedOn(b2, b1);
     }

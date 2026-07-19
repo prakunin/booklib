@@ -143,17 +143,14 @@ public class SidecarMetadataReader {
         if (!nullSafeEquals(sm.getLanguage(), db.getLanguage())) return true;
         if (!nullSafeEquals(sm.getPageCount(), db.getPageCount())) return true;
 
-        if (isSeriesDifferent(sm, db)) return true;
-
-        return false;
+        return isSeriesDifferent(sm, db);
     }
 
     private boolean isSeriesDifferent(SidecarBookMetadata sm, BookMetadataEntity db) {
         if (sm.getSeries() != null) {
             if (!nullSafeEquals(sm.getSeries().getName(), db.getSeriesName())) return true;
             if (!nullSafeEquals(sm.getSeries().getNumber(), db.getSeriesNumber())) return true;
-            if (!nullSafeEquals(sm.getSeries().getTotal(), db.getSeriesTotal())) return true;
-            return false;
+            return !nullSafeEquals(sm.getSeries().getTotal(), db.getSeriesTotal());
         }
         return db.getSeriesName() != null || db.getSeriesNumber() != null || db.getSeriesTotal() != null;
     }

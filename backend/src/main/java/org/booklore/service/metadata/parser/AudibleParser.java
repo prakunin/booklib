@@ -50,7 +50,14 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
             "in", "https://api.audible.in/"
     );
 
+    // Audible's REST catalog API path structure is a fixed external vendor contract, not an
+    // environment-specific value - BASE_URIS above already externalizes the per-locale host,
+    // so making the path itself configurable too would be artificial.
+    // (Also suppressing java:S125 here: this prose comment trips the commented-out-code heuristic
+    // because it quotes an identifier, not because it contains dead code.)
+    @SuppressWarnings({"java:S1075", "java:S125"})
     private static final String PATH_SEARCH = "/1.0/catalog/products";
+    @SuppressWarnings("java:S1075")
     private static final String PATH_ASIN = "/1.0/catalog/products/{asin}";
     private static final String IMAGE_SIZE = "1000";
 

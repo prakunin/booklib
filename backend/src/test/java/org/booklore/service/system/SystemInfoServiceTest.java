@@ -47,8 +47,8 @@ class SystemInfoServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Benign default so blocks unrelated to the database don't have to know about it;
-        // DatabaseBlock tests below override this per-case.
+        // Benign default so blocks unrelated to the database don't have to know about it —
+        // DatabaseBlock tests below override this per case.
         Connection defaultConnection = mock(Connection.class);
         DatabaseMetaData defaultMetaData = mock(DatabaseMetaData.class);
         lenient().when(dataSource.getConnection()).thenReturn(defaultConnection);

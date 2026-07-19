@@ -114,6 +114,11 @@ public class BookCoverGenerator {
      * Extracts audiobook cover bytes, logging and returning {@code null} on either a failed read
      * or a legitimate absence of an embedded cover.
      */
+    // audiobookMetadataExtractor.extractCover can itself legitimately return a zero-length byte[]
+    // (artwork present but empty), distinct from this method's own null (failed read / no artwork
+    // at all) - collapsing this null to an empty array would make that upstream distinction
+    // unrecoverable for callers.
+    @SuppressWarnings("java:S1168")
     private byte[] extractAudiobookCoverBytes(File file, String fileName) {
         byte[] coverData;
         try {
@@ -179,6 +184,11 @@ public class BookCoverGenerator {
      * Extracts ebook cover bytes, logging and returning {@code null} on either a failed read
      * or a legitimate absence of an embedded cover.
      */
+    // extractor.extractCover can itself legitimately return a zero-length byte[] (a manifest-scan
+    // match with genuinely empty content), distinct from this method's own null (failed read / no
+    // cover found at all) - collapsing this null to an empty array would make that upstream
+    // distinction unrecoverable for callers.
+    @SuppressWarnings("java:S1168")
     private byte[] extractEbookCoverBytes(FileMetadataExtractor extractor, File file, String fileName) {
         byte[] coverData;
         try {

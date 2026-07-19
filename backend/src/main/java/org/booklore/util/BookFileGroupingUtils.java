@@ -213,7 +213,32 @@ public class BookFileGroupingUtils {
         String folderName = extractFolderName(fileSubPath);
         String folderKey = extractGroupingKey(folderName);
 
-        // Categorize files
+        FolderCategorization categorized = categorizeFilesInFolder(files, folderKey, fileSubPath, libraryPathId);
+
+        // Group files that match folder name, separating by trailing number
+        appendFolderMatches(result, categorized.matchesFolderByNumber(), folderName, folderKey, fileSubPath, libraryPathId);
+
+        // Add series entries as separate groups
+        result.putAll(categorized.seriesEntries());
+
+        // Handle unmatched files - try to cluster by similarity
+        if (!categorized.unmatched().isEmpty()) {
+            Map<String, List<LibraryFile>> clusters = clusterBySimilarity(categorized.unmatched(), libraryPathId, fileSubPath);
+            result.putAll(clusters);
+        }
+
+        return result;
+    }
+
+    private record FolderCategorization(Map<String, List<LibraryFile>> matchesFolderByNumber,
+                                        Map<String, List<LibraryFile>> seriesEntries,
+                                        List<LibraryFile> unmatched) {
+    }
+
+    // Splits a folder's files into: matches on the folder's own name (grouped by trailing
+    // number), series entries whose base title matches the folder, and everything else.
+    private FolderCategorization categorizeFilesInFolder(List<LibraryFile> files, String folderKey,
+                                                          String fileSubPath, Long libraryPathId) {
         Map<String, List<LibraryFile>> matchesFolderByNumber = new LinkedHashMap<>();
         Map<String, List<LibraryFile>> seriesEntries = new LinkedHashMap<>();
         List<LibraryFile> unmatched = new ArrayList<>();
@@ -242,7 +267,11 @@ public class BookFileGroupingUtils {
             }
         }
 
-        // Group files that match folder name, separating by trailing number
+        return new FolderCategorization(matchesFolderByNumber, seriesEntries, unmatched);
+    }
+
+    private void appendFolderMatches(Map<String, List<LibraryFile>> result, Map<String, List<LibraryFile>> matchesFolderByNumber,
+                                     String folderName, String folderKey, String fileSubPath, Long libraryPathId) {
         for (Map.Entry<String, List<LibraryFile>> entry : matchesFolderByNumber.entrySet()) {
             List<LibraryFile> filesWithNumber = entry.getValue();
             String numberSuffix = "none".equals(entry.getKey()) ? "" : ":" + entry.getKey();
@@ -252,17 +281,6 @@ public class BookFileGroupingUtils {
                     numberSuffix.isEmpty() ? "" : " (num=" + entry.getKey() + ")",
                     filesWithNumber.stream().map(LibraryFile::getFileName).toList());
         }
-
-        // Add series entries as separate groups
-        result.putAll(seriesEntries);
-
-        // Handle unmatched files - try to cluster by similarity
-        if (!unmatched.isEmpty()) {
-            Map<String, List<LibraryFile>> clusters = clusterBySimilarity(unmatched, libraryPathId, fileSubPath);
-            result.putAll(clusters);
-        }
-
-        return result;
     }
 
     /**
@@ -394,20 +412,25 @@ public class BookFileGroupingUtils {
                 .map(f -> extractGroupingKey(f.getFileName()))
                 .toList();
 
-        // Union-Find for clustering
-        int[] parent = new int[files.size()];
+        int[] parent = buildSimilarityUnionFind(keys);
+
+        return collectClusters(parent, files, libraryPathId, fileSubPath);
+    }
+
+    // Compares each pair of keys and unions the similar ones (edition-stripped substring match
+    // or fuzzy similarity), except pairs with different trailing numbers - this prevents
+    // "book1" and "book2" from being grouped together.
+    private int[] buildSimilarityUnionFind(List<String> keys) {
+        int[] parent = new int[keys.size()];
         for (int i = 0; i < parent.length; i++) {
             parent[i] = i;
         }
 
-        // Compare each pair and union if similar
-        for (int i = 0; i < files.size(); i++) {
-            for (int j = i + 1; j < files.size(); j++) {
+        for (int i = 0; i < keys.size(); i++) {
+            for (int j = i + 1; j < keys.size(); j++) {
                 String key1 = stripEditionInfo(keys.get(i));
                 String key2 = stripEditionInfo(keys.get(j));
 
-                // Don't cluster files that have different trailing numbers
-                // This prevents "book1" and "book2" from being grouped
                 if (hasDifferentTrailingNumbers(key1, key2)) {
                     continue;
                 }
@@ -421,6 +444,12 @@ public class BookFileGroupingUtils {
                 }
             }
         }
+
+        return parent;
+    }
+
+    private Map<String, List<LibraryFile>> collectClusters(int[] parent, List<LibraryFile> files, Long libraryPathId, String fileSubPath) {
+        Map<String, List<LibraryFile>> result = new LinkedHashMap<>();
 
         // Group files by their root
         Map<Integer, List<LibraryFile>> clusters = new LinkedHashMap<>();

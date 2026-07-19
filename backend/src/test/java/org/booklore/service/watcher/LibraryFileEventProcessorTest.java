@@ -301,7 +301,7 @@ class LibraryFileEventProcessorTest {
     class FolderDeleteHandling {
 
         @Test
-        void folderWithBooks_addsToPool() throws Exception {
+        void folderWithBooks_addsToPool() {
             BookEntity book = BookEntity.builder()
                     .id(10L)
                     .library(library)
@@ -329,7 +329,7 @@ class LibraryFileEventProcessorTest {
         }
 
         @Test
-        void folderWithNoBooks_doesNotAddToPool() throws Exception {
+        void folderWithNoBooks_doesNotAddToPool() {
             when(bookRepository.findBooksWithFilesUnderPath(eq(1L), anyString()))
                     .thenReturn(List.of());
 
@@ -347,7 +347,7 @@ class LibraryFileEventProcessorTest {
     class FileDeleteHandling {
 
         @Test
-        void bookFileFound_addsToPool() throws Exception {
+        void bookFileFound_addsToPool() {
             BookEntity book = BookEntity.builder()
                     .id(10L).library(library).libraryPath(libraryPath).deleted(false)
                     .bookFiles(new ArrayList<>()).build();
@@ -367,7 +367,7 @@ class LibraryFileEventProcessorTest {
         }
 
         @Test
-        void bookFileNotFound_logsAndContinues() throws Exception {
+        void bookFileNotFound_logsAndContinues() {
             when(bookFilePersistenceService.findBookFileByLibraryPathSubPathAndFileName(anyLong(), anyString(), anyString()))
                     .thenReturn(Optional.empty());
 

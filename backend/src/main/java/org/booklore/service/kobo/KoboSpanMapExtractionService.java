@@ -96,7 +96,7 @@ public class KoboSpanMapExtractionService {
         }
     }
 
-    private String readOpfPath(ZipFile zipFile) throws Exception {
+    private String readOpfPath(ZipFile zipFile) throws IOException, SAXException, ParserConfigurationException {
         org.w3c.dom.Document containerDocument = parseXmlEntry(zipFile, CONTAINER_PATH);
         NodeList rootfiles = containerDocument.getElementsByTagNameNS(CONTAINER_NS, "rootfile");
         if (rootfiles.getLength() == 0) {

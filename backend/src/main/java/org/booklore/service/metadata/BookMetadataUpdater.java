@@ -118,8 +118,8 @@ public class BookMetadataUpdater {
         bookEntity.setMetadataUpdatedAt(Instant.now());
         bookRepository.save(bookEntity);
         calculateAndSetMatchScore(bookEntity, bookId);
-        writeMetadataToFileIfNeeded(bookEntity, metadata, newMetadata, clearFlags, writeToFile, primaryFile, bookType,
-                updateThumbnail, thumbnailRequiresUpdate, hasValueChangesForFileWrite, bookId);
+        writeMetadataToFileIfNeeded(new FileWriteRequest(bookEntity, metadata, newMetadata, clearFlags, writeToFile,
+                primaryFile, bookType, updateThumbnail, thumbnailRequiresUpdate, hasValueChangesForFileWrite, bookId));
         writeSidecarMetadataIfEnabled(bookEntity, bookId);
         moveFilesToLibraryPatternIfEnabled(settings, primaryFile, metadata, bookId);
     }
@@ -140,22 +140,28 @@ public class BookMetadataUpdater {
                 && ((writeToFile.isAnyFormatEnabled() && hasValueChangesForFileWrite) || thumbnailRequiresUpdate);
     }
 
-    private void writeMetadataToFileIfNeeded(BookEntity bookEntity, BookMetadataEntity metadata, BookMetadata newMetadata,
-                                             MetadataClearFlags clearFlags, MetadataPersistenceSettings.SaveToOriginalFile writeToFile,
-                                             BookFileEntity primaryFile, BookFileType bookType, boolean updateThumbnail,
-                                             boolean thumbnailRequiresUpdate, boolean hasValueChangesForFileWrite, Long bookId) {
-        if (!shouldWriteMetadataToFile(primaryFile, bookType, writeToFile, thumbnailRequiresUpdate, hasValueChangesForFileWrite)) {
+    private record FileWriteRequest(BookEntity bookEntity, BookMetadataEntity metadata, BookMetadata newMetadata,
+                                    MetadataClearFlags clearFlags, MetadataPersistenceSettings.SaveToOriginalFile writeToFile,
+                                    BookFileEntity primaryFile, BookFileType bookType, boolean updateThumbnail,
+                                    boolean thumbnailRequiresUpdate, boolean hasValueChangesForFileWrite, Long bookId) {
+    }
+
+    private void writeMetadataToFileIfNeeded(FileWriteRequest request) {
+        if (!shouldWriteMetadataToFile(request.primaryFile(), request.bookType(), request.writeToFile(),
+                request.thumbnailRequiresUpdate(), request.hasValueChangesForFileWrite())) {
             return;
         }
-        metadataWriterFactory.getWriter(bookType).ifPresent(writer -> {
+        metadataWriterFactory.getWriter(request.bookType()).ifPresent(writer -> {
             try {
-                String thumbnailUrl = updateThumbnail ? newMetadata.getThumbnailUrl() : null;
-                if ((StringUtils.hasText(thumbnailUrl) && isLocalOrPrivateUrl(thumbnailUrl) || Boolean.TRUE.equals(metadata.getCoverLocked()))) {
+                String thumbnailUrl = request.updateThumbnail() ? request.newMetadata().getThumbnailUrl() : null;
+                if ((StringUtils.hasText(thumbnailUrl) && isLocalOrPrivateUrl(thumbnailUrl) || Boolean.TRUE.equals(request.metadata().getCoverLocked()))) {
                     log.debug("Blocked local/private thumbnail URL: {}", thumbnailUrl);
                     thumbnailUrl = null;
                 }
+                BookEntity bookEntity = request.bookEntity();
+                BookFileEntity primaryFile = request.primaryFile();
                 File file = new File(bookEntity.getFullFilePath().toUri());
-                writer.saveMetadataToFile(file, metadata, thumbnailUrl, clearFlags);
+                writer.saveMetadataToFile(file, request.metadata(), thumbnailUrl, request.clearFlags());
                 updateFileNameIfConverted(primaryFile, file.toPath());
                 String newHash = file.isDirectory()
                         ? FileFingerprint.generateFolderHash(bookEntity.getFullFilePath())
@@ -164,7 +170,7 @@ public class BookMetadataUpdater {
                 primaryFile.setCurrentHash(newHash);
                 bookRepository.save(bookEntity);
             } catch (Exception e) {
-                log.warn("Failed to write metadata for book ID {}: {}", bookId, e.getMessage());
+                log.warn("Failed to write metadata for book ID {}: {}", request.bookId(), e.getMessage());
             }
         });
     }

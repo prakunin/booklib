@@ -247,6 +247,8 @@ public class ReadingProgressService {
                 .build();
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private boolean hasProgressData(ReadProgressRequest request) {
         return request.getFileProgress() != null
                 || request.getEpubProgress() != null

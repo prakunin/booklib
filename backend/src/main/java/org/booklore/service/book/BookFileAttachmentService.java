@@ -197,8 +197,9 @@ public class BookFileAttachmentService {
 
             Map<String, Integer> extensionCounts = buildExtensionCounts(targetBook);
 
-            moveSourceBooksFiles(sourceBooks, targetBook, targetDirectory, targetFileSubPath, baseFileName,
-                    extensionCounts, pathsToReregister, sourceDirectoriesToCleanup, sourceBooksToDelete);
+            MoveTargetContext moveContext = new MoveTargetContext(targetBook, targetDirectory, targetFileSubPath,
+                    baseFileName, extensionCounts, pathsToReregister);
+            moveSourceBooksFiles(sourceBooks, moveContext, sourceDirectoriesToCleanup, sourceBooksToDelete);
 
             return finalizeSourceBookRemoval(sourceBooksToDelete, sourceDirectoriesToCleanup, targetBook);
         } finally {
@@ -310,9 +311,7 @@ public class BookFileAttachmentService {
         return extensionCounts;
     }
 
-    private void moveSourceBooksFiles(List<BookEntity> sourceBooks, BookEntity targetBook, Path targetDirectory,
-                                      String targetFileSubPath, String baseFileName,
-                                      Map<String, Integer> extensionCounts, Set<Path> pathsToReregister,
+    private void moveSourceBooksFiles(List<BookEntity> sourceBooks, MoveTargetContext moveContext,
                                       List<Path> sourceDirectoriesToCleanup, List<BookEntity> sourceBooksToDelete) {
         for (BookEntity sourceBook : sourceBooks) {
             List<BookFileEntity> filesToMove = sourceBook.getBookFiles().stream()
@@ -322,8 +321,7 @@ public class BookFileAttachmentService {
             Set<Path> sourceDirectories = new HashSet<>();
 
             for (BookFileEntity fileToMove : filesToMove) {
-                moveSourceFile(fileToMove, sourceBook, targetBook, targetDirectory, targetFileSubPath,
-                        baseFileName, extensionCounts, sourceDirectories, pathsToReregister);
+                moveSourceFile(fileToMove, sourceBook, moveContext, sourceDirectories);
             }
 
             sourceDirectoriesToCleanup.addAll(sourceDirectories);
@@ -337,10 +335,8 @@ public class BookFileAttachmentService {
         }
     }
 
-    private void moveSourceFile(BookFileEntity fileToMove, BookEntity sourceBook, BookEntity targetBook,
-                                Path targetDirectory, String targetFileSubPath, String baseFileName,
-                                Map<String, Integer> extensionCounts, Set<Path> sourceDirectories,
-                                Set<Path> pathsToReregister) {
+    private void moveSourceFile(BookFileEntity fileToMove, BookEntity sourceBook, MoveTargetContext moveContext,
+                                Set<Path> sourceDirectories) {
         Path sourceFilePath = fileToMove.getFullFilePath();
         Path sourceDirectory = sourceFilePath.getParent();
 
@@ -350,11 +346,12 @@ public class BookFileAttachmentService {
             } catch (Exception ex) {
                 log.warn("Failed to unregister source directory from monitoring: {}", sourceDirectory, ex);
             }
-            pathsToReregister.add(sourceDirectory);
+            moveContext.pathsToReregister().add(sourceDirectory);
         }
 
         String extension = getFileExtension(fileToMove.getFileName()).toLowerCase();
-        int existingCount = extensionCounts.getOrDefault(extension, 0);
+        int existingCount = moveContext.extensionCounts().getOrDefault(extension, 0);
+        String baseFileName = moveContext.baseFileName();
         String newFileName;
         if (extension.isEmpty()) {
             newFileName = existingCount > 0
@@ -365,11 +362,11 @@ public class BookFileAttachmentService {
                     ? baseFileName + "_" + existingCount + "." + extension
                     : baseFileName + "." + extension;
         }
-        extensionCounts.merge(extension, 1, Integer::sum);
+        moveContext.extensionCounts().merge(extension, 1, Integer::sum);
 
-        newFileName = resolveFilenameConflict(targetDirectory, newFileName);
+        newFileName = resolveFilenameConflict(moveContext.targetDirectory(), newFileName);
 
-        Path destinationPath = targetDirectory.resolve(newFileName);
+        Path destinationPath = moveContext.targetDirectory().resolve(newFileName);
         try {
             Files.move(sourceFilePath, destinationPath);
             log.info("Moved file from {} to {}", sourceFilePath, destinationPath);
@@ -378,12 +375,18 @@ public class BookFileAttachmentService {
             throw ApiError.INTERNAL_SERVER_ERROR.createException("Failed to move file: " + e.getMessage());
         }
 
-        fileToMove.setFileSubPath(targetFileSubPath);
+        BookEntity targetBook = moveContext.targetBook();
+        fileToMove.setFileSubPath(moveContext.targetFileSubPath());
         fileToMove.setFileName(newFileName);
 
         sourceBook.getBookFiles().remove(fileToMove);
         fileToMove.setBook(targetBook);
         targetBook.getBookFiles().add(fileToMove);
+    }
+
+    private record MoveTargetContext(BookEntity targetBook, Path targetDirectory, String targetFileSubPath,
+                                     String baseFileName, Map<String, Integer> extensionCounts,
+                                     Set<Path> pathsToReregister) {
     }
 
     private List<Long> finalizeSourceBookRemoval(List<BookEntity> sourceBooksToDelete,

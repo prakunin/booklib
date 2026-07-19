@@ -51,8 +51,8 @@ public class TimeoutProcessRunner implements ProcessRunner {
             long remainingNanos = deadlineNanos - System.nanoTime();
             // Unlike Thread.join(long) below, Process.waitFor(long, TimeUnit) documents that a
             // non-positive timeout means "poll once and return immediately" — the opposite trap to
-            // the one that bit readFirstLine's join. Math.max(0, ...) is correct here and must stay;
-            // do not "unify" this with the Duration-based join fix below.
+            // the one that bit readFirstLine's join. Clamping the remaining time to zero via Math.max
+            // is correct here and must stay; do not "unify" this with the Duration-based join fix below.
             boolean exited = process.waitFor(Math.max(0, remainingNanos), TimeUnit.NANOSECONDS);
             if (!exited) {
                 log.warn("Timed out waiting for {} to exit", binary);

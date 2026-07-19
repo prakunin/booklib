@@ -160,7 +160,8 @@ public class FileMoveService {
             List<PlannedMove> committedMoves = commitPlannedMoves(plannedMovesByBookFileId);
 
             // Only update database after all file commits succeed
-            commitDatabaseUpdate(bookId, bookFiles, pattern, libraryPathEntity, bookEntity, targetLibrary, newFileSubPath, committedMoves);
+            commitDatabaseUpdate(new MoveCommitContext(bookId, bookFiles, pattern, newFileSubPath, committedMoves),
+                    libraryPathEntity, bookEntity, targetLibrary);
 
             Set<Path> libraryRoots = collectLibraryRoots(targetLibrary, bookEntity);
 
@@ -258,7 +259,8 @@ public class FileMoveService {
 
             // Update database for ALL BookFileEntity records (only after all commits succeed)
             BookEntity finalBookWithFiles = bookWithFiles;
-            commitFileRenameUpdate(bookEntity.getId(), bookFiles, pattern, finalBookWithFiles, newFileSubPath, committedMoves);
+            commitFileRenameUpdate(new MoveCommitContext(bookEntity.getId(), bookFiles, pattern, newFileSubPath, committedMoves),
+                    finalBookWithFiles);
 
             // Clean up empty parent directories – load library paths via a separate query
             // to avoid LazyInitializationException (OSIV is disabled) and MultipleBagFetchException
@@ -316,54 +318,54 @@ public class FileMoveService {
         }
     }
 
-    private void commitDatabaseUpdate(Long bookId, List<BookFileEntity> bookFiles, String pattern,
-                                       LibraryPathEntity libraryPathEntity, BookEntity bookEntity,
-                                       LibraryEntity targetLibrary, String newFileSubPath,
-                                       List<PlannedMove> committedMoves) {
+    private record MoveCommitContext(Long bookId, List<BookFileEntity> bookFiles, String pattern,
+                                     String newFileSubPath, List<PlannedMove> committedMoves) {
+    }
+
+    private void commitDatabaseUpdate(MoveCommitContext commit, LibraryPathEntity libraryPathEntity,
+                                       BookEntity bookEntity, LibraryEntity targetLibrary) {
         try {
             transactionTemplate.executeWithoutResult(status -> {
-                for (var bookFile : bookFiles) {
+                for (var bookFile : commit.bookFiles()) {
                     String newFileName;
                     if (bookFile.isBook()) {
-                        Path targetPath = fileMoveHelper.generateNewFilePath(bookEntity, bookFile, libraryPathEntity, pattern);
+                        Path targetPath = fileMoveHelper.generateNewFilePath(bookEntity, bookFile, libraryPathEntity, commit.pattern());
                         newFileName = targetPath.getFileName().toString();
                     } else {
                         newFileName = bookFile.getFileName();
                     }
-                    bookFileRepository.updateFileNameAndSubPath(bookFile.getId(), newFileName, newFileSubPath);
+                    bookFileRepository.updateFileNameAndSubPath(bookFile.getId(), newFileName, commit.newFileSubPath());
                 }
 
                 bookRepository.updateLibrary(bookEntity.getId(), targetLibrary.getId(), libraryPathEntity);
             });
         } catch (Exception e) {
-            log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", bookId, e);
-            for (PlannedMove committed : committedMoves) {
-                rollbackSingleFileMove(bookId, committed.target(), committed.source());
+            log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", commit.bookId(), e);
+            for (PlannedMove committed : commit.committedMoves()) {
+                rollbackSingleFileMove(commit.bookId(), committed.target(), committed.source());
             }
             throw e;
         }
     }
 
-    private void commitFileRenameUpdate(Long bookId, List<BookFileEntity> bookFiles, String pattern,
-                                         BookEntity bookWithFiles, String newFileSubPath,
-                                         List<PlannedMove> committedMoves) {
+    private void commitFileRenameUpdate(MoveCommitContext commit, BookEntity bookWithFiles) {
         try {
             transactionTemplate.executeWithoutResult(status -> {
-                for (var bookFile : bookFiles) {
+                for (var bookFile : commit.bookFiles()) {
                     String newFileName;
                     if (bookFile.isBook()) {
-                        Path targetPath = fileMoveHelper.generateNewFilePath(bookWithFiles, bookFile, bookWithFiles.getLibraryPath(), pattern);
+                        Path targetPath = fileMoveHelper.generateNewFilePath(bookWithFiles, bookFile, bookWithFiles.getLibraryPath(), commit.pattern());
                         newFileName = targetPath.getFileName().toString();
                     } else {
                         newFileName = bookFile.getFileName();
                     }
-                    bookFileRepository.updateFileNameAndSubPath(bookFile.getId(), newFileName, newFileSubPath);
+                    bookFileRepository.updateFileNameAndSubPath(bookFile.getId(), newFileName, commit.newFileSubPath());
                 }
             });
         } catch (Exception e) {
-            log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", bookId, e);
-            for (PlannedMove committed : committedMoves) {
-                rollbackSingleFileMove(bookId, committed.target(), committed.source());
+            log.error("Database update failed after files were moved. Attempting to rollback file moves for book ID {}", commit.bookId(), e);
+            for (PlannedMove committed : commit.committedMoves()) {
+                rollbackSingleFileMove(commit.bookId(), committed.target(), committed.source());
             }
             throw e;
         }

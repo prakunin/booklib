@@ -101,7 +101,7 @@ class StorageInfoServiceTest {
         @Test
         void degradesToEmptyRatherThanPropagatingWhenTheRepositoryFails() {
             // Spring Data reports SQL failures as unchecked exceptions — exactly the case
-            // this diagnostics tab exists for (DB unreachable).
+            // this diagnostics tab exists for, e.g. an unreachable database.
             when(libraryPathRepository.findAllPaths())
                     .thenThrow(new DataAccessResourceFailureException("connection refused"));
 

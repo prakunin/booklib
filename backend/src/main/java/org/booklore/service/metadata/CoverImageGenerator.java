@@ -490,6 +490,10 @@ public class CoverImageGenerator {
         return lines;
     }
 
+    // Private rendering helper: params are heterogeneous graphics/layout inputs (canvas, text,
+    // font metrics, geometry, palette) with no cohesive real-world grouping; a param object here
+    // would be artificial. sonar java:S107.
+    @SuppressWarnings("java:S107")
     private void renderAuthorLines(Graphics2D g, List<String> lines, int startY, FontMetrics authorFm,
                                    int authorLineH, int w, int bottomBound, float tracking, Palette p) {
         for (int i = 0; i < lines.size(); i++) {

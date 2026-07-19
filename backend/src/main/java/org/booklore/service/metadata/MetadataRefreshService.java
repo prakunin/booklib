@@ -134,7 +134,9 @@ public class MetadataRefreshService {
         } else if (isLibraryRefresh) {
             return prepareProviders(libraryRefreshOptions);
         }
-        return null;
+        // Neither branch applies: processSingleBook falls back to resolving providers itself
+        // per book and never reads this value, so an empty list is a safe, unused placeholder.
+        return List.of();
     }
 
     private MetadataRefreshOptions resolveReviewModeOptions(MetadataRefreshOptions requestRefreshOptions,

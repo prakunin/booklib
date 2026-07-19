@@ -62,7 +62,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         }
     }
 
-    private CoverCandidate findCoverCandidate(File file) throws Exception {
+    private CoverCandidate findCoverCandidate(File file) throws IOException, XMLStreamException {
         try (InputStream inputStream = getInputStream(file)) {
             XMLStreamReader reader = createXmlStreamReader(inputStream);
             CoverScan scan = new CoverScan();
@@ -133,7 +133,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     }
 
     @SuppressWarnings("java:S1168") // return value flows straight through to extractCover's null-means-no-cover contract
-    private byte[] decodeCoverBinary(File file, String binaryId) throws Exception {
+    private byte[] decodeCoverBinary(File file, String binaryId) throws IOException, XMLStreamException {
         try (InputStream inputStream = getInputStream(file)) {
             XMLStreamReader reader = createXmlStreamReader(inputStream);
             BinaryScan scan = new BinaryScan();
@@ -168,6 +168,11 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         }
     }
 
+    // null means "not yet at the target binary's end tag, keep scanning" - a genuinely different
+    // state from a successful decode of empty base64 content, which legitimately yields byte[0]
+    // from Base64.getMimeDecoder().decode(""). decodeCoverBinary's `!= null` check depends on
+    // telling those two apart, so null cannot be replaced with an empty array here.
+    @SuppressWarnings("java:S1168")
     private byte[] handleBinaryEnd(XMLStreamReader reader, BinaryScan scan) {
         if (scan.targetDepth == 1 && BINARY_ELEMENT.equals(reader.getLocalName())) {
             return Base64.getMimeDecoder().decode(scan.base64.toString().trim());

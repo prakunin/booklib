@@ -515,7 +515,7 @@ class PathPatternResolverTest {
                 .authors(List.of("Author Name Jr."))
                 .build();
 
-        // Pattern: {authors}/{title}
+        // Pattern under test: an authors folder followed by a title file
         String result = PathPatternResolver.resolvePattern(metadata, "{authors}/{title}", "original.pdf");
 
         // Expected: Author Name Jr/Book Title.pdf
@@ -1210,7 +1210,7 @@ class PathPatternResolverTest {
         String result = PathPatternResolver.resolvePattern(metadata,
                 "<{series} #{seriesIndex}|{title}>", "original.pdf");
 
-        // series present but seriesIndex missing → fallback to {title}
+        // series present but seriesIndex missing → falls back to the title placeholder
         assertEquals("Book Title.pdf", result);
     }
 

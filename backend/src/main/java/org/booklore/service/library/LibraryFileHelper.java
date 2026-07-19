@@ -262,8 +262,8 @@ public class LibraryFileHelper {
             @Override
             @NonNull
             public FileVisitResult postVisitDirectory(@NonNull Path dir, IOException exc) throws IOException {
-                return handlePostVisitDirectory(dir, libraryPath, pathEntity, libraryEntity, libraryFiles,
-                        dirAudioFiles, dirHasNonAudioBooks, processedAsFolderAudiobook);
+                return handlePostVisitDirectory(dir, new DirectoryVisitContext(libraryPath, pathEntity, libraryEntity,
+                        libraryFiles, dirAudioFiles, dirHasNonAudioBooks, processedAsFolderAudiobook));
             }
 
             @Override
@@ -326,18 +326,22 @@ public class LibraryFileHelper {
         return FileVisitResult.CONTINUE;
     }
 
-    private FileVisitResult handlePostVisitDirectory(Path dir, Path libraryPath, LibraryPathEntity pathEntity,
-                                                     LibraryEntity libraryEntity, List<LibraryFile> libraryFiles,
-                                                     Map<Path, List<Path>> dirAudioFiles, Map<Path, Boolean> dirHasNonAudioBooks,
-                                                     Set<Path> processedAsFolderAudiobook) {
+    private record DirectoryVisitContext(Path libraryPath, LibraryPathEntity pathEntity, LibraryEntity libraryEntity,
+                                         List<LibraryFile> libraryFiles, Map<Path, List<Path>> dirAudioFiles,
+                                         Map<Path, Boolean> dirHasNonAudioBooks, Set<Path> processedAsFolderAudiobook) {
+    }
+
+    private FileVisitResult handlePostVisitDirectory(Path dir, DirectoryVisitContext context) {
         // Check if this directory should be treated as a folder-based audiobook
-        List<Path> audioFiles = dirAudioFiles.get(dir);
-        boolean hasNonAudioBooks = dirHasNonAudioBooks.getOrDefault(dir, false);
+        List<Path> audioFiles = context.dirAudioFiles().get(dir);
+        boolean hasNonAudioBooks = context.dirHasNonAudioBooks().getOrDefault(dir, false);
 
         if (audioFiles != null && audioFiles.size() >= MIN_AUDIO_FILES_FOR_FOLDER_AUDIOBOOK && !hasNonAudioBooks) {
-            handleFolderAudiobookCandidate(dir, audioFiles, libraryPath, pathEntity, libraryEntity, libraryFiles, processedAsFolderAudiobook);
+            handleFolderAudiobookCandidate(dir, audioFiles, context.libraryPath(), context.pathEntity(),
+                    context.libraryEntity(), context.libraryFiles(), context.processedAsFolderAudiobook());
         } else if (audioFiles != null) {
-            addAudioFilesUnlessParentIsAudiobookFolder(dir, audioFiles, libraryPath, pathEntity, libraryEntity, libraryFiles, processedAsFolderAudiobook);
+            addAudioFilesUnlessParentIsAudiobookFolder(dir, audioFiles, context.libraryPath(), context.pathEntity(),
+                    context.libraryEntity(), context.libraryFiles(), context.processedAsFolderAudiobook());
         }
 
         return FileVisitResult.CONTINUE;
