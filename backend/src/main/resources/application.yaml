@@ -22,6 +22,10 @@ app:
   force-disable-oidc: ${FORCE_DISABLE_OIDC:false}
   disk-type: ${DISK_TYPE:LOCAL}
 
+booklore:
+  flyway:
+    repair-on-validate-error: ${BOOKLORE_FLYWAY_REPAIR_ON_VALIDATE_ERROR:false}
+
 server:
   forward-headers-strategy: native
   port: ${BOOKLORE_PORT:6060}

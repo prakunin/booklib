@@ -154,6 +154,32 @@ class OidcGroupMappingServiceTest {
     }
 
     @Test
+    void removeLibraryFromMappings_removesDeletedLibraryIdFromMappings() {
+        var changed = createMapping(false, "[\"permissionUpload\"]", "[1,2,3]");
+        changed.setOidcGroupClaim("changed-group");
+        var unchanged = createMapping(false, "[]", "[4,5]");
+        unchanged.setOidcGroupClaim("unchanged-group");
+
+        var changedDto = new OidcGroupMapping(1L, "changed-group", false, List.of("permissionUpload"), List.of(1L, 2L, 3L), "");
+        var updatedDto = new OidcGroupMapping(1L, "changed-group", false, List.of("permissionUpload"), List.of(1L, 3L), "");
+        var encoded = new OidcGroupMappingEntity();
+        encoded.setLibraryIds("[1,3]");
+        var unchangedDto = new OidcGroupMapping(1L, "unchanged-group", false, List.of(), List.of(4L, 5L), "");
+
+        when(repository.findAll()).thenReturn(List.of(changed, unchanged));
+        when(mapper.toDto(changed)).thenReturn(changedDto);
+        when(mapper.toDto(unchanged)).thenReturn(unchangedDto);
+        when(mapper.toEntity(updatedDto)).thenReturn(encoded);
+
+        service.removeLibraryFromMappings(2L);
+
+        assertThat(changed.getLibraryIds()).isEqualTo("[1,3]");
+        assertThat(unchanged.getLibraryIds()).isEqualTo("[4,5]");
+        verify(repository).save(changed);
+        verify(repository, never()).save(unchanged);
+    }
+
+    @Test
     void syncUserGroups_nullGroups_doesNothing() {
         var user = mock(BookLoreUserEntity.class);
 

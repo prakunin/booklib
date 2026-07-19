@@ -17,10 +17,10 @@ import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.audit.AuditService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Slf4j
@@ -70,6 +70,33 @@ public class OidcGroupMappingService {
         repository.delete(existing);
         auditService.log(AuditAction.OIDC_GROUP_MAPPING_DELETED,
                 "Deleted OIDC group mapping: " + existing.getOidcGroupClaim());
+    }
+
+    @Transactional
+    public void removeLibraryFromMappings(Long libraryId) {
+        if (libraryId == null) return;
+
+        for (OidcGroupMappingEntity mapping : repository.findAll()) {
+            OidcGroupMapping dto = mapper.toDto(mapping);
+            if (dto == null || dto.libraryIds() == null || !dto.libraryIds().contains(libraryId)) {
+                continue;
+            }
+
+            List<Long> remainingLibraryIds = dto.libraryIds().stream()
+                    .filter(id -> !Objects.equals(id, libraryId))
+                    .toList();
+            OidcGroupMapping updated = new OidcGroupMapping(
+                    dto.id(),
+                    dto.oidcGroupClaim(),
+                    dto.isAdmin(),
+                    dto.permissions(),
+                    remainingLibraryIds,
+                    dto.description()
+            );
+            OidcGroupMappingEntity encoded = mapper.toEntity(updated);
+            mapping.setLibraryIds(encoded.getLibraryIds());
+            repository.save(mapping);
+        }
     }
 
     @Transactional

@@ -70,6 +70,7 @@ public class BookService {
     private final SidecarMetadataWriter sidecarMetadataWriter;
     private final FileStreamingService fileStreamingService;
     private final AuditService auditService;
+    private final KoboReadingStateRepository koboReadingStateRepository;
 
 
     public List<Book> getBookDTOs(boolean includeDescription, boolean stripForListView) {
@@ -464,6 +465,14 @@ public class BookService {
 
         // Because this is `InBatch` we need to clear and flush the entity manager to
         // prevent unexpected updates of records when the transaction commits.
+        List<String> deletedEntitlementIds = books.stream()
+                .map(BookEntity::getId)
+                .map(String::valueOf)
+                .toList();
+        if (!deletedEntitlementIds.isEmpty()) {
+            koboReadingStateRepository.deleteByEntitlementIdIn(deletedEntitlementIds);
+        }
+
         entityManager.flush();
         entityManager.clear();
 
