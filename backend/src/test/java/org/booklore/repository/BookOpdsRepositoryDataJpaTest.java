@@ -7,9 +7,12 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
+import org.booklore.model.enums.OpdsSortOrder;
 import org.booklore.service.task.TaskCronService;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
@@ -115,5 +118,65 @@ class BookOpdsRepositoryDataJpaTest {
         List<BookEntity> result = bookOpdsRepository.findAllWithMetadataByIds(List.of(book.getId()));
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getId()).isEqualTo(book.getId());
+    }
+
+    @Test
+    void findBookIds_sortsBeforePagination() {
+        LibraryEntity library = persistLibrary("Sorted Library");
+        LibraryPathEntity libraryPath = persistLibraryPath(library);
+
+        persistBook(library, libraryPath, "Zulu", Instant.parse("2026-01-03T00:00:00Z"));
+        Long alphaId = persistBook(library, libraryPath, "Alpha", Instant.parse("2026-01-01T00:00:00Z"));
+        Long betaId = persistBook(library, libraryPath, "Beta", Instant.parse("2026-01-02T00:00:00Z"));
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<Long> firstPage = bookOpdsRepository.findBookIds(OpdsSortOrder.TITLE_ASC, PageRequest.of(0, 1));
+        Page<Long> secondPage = bookOpdsRepository.findBookIds(OpdsSortOrder.TITLE_ASC, PageRequest.of(1, 1));
+
+        assertThat(firstPage.getContent()).containsExactly(alphaId);
+        assertThat(secondPage.getContent()).containsExactly(betaId);
+        assertThat(firstPage.getTotalElements()).isEqualTo(3);
+        for (OpdsSortOrder sortOrder : OpdsSortOrder.values()) {
+            assertThat(bookOpdsRepository.findBookIds(sortOrder, PageRequest.of(0, 2)).getTotalElements()).isEqualTo(3);
+        }
+    }
+
+    private LibraryEntity persistLibrary(String name) {
+        LibraryEntity library = LibraryEntity.builder()
+                .name(name)
+                .icon("book")
+                .watch(false)
+                .build();
+        entityManager.persist(library);
+        return library;
+    }
+
+    private LibraryPathEntity persistLibraryPath(LibraryEntity library) {
+        LibraryPathEntity libraryPath = LibraryPathEntity.builder()
+                .library(library)
+                .path("/test/" + library.getName())
+                .build();
+        entityManager.persist(libraryPath);
+        return libraryPath;
+    }
+
+    private Long persistBook(LibraryEntity library, LibraryPathEntity libraryPath, String title, Instant addedOn) {
+        BookEntity book = BookEntity.builder()
+                .library(library)
+                .libraryPath(libraryPath)
+                .addedOn(addedOn)
+                .deleted(false)
+                .build();
+        entityManager.persist(book);
+        entityManager.flush();
+
+        BookMetadataEntity metadata = BookMetadataEntity.builder()
+                .book(book)
+                .bookId(book.getId())
+                .title(title)
+                .build();
+        entityManager.persist(metadata);
+        return book.getId();
     }
 }
