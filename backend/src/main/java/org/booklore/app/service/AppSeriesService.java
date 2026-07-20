@@ -39,6 +39,8 @@ public class AppSeriesService {
     private static final String READING_COUNT_EXPR = "SUM(CASE WHEN p.readStatus IN (org.booklore.model.enums.ReadStatus.READING, org.booklore.model.enums.ReadStatus.RE_READING, org.booklore.model.enums.ReadStatus.PAUSED) THEN 1 ELSE 0 END)";
     private static final String ABANDONED_COUNT_EXPR = "SUM(CASE WHEN p.readStatus = org.booklore.model.enums.ReadStatus.ABANDONED THEN 1 ELSE 0 END)";
     private static final String WONT_READ_COUNT_EXPR = "SUM(CASE WHEN p.readStatus = org.booklore.model.enums.ReadStatus.WONT_READ THEN 1 ELSE 0 END)";
+    private static final String STATUS_IN_PROGRESS = "in-progress";
+    private static final String HAVING = " HAVING ";
 
     private final EntityManager entityManager;
     private final AuthenticationService authenticationService;
@@ -341,7 +343,7 @@ public class AppSeriesService {
             case "readprogress" -> "(" + READ_COUNT_EXPR + " * 1.0 / COUNT(b.id)) " + dir;
             case "lastreadtime" -> "MAX(p.lastReadTime) " + dir + nullsClause;
             default -> {
-                if ("in-progress".equals(statusFilter)) {
+                if (STATUS_IN_PROGRESS.equals(statusFilter)) {
                     yield "MAX(p.lastReadTime) " + dir + nullsClause;
                 }
                 yield "MAX(b.addedOn) " + dir + nullsClause;
@@ -355,7 +357,7 @@ public class AppSeriesService {
         }
         String normalized = statusFilter.trim().toLowerCase(Locale.ROOT);
         return switch (normalized) {
-            case "not-started", "in-progress", "completed", "abandoned" -> normalized;
+            case "not-started", STATUS_IN_PROGRESS, "completed", "abandoned" -> normalized;
             default -> null;
         };
     }
@@ -366,13 +368,13 @@ public class AppSeriesService {
         }
         String abandonedTotalExpr = "(" + ABANDONED_COUNT_EXPR + " + " + WONT_READ_COUNT_EXPR + ")";
         return switch (statusFilter) {
-            case "not-started" -> " HAVING " + READ_COUNT_EXPR + " = 0 AND " + READING_COUNT_EXPR
+            case "not-started" -> HAVING + READ_COUNT_EXPR + " = 0 AND " + READING_COUNT_EXPR
                     + " = 0 AND " + abandonedTotalExpr + " = 0";
-            case "in-progress" -> " HAVING " + abandonedTotalExpr + " = 0 AND ("
+            case STATUS_IN_PROGRESS -> HAVING + abandonedTotalExpr + " = 0 AND ("
                     + READING_COUNT_EXPR + " > 0 OR (" + READ_COUNT_EXPR + " > 0 AND "
                     + READ_COUNT_EXPR + " < COUNT(b.id)))";
-            case "completed" -> " HAVING " + READ_COUNT_EXPR + " = COUNT(b.id)";
-            case "abandoned" -> " HAVING " + abandonedTotalExpr + " > 0";
+            case "completed" -> HAVING + READ_COUNT_EXPR + " = COUNT(b.id)";
+            case "abandoned" -> HAVING + abandonedTotalExpr + " > 0";
             default -> "";
         };
     }
