@@ -1053,6 +1053,44 @@ class FileMoveServiceTest {
 
             verify(fileMoveHelper, never()).moveFileWithBackup(any());
         }
+
+        @Test
+        @DisplayName("moves a physical book with no files by updating its library reference only")
+        void movesPhysicalBookWithoutFiles() throws IOException {
+            BookEntity book = createBook(List.of());
+            book.setIsPhysical(true);
+
+            LibraryEntity targetLibrary = new LibraryEntity();
+            targetLibrary.setId(2L);
+            LibraryPathEntity targetPath = new LibraryPathEntity();
+            targetPath.setId(20L);
+            targetPath.setPath("/target");
+            targetPath.setLibrary(targetLibrary);
+            targetLibrary.setLibraryPaths(List.of(targetPath));
+
+            when(bookRepository.findById(100L)).thenReturn(Optional.of(book));
+            when(bookRepository.findByIdWithBookFiles(100L))
+                    .thenReturn(Optional.of(book))
+                    .thenReturn(Optional.of(book));
+            when(libraryRepository.findByIdWithPaths(2L)).thenReturn(Optional.of(targetLibrary));
+            when(monitoringRegistrationService.getPathsForLibraries(anySet())).thenReturn(Set.of(Paths.get("/library")));
+            org.booklore.model.dto.Book mappedBook = org.booklore.model.dto.Book.builder().id(100L).build();
+            when(bookMapper.toBookWithDescription(book, false)).thenReturn(mappedBook);
+
+            FileMoveRequest request = new FileMoveRequest();
+            FileMoveRequest.Move move = new FileMoveRequest.Move();
+            move.setBookId(100L);
+            move.setTargetLibraryId(2L);
+            move.setTargetLibraryPathId(20L);
+            request.setMoves(List.of(move));
+
+            service.bulkMoveFiles(request);
+
+            verify(bookRepository).updateLibrary(100L, 2L, targetPath);
+            verify(entityManager).clear();
+            verify(notificationService).sendMessage(Topic.BOOK_UPDATE, mappedBook);
+            verify(fileMoveHelper, never()).moveFileWithBackup(any());
+        }
     }
 
     @Nested

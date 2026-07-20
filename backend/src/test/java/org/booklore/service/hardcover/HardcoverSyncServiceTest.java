@@ -267,6 +267,40 @@ class HardcoverSyncServiceTest {
         verify(restClient, atLeastOnce()).post();
     }
 
+    @Test
+    @DisplayName("Should handle a RestClientException from the transport itself gracefully")
+    void syncProgressToHardcover_whenTransportThrowsRestClientException_shouldNotThrow() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        when(responseSpec.body(Map.class)).thenThrow(new org.springframework.web.client.RestClientException("connection refused"));
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        verify(restClient, times(1)).post();
+    }
+
+    @Test
+    @DisplayName("Should abort when updateUserBook mutation itself returns an error field")
+    void syncProgressToHardcover_whenUpdateUserBookReturnsError_shouldAbort() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        Map<String, Object> updateUserBookErrorResponse = Map.of(
+                "data", Map.of("update_user_book", Map.of("error", "Cannot update finished book"))
+        );
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createGetUserBookAndReadsResponse(5001, 1, 10, List.of()))
+                .thenReturn(updateUserBookErrorResponse);
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+
+        // resolveByBookId + getUserBookAndReads + the failing update_user_book call, then abort (no further calls)
+        verify(restClient, times(3)).post();
+    }
+
     // === Tests for error handling ===
 
     @Test
