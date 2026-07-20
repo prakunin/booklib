@@ -429,6 +429,7 @@ public class BookFileTransactionalHandler {
                 .build();
 
         bookAdditionalFileRepository.save(additionalFile);
+        book.setHasFiles(true);
         String primaryFileName = book.hasFiles() ? book.getPrimaryBookFile().getFileName() : BOOK_ID_PREFIX + book.getId();
         log.info("Auto-attached folder audiobook {} to existing book: {}", folderName, primaryFileName);
     }
@@ -450,6 +451,7 @@ public class BookFileTransactionalHandler {
                 .build();
 
         bookAdditionalFileRepository.save(additionalFile);
+        book.setHasFiles(true);
         String primaryFileName = book.hasFiles() ? book.getPrimaryBookFile().getFileName() : BOOK_ID_PREFIX + book.getId();
         log.info("Auto-attached new format {} to existing book: {}", fileName, primaryFileName);
     }

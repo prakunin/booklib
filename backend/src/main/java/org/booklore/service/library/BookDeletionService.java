@@ -167,6 +167,7 @@ public class BookDeletionService {
             book.getBookFiles().remove(bf);
             bookAdditionalFileRepository.delete(bf);
         });
+        book.syncHasFiles();
 
         boolean hasRemainingBookFiles = book.getBookFiles().stream()
                 .anyMatch(BookFileEntity::isBook);

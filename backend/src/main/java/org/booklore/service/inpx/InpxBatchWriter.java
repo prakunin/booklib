@@ -194,6 +194,7 @@ public class InpxBatchWriter {
                 .addedOn(now)
                 .build();
         book.setBookFiles(new ArrayList<>(List.of(file)));
+        book.setHasFiles(true);
         return book;
     }
 

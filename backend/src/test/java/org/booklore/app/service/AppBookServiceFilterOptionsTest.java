@@ -279,7 +279,7 @@ class AppBookServiceFilterOptionsTest {
 
         List<String> jpql = capturedTupleJpql();
         assertFalse(jpql.isEmpty());
-        assertTrue(jpql.stream().noneMatch(q -> q.contains("bookFiles IS NOT EMPTY")),
+        assertTrue(jpql.stream().noneMatch(q -> q.contains("b.hasFiles = true")),
                 "no facet query should pay for the file-existence predicate when there are no shell books");
     }
 
@@ -295,7 +295,7 @@ class AppBookServiceFilterOptionsTest {
         assertFalse(jpql.isEmpty());
         assertTrue(jpql.stream().allMatch(q -> q.contains("b.id NOT IN (42, 43)")),
                 "every facet query must exclude shell books when they exist");
-        assertTrue(jpql.stream().noneMatch(q -> q.contains("bookFiles IS NOT EMPTY")));
+        assertTrue(jpql.stream().noneMatch(q -> q.contains("b.hasFiles = true")));
     }
 
     @Test
@@ -308,8 +308,8 @@ class AppBookServiceFilterOptionsTest {
 
         List<String> jpql = capturedTupleJpql();
         assertFalse(jpql.isEmpty());
-        assertTrue(jpql.stream().allMatch(q -> q.contains("bookFiles IS NOT EMPTY")),
-                "an oversized shell set must fall back to the legacy predicate instead of a huge IN list");
+        assertTrue(jpql.stream().allMatch(q -> q.contains("b.hasFiles = true")),
+                "an oversized shell set must fall back to the flag predicate instead of a huge IN list");
     }
 
     // -------------------------------------------------------------------------
@@ -336,7 +336,7 @@ class AppBookServiceFilterOptionsTest {
         TypedQuery<Long> shellQuery = mock(TypedQuery.class);
         when(shellQuery.getResultList()).thenReturn(ids);
         when(entityManager.createQuery(
-                argThat((String s) -> s != null && s.contains("bookFiles IS EMPTY")), eq(Long.class)))
+                argThat((String s) -> s != null && s.contains("b.hasFiles = false")), eq(Long.class)))
                 .thenReturn(shellQuery);
     }
 

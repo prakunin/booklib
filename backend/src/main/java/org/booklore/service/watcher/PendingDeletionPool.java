@@ -217,6 +217,8 @@ public class PendingDeletionPool {
                         log.info("[EXPIRED] BookFile id={} removed from book id={}", fs.bookFileId(), book.getId());
                     });
                 }
+                book.setHasFiles(bookFileRepository.countByBookId(book.getId()) > 0);
+                bookRepository.save(book);
                 notificationService.sendMessageToPermissions(Topic.BOOK_UPDATE,
                         bookMapper.toBookWithDescription(book, false), Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY));
             }

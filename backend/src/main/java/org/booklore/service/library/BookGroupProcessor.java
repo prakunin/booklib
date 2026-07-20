@@ -139,6 +139,7 @@ public class BookGroupProcessor {
 
         try {
             bookAdditionalFileRepository.save(additionalFile);
+            bookEntity.setHasFiles(true);
             String primaryFileName = bookEntity.getPrimaryBookFile() != null ? bookEntity.getPrimaryBookFile().getFileName() : "unknown";
             log.info("Attached additional format {} to book: {}", file.getFileName(), primaryFileName);
             bookCoverGenerator.generateCoverFromAdditionalFile(bookEntity, file);
