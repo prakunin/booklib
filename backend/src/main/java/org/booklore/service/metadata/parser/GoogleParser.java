@@ -21,6 +21,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -552,7 +553,7 @@ public class GoogleParser implements BookParser {
                 int year = Integer.parseInt(yearMatcher.group(1));
                 // Basic year validation
                 if (year >= 1000 && year <= 9999) {
-                    return LocalDate.of(year, 1, 1);
+                    return LocalDate.of(year, Month.JANUARY, 1);
                 }
             }
             

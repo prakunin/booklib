@@ -20,7 +20,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.File;
@@ -31,6 +30,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class BookServiceDeleteTests {
@@ -42,27 +42,27 @@ class BookServiceDeleteTests {
 
     @BeforeEach
     void setUp() {
-        BookRepository bookRepository = Mockito.mock(BookRepository.class);
-        BookFileRepository bookFileRepository = Mockito.mock(BookFileRepository.class);
-        PdfViewerPreferencesRepository pdfViewerPreferencesRepository = Mockito.mock(PdfViewerPreferencesRepository.class);
-        EbookViewerPreferenceRepository ebookViewerPreferenceRepository = Mockito.mock(EbookViewerPreferenceRepository.class);
-        CbxViewerPreferencesRepository cbxViewerPreferencesRepository = Mockito.mock(CbxViewerPreferencesRepository.class);
-        NewPdfViewerPreferencesRepository newPdfViewerPreferencesRepository = Mockito.mock(NewPdfViewerPreferencesRepository.class);
-        FileService fileService = Mockito.mock(FileService.class);
-        BookMapper bookMapper = Mockito.mock(BookMapper.class);
-        UserBookProgressRepository userBookProgressRepository = Mockito.mock(UserBookProgressRepository.class);
-        AuthenticationService authenticationService = Mockito.mock(AuthenticationService.class);
-        BookQueryService bookQueryService = Mockito.mock(BookQueryService.class);
-        ReadingProgressService readingProgressService = Mockito.mock(ReadingProgressService.class);
-        BookDownloadService bookDownloadService = Mockito.mock(BookDownloadService.class);
-        MonitoringRegistrationService monitoringRegistrationService = Mockito.mock(MonitoringRegistrationService.class);
-        BookUpdateService bookUpdateService = Mockito.mock(BookUpdateService.class);
-        SidecarMetadataWriter sidecarMetadataWriter = Mockito.mock(SidecarMetadataWriter.class);
-        FileStreamingService fileStreamingService = Mockito.mock(FileStreamingService.class);
-        AuditService auditService = Mockito.mock(AuditService.class);
-        ArchivedBookContentService archivedBookContentService = Mockito.mock(ArchivedBookContentService.class);
-        ContentRestrictionService contentRestrictionService = Mockito.mock(ContentRestrictionService.class);
-        EntityManager entityManager = Mockito.mock(EntityManager.class);
+        BookRepository bookRepository = mock(BookRepository.class);
+        BookFileRepository bookFileRepository = mock(BookFileRepository.class);
+        PdfViewerPreferencesRepository pdfViewerPreferencesRepository = mock(PdfViewerPreferencesRepository.class);
+        EbookViewerPreferenceRepository ebookViewerPreferenceRepository = mock(EbookViewerPreferenceRepository.class);
+        CbxViewerPreferencesRepository cbxViewerPreferencesRepository = mock(CbxViewerPreferencesRepository.class);
+        NewPdfViewerPreferencesRepository newPdfViewerPreferencesRepository = mock(NewPdfViewerPreferencesRepository.class);
+        FileService fileService = mock(FileService.class);
+        BookMapper bookMapper = mock(BookMapper.class);
+        UserBookProgressRepository userBookProgressRepository = mock(UserBookProgressRepository.class);
+        AuthenticationService authenticationService = mock(AuthenticationService.class);
+        BookQueryService bookQueryService = mock(BookQueryService.class);
+        ReadingProgressService readingProgressService = mock(ReadingProgressService.class);
+        BookDownloadService bookDownloadService = mock(BookDownloadService.class);
+        MonitoringRegistrationService monitoringRegistrationService = mock(MonitoringRegistrationService.class);
+        BookUpdateService bookUpdateService = mock(BookUpdateService.class);
+        SidecarMetadataWriter sidecarMetadataWriter = mock(SidecarMetadataWriter.class);
+        FileStreamingService fileStreamingService = mock(FileStreamingService.class);
+        AuditService auditService = mock(AuditService.class);
+        ArchivedBookContentService archivedBookContentService = mock(ArchivedBookContentService.class);
+        ContentRestrictionService contentRestrictionService = mock(ContentRestrictionService.class);
+        EntityManager entityManager = mock(EntityManager.class);
 
         bookService = new BookService(
                 bookRepository,

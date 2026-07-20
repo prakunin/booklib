@@ -12,7 +12,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.mockito.Mockito;
 import org.w3c.dom.Document;
 
 import javax.xml.XMLConstants;
@@ -25,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -35,6 +35,8 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @EnabledIf("org.booklore.service.ArchiveService#isAvailable")
 class CbxMetadataWriterTest {
@@ -44,7 +46,7 @@ class CbxMetadataWriterTest {
 
     @BeforeEach
     void setup() throws Exception {
-        AppSettingService appSettingService = Mockito.mock(AppSettingService.class);
+        AppSettingService appSettingService = mock(AppSettingService.class);
         AppSettings settings = new AppSettings();
         MetadataPersistenceSettings persistence = new MetadataPersistenceSettings();
         MetadataPersistenceSettings.SaveToOriginalFile save = new MetadataPersistenceSettings.SaveToOriginalFile();
@@ -54,7 +56,7 @@ class CbxMetadataWriterTest {
         save.setCbx(cbx);
         persistence.setSaveToOriginalFile(save);
         settings.setMetadataPersistenceSettings(persistence);
-        Mockito.when(appSettingService.getAppSettings()).thenReturn(settings);
+        when(appSettingService.getAppSettings()).thenReturn(settings);
 
         writer = new CbxMetadataWriter(appSettingService, new ArchiveService());
         tempDir = Files.createTempDirectory("cbx_writer_test_");
@@ -95,7 +97,7 @@ class CbxMetadataWriterTest {
         meta.setSeriesName("Series X");
         meta.setSeriesNumber(2.5f);
         meta.setSeriesTotal(12);
-        meta.setPublishedDate(LocalDate.of(2020, 7, 14));
+        meta.setPublishedDate(LocalDate.of(2020, Month.JULY, 14));
         meta.setPageCount(42);
         meta.setLanguage("en");
 

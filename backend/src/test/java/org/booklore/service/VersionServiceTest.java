@@ -2,6 +2,7 @@ package org.booklore.service;
 
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.util.List;
 
 import org.booklore.model.dto.ReleaseNote;
@@ -9,10 +10,12 @@ import org.booklore.model.dto.VersionInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 class VersionServiceTest {
 
@@ -22,7 +25,7 @@ class VersionServiceTest {
     @BeforeEach
     void setUp() {
         service = new VersionService(new ObjectMapper());
-        spyService = Mockito.spy(service);
+        spyService = spy(service);
     }
 
 
@@ -109,7 +112,7 @@ class VersionServiceTest {
 
         @Test
         void includesAppAndLatestOnSuccess() {
-            Mockito.doReturn("v9.9.9")
+            doReturn("v9.9.9")
                     .when(spyService)
                     .fetchLatestGitHubReleaseVersion();
 
@@ -123,7 +126,7 @@ class VersionServiceTest {
 
         @Test
         void usesFallbackIfMissingPackageVersion() {
-            Mockito.doReturn("v9.9.9")
+            doReturn("v9.9.9")
                     .when(spyService)
                     .fetchLatestGitHubReleaseVersion();
 
@@ -139,7 +142,7 @@ class VersionServiceTest {
 
         @Test
         void usesUnknownIfFetchFails() {
-            Mockito.doThrow(new RuntimeException("fail"))
+            doThrow(new RuntimeException("fail"))
                     .when(spyService)
                     .fetchLatestGitHubReleaseVersion();
 
@@ -156,10 +159,10 @@ class VersionServiceTest {
 
         @Test
         void returnsNotesWhenAvailable() {
-            LocalDateTime fixedTime = LocalDateTime.of(2025, 1, 1, 12, 0, 0);
+            LocalDateTime fixedTime = LocalDateTime.of(2025, Month.JANUARY, 1, 12, 0, 0);
             ReleaseNote note = new ReleaseNote("v1.1", "n", "b", "u", fixedTime);
 
-            Mockito.doReturn(List.of(note))
+            doReturn(List.of(note))
                     .when(spyService)
                     .fetchReleaseNotesSince(service.getAppVersion());
 
@@ -169,7 +172,7 @@ class VersionServiceTest {
 
         @Test
         void returnsEmptyListWhenNoNewReleases() {
-            Mockito.doReturn(List.of())
+            doReturn(List.of())
                     .when(spyService)
                     .fetchReleaseNotesSince(service.getAppVersion());
 

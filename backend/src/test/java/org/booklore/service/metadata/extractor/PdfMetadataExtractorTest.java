@@ -1082,7 +1082,7 @@ class PdfMetadataExtractorTest {
         );
         assertThat(meta.getPublisher()).isEqualTo("Orbit");
         assertThat(meta.getLanguage()).isEqualTo("en");
-        assertThat(meta.getPublishedDate()).isEqualTo(java.time.LocalDate.of(2013, 11, 6));
+        assertThat(meta.getPublishedDate()).isEqualTo(java.time.LocalDate.of(2013, java.time.Month.NOVEMBER, 6));
         assertThat(meta.getSeriesName()).isEqualTo("The Witcher");
         assertThat(meta.getSeriesNumber()).isEqualTo(0.6f);
         assertThat(meta.getSeriesTotal()).isEqualTo(5);

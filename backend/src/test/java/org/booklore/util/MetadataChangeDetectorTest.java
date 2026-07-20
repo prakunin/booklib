@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -35,7 +36,7 @@ class MetadataChangeDetectorTest {
                 .title("Original Title")
                 .subtitle("Original Subtitle")
                 .publisher("Original Publisher")
-                .publishedDate(LocalDate.of(2020, 1, 1))
+                .publishedDate(LocalDate.of(2020, Month.JANUARY, 1))
                 .description("Original Description")
                 .seriesName("Original Series")
                 .seriesNumber(1.0f)
@@ -108,7 +109,7 @@ class MetadataChangeDetectorTest {
                 .title("Original Title")
                 .subtitle("Original Subtitle")
                 .publisher("Original Publisher")
-                .publishedDate(LocalDate.of(2020, 1, 1))
+                .publishedDate(LocalDate.of(2020, Month.JANUARY, 1))
                 .description("Original Description")
                 .seriesName("Original Series")
                 .seriesNumber(1.0f)
@@ -187,7 +188,7 @@ class MetadataChangeDetectorTest {
             Arguments.of("title", (Consumer<BookMetadata>) m -> m.setTitle("New Title")),
             Arguments.of("subtitle", (Consumer<BookMetadata>) m -> m.setSubtitle("New Subtitle")),
             Arguments.of("publisher", (Consumer<BookMetadata>) m -> m.setPublisher("New Publisher")),
-            Arguments.of("publishedDate", (Consumer<BookMetadata>) m -> m.setPublishedDate(LocalDate.of(2021, 6, 15))),
+            Arguments.of("publishedDate", (Consumer<BookMetadata>) m -> m.setPublishedDate(LocalDate.of(2021, Month.JUNE, 15))),
             Arguments.of("description", (Consumer<BookMetadata>) m -> m.setDescription("New Description")),
             Arguments.of("seriesName", (Consumer<BookMetadata>) m -> m.setSeriesName("New Series")),
             Arguments.of("seriesNumber", (Consumer<BookMetadata>) m -> m.setSeriesNumber(2.0f)),

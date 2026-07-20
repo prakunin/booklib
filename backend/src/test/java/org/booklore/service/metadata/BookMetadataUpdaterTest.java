@@ -32,6 +32,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -721,7 +722,7 @@ class BookMetadataUpdaterTest {
 
         @Test
         void updatesPublishedDate() {
-            LocalDate date = LocalDate.of(2024, 6, 15);
+            LocalDate date = LocalDate.of(2024, Month.JUNE, 15);
             BookMetadata newMeta = BookMetadata.builder().title("T").publishedDate(date).build();
             MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
 

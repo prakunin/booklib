@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -90,7 +91,7 @@ class InpxArchiveScannerTest {
                 .categories(Set.of("fantasy"))
                 .seriesName("Saga")
                 .seriesNumber(2F)
-                .publishedDate(LocalDate.of(2026, 7, 15))
+                .publishedDate(LocalDate.of(2026, Month.JULY, 15))
                 .language("ru")
                 .build());
 

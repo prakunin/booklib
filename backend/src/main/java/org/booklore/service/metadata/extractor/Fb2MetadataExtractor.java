@@ -15,6 +15,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashSet;
@@ -434,7 +435,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         if (matcher.find()) {
             try {
                 int yearValue = Integer.parseInt(matcher.group());
-                builder.publishedDate(LocalDate.of(yearValue, 1, 1));
+                builder.publishedDate(LocalDate.of(yearValue, Month.JANUARY, 1));
             } catch (NumberFormatException _) {
                 log.debug("Failed to parse year: {}", yearText);
             }
@@ -540,7 +541,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
             Matcher matcher = YEAR_PATTERN.matcher(dateString);
             if (matcher.find()) {
                 int year = Integer.parseInt(matcher.group());
-                return LocalDate.of(year, 1, 1);
+                return LocalDate.of(year, Month.JANUARY, 1);
             }
         } catch (Exception e) {
             log.debug("Failed to parse date: {}", dateString, e);

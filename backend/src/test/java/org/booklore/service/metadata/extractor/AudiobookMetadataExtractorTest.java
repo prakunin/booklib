@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -161,7 +162,7 @@ class AudiobookMetadataExtractorTest {
 
                 BookMetadata metadata = extractor.extractMetadata(file);
 
-                assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 1, 1));
+                assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.JANUARY, 1));
             }
         }
 
@@ -174,7 +175,7 @@ class AudiobookMetadataExtractorTest {
 
                 BookMetadata metadata = extractor.extractMetadata(file);
 
-                assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 1, 1));
+                assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.JANUARY, 1));
             }
         }
 

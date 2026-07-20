@@ -184,7 +184,7 @@ public class BookRuleEvaluatorService {
         if (field == null) return cb.conjunction();
 
         String period = rule.getValue() != null ? rule.getValue().toString().toLowerCase() : "year";
-        LocalDate now = LocalDate.now();
+        LocalDate now = LocalDate.now(ZoneId.systemDefault());
         LocalDate start = switch (period) {
             case "week" -> now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
             case "month" -> now.withDayOfMonth(1);
@@ -212,7 +212,7 @@ public class BookRuleEvaluatorService {
             }
         }
         String unit = rule.getValueEnd() != null ? rule.getValueEnd().toString().toLowerCase() : "days";
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
         LocalDateTime threshold = switch (unit) {
             case "weeks" -> now.minusWeeks(amount);
             case "months" -> now.minusMonths(amount);

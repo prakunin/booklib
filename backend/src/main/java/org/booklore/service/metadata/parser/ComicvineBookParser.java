@@ -25,6 +25,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -952,7 +953,7 @@ public class ComicvineBookParser implements BookParser, DetailedMetadataProvider
         if (yearMatcher.find()) {
             try {
                 int y = Integer.parseInt(yearMatcher.group(1));
-                if (y > 1900 && y <= LocalDate.now().getYear() + 1) {
+                if (y > 1900 && y <= LocalDate.now(ZoneId.systemDefault()).getYear() + 1) {
                     year = y;
                     yearString = yearMatcher.group(0);
                 }

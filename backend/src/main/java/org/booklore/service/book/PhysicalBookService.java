@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -110,7 +111,7 @@ public class PhysicalBookService {
         // Try year only format (YYYY)
         try {
             int year = Integer.parseInt(trimmed);
-            return LocalDate.of(year, 1, 1);
+            return LocalDate.of(year, Month.JANUARY, 1);
         } catch (NumberFormatException _) { /* unparseable, return null below */ }
         return null;
     }

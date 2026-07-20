@@ -21,7 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -316,7 +315,7 @@ class OpdsBookServiceTest {
     @Test
     void getRandomBooks_returnsBooks_whenLibrariesAccessible() {
         OpdsUserDetails details = v2UserDetails(1L, true, Set.of(1L));
-        OpdsBookService spy = Mockito.spy(opdsBookService);
+        OpdsBookService spy = spy(opdsBookService);
         List<Library> libs = List.of(Library.builder().id(1L).watch(false).build());
         doReturn(libs).when(spy).getAccessibleLibraries(details.getOpdsUserV2().getUserId());
 
@@ -334,7 +333,7 @@ class OpdsBookServiceTest {
     @Test
     void getRandomBooks_returnsEmpty_whenNoLibraries() {
         OpdsUserDetails details = v2UserDetails(1L, false, Set.of());
-        OpdsBookService spy = Mockito.spy(opdsBookService);
+        OpdsBookService spy = spy(opdsBookService);
         doReturn(List.of()).when(spy).getAccessibleLibraries(details.getOpdsUserV2().getUserId());
 
         List<Book> result = spy.getRandomBooks(details.getOpdsUserV2().getUserId(), 1);
@@ -751,7 +750,7 @@ class OpdsBookServiceTest {
 
     @Test
     void getRandomBooks_appliesContentRestrictions() {
-        OpdsBookService spy = Mockito.spy(opdsBookService);
+        OpdsBookService spy = spy(opdsBookService);
         doReturn(List.of(Library.builder().id(1L).watch(false).build()))
                 .when(spy).getAccessibleLibraries(2L);
 

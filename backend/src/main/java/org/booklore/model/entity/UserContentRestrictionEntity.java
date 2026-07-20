@@ -6,6 +6,7 @@ import org.booklore.model.enums.ContentRestrictionMode;
 import org.booklore.model.enums.ContentRestrictionType;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Getter
@@ -41,6 +42,6 @@ public class UserContentRestrictionEntity {
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneId.systemDefault());
     }
 }

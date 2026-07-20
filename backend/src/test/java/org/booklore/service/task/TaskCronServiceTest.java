@@ -17,6 +17,7 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,7 +37,7 @@ class TaskCronServiceTest {
 
     private AutoCloseable mocks;
 
-    private static final LocalDateTime FIXED_TIME = LocalDateTime.of(2025, 1, 1, 12, 0, 0);
+    private static final LocalDateTime FIXED_TIME = LocalDateTime.of(2025, Month.JANUARY, 1, 12, 0, 0);
 
     @BeforeEach
     void setUp() {

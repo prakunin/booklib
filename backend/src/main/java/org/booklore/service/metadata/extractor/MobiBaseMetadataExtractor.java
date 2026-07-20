@@ -10,6 +10,7 @@ import java.io.RandomAccessFile;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -413,7 +414,7 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
             }
 
             if (YEAR_ONLY_PATTERN.matcher(dateString).matches()) {
-                return LocalDate.of(Integer.parseInt(dateString), 1, 1);
+                return LocalDate.of(Integer.parseInt(dateString), Month.JANUARY, 1);
             }
 
             if (DATE_SLASH_FORMAT_PATTERN.matcher(dateString).matches()) {

@@ -80,6 +80,8 @@ public class JwtUtils {
         return generateToken(user, expirationTime, tokenType);
     }
 
+    // nimbus-jose-jwt's JWTClaimsSet.Builder only accepts java.util.Date for issueTime/expirationTime (no java.time overload).
+    @SuppressWarnings("java:S2143")
     private String generateToken(BookLoreUserEntity user, long expirationTime, String tokenType) {
         Instant now = Instant.now();
 

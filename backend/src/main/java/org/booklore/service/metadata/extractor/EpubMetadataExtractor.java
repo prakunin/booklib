@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -764,7 +765,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
         if (YEAR_ONLY_PATTERN.matcher(value).matches()) {
             int year = Integer.parseInt(value);
             if (year >= 1 && year <= 9999) {
-                return LocalDate.of(year, 1, 1);
+                return LocalDate.of(year, Month.JANUARY, 1);
             }
         }
 

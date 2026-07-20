@@ -50,6 +50,7 @@ import org.mockito.quality.Strictness;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
@@ -439,8 +440,8 @@ class KoboEntitlementServiceTest {
         BookEntity book1 = createEpubBookEntity(1L);
         ShelfEntity koboShelf = ShelfEntity.builder().id(100L).name(ShelfType.KOBO.getName()).bookEntities(Set.of(book1)).build();
 
-        LocalDateTime createdAt = LocalDateTime.of(2024, 1, 15, 10, 30, 0);
-        LocalDateTime updatedAt = LocalDateTime.of(2024, 6, 20, 14, 45, 0);
+        LocalDateTime createdAt = LocalDateTime.of(2024, Month.JANUARY, 15, 10, 30, 0);
+        LocalDateTime updatedAt = LocalDateTime.of(2024, Month.JUNE, 20, 14, 45, 0);
         MagicShelfEntity magicShelf = MagicShelfEntity.builder()
                 .id(201L)
                 .userId(user.getId())

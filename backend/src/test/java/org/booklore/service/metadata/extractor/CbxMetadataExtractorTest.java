@@ -21,6 +21,7 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -285,7 +286,7 @@ class CbxMetadataExtractorTest {
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, 6, 15));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, Month.JUNE, 15));
         }
 
         @Test
@@ -294,7 +295,7 @@ class CbxMetadataExtractorTest {
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(1986, 1, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(1986, Month.JANUARY, 1));
         }
 
         @Test
@@ -306,7 +307,7 @@ class CbxMetadataExtractorTest {
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 11, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.NOVEMBER, 1));
         }
 
         @Test
@@ -1122,7 +1123,7 @@ class CbxMetadataExtractorTest {
             assertThat(metadata.getSeriesNumber()).isEqualTo(1f);
             assertThat(metadata.getSeriesTotal()).isEqualTo(4);
             assertThat(metadata.getDescription()).isEqualTo("In a bleak future, Bruce Wayne returns as Batman.");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(1986, 2, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(1986, Month.FEBRUARY, 1));
             assertThat(metadata.getAuthors()).containsExactly("Frank Miller");
             assertThat(metadata.getPublisher()).isEqualTo("DC Comics");
         }

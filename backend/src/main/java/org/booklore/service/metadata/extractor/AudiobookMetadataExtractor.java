@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -173,7 +174,7 @@ public class AudiobookMetadataExtractor implements FileMetadataExtractor {
         try {
             int yearInt = Integer.parseInt(year.trim().substring(0, Math.min(4, year.trim().length())));
             if (yearInt >= 1 && yearInt <= 9999) {
-                builder.publishedDate(LocalDate.of(yearInt, 1, 1));
+                builder.publishedDate(LocalDate.of(yearInt, Month.JANUARY, 1));
             }
         } catch (NumberFormatException _) {
             // ignore malformed year value

@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -292,7 +293,7 @@ class SystemInfoServiceTest {
 
             assertThat(info.getLibraryPaths()).extracting(LibraryPathInfo::getPath).containsExactly("/books/shared");
             // configuredLibraryPaths() is fetched exactly once per request, not once per block.
-            verify(storageInfoService, org.mockito.Mockito.times(1)).configuredLibraryPaths();
+            verify(storageInfoService, times(1)).configuredLibraryPaths();
         }
 
         @Test

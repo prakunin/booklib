@@ -20,6 +20,7 @@ import org.w3c.dom.NodeList;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -411,7 +412,7 @@ private static String cleanIsbn(String value) {
                 );
             }
             if (YEAR_PATTERN.matcher(s).matches()) {
-                return LocalDate.of(Integer.parseInt(s.substring(0, 4)), 1, 1);
+                return LocalDate.of(Integer.parseInt(s.substring(0, 4)), Month.JANUARY, 1);
             }
         } catch (Exception e) {
             log.debug("Failed to parse PDF date '{}': {}", pdfDate, e.getMessage());

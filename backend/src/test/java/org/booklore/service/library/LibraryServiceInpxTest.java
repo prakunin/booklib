@@ -38,6 +38,7 @@ import java.util.concurrent.Executor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -210,7 +211,7 @@ class LibraryServiceInpxTest {
         // scanningLibraries, so a cancel for it must be forwarded to InpxScanControl.
         org.mockito.Mockito.doAnswer(invocation -> {
             libraryService.cancelScan(libraryId);
-            org.mockito.Mockito.verify(inpxScanControl).requestCancel(libraryId);
+            verify(inpxScanControl).requestCancel(libraryId);
             return null;
         }).when(libraryProcessingService).rescanLibrary(any());
 
@@ -239,7 +240,7 @@ class LibraryServiceInpxTest {
         InOrder inOrder = org.mockito.Mockito.inOrder(inpxScanControl);
         inOrder.verify(inpxScanControl).clear(libraryId);
         inOrder.verify(inpxScanControl).requestCancel(libraryId);
-        verify(inpxScanControl, org.mockito.Mockito.times(1)).clear(libraryId);
+        verify(inpxScanControl, times(1)).clear(libraryId);
     }
 
     @Test
@@ -266,7 +267,7 @@ class LibraryServiceInpxTest {
         libraryService.rescanLibrary(libraryId);
         tasks.get(0).run();
 
-        verify(inpxScanControl, org.mockito.Mockito.times(1)).clear(libraryId);
+        verify(inpxScanControl, times(1)).clear(libraryId);
         verify(inpxScanControl).requestCancel(libraryId);
     }
 }

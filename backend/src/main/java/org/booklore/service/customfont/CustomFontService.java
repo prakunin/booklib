@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -92,7 +93,7 @@ public class CustomFontService {
                     .originalFileName(originalFilename)
                     .format(format)
                     .fileSize(file.getSize())
-                    .uploadedAt(LocalDateTime.now())
+                    .uploadedAt(LocalDateTime.now(ZoneId.systemDefault()))
                     .build();
 
             savedEntity = customFontRepository.save(entity);

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.*;
 
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -22,7 +23,7 @@ import java.lang.reflect.Field;
 
 class TaskHistoryServiceTest {
 
-    private static final LocalDateTime FIXED_TIME = LocalDateTime.of(2025, 1, 1, 12, 0, 0);
+    private static final LocalDateTime FIXED_TIME = LocalDateTime.of(2025, Month.JANUARY, 1, 12, 0, 0);
 
     @Mock
     private TaskHistoryRepository taskHistoryRepository;

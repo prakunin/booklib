@@ -12,7 +12,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -20,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
@@ -30,6 +30,8 @@ import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @EnabledIf("org.booklore.service.ArchiveService#isAvailable")
 class CbxComicInfoComplianceTest {
@@ -40,7 +42,7 @@ class CbxComicInfoComplianceTest {
 
     @BeforeEach
     void setup() throws Exception {
-        AppSettingService appSettingService = Mockito.mock(AppSettingService.class);
+        AppSettingService appSettingService = mock(AppSettingService.class);
         AppSettings settings = new AppSettings();
         MetadataPersistenceSettings persistence = new MetadataPersistenceSettings();
         MetadataPersistenceSettings.SaveToOriginalFile save = new MetadataPersistenceSettings.SaveToOriginalFile();
@@ -50,7 +52,7 @@ class CbxComicInfoComplianceTest {
         save.setCbx(cbx);
         persistence.setSaveToOriginalFile(save);
         settings.setMetadataPersistenceSettings(persistence);
-        Mockito.when(appSettingService.getAppSettings()).thenReturn(settings);
+        when(appSettingService.getAppSettings()).thenReturn(settings);
 
         writer = new CbxMetadataWriter(appSettingService, new ArchiveService());
         tempDir = Files.createTempDirectory("compliance_test_");
@@ -80,7 +82,7 @@ class CbxComicInfoComplianceTest {
         metadata.setSeriesName("The Boys");
         metadata.setSeriesNumber(70f);
         metadata.setSeriesTotal(14);
-        metadata.setPublishedDate(LocalDate.of(2012, 9, 5));
+        metadata.setPublishedDate(LocalDate.of(2012, Month.SEPTEMBER, 5));
         metadata.setPageCount(170);
         metadata.setDescription("<p><i>On his own and out of options, Hughie resorts to extreme measures...</i></p>");
         

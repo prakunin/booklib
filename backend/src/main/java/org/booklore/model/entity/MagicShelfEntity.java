@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Getter
@@ -42,14 +43,14 @@ public class MagicShelfEntity {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @lombok.Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneId.systemDefault());
 
     @Column(name = "updated_at", nullable = false)
     @lombok.Builder.Default
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = LocalDateTime.now(ZoneId.systemDefault());
 
     @PreUpdate
     public void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now(ZoneId.systemDefault());
     }
 }

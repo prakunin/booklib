@@ -16,6 +16,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -201,7 +202,7 @@ public class HardcoverSyncService {
             if (readInfo.editionId == null || (readInfo.editionId != null && readInfo.editionId.equals(hardcoverBook.editionId))) {
                 readInfo.progressPages = progressPages;
                 if (isFinished) {
-                    readInfo.finishedAt = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+                    readInfo.finishedAt = LocalDate.now(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_LOCAL_DATE);
                 }
 
                 // Update existing reading progress and the user book to match the edition and status based on the new progress
@@ -733,10 +734,10 @@ public class HardcoverSyncService {
         bookInput.put(JSON_KEY_STATUS_ID, isFinished ? STATUS_READ : STATUS_CURRENTLY_READING);
 
         Map<String, Object> readInput = new HashMap<>();
-        readInput.put(JSON_KEY_STARTED_AT, LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
+        readInput.put(JSON_KEY_STARTED_AT, LocalDate.now(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_LOCAL_DATE));
         readInput.put(JSON_KEY_PROGRESS_PAGES, progressPages);
         if (isFinished) {
-            readInput.put(JSON_KEY_FINISHED_AT, LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
+            readInput.put(JSON_KEY_FINISHED_AT, LocalDate.now(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_LOCAL_DATE));
         }
         if (editionId != null) {
             readInput.put(JSON_KEY_EDITION_ID, editionId);

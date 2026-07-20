@@ -33,7 +33,7 @@ public class TaskHistoryService {
                 .type(type)
                 .status(TaskStatus.ACCEPTED)
                 .userId(userId)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneId.systemDefault()))
                 .progressPercentage(0)
                 .taskOptions(options)
                 .build();
@@ -87,10 +87,10 @@ public class TaskHistoryService {
         taskHistoryRepository.findById(taskId).ifPresent(task -> {
             task.setStatus(status);
             task.setMessage(message);
-            task.setUpdatedAt(LocalDateTime.now());
+            task.setUpdatedAt(LocalDateTime.now(ZoneId.systemDefault()));
 
             if (status == TaskStatus.COMPLETED || status == TaskStatus.FAILED) {
-                task.setCompletedAt(LocalDateTime.now());
+                task.setCompletedAt(LocalDateTime.now(ZoneId.systemDefault()));
                 task.setProgressPercentage(100);
             }
 
@@ -103,8 +103,8 @@ public class TaskHistoryService {
         taskHistoryRepository.findById(taskId).ifPresent(task -> {
             task.setStatus(TaskStatus.FAILED);
             task.setErrorDetails(errorDetails);
-            task.setCompletedAt(LocalDateTime.now());
-            task.setUpdatedAt(LocalDateTime.now());
+            task.setCompletedAt(LocalDateTime.now(ZoneId.systemDefault()));
+            task.setUpdatedAt(LocalDateTime.now(ZoneId.systemDefault()));
             taskHistoryRepository.save(task);
             log.error("Task failed: id={}", taskId);
         });

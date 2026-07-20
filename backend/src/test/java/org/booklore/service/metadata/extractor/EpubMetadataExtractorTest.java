@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -265,7 +266,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2024, 1, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2024, Month.JANUARY, 1));
         }
 
         @Test
@@ -276,7 +277,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, 6, 15));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, Month.JUNE, 15));
         }
 
         @Test
@@ -287,7 +288,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2022, 3, 10));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2022, Month.MARCH, 10));
         }
 
         @Test
@@ -298,7 +299,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2021, 12, 25));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2021, Month.DECEMBER, 25));
         }
 
         @Test
@@ -309,7 +310,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 8, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.AUGUST, 1));
         }
 
         @Test
@@ -1186,7 +1187,7 @@ class EpubMetadataExtractorTest {
 
             assertThat(metadata.getTitle()).isEqualTo("Root OPF");
             assertThat(metadata.getAuthors()).containsExactly("Root Author");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 1, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.JANUARY, 1));
         }
     }
 
@@ -1270,7 +1271,7 @@ class EpubMetadataExtractorTest {
             assertThat(metadata.getDescription()).isEqualTo("A very detailed description.");
             assertThat(metadata.getPublisher()).isEqualTo("Big Publisher");
             assertThat(metadata.getLanguage()).isEqualTo("en");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, 11, 15));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, Month.NOVEMBER, 15));
             assertThat(metadata.getCategories()).containsExactlyInAnyOrder("Science Fiction", "Adventure");
             assertThat(metadata.getIsbn13()).isEqualTo("9781234567890");
             assertThat(metadata.getAsin()).isEqualTo("B09FULL");

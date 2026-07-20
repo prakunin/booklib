@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -836,7 +837,7 @@ public class DoubanBookParser implements BookParser {
             matcher = pattern.matcher(trim);
             if (matcher.matches()) {
                 int year = Integer.parseInt(matcher.group(1));
-                return LocalDate.of(year, 1, 1);
+                return LocalDate.of(year, Month.JANUARY, 1);
             }
 
             // Chinese patterns
@@ -864,7 +865,7 @@ public class DoubanBookParser implements BookParser {
             matcher = pattern.matcher(trim);
             if (matcher.matches()) {
                 int year = Integer.parseInt(matcher.group(1));
-                return LocalDate.of(year, 1, 1);
+                return LocalDate.of(year, Month.JANUARY, 1);
             }
 
         } catch (Exception e) {

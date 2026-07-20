@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -207,7 +208,7 @@ public class PdfMetadataWriter implements MetadataWriter {
 
         // XMP Basic (unprefixed → written as xmp: by XmpMetadataWriter)
         customFields.put("CreatorTool", "Booklore");
-        String nowIso = ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT);
+        String nowIso = ZonedDateTime.now(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_INSTANT);
         customFields.put("MetadataDate", nowIso);
         customFields.put("ModifyDate", nowIso);
         if (scalars.date() != null) {

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.Year;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -444,7 +445,7 @@ public class FilenamePatternExtractor {
         try {
             if ("yyyy".equals(detectedFormat)) {
                 Year year = Year.parse(value, DateTimeFormatter.ofPattern("yyyy"));
-                metadata.setPublishedDate(year.atMonthDay(MonthDay.of(1, 1)));
+                metadata.setPublishedDate(year.atMonthDay(MonthDay.of(Month.JANUARY, 1)));
                 return;
             }
             
@@ -453,7 +454,7 @@ public class FilenamePatternExtractor {
                 if (year < 100) {
                     year += (year < TWO_DIGIT_YEAR_CUTOFF) ? 2000 : TWO_DIGIT_YEAR_CENTURY_BASE;
                 }
-                metadata.setPublishedDate(LocalDate.of(year, 1, 1));
+                metadata.setPublishedDate(LocalDate.of(year, Month.JANUARY, 1));
                 return;
             }
             
