@@ -172,6 +172,8 @@ public class FileUploadService {
 
             final BookFileEntity entity = createAdditionalFileEntityWithSubPath(book, finalFileName, fileSubPath, isBook, effectiveBookType, file.getSize(), fileHash, description);
             final BookFileEntity savedEntity = additionalFileRepository.save(entity);
+            book.setHasFiles(true);
+            bookRepository.save(book);
 
             return additionalFileMapper.toAdditionalFile(savedEntity);
 

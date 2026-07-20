@@ -55,6 +55,17 @@ public class BookEntity {
     @Builder.Default
     private Boolean isPhysical = Boolean.FALSE;
 
+    /**
+     * Denormalized mirror of "bookFiles is non-empty" so catalog predicates avoid the correlated
+     * EXISTS over book_file (~2.5s on a 630k-book catalog in MariaDB). Every code path that
+     * attaches or detaches a BookFileEntity must keep it in sync - via {@link #syncHasFiles()}
+     * when the collection is loaded, or {@code setHasFiles} otherwise. Distinct from the
+     * in-memory check {@link #hasFiles()}.
+     */
+    @Column(name = "has_files", nullable = false)
+    @Builder.Default
+    private Boolean hasFiles = Boolean.FALSE;
+
     @Column(name = "added_on")
     private Instant addedOn;
 
@@ -210,6 +221,10 @@ public class BookEntity {
 
     public boolean hasFiles() {
         return bookFiles != null && !bookFiles.isEmpty();
+    }
+
+    public void syncHasFiles() {
+        this.hasFiles = hasFiles();
     }
 
     @Override

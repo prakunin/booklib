@@ -301,8 +301,10 @@ public class BookFileAttachmentService {
                     fileToMove.setFileName(newFileName);
 
                     sourceBook.getBookFiles().remove(fileToMove);
+                    sourceBook.syncHasFiles();
                     fileToMove.setBook(targetBook);
                     targetBook.getBookFiles().add(fileToMove);
+                    targetBook.setHasFiles(true);
                 }
 
                 sourceDirectoriesToCleanup.addAll(sourceDirectories);

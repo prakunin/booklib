@@ -1310,16 +1310,16 @@ public class AppBookService {
     }
 
     /**
-     * Books with no files that are not physical either would render as empty shells. The legacy
-     * per-query predicate "(b.bookFiles IS NOT EMPTY OR b.isPhysical = true)" excluded them, but
-     * MariaDB executes that OR-EXISTS as a materialized scan of the whole book_file index in every
-     * facet aggregate. The set is almost always empty, so it is computed once per facet
-     * recomputation and the aggregates only pay for it when shells actually exist.
+     * Books with no files that are not physical either would render as empty shells. The per-query
+     * predicate "(b.hasFiles = true OR b.isPhysical = true)" excluded them, but repeating that OR
+     * in every facet aggregate still forces MariaDB through the whole book table per aggregate.
+     * The set is almost always empty, so it is resolved once (globally cached, denormalized
+     * has_files flag) and the aggregates only pay for it when shells actually exist.
      */
     private Set<Long> findShellBookIds() {
         return shellBookIdsCache.get(() -> Set.copyOf(entityManager.createQuery(
                 "SELECT b.id FROM BookEntity b"
-                        + " WHERE b.bookFiles IS EMPTY AND (b.isPhysical IS NULL OR b.isPhysical = false)",
+                        + " WHERE b.hasFiles = false AND (b.isPhysical IS NULL OR b.isPhysical = false)",
                 Long.class).getResultList()));
     }
 
@@ -1328,7 +1328,7 @@ public class AppBookService {
             return "";
         }
         if (shellBookIds.size() > MAX_SHELL_IDS_IN_CLAUSE) {
-            return " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)";
+            return " AND (b.hasFiles = true OR b.isPhysical = true)";
         }
         return " AND b.id NOT IN (" + shellBookIds.stream().sorted()
                 .map(String::valueOf).collect(Collectors.joining(", ")) + ")";
