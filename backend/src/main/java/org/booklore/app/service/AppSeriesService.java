@@ -91,7 +91,7 @@ public class AppSeriesService {
                 + " FROM BookEntity b JOIN b.metadata m"
                 + " LEFT JOIN b.userBookProgress p ON p.user.id = :userId"
                 + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
+                + " AND (b.hasFiles = true OR b.isPhysical = true)"
                 + " AND m.seriesName IS NOT NULL"
                 + libraryClause
                 + searchClause
@@ -126,7 +126,7 @@ public class AppSeriesService {
             String countAlt = "SELECT m.seriesName FROM BookEntity b JOIN b.metadata m"
                     + " LEFT JOIN b.userBookProgress p ON p.user.id = :userId"
                     + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                    + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
+                    + " AND (b.hasFiles = true OR b.isPhysical = true)"
                     + " AND m.seriesName IS NOT NULL"
                     + libraryClause
                     + searchClause
@@ -143,7 +143,7 @@ public class AppSeriesService {
 
         String countQuery = "SELECT COUNT(DISTINCT m.seriesName) FROM BookEntity b JOIN b.metadata m"
                 + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
+                + " AND (b.hasFiles = true OR b.isPhysical = true)"
                 + " AND m.seriesName IS NOT NULL"
                 + libraryClause
                 + searchClause;
@@ -178,7 +178,7 @@ public class AppSeriesService {
                 + " JOIN FETCH b.metadata m"
                 + " WHERE m.seriesName IN :seriesNames"
                 + " AND (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
+                + " AND (b.hasFiles = true OR b.isPhysical = true)"
                 + libraryClause;
 
         var booksQ = entityManager.createQuery(booksQuery, BookEntity.class);
