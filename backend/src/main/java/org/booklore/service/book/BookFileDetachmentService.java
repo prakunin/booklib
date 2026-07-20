@@ -82,6 +82,7 @@ public class BookFileDetachmentService {
                 .library(sourceBook.getLibrary())
                 .libraryPath(newLibraryPath)
                 .addedOn(Instant.now())
+                .hasFiles(true)
                 .build();
 
         BookMetadataEntity newMetadata;
@@ -96,6 +97,7 @@ public class BookFileDetachmentService {
         newBook.setMetadata(newMetadata);
 
         sourceBook.getBookFiles().remove(targetFile);
+        sourceBook.syncHasFiles();
         targetFile.setFileSubPath(newFileSubPath);
         targetFile.setBook(newBook);
 

@@ -114,7 +114,11 @@ public class BookFilePersistenceService {
 
     @Transactional
     public void deleteBookFile(BookFileEntity bookFile) {
+        BookEntity book = bookFile.getBook();
         bookFileRepository.delete(bookFile);
+        if (book != null) {
+            book.setHasFiles(bookFileRepository.countByBookId(book.getId()) > 0);
+        }
     }
 
     @Transactional

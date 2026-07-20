@@ -146,7 +146,7 @@ public class AppAuthorService {
         StringBuilder jpql = new StringBuilder(
                 "SELECT COUNT(DISTINCT bm.id) FROM AuthorEntity a JOIN a.bookMetadataEntityList bm JOIN bm.book b"
                         + " WHERE a.id = :authorId AND (b.deleted IS NULL OR b.deleted = false)"
-                        + " AND b.bookFiles IS NOT EMPTY");
+                        + " AND b.hasFiles = true");
         if (accessibleLibraryIds != null) {
             jpql.append(" AND b.library.id IN :libraryIds");
         }
@@ -183,7 +183,7 @@ public class AppAuthorService {
             whereClause.append(" AND b.library.id IN :libraryIds");
         }
         whereClause.append(" AND (b.deleted IS NULL OR b.deleted = false)");
-        whereClause.append(" AND b.bookFiles IS NOT EMPTY");
+        whereClause.append(" AND b.hasFiles = true");
     }
 
     private void buildSearchFilter(StringBuilder whereClause, String search) {
