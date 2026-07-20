@@ -734,6 +734,224 @@ class HardcoverParserTest {
         }
     }
 
+    @Nested
+    @DisplayName("Additional branch coverage")
+    class AdditionalBranchCoverageTests {
+
+        @Test
+        @DisplayName("Should filter out a combined-search hit with no author names, then fall back to title-only")
+        void fetchMetadata_hitWithNoAuthorNames_isFilteredOut() {
+            Book book = Book.builder().title("Test Book").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder()
+                    .title("Test Book")
+                    .author("Some Author")
+                    .build();
+
+            GraphQLResponse.Document docWithoutAuthors = new GraphQLResponse.Document();
+            docWithoutAuthors.setTitle("Test Book");
+            docWithoutAuthors.setAuthorNames(null);
+            GraphQLResponse.Hit hitWithoutAuthors = new GraphQLResponse.Hit();
+            hitWithoutAuthors.setDocument(docWithoutAuthors);
+            when(hardcoverBookSearchService.searchBooks("Test Book Some Author"))
+                    .thenReturn(List.of(hitWithoutAuthors));
+
+            GraphQLResponse.Hit fallbackHit = createHitWithAuthor("Test Book", "Some Author");
+            when(hardcoverBookSearchService.searchBooks("Test Book"))
+                    .thenReturn(List.of(fallbackHit));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            verify(hardcoverBookSearchService).searchBooks("Test Book");
+            assertThat(results).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("Should map an edition with no featured book series")
+        void fetchMetadata_editionWithNoFeaturedSeries_leavesSeriesFieldsNull() {
+            Book book = Book.builder().title("Test").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder()
+                    .title("Test")
+                    .isbn("9780316769488")
+                    .build();
+
+            GraphQLResponse.BookWithEditions bookWithEditions = createBookWithEditions();
+            bookWithEditions.setFeaturedBookSeries(null);
+
+            when(hardcoverBookSearchService.searchBookByIsbn("9780316769488"))
+                    .thenReturn(List.of(bookWithEditions));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results.get(0).getSeriesName()).isNull();
+            assertThat(results.get(0).getSeriesTotal()).isNull();
+        }
+
+        @Test
+        @DisplayName("Should not set series fields for a plain document hit whose featured series has no series object")
+        void fetchMetadata_documentWithFeaturedSeriesButNoSeries_leavesSeriesFieldsNull() {
+            Book book = Book.builder().title("Test").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Test").build();
+
+            GraphQLResponse.Hit hit = createFullyPopulatedHit();
+            hit.getDocument().getFeaturedSeries().setSeries(null);
+
+            when(hardcoverBookSearchService.searchBooks("Test")).thenReturn(List.of(hit));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results.get(0).getSeriesName()).isNull();
+        }
+
+        @Test
+        @DisplayName("Should compute isbn13 from isbn10 for an edition that only has isbn10")
+        void fetchMetadata_editionWithOnlyIsbn10_computesIsbn13() {
+            Book book = Book.builder().title("Test").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder()
+                    .title("Test")
+                    .isbn("0316769487")
+                    .build();
+
+            GraphQLResponse.BookWithEditions bookWithEditions = createBookWithEditions();
+            bookWithEditions.getEditions().get(0).setIsbn10("0316769487");
+            bookWithEditions.getEditions().get(0).setIsbn13(null);
+
+            when(hardcoverBookSearchService.searchBookByIsbn("0316769487"))
+                    .thenReturn(List.of(bookWithEditions));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results.get(0).getIsbn10()).isEqualTo("0316769487");
+            assertThat(results.get(0).getIsbn13()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("Should skip cached-tag mapping entirely for an edition whose book has no cached tags")
+        void fetchMetadata_editionBookWithNoCachedTags_leavesMoodsCategoriesTagsNull() {
+            Book book = Book.builder().title("Test").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder()
+                    .title("Test")
+                    .isbn("9780316769488")
+                    .build();
+
+            GraphQLResponse.BookWithEditions bookWithEditions = createBookWithEditions();
+            bookWithEditions.setCachedTags(null);
+
+            when(hardcoverBookSearchService.searchBookByIsbn("9780316769488"))
+                    .thenReturn(List.of(bookWithEditions));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results.get(0).getMoods()).isNullOrEmpty();
+            assertThat(results.get(0).getCategories()).isNullOrEmpty();
+            assertThat(results.get(0).getTags()).isNullOrEmpty();
+        }
+
+        @Test
+        @DisplayName("Should skip mood/genre/tag categories that are empty for an edition's cached tags")
+        void fetchMetadata_editionWithEmptyCachedTagLists_leavesFieldsNull() {
+            Book book = Book.builder().title("Test").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder()
+                    .title("Test")
+                    .isbn("9780316769488")
+                    .build();
+
+            GraphQLResponse.BookWithEditions bookWithEditions = createBookWithEditions();
+            GraphQLResponse.CachedTags emptyCachedTags = new GraphQLResponse.CachedTags();
+            emptyCachedTags.setMood(Collections.emptyList());
+            emptyCachedTags.setGenre(Collections.emptyList());
+            emptyCachedTags.setTag(Collections.emptyList());
+            bookWithEditions.setCachedTags(emptyCachedTags);
+
+            when(hardcoverBookSearchService.searchBookByIsbn("9780316769488"))
+                    .thenReturn(List.of(bookWithEditions));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results.get(0).getMoods()).isNullOrEmpty();
+            assertThat(results.get(0).getCategories()).isNullOrEmpty();
+            assertThat(results.get(0).getTags()).isNullOrEmpty();
+        }
+
+        @Test
+        @DisplayName("Should use the exact ISBN match from a document's isbn list when one is present")
+        void fetchMetadata_documentIsbnsContainsExactRequestIsbn_usesExactMatch() {
+            // A request ISBN made only of letters cleans to blank (ParserUtils.cleanIsbn strips
+            // non-digit/non-X characters), so the title/author search path is taken instead of the
+            // ISBN-search path, letting the raw value reach selectMatchingIsbn's exact-match branch.
+            String junkIsbn = "qqqqqqqqqq";
+            Book book = Book.builder().title("Test").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder()
+                    .title("Test")
+                    .isbn(junkIsbn)
+                    .build();
+
+            GraphQLResponse.Hit hit = createFullyPopulatedHit();
+            List<String> isbnsWithExactJunkMatch = new ArrayList<>(hit.getDocument().getIsbns());
+            isbnsWithExactJunkMatch.add(junkIsbn);
+            hit.getDocument().setIsbns(isbnsWithExactJunkMatch);
+            when(hardcoverBookSearchService.searchBooks("Test")).thenReturn(List.of(hit));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results.get(0).getIsbn10()).isEqualTo(junkIsbn);
+            assertThat(results.get(0).getIsbn13()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("Should pick the closest ISBN by edit distance when no exact match exists in a document's isbn list")
+        void fetchMetadata_documentIsbnsNoExactMatch_picksClosestByDistance() {
+            // All-letter request ISBN cleans to blank (same reasoning as above), so it reaches
+            // findClosestIsbn without an exact match; among same-length candidates it should pick
+            // the first-seen entry at the smallest edit distance.
+            Book book = Book.builder().title("Test").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder()
+                    .title("Test")
+                    .isbn("zzzzzzzzzz")
+                    .build();
+
+            GraphQLResponse.Hit hit = createFullyPopulatedHit();
+            when(hardcoverBookSearchService.searchBooks("Test")).thenReturn(List.of(hit));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results.get(0).getIsbn10()).isEqualTo("1111111111");
+        }
+
+        @Test
+        @DisplayName("Should null out both ISBN fields when the document has no valid-length ISBNs")
+        void fetchMetadata_documentWithNoValidLengthIsbns_nullsIsbnFields() {
+            Book book = Book.builder().title("Test").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Test").build();
+
+            GraphQLResponse.Hit hit = createFullyPopulatedHit();
+            hit.getDocument().setIsbns(List.of("tooshort", "waytoolongtobevalid"));
+
+            when(hardcoverBookSearchService.searchBooks("Test")).thenReturn(List.of(hit));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results.get(0).getIsbn10()).isNull();
+            assertThat(results.get(0).getIsbn13()).isNull();
+        }
+
+        @Test
+        @DisplayName("Should leave isbn fields untouched when the document has no isbns at all")
+        void fetchMetadata_documentWithNullIsbns_leavesIsbnsAsPreviouslySet() {
+            Book book = Book.builder().title("Test").build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Test").build();
+
+            GraphQLResponse.Hit hit = createHitWithAuthor("Test", "Author");
+            hit.getDocument().setIsbns(null);
+
+            when(hardcoverBookSearchService.searchBooks("Test")).thenReturn(List.of(hit));
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results.get(0).getIsbn10()).isNull();
+            assertThat(results.get(0).getIsbn13()).isNull();
+        }
+    }
+
     private GraphQLResponse.Hit createHitWithAuthor(String title, String author) {
         GraphQLResponse.Document doc = new GraphQLResponse.Document();
         doc.setTitle(title);

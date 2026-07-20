@@ -213,6 +213,173 @@ class AppSeriesServiceTest {
 
             assertNotNull(result);
         }
+
+        @Test
+        void getSeries_sortByReadProgress_asc() {
+            mockAdminUser();
+            mockAggregateQuery(Collections.emptyList());
+            mockCountQuery(0L);
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "readProgress", "asc", null, null, null);
+
+            assertNotNull(result);
+        }
+
+        @Test
+        void getSeries_sortByLastReadTime_desc() {
+            mockAdminUser();
+            mockAggregateQuery(Collections.emptyList());
+            mockCountQuery(0L);
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "lastReadTime", "desc", null, null, null);
+
+            assertNotNull(result);
+        }
+
+        @Test
+        void getSeries_notStartedFilter_appliesHavingClauseAndAltCount() {
+            mockAdminUser();
+            mockAggregateQueryInProgress(List.of(
+                    mockSeriesTuple("Fresh Series", 4L, 4, Instant.now(), 0L)
+            ));
+            mockCountQueryInProgress(1L);
+            mockBooksQuery(List.of(buildBook(20L, "Fresh Series", 1.0f, "Author A")));
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, "not-started");
+
+            assertNotNull(result);
+            assertEquals(1, result.getContent().size());
+        }
+
+        @Test
+        void getSeries_completedFilter_appliesHavingClauseAndAltCount() {
+            mockAdminUser();
+            mockAggregateQueryInProgress(List.of(
+                    mockSeriesTuple("Finished Series", 3L, 3, Instant.now(), 3L)
+            ));
+            mockCountQueryInProgress(1L);
+            mockBooksQuery(List.of(buildBook(21L, "Finished Series", 1.0f, "Author A")));
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, "completed");
+
+            assertNotNull(result);
+            assertEquals(1, result.getContent().size());
+        }
+
+        @Test
+        void getSeries_abandonedFilter_appliesHavingClauseAndAltCount() {
+            mockAdminUser();
+            mockAggregateQueryInProgress(List.of(
+                    mockSeriesTuple("Dropped Series", 5L, 5, Instant.now(), 1L)
+            ));
+            mockCountQueryInProgress(1L);
+            mockBooksQuery(List.of(buildBook(22L, "Dropped Series", 1.0f, "Author A")));
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, "abandoned");
+
+            assertNotNull(result);
+            assertEquals(1, result.getContent().size());
+        }
+
+        @Test
+        void getSeries_unrecognizedStatusFilter_normalizesToNoFilter() {
+            mockAdminUser();
+            mockAggregateQuery(List.of(
+                    mockSeriesTuple("Any Series", 2L, 2, Instant.now(), 1L)
+            ));
+            mockCountQuery(1L);
+            mockBooksQuery(List.of(buildBook(23L, "Any Series", 1.0f, "Author A")));
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, "not-a-real-status");
+
+            assertNotNull(result);
+            assertEquals(1, result.getContent().size());
+        }
+
+        @Test
+        void getSeries_seriesStatus_wontRead_whenWontReadCountPositive() {
+            mockAdminUser();
+            Tuple tuple = mockSeriesTupleWithCounts("Won't Read Series", 4L, 4, Instant.now(), 0L, 0L, 0L, 2L);
+            mockAggregateQuery(List.of(tuple));
+            mockCountQuery(1L);
+            mockBooksQuery(List.of(buildBook(30L, "Won't Read Series", 1.0f, "Author A")));
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, null);
+
+            assertEquals("WONT_READ", result.getContent().getFirst().getSeriesStatus());
+        }
+
+        @Test
+        void getSeries_seriesStatus_abandoned_whenAbandonedCountPositive() {
+            mockAdminUser();
+            Tuple tuple = mockSeriesTupleWithCounts("Abandoned Series", 4L, 4, Instant.now(), 0L, 0L, 1L, 0L);
+            mockAggregateQuery(List.of(tuple));
+            mockCountQuery(1L);
+            mockBooksQuery(List.of(buildBook(31L, "Abandoned Series", 1.0f, "Author A")));
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, null);
+
+            assertEquals("ABANDONED", result.getContent().getFirst().getSeriesStatus());
+        }
+
+        @Test
+        void getSeries_seriesStatus_reading_whenReadingCountPositive() {
+            mockAdminUser();
+            Tuple tuple = mockSeriesTupleWithCounts("Reading Series", 4L, 4, Instant.now(), 0L, 1L, 0L, 0L);
+            mockAggregateQuery(List.of(tuple));
+            mockCountQuery(1L);
+            mockBooksQuery(List.of(buildBook(32L, "Reading Series", 1.0f, "Author A")));
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, null);
+
+            assertEquals("READING", result.getContent().getFirst().getSeriesStatus());
+        }
+
+        @Test
+        void getSeries_seriesStatus_unread_whenAllCountsAreNull() {
+            mockAdminUser();
+            Tuple tuple = mock(Tuple.class);
+            when(tuple.get(0, String.class)).thenReturn("Unread Series");
+            when(tuple.get(1, Long.class)).thenReturn(4L);
+            when(tuple.get(2, Integer.class)).thenReturn(4);
+            when(tuple.get(3, Instant.class)).thenReturn(Instant.now());
+            when(tuple.get(4, Long.class)).thenReturn(null);
+            when(tuple.get(5, Instant.class)).thenReturn(null);
+            when(tuple.get(6, Long.class)).thenReturn(null);
+            when(tuple.get(7, Long.class)).thenReturn(null);
+            when(tuple.get(8, Long.class)).thenReturn(null);
+            mockAggregateQuery(List.of(tuple));
+            mockCountQuery(1L);
+            mockBooksQuery(List.of(buildBook(33L, "Unread Series", 1.0f, "Author A")));
+
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, null);
+
+            assertEquals("UNREAD", result.getContent().getFirst().getSeriesStatus());
+            assertEquals(0, result.getContent().getFirst().getBooksRead());
+        }
+
+        @Test
+        void getSeries_nonAdmin_nullAssignedLibraries_treatedAsNoAccess() {
+            var permissions = new BookLoreUser.UserPermissions();
+            permissions.setAdmin(false);
+            BookLoreUser user = BookLoreUser.builder()
+                    .id(userId)
+                    .permissions(permissions)
+                    .assignedLibraries(null)
+                    .build();
+            when(authenticationService.getAuthenticatedUser()).thenReturn(user);
+
+            assertThrows(APIException.class, () ->
+                    service.getSeries(0, 20, null, null, 5L, null, null));
+        }
+
+        @Test
+        void getSeries_nonAdmin_emptyAssignedLibraries_throwsForbidden() {
+            mockNonAdminUser(Collections.emptySet());
+
+            assertThrows(APIException.class, () ->
+                    service.getSeries(0, 20, null, null, 5L, null, null));
+        }
     }
 
     // ---- getSeriesBooks tests ----
@@ -300,6 +467,38 @@ class AppSeriesServiceTest {
 
             assertEquals(50, result.getSize());
         }
+
+        @Test
+        void getSeriesBooks_nonAdmin_withoutSpecificLibraryId_restrictsToAllAccessibleLibraries() {
+            mockNonAdminUser(Set.of(5L, 6L));
+            mockBookPage(Collections.emptyList(), 0L);
+
+            AppPageResponse<AppBookSummary> result = service.getSeriesBooks("Dune", 0, 20, null, null, null);
+
+            assertNotNull(result);
+            verify(bookRepository).findAll(any(Specification.class), any(Pageable.class));
+        }
+
+        @Test
+        void getSeriesBooks_admin_withSpecificLibraryId_restrictsToThatLibrary() {
+            mockAdminUser();
+            mockBookPage(Collections.emptyList(), 0L);
+
+            AppPageResponse<AppBookSummary> result = service.getSeriesBooks("Dune", 0, 20, null, null, 5L);
+
+            assertNotNull(result);
+            verify(bookRepository).findAll(any(Specification.class), any(Pageable.class));
+        }
+
+        @Test
+        void getSeriesBooks_sortBySeriesNumber_explicit() {
+            mockAdminUser();
+            mockBookPage(Collections.emptyList(), 0L);
+
+            AppPageResponse<AppBookSummary> result = service.getSeriesBooks("Dune", 0, 20, "seriesNumber", "asc", null);
+
+            assertNotNull(result);
+        }
     }
 
     // ---- Helpers ----
@@ -345,6 +544,15 @@ class AppSeriesServiceTest {
     private Tuple mockSeriesTupleInProgress(String name, Long count, Integer total, Instant addedOn, Long booksRead, Instant lastReadTime) {
         Tuple tuple = mockSeriesTuple(name, count, total, addedOn, booksRead);
         when(tuple.get(5, Instant.class)).thenReturn(lastReadTime);
+        return tuple;
+    }
+
+    private Tuple mockSeriesTupleWithCounts(String name, Long count, Integer total, Instant addedOn, Long booksRead,
+                                             Long readingCount, Long abandonedCount, Long wontReadCount) {
+        Tuple tuple = mockSeriesTuple(name, count, total, addedOn, booksRead);
+        when(tuple.get(6, Long.class)).thenReturn(readingCount);
+        when(tuple.get(7, Long.class)).thenReturn(abandonedCount);
+        when(tuple.get(8, Long.class)).thenReturn(wontReadCount);
         return tuple;
     }
 
