@@ -17,20 +17,24 @@ import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.file.FileMoveService;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
+import org.booklore.service.metadata.writer.MetadataWriter;
 import org.booklore.service.metadata.writer.MetadataWriterFactory;
 import org.booklore.util.FileService;
 import org.booklore.util.MetadataChangeDetector;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.File;
 import java.time.LocalDate;
 import java.time.Month;
 import java.util.*;
@@ -43,6 +47,8 @@ import java.nio.file.Path;
 
 @ExtendWith(MockitoExtension.class)
 class BookMetadataUpdaterTest {
+
+    private static final String TEST_BOOK_EPUB = "book.epub";
 
     @Mock private AppProperties appProperties;
     @Mock private AuthorRepository authorRepository;
@@ -1726,7 +1732,7 @@ class BookMetadataUpdaterTest {
         @Test
         void movesFile_whenSettingEnabled() {
             BookFileEntity primaryFile = BookFileEntity.builder()
-                    .fileName("book.epub").bookType(BookFileType.EPUB).build();
+                    .fileName(TEST_BOOK_EPUB).bookType(BookFileType.EPUB).build();
             bookEntity.setBookFiles(new ArrayList<>(List.of(primaryFile)));
 
             BookMetadata newMeta = BookMetadata.builder().title("T").build();
@@ -1759,7 +1765,7 @@ class BookMetadataUpdaterTest {
         @Test
         void moveFileException_doesNotFailUpdate() {
             BookFileEntity primaryFile = BookFileEntity.builder()
-                    .fileName("book.epub").bookType(BookFileType.EPUB).build();
+                    .fileName(TEST_BOOK_EPUB).bookType(BookFileType.EPUB).build();
             bookEntity.setBookFiles(new ArrayList<>(List.of(primaryFile)));
 
             BookMetadata newMeta = BookMetadata.builder().title("T").build();
@@ -1850,6 +1856,119 @@ class BookMetadataUpdaterTest {
 
                 verify(metadataWriterFactory, never()).getWriter(any());
                 verify(bookRepository).save(bookEntity);
+            }
+        }
+    }
+
+    @Nested
+    class FileWriteExecution {
+
+        private Path tempDir;
+        private BookFileEntity primaryFile;
+
+        @BeforeEach
+        void setUpFile() throws Exception {
+            tempDir = Files.createTempDirectory("test-metadata-filewrite-");
+            Files.write(tempDir.resolve(TEST_BOOK_EPUB), new byte[]{1, 2, 3, 4});
+
+            bookEntity.setLibraryPath(LibraryPathEntity.builder().path(tempDir.toString()).build());
+            primaryFile = BookFileEntity.builder().fileName(TEST_BOOK_EPUB).fileSubPath("").bookType(BookFileType.EPUB).build();
+            bookEntity.setBookFiles(new ArrayList<>(List.of(primaryFile)));
+        }
+
+        @AfterEach
+        void tearDownFile() throws Exception {
+            Files.deleteIfExists(tempDir.resolve(TEST_BOOK_EPUB));
+            Files.deleteIfExists(tempDir);
+        }
+
+        private void enableEpubFormat() {
+            MetadataPersistenceSettings.FormatSettings epubSettings = MetadataPersistenceSettings.FormatSettings.builder()
+                    .enabled(true).maxFileSizeInMb(100).build();
+            MetadataPersistenceSettings settings = MetadataPersistenceSettings.builder()
+                    .saveToOriginalFile(MetadataPersistenceSettings.SaveToOriginalFile.builder().epub(epubSettings).build())
+                    .build();
+            when(appSettingService.getAppSettings()).thenReturn(
+                    AppSettings.builder().metadataPersistenceSettings(settings).build());
+            when(sidecarMetadataWriter.isWriteOnUpdateEnabled()).thenReturn(false);
+        }
+
+        @Test
+        void writesMetadataToFileWhenLocalStorageAndFormatEnabledAndValueChanges() {
+            MetadataWriter writer = mock(MetadataWriter.class);
+            when(metadataWriterFactory.getWriter(BookFileType.EPUB)).thenReturn(Optional.of(writer));
+
+            BookMetadata newMeta = BookMetadata.builder().title("T").build();
+            MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                enableEpubFormat();
+                mcd.when(() -> MetadataChangeDetector.isDifferent(any(), any(), any())).thenReturn(true);
+                mcd.when(() -> MetadataChangeDetector.hasValueChanges(any(), any(), any())).thenReturn(true);
+                mcd.when(() -> MetadataChangeDetector.hasLockChanges(any(), any())).thenReturn(false);
+                mcd.when(() -> MetadataChangeDetector.hasValueChangesForFileWrite(any(), any(), any())).thenReturn(true);
+
+                updater.setBookMetadata(context);
+
+                verify(writer).saveMetadataToFile(any(File.class), eq(metadataEntity), any(), any());
+                assertThat(primaryFile.getCurrentHash()).isNotBlank();
+            }
+        }
+
+        @Test
+        void fileWriteExceptionDoesNotFailUpdate() {
+            MetadataWriter writer = mock(MetadataWriter.class);
+            doThrow(new RuntimeException("write error")).when(writer)
+                    .saveMetadataToFile(any(File.class), any(), any(), any());
+            when(metadataWriterFactory.getWriter(BookFileType.EPUB)).thenReturn(Optional.of(writer));
+
+            BookMetadata newMeta = BookMetadata.builder().title("T").build();
+            MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                enableEpubFormat();
+                mcd.when(() -> MetadataChangeDetector.isDifferent(any(), any(), any())).thenReturn(true);
+                mcd.when(() -> MetadataChangeDetector.hasValueChanges(any(), any(), any())).thenReturn(true);
+                mcd.when(() -> MetadataChangeDetector.hasLockChanges(any(), any())).thenReturn(false);
+                mcd.when(() -> MetadataChangeDetector.hasValueChangesForFileWrite(any(), any(), any())).thenReturn(true);
+
+                updater.setBookMetadata(context);
+
+                assertThat(primaryFile.getCurrentHash()).isNull();
+                verify(bookRepository).save(bookEntity);
+            }
+        }
+
+        @Test
+        void blocksLocalOrPrivateThumbnailUrlDuringFileWrite() {
+            MetadataWriter writer = mock(MetadataWriter.class);
+            when(metadataWriterFactory.getWriter(BookFileType.EPUB)).thenReturn(Optional.of(writer));
+
+            BookMetadata newMeta = BookMetadata.builder().title("T").thumbnailUrl("http://127.0.0.1/cover.jpg").build();
+            MetadataUpdateContext context = MetadataUpdateContext.builder()
+                    .bookEntity(bookEntity)
+                    .metadataUpdateWrapper(MetadataUpdateWrapper.builder().metadata(newMeta).build())
+                    .replaceMode(MetadataReplaceMode.REPLACE_ALL)
+                    .updateThumbnail(true)
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                when(appSettingService.getAppSettings()).thenReturn(
+                        AppSettings.builder().metadataPersistenceSettings(
+                                MetadataPersistenceSettings.builder()
+                                        .saveToOriginalFile(MetadataPersistenceSettings.SaveToOriginalFile.builder().build())
+                                        .build()).build());
+                when(sidecarMetadataWriter.isWriteOnUpdateEnabled()).thenReturn(false);
+                mcd.when(() -> MetadataChangeDetector.isDifferent(any(), any(), any())).thenReturn(true);
+                mcd.when(() -> MetadataChangeDetector.hasValueChanges(any(), any(), any())).thenReturn(true);
+                mcd.when(() -> MetadataChangeDetector.hasLockChanges(any(), any())).thenReturn(false);
+                mcd.when(() -> MetadataChangeDetector.hasValueChangesForFileWrite(any(), any(), any())).thenReturn(false);
+
+                updater.setBookMetadata(context);
+
+                ArgumentCaptor<String> thumbnailCaptor = ArgumentCaptor.forClass(String.class);
+                verify(writer).saveMetadataToFile(any(File.class), eq(metadataEntity), thumbnailCaptor.capture(), any());
+                assertThat(thumbnailCaptor.getValue()).isNull();
             }
         }
     }

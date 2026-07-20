@@ -52,6 +52,8 @@ import java.net.URLDecoder;
 
 class EpubMetadataWriterTest {
 
+    private static final String BELONGS_TO_COLLECTION = "belongs-to-collection";
+
     private EpubMetadataWriter writer;
     private BookMetadataEntity metadata;
     private BookEntity bookEntity;
@@ -447,7 +449,7 @@ class EpubMetadataWriterTest {
                     .contains("name=\"calibre:series_index\"")
                     .contains("content=\"5\"")
                     // Should NOT contain EPUB3 series constructs
-                    .doesNotContain("belongs-to-collection")
+                    .doesNotContain(BELONGS_TO_COLLECTION)
                     .doesNotContain("collection-type")
                     .doesNotContain("group-position");
         }
@@ -1116,6 +1118,71 @@ class EpubMetadataWriterTest {
             assertDoesNotThrow(() -> writer.replaceCoverImageFromBytes(bookEntity(epubFile), createMinimalPngImage()));
         }
 
+        @Test
+        @DisplayName("Should not throw when the cover item has a blank href attribute")
+        void blankCoverHrefDoesNotThrow() throws Exception {
+            String opf = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Book</dc:title>
+                        </metadata>
+                        <manifest>
+                            <item id="cover-image" href="" media-type="image/jpeg" properties="cover-image"/>
+                        </manifest>
+                    </package>""";
+            File epubFile = createEpubWithOpf(opf, "cover-blank-href-" + System.nanoTime() + ".epub");
+
+            assertDoesNotThrow(() -> writer.replaceCoverImageFromBytes(bookEntity(epubFile), createMinimalPngImage()));
+        }
+
+        @Test
+        @DisplayName("Should not throw when no OPF file can be located for cover replacement")
+        void missingOpfDoesNotThrowDuringCoverReplacement() throws Exception {
+            File epubFile = tempDir.resolve("cover-no-opf-" + System.nanoTime() + ".epub").toFile();
+            String containerXml = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                        <rootfiles>
+                            <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+                        </rootfiles>
+                    </container>
+                    """;
+            try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(epubFile))) {
+                zos.putNextEntry(new ZipEntry("mimetype"));
+                zos.write("application/epub+zip".getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+                zos.putNextEntry(new ZipEntry("META-INF/container.xml"));
+                zos.write(containerXml.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+            }
+
+            assertDoesNotThrow(() -> writer.replaceCoverImageFromBytes(bookEntity(epubFile), createMinimalPngImage()));
+        }
+
+        @Test
+        @DisplayName("replaceCoverImageFromUrl should replace the cover when the image loads successfully")
+        void urlReplacesCoverWhenLoadSucceeds() throws Exception {
+            String opf = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Book</dc:title>
+                        </metadata>
+                        <manifest>
+                            <item id="cover-image" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+                        </manifest>
+                    </package>""";
+            File epubFile = createEpubWithManifestAndCover(opf, "cover.jpg", new byte[]{1, 1, 1}, "cover-url-success-" + System.nanoTime() + ".epub");
+
+            when(fileService.downloadImageFromUrl(anyString())).thenReturn(new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB));
+
+            writer.replaceCoverImageFromUrl(bookEntity(epubFile), "https://example.com/cover.jpg");
+
+            byte[] updated = readZipEntry(epubFile, "OEBPS/cover.jpg");
+            assertThat(updated).isNotEqualTo(new byte[]{1, 1, 1});
+        }
+
         private BookEntity bookEntity(File epubFile) {
             BookEntity entity = new BookEntity();
             LibraryPathEntity libraryPath = new LibraryPathEntity();
@@ -1213,7 +1280,7 @@ class EpubMetadataWriterTest {
             int idxPublisher = content.indexOf("<dc:publisher>Pub</dc:publisher>");
             int idxDescription = content.indexOf("<dc:description>Desc</dc:description>");
             int idxSubject = content.indexOf("<dc:subject>Fiction</dc:subject>");
-            int idxSeriesMeta = content.indexOf("belongs-to-collection");
+            int idxSeriesMeta = content.indexOf(BELONGS_TO_COLLECTION);
             int idxModified = content.indexOf("dcterms:modified");
             int idxOtherMeta = content.indexOf("rendition:layout");
             int idxBooklore = content.indexOf("booklore:page_count");
@@ -1232,6 +1299,333 @@ class EpubMetadataWriterTest {
             assertThat(idxOtherMeta).isGreaterThan(idxModified);
             assertThat(idxBooklore).isGreaterThan(idxOtherMeta);
         }
+    }
+
+    @Nested
+    @DisplayName("Null Clear Flags Tests")
+    class NullClearFlagsTests {
+
+        @Test
+        @DisplayName("Should treat a null MetadataClearFlags as no fields cleared")
+        void nullClearFlagsTreatedAsNoClear() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Book</dc:title>
+                        </metadata>
+                    </package>""";
+
+            metadata.setDescription("A description.");
+
+            File epubFile = createEpubWithOpf(opfContent, "test-null-clear-" + System.nanoTime() + ".epub");
+            assertDoesNotThrow(() -> writer.saveMetadataToFile(epubFile, metadata, null, null));
+
+            String content = readOpfContent(epubFile);
+            assertThat(content).contains("<dc:description>A description.</dc:description>");
+        }
+    }
+
+    @Nested
+    @DisplayName("Clear Optional Identifiers And Series Tests")
+    class ClearOptionalIdentifiersAndSeriesTests {
+
+        @Test
+        @DisplayName("Should remove every optional identifier and series metadata when their clear flags are set")
+        void clearingAllOptionalIdentifiersAndSeriesRemovesThem() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Book</dc:title>
+                            <dc:identifier>urn:isbn:0135957059</dc:identifier>
+                            <dc:identifier>urn:amazon:B09XXXAMZN</dc:identifier>
+                            <dc:identifier>urn:goodreads:99999</dc:identifier>
+                            <dc:identifier>urn:google:goo123</dc:identifier>
+                            <dc:identifier>urn:comicvine:cv456</dc:identifier>
+                            <dc:identifier>urn:hardcover:hc789</dc:identifier>
+                            <dc:identifier>urn:hardcoverbook:hcb1</dc:identifier>
+                            <dc:identifier>urn:lubimyczytac:lu1</dc:identifier>
+                            <dc:identifier>urn:ranobedb:rn1</dc:identifier>
+                            <meta property="belongs-to-collection">Old Series</meta>
+                        </metadata>
+                    </package>""";
+
+            MetadataClearFlags clear = new MetadataClearFlags();
+            clear.setIsbn13(true);
+            clear.setIsbn10(true);
+            clear.setAsin(true);
+            clear.setGoodreadsId(true);
+            clear.setGoogleId(true);
+            clear.setComicvineId(true);
+            clear.setHardcoverId(true);
+            clear.setHardcoverBookId(true);
+            clear.setLubimyczytacId(true);
+            clear.setRanobedbId(true);
+            clear.setSeriesName(true);
+            clear.setSeriesNumber(true);
+
+            BookMetadataEntity emptyMeta = new BookMetadataEntity();
+            emptyMeta.setAuthors(null);
+            emptyMeta.setCategories(null);
+
+            File epubFile = createEpubWithOpf(opfContent, "test-clear-all-identifiers-" + System.nanoTime() + ".epub");
+            writer.saveMetadataToFile(epubFile, emptyMeta, null, clear);
+
+            String content = readOpfContent(epubFile);
+            assertThat(content)
+                    .doesNotContain("urn:isbn:0135957059")
+                    .doesNotContain("urn:amazon:B09XXXAMZN")
+                    .doesNotContain("urn:goodreads:99999")
+                    .doesNotContain("urn:google:goo123")
+                    .doesNotContain("urn:comicvine:cv456")
+                    .doesNotContain("urn:hardcover:hc789")
+                    .doesNotContain("urn:hardcoverbook:hcb1")
+                    .doesNotContain("urn:lubimyczytac:lu1")
+                    .doesNotContain("urn:ranobedb:rn1")
+                    .doesNotContain(BELONGS_TO_COLLECTION);
+        }
+    }
+
+    @Nested
+    @DisplayName("Single Word Author Name Tests")
+    class SingleWordAuthorNameTests {
+
+        @Test
+        @DisplayName("Should handle a single-word author name without a space")
+        void singleWordAuthorNameOmitsFirstName() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+                            <dc:title>Book</dc:title>
+                        </metadata>
+                    </package>""";
+
+            AuthorEntity author = new AuthorEntity();
+            author.setName("Cher");
+            metadata.setAuthors(List.of(author));
+
+            File epubFile = createEpubWithOpf(opfContent, "test-single-word-author-" + System.nanoTime() + ".epub");
+            writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
+
+            String content = readOpfContent(epubFile);
+            assertThat(content)
+                    .contains(">Cher<")
+                    .contains("opf:file-as=\"Cher, \"");
+        }
+    }
+
+    @Nested
+    @DisplayName("Backup And Recovery Tests")
+    class BackupAndRecoveryTests {
+
+        @Test
+        @DisplayName("Should abort without modifying the file when backup creation fails")
+        void backupCreationFailureAbortsSave() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Book</dc:title>
+                        </metadata>
+                    </package>""";
+            File epubFile = createEpubWithOpf(opfContent, "test-backupfail-" + System.nanoTime() + ".epub");
+
+            File backupBlocker = new File(epubFile.getParentFile(), epubFile.getName() + ".bak");
+            assertTrue(backupBlocker.mkdir());
+            Files.write(backupBlocker.toPath().resolve("occupied.txt"), new byte[]{1});
+            byte[] before = Files.readAllBytes(epubFile.toPath());
+
+            assertDoesNotThrow(() -> writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags()));
+
+            byte[] after = Files.readAllBytes(epubFile.toPath());
+            assertThat(after).isEqualTo(before);
+        }
+
+        @Test
+        @DisplayName("Should restore from backup and clean it up when the OPF is malformed XML")
+        void malformedOpfRestoresFromBackupAndCleansUp() throws Exception {
+            String opfContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><package><metadata><dc:title>Broken</metadata>";
+            File epubFile = createEpubWithOpf(opfContent, "test-malformed-" + System.nanoTime() + ".epub");
+            byte[] before = Files.readAllBytes(epubFile.toPath());
+
+            assertDoesNotThrow(() -> writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags()));
+
+            byte[] after = Files.readAllBytes(epubFile.toPath());
+            assertThat(after).isEqualTo(before);
+            assertThat(new File(epubFile.getParentFile(), epubFile.getName() + ".bak")).doesNotExist();
+        }
+    }
+
+    @Nested
+    @DisplayName("Booklore Metadata Change Detection Tests")
+    class BookloreMetadataChangeDetectionTests {
+
+        @Test
+        @DisplayName("Should not rewrite when pre-existing booklore metadata already matches expected values")
+        void matchingExistingBookloreMetadataSkipsRewrite() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Untouched</dc:title>
+                            <meta property="booklore:page_count">350</meta>
+                        </metadata>
+                    </package>""";
+
+            File epubFile = createEpubWithOpf(opfContent, "test-booklore-match-" + System.nanoTime() + ".epub");
+            byte[] before = Files.readAllBytes(epubFile.toPath());
+
+            BookMetadataEntity sameMeta = new BookMetadataEntity();
+            sameMeta.setTitle("Untouched");
+            sameMeta.setPageCount(350);
+            sameMeta.setAuthors(null);
+            sameMeta.setCategories(null);
+
+            writer.saveMetadataToFile(epubFile, sameMeta, null, new MetadataClearFlags());
+
+            byte[] after = Files.readAllBytes(epubFile.toPath());
+            assertThat(after).isEqualTo(before);
+        }
+
+        @Test
+        @DisplayName("Should rewrite when pre-existing non-numeric booklore metadata differs from expected values")
+        void differingExistingBookloreMetadataTriggersRewrite() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Untouched</dc:title>
+                            <meta property="booklore:content_rating">unrated</meta>
+                        </metadata>
+                    </package>""";
+
+            File epubFile = createEpubWithOpf(opfContent, "test-booklore-diff-" + System.nanoTime() + ".epub");
+
+            BookMetadataEntity sameTitleMeta = new BookMetadataEntity();
+            sameTitleMeta.setTitle("Untouched");
+            sameTitleMeta.setContentRating("teen");
+            sameTitleMeta.setAuthors(null);
+            sameTitleMeta.setCategories(null);
+
+            writer.saveMetadataToFile(epubFile, sameTitleMeta, null, new MetadataClearFlags());
+
+            String content = readOpfContent(epubFile);
+            assertThat(content)
+                    .contains("property=\"booklore:content_rating\"")
+                    .contains(">teen<")
+                    .doesNotContain("unrated");
+        }
+    }
+
+    @Nested
+    @DisplayName("Thumbnail Cover Load Failure Tests")
+    class ThumbnailCoverLoadFailureTests {
+
+        @Test
+        @DisplayName("Should not apply a cover during saveMetadataToFile when the thumbnail fails to load")
+        void thumbnailLoadFailureDoesNotApplyCover() throws Exception {
+            String opf = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Book</dc:title>
+                        </metadata>
+                        <manifest>
+                            <item id="cover-image" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+                        </manifest>
+                    </package>""";
+            File epubFile = createEpubWithManifestAndCover(opf, "cover.jpg", new byte[]{9, 9, 9}, "thumb-fail-" + System.nanoTime() + ".epub");
+
+            when(fileService.downloadImageFromUrl(anyString())).thenThrow(new IOException("boom"));
+
+            assertDoesNotThrow(() -> writer.saveMetadataToFile(epubFile, metadata, "https://example.com/thumb.jpg", new MetadataClearFlags()));
+
+            byte[] cover = readZipEntry(epubFile, "OEBPS/cover.jpg");
+            assertThat(cover).isEqualTo(new byte[]{9, 9, 9});
+        }
+    }
+
+    @Nested
+    @DisplayName("Disabled Setting Skip Tests")
+    class DisabledSettingSkipTests {
+
+        @Test
+        @DisplayName("saveMetadataToFile should skip writing when EPUB metadata writing is disabled")
+        void saveMetadataToFileSkipsWhenDisabled() throws Exception {
+            configureEpubWritingDisabled();
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Book</dc:title>
+                        </metadata>
+                    </package>""";
+            metadata.setDescription("Should not be written.");
+            File epubFile = createEpubWithOpf(opfContent, "test-save-disabled-" + System.nanoTime() + ".epub");
+            byte[] before = Files.readAllBytes(epubFile.toPath());
+
+            writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
+
+            assertThat(Files.readAllBytes(epubFile.toPath())).isEqualTo(before);
+        }
+
+        @Test
+        @DisplayName("replaceCoverImageFromBytes should skip when EPUB metadata writing is disabled")
+        void bytesSkipsWhenDisabled() throws IOException {
+            configureEpubWritingDisabled();
+            Path filePath = bookEntity.getFullFilePath();
+            Files.write(filePath, new byte[]{1, 2, 3});
+            byte[] before = Files.readAllBytes(filePath);
+
+            writer.replaceCoverImageFromBytes(bookEntity, createMinimalPngImage());
+
+            assertThat(Files.readAllBytes(filePath)).isEqualTo(before);
+        }
+
+        @Test
+        @DisplayName("replaceCoverImageFromUpload should skip when EPUB metadata writing is disabled")
+        void uploadSkipsWhenDisabled() throws IOException {
+            configureEpubWritingDisabled();
+            Path filePath = bookEntity.getFullFilePath();
+            Files.write(filePath, new byte[]{1, 2, 3});
+            byte[] before = Files.readAllBytes(filePath);
+            MultipartFile coverFile = new MockMultipartFile("cover.png", "cover.png", "image/png", createMinimalPngImage());
+
+            writer.replaceCoverImageFromUpload(bookEntity, coverFile);
+
+            assertThat(Files.readAllBytes(filePath)).isEqualTo(before);
+        }
+
+        @Test
+        @DisplayName("replaceCoverImageFromUrl should skip when EPUB metadata writing is disabled")
+        void urlSkipsWhenDisabled() throws IOException {
+            configureEpubWritingDisabled();
+            Path filePath = bookEntity.getFullFilePath();
+            Files.write(filePath, new byte[]{1, 2, 3});
+            byte[] before = Files.readAllBytes(filePath);
+
+            writer.replaceCoverImageFromUrl(bookEntity, "https://example.com/cover.jpg");
+
+            assertThat(Files.readAllBytes(filePath)).isEqualTo(before);
+        }
+    }
+
+    private void configureEpubWritingDisabled() {
+        MetadataPersistenceSettings.FormatSettings epubFormatSettings = MetadataPersistenceSettings.FormatSettings.builder()
+                .enabled(false)
+                .maxFileSizeInMb(100)
+                .build();
+        MetadataPersistenceSettings.SaveToOriginalFile saveToOriginalFile = MetadataPersistenceSettings.SaveToOriginalFile.builder()
+                .epub(epubFormatSettings)
+                .build();
+        MetadataPersistenceSettings metadataPersistenceSettings = new MetadataPersistenceSettings();
+        metadataPersistenceSettings.setSaveToOriginalFile(saveToOriginalFile);
+
+        AppSettings appSettings = mock(AppSettings.class);
+        when(appSettings.getMetadataPersistenceSettings()).thenReturn(metadataPersistenceSettings);
+        when(appSettingService.getAppSettings()).thenReturn(appSettings);
     }
 
     private File createEpubWithManifestAndCover(String opfContent, String coverRelativeHref, byte[] coverBytes, String filename) throws IOException {
