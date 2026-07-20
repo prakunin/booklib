@@ -58,7 +58,7 @@ class AppBookServiceLazyInpxCoverTest {
                 shelfRepository, authenticationService, mobileBookMapper, appBookProgressService,
                 magicShelfBookService, entityManager, restrictionRepository,
                 new AppContentRestrictionQueryService(restrictionRepository), bookSortRegistry,
-                eventPublisher, new CatalogSummaryCache(), new FilterOptionsCache());
+                eventPublisher, new CatalogSummaryCache(), new FilterOptionsCache(), new ShellBookIdsCache());
     }
 
     @Test

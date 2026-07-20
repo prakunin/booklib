@@ -71,7 +71,7 @@ class AppBookServiceFilterOptionsTest {
                 shelfRepository, authenticationService, mobileBookMapper,
                 appBookProgressService, magicShelfBookService, entityManager, restrictionRepository,
                 new AppContentRestrictionQueryService(restrictionRepository), bookSortRegistry, eventPublisher,
-                new CatalogSummaryCache(), new FilterOptionsCache()
+                new CatalogSummaryCache(), new FilterOptionsCache(), new ShellBookIdsCache()
         );
     }
 

@@ -79,6 +79,7 @@ public class AppBookService {
     private final ApplicationEventPublisher eventPublisher;
     private final CatalogSummaryCache catalogSummaryCache;
     private final FilterOptionsCache filterOptionsCache;
+    private final ShellBookIdsCache shellBookIdsCache;
 
     public AppBookService(BookRepository bookRepository,
                           UserBookProgressRepository userBookProgressRepository,
@@ -94,7 +95,8 @@ public class AppBookService {
                           BookSortRegistry bookSortRegistry,
                           ApplicationEventPublisher eventPublisher,
                           CatalogSummaryCache catalogSummaryCache,
-                          FilterOptionsCache filterOptionsCache) {
+                          FilterOptionsCache filterOptionsCache,
+                          ShellBookIdsCache shellBookIdsCache) {
         this.bookRepository = bookRepository;
         this.userBookProgressRepository = userBookProgressRepository;
         this.userBookFileProgressRepository = userBookFileProgressRepository;
@@ -110,6 +112,7 @@ public class AppBookService {
         this.eventPublisher = eventPublisher;
         this.catalogSummaryCache = catalogSummaryCache;
         this.filterOptionsCache = filterOptionsCache;
+        this.shellBookIdsCache = shellBookIdsCache;
     }
 
     public AppPageResponse<AppBookSummary> getBooks(BookListRequest req) {
@@ -1314,10 +1317,10 @@ public class AppBookService {
      * recomputation and the aggregates only pay for it when shells actually exist.
      */
     private Set<Long> findShellBookIds() {
-        return Set.copyOf(entityManager.createQuery(
+        return shellBookIdsCache.get(() -> Set.copyOf(entityManager.createQuery(
                 "SELECT b.id FROM BookEntity b"
                         + " WHERE b.bookFiles IS EMPTY AND (b.isPhysical IS NULL OR b.isPhysical = false)",
-                Long.class).getResultList());
+                Long.class).getResultList()));
     }
 
     private String visibilityClause(Set<Long> shellBookIds) {
