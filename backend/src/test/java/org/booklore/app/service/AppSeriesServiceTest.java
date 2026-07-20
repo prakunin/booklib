@@ -72,7 +72,7 @@ class AppSeriesServiceTest {
             mockCountQuery(1L);
             mockBooksQuery(List.of(buildBook(1L, "The Expanse", 1.0f, "Author A")));
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, false);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, null);
 
             assertNotNull(result);
             assertEquals(1, result.getContent().size());
@@ -87,7 +87,7 @@ class AppSeriesServiceTest {
             mockAggregateQuery(Collections.emptyList());
             mockCountQuery(0L);
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, false);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, null);
 
             assertNotNull(result);
             assertTrue(result.getContent().isEmpty());
@@ -103,7 +103,7 @@ class AppSeriesServiceTest {
             mockCountQuery(1L);
             mockBooksQuery(List.of(buildBook(2L, "Dune", 1.0f, "Frank Herbert")));
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, 5L, null, false);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, 5L, null, null);
 
             assertNotNull(result);
             assertEquals(1, result.getContent().size());
@@ -114,7 +114,7 @@ class AppSeriesServiceTest {
             mockNonAdminUser(Set.of(10L));
 
             assertThrows(APIException.class, () ->
-                    service.getSeries(0, 20, null, null, 5L, null, false));
+                    service.getSeries(0, 20, null, null, 5L, null, null));
         }
 
         @Test
@@ -126,7 +126,7 @@ class AppSeriesServiceTest {
             mockCountQuery(1L);
             mockBooksQuery(List.of(buildBook(3L, "Harry Potter", 1.0f, "J.K. Rowling")));
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, "harry", false);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, "harry", null);
 
             assertNotNull(result);
             assertEquals(1, result.getContent().size());
@@ -141,7 +141,7 @@ class AppSeriesServiceTest {
             mockCountQueryInProgress(1L);
             mockBooksQuery(List.of(buildBook(1L, "The Expanse", 1.0f, "Author A")));
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, true);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, "in-progress");
 
             assertNotNull(result);
             assertEquals(1, result.getContent().size());
@@ -153,7 +153,7 @@ class AppSeriesServiceTest {
             mockAggregateQuery(Collections.emptyList());
             mockCountQuery(0L);
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(null, null, null, null, null, null, false);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(null, null, null, null, null, null, null);
 
             assertEquals(0, result.getPage());
             assertEquals(20, result.getSize());
@@ -165,7 +165,7 @@ class AppSeriesServiceTest {
             mockAggregateQuery(Collections.emptyList());
             mockCountQuery(0L);
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 100, null, null, null, null, false);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 100, null, null, null, null, null);
 
             assertEquals(50, result.getSize());
         }
@@ -182,7 +182,7 @@ class AppSeriesServiceTest {
             mockCountQuery(1L);
             mockBooksQuery(List.of(book1, book2));
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, false);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, null, null, null, null, null);
 
             AppSeriesSummary series = result.getContent().getFirst();
             assertEquals(2, series.getCoverBooks().size());
@@ -198,7 +198,7 @@ class AppSeriesServiceTest {
             mockAggregateQuery(Collections.emptyList());
             mockCountQuery(0L);
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "name", "asc", null, null, false);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "name", "asc", null, null, null);
 
             assertNotNull(result);
         }
@@ -209,7 +209,7 @@ class AppSeriesServiceTest {
             mockAggregateQuery(Collections.emptyList());
             mockCountQuery(0L);
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "bookCount", "desc", null, null, false);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "bookCount", "desc", null, null, null);
 
             assertNotNull(result);
         }
@@ -335,6 +335,10 @@ class AppSeriesServiceTest {
         when(tuple.get(2, Integer.class)).thenReturn(total);
         when(tuple.get(3, Instant.class)).thenReturn(addedOn);
         when(tuple.get(4, Long.class)).thenReturn(booksRead);
+        when(tuple.get(5, Instant.class)).thenReturn(null);
+        when(tuple.get(6, Long.class)).thenReturn(0L);
+        when(tuple.get(7, Long.class)).thenReturn(0L);
+        when(tuple.get(8, Long.class)).thenReturn(0L);
         return tuple;
     }
 
