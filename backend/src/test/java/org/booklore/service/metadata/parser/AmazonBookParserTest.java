@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -257,6 +258,7 @@ class AmazonBookParserTest {
 
         @Test
         @DisplayName("parses every metadata field, including reviews, from a full RPI-driven detail page")
+        @SuppressWarnings("java:S5961") // one thorough end-to-end assertion of every parsed field from a single fixture
         void parsesAllFieldsFromFullPage() throws Exception {
             when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettingsWithReviews("com", 5));
             mockJsoupConnect("https://www.amazon.com/dp/EXAMPLEA1B", readFixture("amazon-book-page-full.html"));
@@ -274,7 +276,7 @@ class AmazonBookParserTest {
             assertThat(metadata.getIsbn10()).isEqualTo("042519078X");
             assertThat(metadata.getIsbn13()).isEqualTo("9780425190780");
             assertThat(metadata.getPublisher()).isEqualTo("Ace");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2019, 4, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2019, Month.APRIL, 1));
             assertThat(metadata.getSeriesName()).isEqualTo("The Example Series");
             assertThat(metadata.getSeriesNumber()).isEqualTo(3.0f);
             assertThat(metadata.getSeriesTotal()).isEqualTo(6);
@@ -293,7 +295,7 @@ class AmazonBookParserTest {
             assertThat(review.getRating()).isEqualTo(4.0f);
             assertThat(review.getCountry()).isEqualTo("United States");
             assertThat(review.getBody()).isEqualTo("Great book overall.");
-            assertThat(review.getDate()).isEqualTo(LocalDate.of(2019, 4, 1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant());
+            assertThat(review.getDate()).isEqualTo(LocalDate.of(2019, Month.APRIL, 1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant());
         }
 
         @Test
@@ -315,7 +317,7 @@ class AmazonBookParserTest {
             assertThat(metadata.getIsbn10()).isEqualTo("042519078X");
             assertThat(metadata.getIsbn13()).isEqualTo("9780425190780");
             assertThat(metadata.getPublisher()).isEqualTo("Beispielverlag");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2019, 4, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2019, Month.APRIL, 1));
             assertThat(metadata.getAmazonRating()).isEqualTo(3.8);
             assertThat(metadata.getAmazonReviewCount()).isNull();
             assertThat(metadata.getThumbnailUrl()).isEqualTo("https://example.com/fallback-only.jpg");
@@ -328,7 +330,7 @@ class AmazonBookParserTest {
             // The "vom ... Januar ..." date only parses under the German-locale fallback loop,
             // since "Januar" isn't recognized as a month name by the default English locale.
             assertThat(review.getCountry()).isEqualTo("Deutschland");
-            assertThat(review.getDate()).isEqualTo(LocalDate.of(2019, 1, 2).atStartOfDay(java.time.ZoneOffset.UTC).toInstant());
+            assertThat(review.getDate()).isEqualTo(LocalDate.of(2019, Month.JANUARY, 2).atStartOfDay(java.time.ZoneOffset.UTC).toInstant());
             assertThat(review.getBody()).isEqualTo("Sehr gutes Buch.");
         }
 

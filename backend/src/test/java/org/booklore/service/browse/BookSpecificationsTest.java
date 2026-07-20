@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.Collections;
 import java.util.List;
@@ -22,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -93,7 +95,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.withFileTypes(List.of("bogus"), "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.withFileTypes(List.of("bogus"), "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid fileType values")
                     .hasMessageContaining("bogus");
@@ -162,7 +166,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.withReadStatuses(List.of("BOGUS"), 1L, "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.withReadStatuses(List.of("BOGUS"), 1L, "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid status values");
         }
@@ -178,7 +184,7 @@ class BookSpecificationsTest {
             // cb.not() is invoked once internally to build the (unused, since hasUnset is
             // false) "no progress entry" predicate; the outer combined predicate itself is
             // not negated because mode is "or" rather than "not".
-            verify(cb, org.mockito.Mockito.times(1)).not(any());
+            verify(cb, times(1)).not(any());
         }
 
         @Test
@@ -520,7 +526,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.withAgeRatings(List.of("99"), "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.withAgeRatings(List.of("99"), "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid ageRating bucket ID");
         }
@@ -569,7 +577,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.withMatchScores(List.of("7"), "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.withMatchScores(List.of("7"), "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid matchScore bucket ID");
         }
@@ -619,7 +629,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.withFileSizes(List.of("8"), "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.withFileSizes(List.of("8"), "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid fileSize bucket ID");
         }
@@ -711,7 +723,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.withPageCounts(List.of("7"), "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.withPageCounts(List.of("7"), "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid pageCount bucket ID");
         }
@@ -743,7 +757,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.withAmazonRatings(List.of("9"), "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.withAmazonRatings(List.of("9"), "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid amazonRating bucket ID");
         }
@@ -847,7 +863,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.withShelfStatus(List.of("bogus"), "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.withShelfStatus(List.of("bogus"), "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid shelfStatus values");
         }
@@ -957,7 +975,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.inShelves(List.of("abc"), "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.inShelves(List.of("abc"), "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid shelf values");
         }
@@ -1093,7 +1113,9 @@ class BookSpecificationsTest {
             CriteriaQuery<?> query = deepQuery();
             CriteriaBuilder cb = deepCb();
 
-            assertThatThrownBy(() -> BookSpecifications.withComicCreators(List.of("Jim Lee:bogus"), "or").toPredicate(root, query, cb))
+            Specification<BookEntity> spec = BookSpecifications.withComicCreators(List.of("Jim Lee:bogus"), "or");
+
+            assertThatThrownBy(() -> spec.toPredicate(root, query, cb))
                     .isInstanceOf(APIException.class)
                     .hasMessageContaining("Invalid comic creator role");
         }

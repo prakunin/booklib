@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -294,7 +295,7 @@ class AudiobookMetadataWriterTest {
         @Test
         @DisplayName("Should set YEAR from published date")
         void setsYearFromPublishedDate() throws Exception {
-            metadata.setPublishedDate(LocalDate.of(2020, 1, 1));
+            metadata.setPublishedDate(LocalDate.of(2020, Month.JANUARY, 1));
             Tag tag = runSaveAndReturnTag();
 
             verify(tag).setField(FieldKey.YEAR, "2020");

@@ -25,6 +25,7 @@ import java.net.http.HttpHeaders;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -286,7 +287,7 @@ class ComicvineBookParserTest {
             assertThat(metadata.getTitle()).isEqualTo("The Example");
             assertThat(metadata.getSeriesTotal()).isEqualTo(3);
             assertThat(metadata.getPublisher()).isEqualTo("Gestalt Comics");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2009, 1, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2009, Month.JANUARY, 1));
         }
 
         @Test

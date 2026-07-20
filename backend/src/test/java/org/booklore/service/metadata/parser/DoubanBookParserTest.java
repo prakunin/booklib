@@ -16,6 +16,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,9 +29,11 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -61,8 +66,8 @@ class DoubanBookParserTest {
         bookPageAltFixture = readFixture("douban-book-page-alt.html");
 
         mockJsoup = mockStatic(Jsoup.class);
-        // cleanDescriptionHtml() calls the single-arg Jsoup.parse(String) overload directly;
-        // without this, the mocked static class would return null and silently fall back to raw HTML.
+        // cleanDescriptionHtml() calls the single-arg Jsoup.parse(String) overload directly.
+        // Without this stub, the mocked static class would return null and silently fall back to raw HTML.
         mockJsoup.when(() -> Jsoup.parse(any(String.class))).thenCallRealMethod();
     }
 
@@ -175,7 +180,7 @@ class DoubanBookParserTest {
             assertThat(metadata.getDoubanId()).isEqualTo("2567698");
             assertThat(metadata.getAuthors()).containsExactly("刘慈欣", "无");
             assertThat(metadata.getPublisher()).isEqualTo("重庆出版社");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2008, 1, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2008, Month.JANUARY, 1));
             assertThat(metadata.getIsbn13()).isEqualTo("9787536692930");
             assertThat(metadata.getIsbn10()).isNull();
             assertThat(metadata.getSeriesName()).isEqualTo("中国科幻基石丛书");
@@ -208,10 +213,10 @@ class DoubanBookParserTest {
             assertThat(review.getDate()).isNotNull();
         }
 
-        @Test
-        @DisplayName("returns empty list when window.__DATA__ JSON is absent")
-        void returnsEmptyWhenNoWindowData() throws Exception {
-            mockConnect("https://search.douban.com/book/subject_search?search_text=Foo", "<html><body>no data here</body></html>");
+        @ParameterizedTest(name = "returns empty list when {0}")
+        @MethodSource("unusableWindowDataHtml")
+        void returnsEmptyForUnusableWindowData(String scenario, String html) throws Exception {
+            mockConnect("https://search.douban.com/book/subject_search?search_text=Foo", html);
 
             Book book = bookWithTitle("Foo");
             FetchMetadataRequest request = FetchMetadataRequest.builder().title("Foo").build();
@@ -221,46 +226,15 @@ class DoubanBookParserTest {
             assertThat(results).isEmpty();
         }
 
-        @Test
-        @DisplayName("returns empty list when window.__DATA__ JSON has no items array")
-        void returnsEmptyWhenNoItemsArray() throws Exception {
-            mockConnect("https://search.douban.com/book/subject_search?search_text=Foo",
-                    "<html><body><script>window.__DATA__ = {\"foo\": 1};</script></body></html>");
-
-            Book book = bookWithTitle("Foo");
-            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Foo").build();
-
-            List<BookMetadata> results = parser.fetchMetadata(book, request);
-
-            assertThat(results).isEmpty();
-        }
-
-        @Test
-        @DisplayName("returns empty list when items array is empty")
-        void returnsEmptyWhenItemsEmpty() throws Exception {
-            mockConnect("https://search.douban.com/book/subject_search?search_text=Foo",
-                    "<html><body><script>window.__DATA__ = {\"items\": []};</script></body></html>");
-
-            Book book = bookWithTitle("Foo");
-            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Foo").build();
-
-            List<BookMetadata> results = parser.fetchMetadata(book, request);
-
-            assertThat(results).isEmpty();
-        }
-
-        @Test
-        @DisplayName("returns empty list when window.__DATA__ JSON is malformed")
-        void returnsEmptyWhenJsonMalformed() throws Exception {
-            mockConnect("https://search.douban.com/book/subject_search?search_text=Foo",
-                    "<html><body><script>window.__DATA__ = {not valid json};</script></body></html>");
-
-            Book book = bookWithTitle("Foo");
-            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Foo").build();
-
-            List<BookMetadata> results = parser.fetchMetadata(book, request);
-
-            assertThat(results).isEmpty();
+        static Stream<Arguments> unusableWindowDataHtml() {
+            return Stream.of(
+                    Arguments.of("window.__DATA__ JSON is absent", "<html><body>no data here</body></html>"),
+                    Arguments.of("window.__DATA__ JSON has no items array",
+                            "<html><body><script>window.__DATA__ = {\"foo\": 1};</script></body></html>"),
+                    Arguments.of("items array is empty",
+                            "<html><body><script>window.__DATA__ = {\"items\": []};</script></body></html>"),
+                    Arguments.of("window.__DATA__ JSON is malformed",
+                            "<html><body><script>window.__DATA__ = {not valid json};</script></body></html>"));
         }
     }
 
@@ -390,7 +364,7 @@ class DoubanBookParserTest {
             assertThat(metadata.getTitle()).isEqualTo("Alt Book Title");
             assertThat(metadata.getIsbn10()).isEqualTo("0393341769");
             assertThat(metadata.getIsbn13()).isNull();
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2011, 1, 10));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2011, Month.JANUARY, 10));
             assertThat(metadata.getDescription()).isEqualTo("Fallback description content.");
             assertThat(metadata.getBookReviews()).hasSize(1);
             assertThat(metadata.getBookReviews().getFirst().getReviewerName()).isEqualTo("Reader C");

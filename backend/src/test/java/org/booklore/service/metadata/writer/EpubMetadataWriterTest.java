@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
@@ -42,6 +43,7 @@ import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -592,7 +594,7 @@ class EpubMetadataWriterTest {
             metadata.setDescription("A great story.");
             metadata.setPublisher("Acme Publishing");
             metadata.setLanguage("fr");
-            metadata.setPublishedDate(LocalDate.of(2021, 5, 1));
+            metadata.setPublishedDate(LocalDate.of(2021, Month.MAY, 1));
 
             File epubFile = createEpubWithOpf(opfContent, "test-descriptive-" + System.nanoTime() + ".epub");
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
@@ -1036,7 +1038,7 @@ class EpubMetadataWriterTest {
 
             byte[] updated = readZipEntry(epubFile, "OEBPS/cover.jpg");
             assertThat(updated).isNotEqualTo(new byte[]{1, 2, 3});
-            assertThat(updated.length).isGreaterThan(0);
+            assertThat(updated).hasSizeGreaterThan(0);
         }
 
         @Test
@@ -1269,7 +1271,7 @@ class EpubMetadataWriterTest {
     private byte[] readZipEntry(File zipFile, String entryName) throws IOException {
         try (ZipFile zf = new ZipFile(zipFile)) {
             ZipEntry entry = zf.getEntry(entryName);
-            assertTrue(entry != null, "Expected entry " + entryName + " to exist");
+            assertNotNull(entry, "Expected entry " + entryName + " to exist");
             try (InputStream is = zf.getInputStream(entry)) {
                 return is.readAllBytes();
             }

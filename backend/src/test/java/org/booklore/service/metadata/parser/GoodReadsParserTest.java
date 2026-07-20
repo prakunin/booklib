@@ -26,6 +26,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Set;
 
@@ -230,7 +231,7 @@ class GoodReadsParserTest {
 
             assertThat(result).isNotNull();
             assertThat(result.getTitle()).isEqualTo("A Clockwork Orange");
-            assertThat(result.getPublishedDate()).isEqualTo(LocalDate.of(2015, 3, 21));
+            assertThat(result.getPublishedDate()).isEqualTo(LocalDate.of(2015, Month.MARCH, 21));
             // No search call was needed, only the GraphQL lookup.
             verify(httpClient, times(1)).send(any(), any());
         }
