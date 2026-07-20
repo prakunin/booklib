@@ -57,6 +57,7 @@ public class BookFileAutoAttacher {
                 .build();
 
         bookAdditionalFileRepository.save(additionalFile);
+        book.setHasFiles(true);
         String primaryFileName = book.hasFiles() ? book.getPrimaryBookFile().getFileName() : "book#" + book.getId();
         log.info("Auto-attached new format {} to existing book: {}", file.getFileName(), primaryFileName);
         return Optional.of(book);

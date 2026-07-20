@@ -107,6 +107,7 @@ public class BookCreatorService {
                 .addedOn(Instant.now())
                 .build();
         bookEntity.getBookFiles().add(bookFileEntity);
+        bookEntity.setHasFiles(true);
 
         BookMetadataEntity metadata = BookMetadataEntity.builder()
                 .book(bookEntity)

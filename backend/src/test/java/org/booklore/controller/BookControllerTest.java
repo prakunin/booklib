@@ -1,5 +1,6 @@
 package org.booklore.controller;
 
+import org.booklore.app.dto.AppCatalogSummary;
 import org.booklore.app.service.AppBookService;
 import org.booklore.exception.APIException;
 import org.booklore.model.dto.Book;
@@ -23,6 +24,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,7 +56,8 @@ class BookControllerTest {
 
     @Test
     void rejectsFlatCatalogBeforeMaterializingLargeLibrary() {
-        when(appBookService.getCatalogBookCount()).thenReturn(10_001L);
+        when(appBookService.getCatalogSummary())
+                .thenReturn(new AppCatalogSummary(10_001L, 0, 0, 0, Map.of()));
 
         assertThatThrownBy(() -> controller.getBooks(false, true))
                 .isInstanceOf(APIException.class)
@@ -65,7 +68,8 @@ class BookControllerTest {
     @Test
     void allowsFlatCatalogBelowSafetyLimit() {
         List<Book> books = List.of(mock(Book.class));
-        when(appBookService.getCatalogBookCount()).thenReturn(10_000L);
+        when(appBookService.getCatalogSummary())
+                .thenReturn(new AppCatalogSummary(10_000L, 0, 0, 0, Map.of()));
         when(bookService.getBookDTOs(false, true)).thenReturn(books);
 
         assertThat(controller.getBooks(false, true).getBody()).isEqualTo(books);

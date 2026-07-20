@@ -231,12 +231,12 @@ public class BookSpecifications {
     }
 
     public static Specification<BookEntity> hasDigitalFile() {
-        return (root, query, cb) -> cb.isNotEmpty(root.get(ATTR_BOOK_FILES));
+        return (root, query, cb) -> cb.isTrue(root.get("hasFiles"));
     }
 
     public static Specification<BookEntity> hasDigitalFileOrIsPhysical() {
         return (root, query, cb) -> cb.or(
-                cb.isNotEmpty(root.get(ATTR_BOOK_FILES)),
+                cb.isTrue(root.get("hasFiles")),
                 cb.equal(root.get("isPhysical"), true)
         );
     }

@@ -11,6 +11,7 @@ import org.booklore.service.browse.BookSpecifications;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.Library;
 import org.booklore.model.entity.*;
+import org.booklore.model.enums.ReadStatus;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.UserBookProgressRepository;
 import org.springframework.data.domain.Page;
@@ -34,6 +35,10 @@ public class AppSeriesService {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 50;
     private static final String PARAM_USER_ID = "userId";
+    private static final String READ_COUNT_EXPR = "SUM(CASE WHEN p.readStatus = org.booklore.model.enums.ReadStatus.READ THEN 1 ELSE 0 END)";
+    private static final String READING_COUNT_EXPR = "SUM(CASE WHEN p.readStatus IN (org.booklore.model.enums.ReadStatus.READING, org.booklore.model.enums.ReadStatus.RE_READING, org.booklore.model.enums.ReadStatus.PAUSED) THEN 1 ELSE 0 END)";
+    private static final String ABANDONED_COUNT_EXPR = "SUM(CASE WHEN p.readStatus = org.booklore.model.enums.ReadStatus.ABANDONED THEN 1 ELSE 0 END)";
+    private static final String WONT_READ_COUNT_EXPR = "SUM(CASE WHEN p.readStatus = org.booklore.model.enums.ReadStatus.WONT_READ THEN 1 ELSE 0 END)";
 
     private final EntityManager entityManager;
     private final AuthenticationService authenticationService;
@@ -49,7 +54,7 @@ public class AppSeriesService {
             String sortDir,
             Long libraryId,
             String search,
-            boolean inProgressOnly) {
+            String statusFilter) {
 
         BookLoreUser user = authenticationService.getAuthenticatedUser();
         Long userId = user.getId();
@@ -72,20 +77,19 @@ public class AppSeriesService {
                 ? " AND LOWER(m.seriesName) LIKE :searchPattern"
                 : "";
 
-        String havingClause = inProgressOnly
-                ? " HAVING SUM(CASE WHEN p.readStatus IN (org.booklore.model.enums.ReadStatus.READING, org.booklore.model.enums.ReadStatus.RE_READING) THEN 1 ELSE 0 END) > 0"
-                : "";
+        String normalizedStatus = normalizeStatusFilter(statusFilter);
+        String havingClause = buildSeriesStatusHavingClause(normalizedStatus);
 
-        String orderBy = buildSeriesOrderBy(sortBy, sortDir, inProgressOnly);
+        String orderBy = buildSeriesOrderBy(sortBy, sortDir, normalizedStatus);
 
         // Phase 1: Aggregate query
         String aggregateQuery = "SELECT m.seriesName, COUNT(b.id), MAX(m.seriesTotal), MAX(b.addedOn),"
-                + " SUM(CASE WHEN p.readStatus = org.booklore.model.enums.ReadStatus.READ THEN 1 ELSE 0 END)"
-                + (inProgressOnly ? ", MAX(p.lastReadTime)" : "")
+                + " " + READ_COUNT_EXPR + ", MAX(p.lastReadTime), " + READING_COUNT_EXPR
+                + ", " + ABANDONED_COUNT_EXPR + ", " + WONT_READ_COUNT_EXPR
                 + " FROM BookEntity b JOIN b.metadata m"
                 + " LEFT JOIN b.userBookProgress p ON p.user.id = :userId"
                 + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
+                + " AND (b.hasFiles = true OR b.isPhysical = true)"
                 + " AND m.seriesName IS NOT NULL"
                 + libraryClause
                 + searchClause
@@ -104,27 +108,28 @@ public class AppSeriesService {
 
         List<Tuple> aggregateResults = aggregateQ.getResultList();
 
-        long totalElements = countSeries(inProgressOnly, accessibleLibraryIds, libraryId, userId,
+        long totalElements = countSeries(normalizedStatus, accessibleLibraryIds, libraryId, userId,
                 searchPattern, searchClause, libraryClause);
 
         return buildSeriesPage(aggregateResults, accessibleLibraryIds, libraryId, pageNum, pageSize, totalElements);
     }
 
-    private long countSeries(boolean inProgressOnly, Set<Long> accessibleLibraryIds, Long libraryId, Long userId,
+    private long countSeries(String statusFilter, Set<Long> accessibleLibraryIds, Long libraryId, Long userId,
                              String searchPattern, String searchClause, String libraryClause) {
         final String searchParam = "searchPattern";
+        String havingClause = buildSeriesStatusHavingClause(statusFilter);
 
-        if (inProgressOnly) {
+        if (!havingClause.isEmpty()) {
             // JPQL doesn't support subqueries in FROM — count via result list size instead
             String countAlt = "SELECT m.seriesName FROM BookEntity b JOIN b.metadata m"
                     + " LEFT JOIN b.userBookProgress p ON p.user.id = :userId"
                     + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                    + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
+                    + " AND (b.hasFiles = true OR b.isPhysical = true)"
                     + " AND m.seriesName IS NOT NULL"
                     + libraryClause
                     + searchClause
                     + " GROUP BY m.seriesName"
-                    + " HAVING SUM(CASE WHEN p.readStatus IN (org.booklore.model.enums.ReadStatus.READING, org.booklore.model.enums.ReadStatus.RE_READING) THEN 1 ELSE 0 END) > 0";
+                    + havingClause;
             var countQ = entityManager.createQuery(countAlt, String.class);
             countQ.setParameter(PARAM_USER_ID, userId);
             setLibraryParams(countQ, accessibleLibraryIds, libraryId);
@@ -136,7 +141,7 @@ public class AppSeriesService {
 
         String countQuery = "SELECT COUNT(DISTINCT m.seriesName) FROM BookEntity b JOIN b.metadata m"
                 + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
+                + " AND (b.hasFiles = true OR b.isPhysical = true)"
                 + " AND m.seriesName IS NOT NULL"
                 + libraryClause
                 + searchClause;
@@ -171,7 +176,7 @@ public class AppSeriesService {
                 + " JOIN FETCH b.metadata m"
                 + " WHERE m.seriesName IN :seriesNames"
                 + " AND (b.deleted IS NULL OR b.deleted = false)"
-                + " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)"
+                + " AND (b.hasFiles = true OR b.isPhysical = true)"
                 + libraryClause;
 
         var booksQ = entityManager.createQuery(booksQuery, BookEntity.class);
@@ -225,13 +230,20 @@ public class AppSeriesService {
 
             Long booksReadLong = agg.get(4, Long.class);
             int booksRead = booksReadLong != null ? booksReadLong.intValue() : 0;
+            Instant lastReadTime = agg.get(5, Instant.class);
+            int readingCount = tupleLongAsInt(agg, 6);
+            int abandonedCount = tupleLongAsInt(agg, 7);
+            int wontReadCount = tupleLongAsInt(agg, 8);
+            int bookCount = agg.get(1, Long.class).intValue();
 
             summaries.add(AppSeriesSummary.builder()
                     .seriesName(agg.get(0, String.class))
-                    .bookCount(agg.get(1, Long.class).intValue())
+                    .bookCount(bookCount)
                     .seriesTotal(agg.get(2, Integer.class))
                     .latestAddedOn(agg.get(3, Instant.class))
+                    .lastReadTime(lastReadTime)
                     .booksRead(booksRead)
+                    .seriesStatus(computeSeriesStatus(bookCount, booksRead, readingCount, abandonedCount, wontReadCount).name())
                     .authors(authors)
                     .coverBooks(coverBooks)
                     .build());
@@ -319,27 +331,64 @@ public class AppSeriesService {
         }
     }
 
-    private String buildSeriesOrderBy(String sortBy, String sortDir, boolean inProgressOnly) {
+    private String buildSeriesOrderBy(String sortBy, String sortDir, String statusFilter) {
         String dir = "asc".equalsIgnoreCase(sortDir) ? "ASC" : "DESC";
         String nullsClause = "ASC".equals(dir) ? " NULLS LAST" : " NULLS FIRST";
 
         return switch (sortBy != null ? sortBy.toLowerCase() : "") {
             case "name" -> "m.seriesName " + dir;
             case "bookcount" -> "COUNT(b.id) " + dir;
-            case "readprogress" -> "SUM(CASE WHEN p.readStatus = org.booklore.model.enums.ReadStatus.READ THEN 1 ELSE 0 END) " + dir;
-            case "lastreadtime" -> {
-                if (inProgressOnly) {
-                    yield "MAX(p.lastReadTime) " + dir + nullsClause;
-                }
-                yield "MAX(b.addedOn) " + dir + nullsClause;
-            }
+            case "readprogress" -> "(" + READ_COUNT_EXPR + " * 1.0 / COUNT(b.id)) " + dir;
+            case "lastreadtime" -> "MAX(p.lastReadTime) " + dir + nullsClause;
             default -> {
-                if (inProgressOnly) {
+                if ("in-progress".equals(statusFilter)) {
                     yield "MAX(p.lastReadTime) " + dir + nullsClause;
                 }
                 yield "MAX(b.addedOn) " + dir + nullsClause;
             }
         };
+    }
+
+    private String normalizeStatusFilter(String statusFilter) {
+        if (statusFilter == null) {
+            return null;
+        }
+        String normalized = statusFilter.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "not-started", "in-progress", "completed", "abandoned" -> normalized;
+            default -> null;
+        };
+    }
+
+    private String buildSeriesStatusHavingClause(String statusFilter) {
+        if (statusFilter == null) {
+            return "";
+        }
+        String abandonedTotalExpr = "(" + ABANDONED_COUNT_EXPR + " + " + WONT_READ_COUNT_EXPR + ")";
+        return switch (statusFilter) {
+            case "not-started" -> " HAVING " + READ_COUNT_EXPR + " = 0 AND " + READING_COUNT_EXPR
+                    + " = 0 AND " + abandonedTotalExpr + " = 0";
+            case "in-progress" -> " HAVING " + abandonedTotalExpr + " = 0 AND ("
+                    + READING_COUNT_EXPR + " > 0 OR (" + READ_COUNT_EXPR + " > 0 AND "
+                    + READ_COUNT_EXPR + " < COUNT(b.id)))";
+            case "completed" -> " HAVING " + READ_COUNT_EXPR + " = COUNT(b.id)";
+            case "abandoned" -> " HAVING " + abandonedTotalExpr + " > 0";
+            default -> "";
+        };
+    }
+
+    private int tupleLongAsInt(Tuple tuple, int index) {
+        Long value = tuple.get(index, Long.class);
+        return value == null ? 0 : value.intValue();
+    }
+
+    private ReadStatus computeSeriesStatus(int bookCount, int booksRead, int readingCount, int abandonedCount, int wontReadCount) {
+        if (wontReadCount > 0) return ReadStatus.WONT_READ;
+        if (abandonedCount > 0) return ReadStatus.ABANDONED;
+        if (bookCount > 0 && booksRead == bookCount) return ReadStatus.READ;
+        if (readingCount > 0) return ReadStatus.READING;
+        if (booksRead > 0) return ReadStatus.PARTIALLY_READ;
+        return ReadStatus.UNREAD;
     }
 
     private Sort buildBookSort(String sortBy, String sortDir) {

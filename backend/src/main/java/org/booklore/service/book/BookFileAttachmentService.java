@@ -380,8 +380,10 @@ public class BookFileAttachmentService {
         fileToMove.setFileName(newFileName);
 
         sourceBook.getBookFiles().remove(fileToMove);
+        sourceBook.syncHasFiles();
         fileToMove.setBook(targetBook);
         targetBook.getBookFiles().add(fileToMove);
+        targetBook.setHasFiles(true);
     }
 
     private record MoveTargetContext(BookEntity targetBook, Path targetDirectory, String targetFileSubPath,

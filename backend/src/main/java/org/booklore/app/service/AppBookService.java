@@ -82,6 +82,7 @@ public class AppBookService {
     private final ApplicationEventPublisher eventPublisher;
     private final CatalogSummaryCache catalogSummaryCache;
     private final FilterOptionsCache filterOptionsCache;
+    private final ShellBookIdsCache shellBookIdsCache;
 
     public AppBookService(BookRepository bookRepository,
                           UserBookProgressRepository userBookProgressRepository,
@@ -97,7 +98,8 @@ public class AppBookService {
                           BookSortRegistry bookSortRegistry,
                           ApplicationEventPublisher eventPublisher,
                           CatalogSummaryCache catalogSummaryCache,
-                          FilterOptionsCache filterOptionsCache) {
+                          FilterOptionsCache filterOptionsCache,
+                          ShellBookIdsCache shellBookIdsCache) {
         this.bookRepository = bookRepository;
         this.userBookProgressRepository = userBookProgressRepository;
         this.userBookFileProgressRepository = userBookFileProgressRepository;
@@ -113,6 +115,7 @@ public class AppBookService {
         this.eventPublisher = eventPublisher;
         this.catalogSummaryCache = catalogSummaryCache;
         this.filterOptionsCache = filterOptionsCache;
+        this.shellBookIdsCache = shellBookIdsCache;
     }
 
     public AppPageResponse<AppBookSummary> getBooks(BookListRequest req) {
@@ -220,12 +223,6 @@ public class AppBookService {
                 totalSeries,
                 unshelvedBooks,
                 countBooksByLibrary(visibleBooks));
-    }
-
-    public long getCatalogBookCount() {
-        BookLoreUser user = authenticationService.getAuthenticatedUser();
-        return bookRepository.count(buildBaseSpecification(
-                getAccessibleLibraryIds(user), null, user.getId(), user.getPermissions().isAdmin()));
     }
 
     public List<AppBookSummary> getBookSummariesByIds(Set<Long> bookIds) {
@@ -1164,17 +1161,17 @@ public class AppBookService {
     }
 
     /**
-     * Books with no files that are not physical either would render as empty shells. The legacy
-     * per-query predicate "(b.bookFiles IS NOT EMPTY OR b.isPhysical = true)" excluded them, but
-     * MariaDB executes that OR-EXISTS as a materialized scan of the whole book_file index in every
-     * facet aggregate. The set is almost always empty, so it is computed once per facet
-     * recomputation and the aggregates only pay for it when shells actually exist.
+     * Books with no files that are not physical either would render as empty shells. The per-query
+     * predicate "(b.hasFiles = true OR b.isPhysical = true)" excluded them, but repeating that OR
+     * in every facet aggregate still forces MariaDB through the whole book table per aggregate.
+     * The set is almost always empty, so it is resolved once (globally cached, denormalized
+     * has_files flag) and the aggregates only pay for it when shells actually exist.
      */
     private Set<Long> findShellBookIds() {
-        return Set.copyOf(entityManager.createQuery(
+        return shellBookIdsCache.get(() -> Set.copyOf(entityManager.createQuery(
                 "SELECT b.id FROM BookEntity b"
-                        + " WHERE b.bookFiles IS EMPTY AND (b.isPhysical IS NULL OR b.isPhysical = false)",
-                Long.class).getResultList());
+                        + " WHERE b.hasFiles = false AND (b.isPhysical IS NULL OR b.isPhysical = false)",
+                Long.class).getResultList()));
     }
 
     private String visibilityClause(Set<Long> shellBookIds) {
@@ -1182,7 +1179,7 @@ public class AppBookService {
             return "";
         }
         if (shellBookIds.size() > MAX_SHELL_IDS_IN_CLAUSE) {
-            return " AND (b.bookFiles IS NOT EMPTY OR b.isPhysical = true)";
+            return " AND (b.hasFiles = true OR b.isPhysical = true)";
         }
         return " AND b.id NOT IN (" + shellBookIds.stream().sorted()
                 .map(String::valueOf).collect(Collectors.joining(", ")) + ")";

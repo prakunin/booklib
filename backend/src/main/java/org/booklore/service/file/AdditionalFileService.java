@@ -81,6 +81,7 @@ public class AdditionalFileService {
 
         if (file.isBook() && book != null) {
             book.getBookFiles().remove(file);
+            book.syncHasFiles();
         }
     }
 
