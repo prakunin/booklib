@@ -84,7 +84,7 @@ public class BookController {
             @RequestParam(required = false, defaultValue = "false") boolean withDescription,
             @Parameter(description = "Remove other metadata fields from the response")
             @RequestParam(required = false, defaultValue = "true") boolean stripForListView) {
-        long bookCount = appBookService.getCatalogBookCount();
+        long bookCount = appBookService.getCatalogSummary().totalBooks();
         if (bookCount > MAX_LEGACY_CATALOG_SIZE) {
             throw ApiError.INVALID_INPUT.createException(
                     "The flat books endpoint is disabled for catalogs over " + MAX_LEGACY_CATALOG_SIZE
