@@ -1,5 +1,6 @@
 package org.booklore.service.watcher;
 
+import org.booklore.model.dto.settings.LibraryFile;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.LibraryEntity;
@@ -19,8 +20,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -294,6 +297,98 @@ class LibraryFileEventProcessorTest {
                     });
                 }
             }
+        }
+
+        @Test
+        void autoDetectMode_walksAndProcessesFilesIndividually() throws Exception {
+            // library.organizationMode is AUTO_DETECT by default (set in setUp)
+            Path folder = tempDir.resolve("autoDetect");
+            Files.createDirectory(folder);
+            Files.writeString(folder.resolve("book1.epub"), "content1");
+            Files.writeString(folder.resolve("book2.pdf"), "content2");
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
+
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() ->
+                    verify(bookFileTransactionalHandler, times(2)).handleNewBookFile(eq(1L), any()));
+        }
+    }
+
+    @Nested
+    class BookPerFolderHashResolution {
+
+        @BeforeEach
+        void setUpBookPerFolder() {
+            library.setOrganizationMode(LibraryOrganizationMode.BOOK_PER_FOLDER);
+        }
+
+        @Test
+        void unmatchedFiles_processedAsNewBooksViaLibraryProcessingService() throws Exception {
+            when(pendingDeletionPool.matchFolderByHashes(any())).thenReturn(Optional.empty());
+            when(pendingDeletionPool.matchByHash(anyString())).thenReturn(Optional.empty());
+            when(bookRepository.findByCurrentHashIncludingRecentlyDeleted(anyString(), any(Instant.class)))
+                    .thenReturn(Optional.empty());
+
+            Path folder = tempDir.resolve("newBookFolder");
+            Files.createDirectory(folder);
+            Files.writeString(folder.resolve("part1.epub"), "content1");
+            Files.writeString(folder.resolve("part2.epub"), "content2");
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
+
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+                @SuppressWarnings("unchecked")
+                var captor = org.mockito.ArgumentCaptor.forClass(List.class);
+                verify(libraryProcessingService).processLibraryFiles(captor.capture(), eq(library));
+                assertThat(captor.getValue()).hasSize(2);
+                assertThat(captor.getValue()).allMatch(f -> f instanceof LibraryFile);
+                verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            });
+        }
+
+        @Test
+        void hashMatchesExistingBook_updatesPathInsteadOfCreatingNewBook() throws Exception {
+            BookEntity existingBook = BookEntity.builder().id(20L).library(library).libraryPath(libraryPath).build();
+
+            when(pendingDeletionPool.matchFolderByHashes(any())).thenReturn(Optional.empty());
+            when(pendingDeletionPool.matchByHash(anyString())).thenReturn(Optional.empty());
+            when(bookRepository.findByCurrentHashIncludingRecentlyDeleted(anyString(), any(Instant.class)))
+                    .thenReturn(Optional.of(existingBook));
+
+            Path folder = tempDir.resolve("movedBookFolder");
+            Files.createDirectory(folder);
+            Files.writeString(folder.resolve("moved.epub"), "moved content");
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
+
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+                verify(bookFilePersistenceService).updatePathIfChanged(eq(existingBook), eq(library), any(), anyString());
+                verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
+            });
+        }
+
+        @Test
+        void poolMatchesEntireFolder_recoversBooksWithoutNewProcessing() throws Exception {
+            PendingDeletionPool.BookSnapshot bookSnapshot =
+                    new PendingDeletionPool.BookSnapshot(30L, 1L, "sub", List.of());
+            PendingDeletionPool.PendingDeletion pendingDeletion = new PendingDeletionPool.PendingDeletion(
+                    tempDir, true, 1L, Instant.now(), null, Map.of(), Map.of(30L, bookSnapshot));
+            PendingDeletionPool.FolderMatchResult folderMatch =
+                    new PendingDeletionPool.FolderMatchResult(pendingDeletion, Map.of());
+
+            when(pendingDeletionPool.matchFolderByHashes(any())).thenReturn(Optional.of(folderMatch));
+
+            Path folder = tempDir.resolve("recoveredFolder");
+            Files.createDirectory(folder);
+            Files.writeString(folder.resolve("recovered.epub"), "recovered content");
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
+
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+                verify(bookFilePersistenceService).recoverFolderBook(eq(bookSnapshot), eq(libraryPath), eq(folder), any());
+                verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
+                verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            });
         }
     }
 

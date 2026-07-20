@@ -10,7 +10,10 @@ import org.booklore.model.dto.settings.MetadataProviderSettings;
 import org.booklore.model.MetadataUpdateContext;
 import org.booklore.model.MetadataUpdateWrapper;
 import org.booklore.model.entity.BookEntity;
+import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.LibraryEntity;
+import org.booklore.model.entity.MetadataFetchJobEntity;
+import org.booklore.model.enums.MetadataFetchTaskStatus;
 import org.booklore.model.enums.MetadataProvider;
 import org.booklore.model.enums.MetadataReplaceMode;
 import org.booklore.repository.BookRepository;
@@ -20,13 +23,18 @@ import org.booklore.service.NotificationService;
 import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.metadata.parser.BookParser;
 import org.booklore.task.TaskCancellationManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.*;
@@ -1362,6 +1370,190 @@ class MetadataRefreshServiceTest {
 
             List<MetadataProvider> result = service.prepareProviders(options);
             assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @MockitoSettings(strictness = Strictness.LENIENT)
+    class RefreshMetadataOrchestrationTests {
+
+        private static final String JOB_ID = "job-1";
+        private TransactionStatus transactionStatus;
+
+        @BeforeEach
+        void setUp() {
+            transactionStatus = mock(TransactionStatus.class);
+            when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+
+            BookLoreUser user = new BookLoreUser();
+            user.setId(1L);
+            when(authenticationService.getAuthenticatedUser()).thenReturn(user);
+
+            when(appSettingService.getAppSettings()).thenReturn(AppSettings.builder()
+                    .defaultMetadataRefreshOptions(MetadataRefreshOptions.builder().build())
+                    .build());
+        }
+
+        private BookEntity unlockedBook(Long id) {
+            BookMetadataEntity metadata = BookMetadataEntity.builder().title("Title " + id).build();
+            return BookEntity.builder().id(id).metadata(metadata).build();
+        }
+
+        private MetadataRefreshRequest booksRequest(Long bookId, MetadataRefreshOptions options) {
+            return MetadataRefreshRequest.builder()
+                    .refreshType(MetadataRefreshRequest.RefreshType.BOOKS)
+                    .bookIds(Set.of(bookId))
+                    .refreshOptions(options)
+                    .build();
+        }
+
+        @Test
+        void successfulRefresh_appliesMetadataAndCompletesTask() {
+            BookEntity book = unlockedBook(1L);
+            when(bookRepository.findAllWithMetadataByIds(Set.of(1L))).thenReturn(List.of(book));
+            when(bookMapper.toBook(book)).thenReturn(Book.builder().id(1L)
+                    .metadata(BookMetadata.builder().title("Title 1").build()).build());
+            when(bookMapper.toBookWithDescription(book, true)).thenReturn(Book.builder().id(1L).build());
+
+            MetadataRefreshOptions options = MetadataRefreshOptions.builder()
+                    .fieldOptions(new MetadataRefreshOptions.FieldOptions())
+                    .enabledFields(new MetadataRefreshOptions.EnabledFields())
+                    .replaceMode(MetadataReplaceMode.REPLACE_MISSING)
+                    .reviewBeforeApply(false)
+                    .build();
+
+            service.refreshMetadata(booksRequest(1L, options), JOB_ID);
+
+            verify(bookRepository).saveAndFlush(book);
+            verify(bookMetadataUpdater).setBookMetadata(any());
+            verify(cancellationManager).clearCancellation(JOB_ID);
+
+            ArgumentCaptor<MetadataFetchJobEntity> jobCaptor = ArgumentCaptor.forClass(MetadataFetchJobEntity.class);
+            verify(metadataFetchJobRepository, atLeastOnce()).save(jobCaptor.capture());
+            assertThat(jobCaptor.getAllValues())
+                    .extracting(MetadataFetchJobEntity::getStatus)
+                    .contains(MetadataFetchTaskStatus.COMPLETED);
+        }
+
+        @Test
+        void lockedBook_isSkippedButTaskStillCompletes() {
+            BookEntity book = unlockedBook(2L);
+            book.getMetadata().applyLockToAllFields(true);
+            when(bookRepository.findAllWithMetadataByIds(Set.of(2L))).thenReturn(List.of(book));
+
+            MetadataRefreshOptions options = MetadataRefreshOptions.builder()
+                    .fieldOptions(new MetadataRefreshOptions.FieldOptions())
+                    .enabledFields(new MetadataRefreshOptions.EnabledFields())
+                    .build();
+
+            service.refreshMetadata(booksRequest(2L, options), JOB_ID);
+
+            verify(bookRepository, never()).saveAndFlush(any());
+            verify(bookMetadataUpdater, never()).setBookMetadata(any());
+
+            ArgumentCaptor<MetadataFetchJobEntity> jobCaptor = ArgumentCaptor.forClass(MetadataFetchJobEntity.class);
+            verify(metadataFetchJobRepository, atLeastOnce()).save(jobCaptor.capture());
+            assertThat(jobCaptor.getAllValues())
+                    .extracting(MetadataFetchJobEntity::getStatus)
+                    .contains(MetadataFetchTaskStatus.COMPLETED);
+        }
+
+        @Test
+        void reviewMode_savesProposalInsteadOfUpdatingBook() {
+            BookEntity book = unlockedBook(3L);
+            when(bookRepository.findAllWithMetadataByIds(Set.of(3L))).thenReturn(List.of(book));
+            when(bookMapper.toBook(book)).thenReturn(Book.builder().id(3L)
+                    .metadata(BookMetadata.builder().title("Title 3").build()).build());
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+            MetadataRefreshOptions options = MetadataRefreshOptions.builder()
+                    .fieldOptions(new MetadataRefreshOptions.FieldOptions())
+                    .enabledFields(new MetadataRefreshOptions.EnabledFields())
+                    .reviewBeforeApply(true)
+                    .build();
+
+            service.refreshMetadata(booksRequest(3L, options), JOB_ID);
+
+            verify(bookMetadataUpdater, never()).setBookMetadata(any());
+            verify(bookRepository).saveAndFlush(book);
+
+            ArgumentCaptor<MetadataFetchJobEntity> jobCaptor = ArgumentCaptor.forClass(MetadataFetchJobEntity.class);
+            verify(metadataFetchJobRepository, atLeastOnce()).save(jobCaptor.capture());
+            MetadataFetchJobEntity latest = jobCaptor.getAllValues().get(jobCaptor.getAllValues().size() - 1);
+            assertThat(latest.getProposals()).hasSize(1);
+            assertThat(latest.getProposals().get(0).getBookId()).isEqualTo(3L);
+        }
+
+        @Test
+        void cancellationMidLoop_stopsProcessingAndMarksCancelled() {
+            when(cancellationManager.isTaskCancelled(JOB_ID)).thenReturn(true);
+
+            MetadataRefreshOptions options = MetadataRefreshOptions.builder()
+                    .fieldOptions(new MetadataRefreshOptions.FieldOptions())
+                    .enabledFields(new MetadataRefreshOptions.EnabledFields())
+                    .build();
+
+            service.refreshMetadata(booksRequest(4L, options), JOB_ID);
+
+            verify(bookRepository, never()).findAllWithMetadataByIds(any());
+            verify(bookRepository, never()).saveAndFlush(any());
+            verify(cancellationManager).clearCancellation(JOB_ID);
+
+            ArgumentCaptor<MetadataFetchJobEntity> jobCaptor = ArgumentCaptor.forClass(MetadataFetchJobEntity.class);
+            verify(metadataFetchJobRepository, atLeastOnce()).save(jobCaptor.capture());
+            assertThat(jobCaptor.getAllValues())
+                    .extracting(MetadataFetchJobEntity::getStatus)
+                    .contains(MetadataFetchTaskStatus.CANCELLED);
+        }
+
+        @Test
+        void fatalRuntimeExceptionWithInterruptedCause_returnsQuietlyWithoutErrorNotification() {
+            RuntimeException wrapped = new RuntimeException(new InterruptedException("stop"));
+            when(appSettingService.getAppSettings()).thenThrow(wrapped);
+
+            service.refreshMetadata(booksRequest(5L, MetadataRefreshOptions.builder().build()), JOB_ID);
+
+            verify(cancellationManager).clearCancellation(JOB_ID);
+            verify(notificationService, never()).sendMessage(any(), any());
+        }
+
+        @Test
+        void fatalRuntimeException_sendsErrorNotificationAndRethrows() {
+            RuntimeException boom = new RuntimeException("boom");
+            when(appSettingService.getAppSettings()).thenThrow(boom);
+
+            assertThatThrownBy(() -> service.refreshMetadata(
+                    booksRequest(6L, MetadataRefreshOptions.builder().build()), JOB_ID))
+                    .isSameAs(boom);
+
+            verify(cancellationManager).clearCancellation(JOB_ID);
+            verify(notificationService).sendMessage(any(), argThat(notification ->
+                    notification instanceof MetadataBatchProgressNotification progress
+                            && progress.getStatus().equals(MetadataFetchTaskStatus.ERROR.name())));
+        }
+
+        @Test
+        void goodReadsProviderInterrupted_rollsBackWithoutApplyingMetadata() {
+            BookEntity book = unlockedBook(7L);
+            when(bookRepository.findAllWithMetadataByIds(Set.of(7L))).thenReturn(List.of(book));
+
+            MetadataRefreshOptions.FieldProvider goodReadsProvider =
+                    MetadataRefreshOptions.FieldProvider.builder().p1(MetadataProvider.GoodReads).build();
+            MetadataRefreshOptions options = MetadataRefreshOptions.builder()
+                    .fieldOptions(MetadataRefreshOptions.FieldOptions.builder().title(goodReadsProvider).build())
+                    .enabledFields(MetadataRefreshOptions.EnabledFields.builder().title(true).build())
+                    .build();
+
+            Thread.currentThread().interrupt();
+            try {
+                service.refreshMetadata(booksRequest(7L, options), JOB_ID);
+            } finally {
+                Thread.interrupted();
+            }
+
+            verify(transactionStatus).setRollbackOnly();
+            verify(bookRepository, never()).saveAndFlush(any());
+            verify(bookMetadataUpdater, never()).setBookMetadata(any());
         }
     }
 }

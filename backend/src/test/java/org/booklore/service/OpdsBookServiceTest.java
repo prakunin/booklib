@@ -9,6 +9,8 @@ import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.ShelfEntity;
 import org.booklore.model.entity.UserPermissionsEntity;
+import org.booklore.model.entity.AuthorEntity;
+import org.booklore.model.enums.OpdsSortOrder;
 import org.booklore.repository.BookOpdsRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.ShelfRepository;
@@ -18,13 +20,16 @@ import org.booklore.service.opds.OpdsBookService;
 import org.booklore.service.restriction.ContentRestrictionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -812,6 +817,333 @@ class OpdsBookServiceTest {
 
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getContent()).extracting(Book::getId).containsExactly(1L, 3L);
+    }
+
+    // ==================== getDistinctAuthors / getDistinctSeries ====================
+
+    @Nested
+    class DistinctAuthorsAndSeries {
+
+        @Test
+        void getDistinctAuthors_returnsEmptyList_whenUserIdIsNull() {
+            assertThat(opdsBookService.getDistinctAuthors(null)).isEmpty();
+        }
+
+        @Test
+        void getDistinctAuthors_admin_returnsSortedDistinctNonNullNames() {
+            BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
+            when(userRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(entity));
+            BookLoreUser user = mock(BookLoreUser.class);
+            when(bookLoreUserTransformer.toDTO(entity)).thenReturn(user);
+            BookLoreUser.UserPermissions perms = mock(BookLoreUser.UserPermissions.class);
+            when(user.getPermissions()).thenReturn(perms);
+            when(perms.isAdmin()).thenReturn(true);
+
+            AuthorEntity beta = mock(AuthorEntity.class);
+            when(beta.getName()).thenReturn("Beta Author");
+            AuthorEntity alpha = mock(AuthorEntity.class);
+            when(alpha.getName()).thenReturn("Alpha Author");
+            AuthorEntity noName = mock(AuthorEntity.class);
+            when(noName.getName()).thenReturn(null);
+            when(bookOpdsRepository.findDistinctAuthors()).thenReturn(List.of(beta, alpha, noName));
+
+            List<String> result = opdsBookService.getDistinctAuthors(1L);
+
+            assertThat(result).containsExactly("Alpha Author", "Beta Author");
+        }
+
+        @Test
+        void getDistinctAuthors_nonAdmin_usesAssignedLibraryIds() {
+            BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
+            when(userRepository.findByIdWithDetails(2L)).thenReturn(Optional.of(entity));
+            BookLoreUser user = mock(BookLoreUser.class);
+            when(bookLoreUserTransformer.toDTO(entity)).thenReturn(user);
+            BookLoreUser.UserPermissions perms = mock(BookLoreUser.UserPermissions.class);
+            when(user.getPermissions()).thenReturn(perms);
+            when(perms.isAdmin()).thenReturn(false);
+            when(user.getAssignedLibraries()).thenReturn(List.of(Library.builder().id(7L).watch(false).build()));
+
+            AuthorEntity author = mock(AuthorEntity.class);
+            when(author.getName()).thenReturn("Library Author");
+            when(bookOpdsRepository.findDistinctAuthorsByLibraryIds(Set.of(7L))).thenReturn(List.of(author));
+
+            List<String> result = opdsBookService.getDistinctAuthors(2L);
+
+            assertThat(result).containsExactly("Library Author");
+        }
+
+        @Test
+        void getDistinctSeries_returnsEmptyList_whenUserIdIsNull() {
+            assertThat(opdsBookService.getDistinctSeries(null)).isEmpty();
+        }
+
+        @Test
+        void getDistinctSeries_admin_delegatesToRepository() {
+            BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
+            when(userRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(entity));
+            BookLoreUser user = mock(BookLoreUser.class);
+            when(bookLoreUserTransformer.toDTO(entity)).thenReturn(user);
+            BookLoreUser.UserPermissions perms = mock(BookLoreUser.UserPermissions.class);
+            when(user.getPermissions()).thenReturn(perms);
+            when(perms.isAdmin()).thenReturn(true);
+            when(bookOpdsRepository.findDistinctSeries()).thenReturn(List.of("Series A", "Series B"));
+
+            List<String> result = opdsBookService.getDistinctSeries(1L);
+
+            assertThat(result).containsExactly("Series A", "Series B");
+        }
+
+        @Test
+        void getDistinctSeries_nonAdmin_usesAssignedLibraryIds() {
+            BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
+            when(userRepository.findByIdWithDetails(2L)).thenReturn(Optional.of(entity));
+            BookLoreUser user = mock(BookLoreUser.class);
+            when(bookLoreUserTransformer.toDTO(entity)).thenReturn(user);
+            BookLoreUser.UserPermissions perms = mock(BookLoreUser.UserPermissions.class);
+            when(user.getPermissions()).thenReturn(perms);
+            when(perms.isAdmin()).thenReturn(false);
+            when(user.getAssignedLibraries()).thenReturn(List.of(Library.builder().id(7L).watch(false).build()));
+            when(bookOpdsRepository.findDistinctSeriesByLibraryIds(Set.of(7L))).thenReturn(List.of("Series C"));
+
+            List<String> result = opdsBookService.getDistinctSeries(2L);
+
+            assertThat(result).containsExactly("Series C");
+        }
+    }
+
+    // ==================== getBooksByAuthorName / getBooksBySeriesName ====================
+
+    @Nested
+    class BooksByAuthorNameAndSeriesName {
+
+        @Test
+        void getBooksByAuthorName_throwsForbidden_whenUserIdIsNull() {
+            assertThatThrownBy(() -> opdsBookService.getBooksByAuthorName(null, "Someone", 0, 10))
+                    .hasMessageContaining("Authentication required");
+        }
+
+        @Test
+        void getBooksByAuthorName_admin_emptyIdPage_returnsEmptyPage() {
+            BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
+            when(userRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(entity));
+            BookLoreUser user = mock(BookLoreUser.class);
+            when(bookLoreUserTransformer.toDTO(entity)).thenReturn(user);
+            BookLoreUser.UserPermissions perms = mock(BookLoreUser.UserPermissions.class);
+            when(user.getPermissions()).thenReturn(perms);
+            when(perms.isAdmin()).thenReturn(true);
+            when(bookOpdsRepository.findBookIdsByAuthorName(eq("Author X"), any())).thenReturn(Page.empty());
+
+            Page<Book> result = opdsBookService.getBooksByAuthorName(1L, "Author X", 0, 10);
+
+            assertThat(result.getContent()).isEmpty();
+            verify(bookOpdsRepository, never()).findAllWithFullMetadataByIds(anyList());
+        }
+
+        @Test
+        void getBooksByAuthorName_nonAdmin_returnsBooksAndAppliesRestrictions() {
+            BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
+            when(userRepository.findByIdWithDetails(2L)).thenReturn(Optional.of(entity));
+            BookLoreUser user = mock(BookLoreUser.class);
+            when(bookLoreUserTransformer.toDTO(entity)).thenReturn(user);
+            BookLoreUser.UserPermissions perms = mock(BookLoreUser.UserPermissions.class);
+            when(user.getPermissions()).thenReturn(perms);
+            when(perms.isAdmin()).thenReturn(false);
+            when(user.getAssignedLibraries()).thenReturn(List.of(Library.builder().id(7L).watch(false).build()));
+
+            BookEntity bookEntity = mock(BookEntity.class);
+            when(bookEntity.getId()).thenReturn(1L);
+            Book book = Book.builder().id(1L).build();
+            when(bookMapper.toBook(bookEntity)).thenReturn(book);
+
+            when(bookOpdsRepository.findBookIdsByAuthorNameAndLibraryIds(eq("Author Y"), eq(Set.of(7L)), any()))
+                    .thenReturn(new PageImpl<>(List.of(1L)));
+            when(bookOpdsRepository.findAllWithFullMetadataByIdsAndLibraryIds(eq(List.of(1L)), eq(Set.of(7L))))
+                    .thenReturn(List.of(bookEntity));
+
+            Page<Book> result = opdsBookService.getBooksByAuthorName(2L, "Author Y", 0, 10);
+
+            assertThat(result.getContent()).hasSize(1);
+            verify(contentRestrictionService).applyRestrictions(anyList(), eq(2L));
+        }
+
+        @Test
+        void getBooksBySeriesName_throwsForbidden_whenUserIdIsNull() {
+            assertThatThrownBy(() -> opdsBookService.getBooksBySeriesName(null, "Some Series", 0, 10))
+                    .hasMessageContaining("Authentication required");
+        }
+
+        @Test
+        void getBooksBySeriesName_admin_emptyIdPage_returnsEmptyPage() {
+            BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
+            when(userRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(entity));
+            BookLoreUser user = mock(BookLoreUser.class);
+            when(bookLoreUserTransformer.toDTO(entity)).thenReturn(user);
+            BookLoreUser.UserPermissions perms = mock(BookLoreUser.UserPermissions.class);
+            when(user.getPermissions()).thenReturn(perms);
+            when(perms.isAdmin()).thenReturn(true);
+            when(bookOpdsRepository.findBookIdsBySeriesName(eq("Series X"), any())).thenReturn(Page.empty());
+
+            Page<Book> result = opdsBookService.getBooksBySeriesName(1L, "Series X", 0, 10);
+
+            assertThat(result.getContent()).isEmpty();
+        }
+
+        @Test
+        void getBooksBySeriesName_nonAdmin_returnsBooksAndAppliesRestrictions() {
+            BookLoreUserEntity entity = mock(BookLoreUserEntity.class);
+            when(userRepository.findByIdWithDetails(2L)).thenReturn(Optional.of(entity));
+            BookLoreUser user = mock(BookLoreUser.class);
+            when(bookLoreUserTransformer.toDTO(entity)).thenReturn(user);
+            BookLoreUser.UserPermissions perms = mock(BookLoreUser.UserPermissions.class);
+            when(user.getPermissions()).thenReturn(perms);
+            when(perms.isAdmin()).thenReturn(false);
+            when(user.getAssignedLibraries()).thenReturn(List.of(Library.builder().id(7L).watch(false).build()));
+
+            BookEntity bookEntity = mock(BookEntity.class);
+            when(bookEntity.getId()).thenReturn(1L);
+            Book book = Book.builder().id(1L).build();
+            when(bookMapper.toBook(bookEntity)).thenReturn(book);
+
+            when(bookOpdsRepository.findBookIdsBySeriesNameAndLibraryIds(eq("Series Y"), eq(Set.of(7L)), any()))
+                    .thenReturn(new PageImpl<>(List.of(1L)));
+            when(bookOpdsRepository.findAllWithFullMetadataByIdsAndLibraryIds(eq(List.of(1L)), eq(Set.of(7L))))
+                    .thenReturn(List.of(bookEntity));
+
+            Page<Book> result = opdsBookService.getBooksBySeriesName(2L, "Series Y", 0, 10);
+
+            assertThat(result.getContent()).hasSize(1);
+            verify(contentRestrictionService).applyRestrictions(anyList(), eq(2L));
+        }
+    }
+
+    // ==================== applySortOrder ====================
+
+    @Nested
+    class ApplySortOrder {
+
+        private Book bookOf(Long id, String title, String firstAuthor, String seriesName, Float seriesNumber,
+                             Double amazonRating, Double goodreadsRating, Instant addedOn) {
+            return Book.builder()
+                    .id(id)
+                    .addedOn(addedOn)
+                    .metadata(BookMetadata.builder()
+                            .title(title)
+                            .authors(firstAuthor != null ? List.of(firstAuthor) : List.of())
+                            .seriesName(seriesName)
+                            .seriesNumber(seriesNumber)
+                            .amazonRating(amazonRating)
+                            .goodreadsRating(goodreadsRating)
+                            .build())
+                    .build();
+        }
+
+        private Page<Book> pageOf(Book... books) {
+            return new PageImpl<>(List.of(books), PageRequest.of(0, 10), books.length);
+        }
+
+        @Test
+        void nullSortOrder_returnsPageUnchanged() {
+            Page<Book> page = pageOf(bookOf(1L, "B", "A", null, null, null, null, Instant.now()));
+
+            Page<Book> result = opdsBookService.applySortOrder(page, null);
+
+            assertThat(result).isSameAs(page);
+        }
+
+        @Test
+        void recentSortOrder_returnsPageUnchanged() {
+            Page<Book> page = pageOf(bookOf(1L, "B", "A", null, null, null, null, Instant.now()));
+
+            Page<Book> result = opdsBookService.applySortOrder(page, OpdsSortOrder.RECENT);
+
+            assertThat(result).isSameAs(page);
+        }
+
+        @Test
+        void titleAscAndDesc_sortByTitleIgnoringCase() {
+            Book zeta = bookOf(1L, "Zeta", "A", null, null, null, null, Instant.now());
+            Book alpha = bookOf(2L, "alpha", "A", null, null, null, null, Instant.now());
+            Page<Book> page = pageOf(zeta, alpha);
+
+            Page<Book> asc = opdsBookService.applySortOrder(page, OpdsSortOrder.TITLE_ASC);
+            assertThat(asc.getContent()).extracting(Book::getId).containsExactly(2L, 1L);
+
+            Page<Book> desc = opdsBookService.applySortOrder(page, OpdsSortOrder.TITLE_DESC);
+            assertThat(desc.getContent()).extracting(Book::getId).containsExactly(1L, 2L);
+        }
+
+        @Test
+        void authorAscAndDesc_sortByFirstAuthorIgnoringCase() {
+            Book zed = bookOf(1L, "T1", "Zed Author", null, null, null, null, Instant.now());
+            Book adam = bookOf(2L, "T2", "adam Author", null, null, null, null, Instant.now());
+            Page<Book> page = pageOf(zed, adam);
+
+            Page<Book> asc = opdsBookService.applySortOrder(page, OpdsSortOrder.AUTHOR_ASC);
+            assertThat(asc.getContent()).extracting(Book::getId).containsExactly(2L, 1L);
+
+            Page<Book> desc = opdsBookService.applySortOrder(page, OpdsSortOrder.AUTHOR_DESC);
+            assertThat(desc.getContent()).extracting(Book::getId).containsExactly(1L, 2L);
+        }
+
+        @Test
+        void seriesAsc_booksWithoutSeriesSortAfter_andFallBackToAddedOnDescending() {
+            Instant older = Instant.now().minusSeconds(120);
+            Instant newer = Instant.now();
+            Book noSeriesOld = bookOf(1L, "T1", "A", null, null, null, null, older);
+            Book noSeriesNew = bookOf(2L, "T2", "A", null, null, null, null, newer);
+            Book seriesB2 = bookOf(3L, "T3", "A", "Beta Series", 2f, null, null, newer);
+            Book seriesA1 = bookOf(4L, "T4", "A", "Alpha Series", 1f, null, null, newer);
+
+            Page<Book> page = pageOf(noSeriesOld, noSeriesNew, seriesB2, seriesA1);
+
+            Page<Book> asc = opdsBookService.applySortOrder(page, OpdsSortOrder.SERIES_ASC);
+
+            // Series books come first (Alpha before Beta), then no-series books newest-first
+            assertThat(asc.getContent()).extracting(Book::getId).containsExactly(4L, 3L, 2L, 1L);
+        }
+
+        @Test
+        void seriesDesc_booksWithoutSeriesSortAfter_higherSeriesNameFirst() {
+            Book seriesB2 = bookOf(1L, "T1", "A", "Beta Series", 2f, null, null, Instant.now());
+            Book seriesA1 = bookOf(2L, "T2", "A", "Alpha Series", 1f, null, null, Instant.now());
+            Book noSeries = bookOf(3L, "T3", "A", null, null, null, null, Instant.now());
+
+            Page<Book> page = pageOf(seriesA1, seriesB2, noSeries);
+
+            Page<Book> desc = opdsBookService.applySortOrder(page, OpdsSortOrder.SERIES_DESC);
+
+            assertThat(desc.getContent()).extracting(Book::getId).containsExactly(1L, 2L, 3L);
+        }
+
+        @Test
+        void ratingAscAndDesc_booksWithoutRatingSortAfter() {
+            Instant now = Instant.now();
+            Book highRated = bookOf(1L, "T1", "A", null, null, 4.5, null, now);
+            Book lowRated = bookOf(2L, "T2", "A", null, null, 2.0, null, now);
+            Book unrated = bookOf(3L, "T3", "A", null, null, null, null, now);
+
+            Page<Book> page = pageOf(highRated, lowRated, unrated);
+
+            Page<Book> asc = opdsBookService.applySortOrder(page, OpdsSortOrder.RATING_ASC);
+            assertThat(asc.getContent()).extracting(Book::getId).containsExactly(2L, 1L, 3L);
+
+            Page<Book> desc = opdsBookService.applySortOrder(page, OpdsSortOrder.RATING_DESC);
+            assertThat(desc.getContent()).extracting(Book::getId).containsExactly(1L, 2L, 3L);
+        }
+
+        @Test
+        void ratingTie_fallsBackToAddedOnDescending() {
+            Instant older = Instant.now().minusSeconds(120);
+            Instant newer = Instant.now();
+            Book olderSameRating = bookOf(1L, "T1", "A", null, null, 3.0, null, older);
+            Book newerSameRating = bookOf(2L, "T2", "A", null, null, 3.0, null, newer);
+
+            Page<Book> page = pageOf(olderSameRating, newerSameRating);
+
+            Page<Book> asc = opdsBookService.applySortOrder(page, OpdsSortOrder.RATING_ASC);
+
+            assertThat(asc.getContent()).extracting(Book::getId).containsExactly(2L, 1L);
+        }
     }
 
 }

@@ -11,6 +11,7 @@ import org.booklore.model.enums.OpdsSortOrder;
 import org.booklore.service.MagicShelfService;
 import org.booklore.util.ArchiveUtils;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -664,5 +665,191 @@ class OpdsFeedServiceTest {
 
         String mimeType = (String) method.invoke(opdsFeedService, bookFile);
         assertThat(mimeType).isEqualTo("application/vnd.comicbook-rar");
+    }
+
+    @Nested
+    class MagicShelvesAuthorsSeriesNavigation {
+
+        @Test
+        void generateMagicShelvesNavigation_shouldListShelves() {
+            mockAuthenticatedUser();
+            MagicShelf shelf = new MagicShelf();
+            shelf.setId(7L);
+            shelf.setName("Unread Favorites");
+            when(magicShelfService.getUserShelvesForOpds(TEST_USER_ID)).thenReturn(List.of(shelf));
+
+            String xml = opdsFeedService.generateMagicShelvesNavigation();
+
+            assertThat(xml)
+                    .contains("Unread Favorites")
+                    .contains("urn:booklore:magic-shelf:7")
+                    .contains("</feed>");
+        }
+
+        @Test
+        void generateMagicShelvesNavigation_shouldHandleNoShelves() {
+            mockAuthenticatedUser();
+            when(magicShelfService.getUserShelvesForOpds(TEST_USER_ID)).thenReturn(Collections.emptyList());
+
+            String xml = opdsFeedService.generateMagicShelvesNavigation();
+
+            assertThat(xml).contains("</feed>").doesNotContain("magic-shelf:");
+        }
+
+        @Test
+        void generateAuthorsNavigation_shouldListAuthors() {
+            mockAuthenticatedUser();
+            when(opdsBookService.getDistinctAuthors(TEST_USER_ID)).thenReturn(List.of("Jane Austen"));
+
+            String xml = opdsFeedService.generateAuthorsNavigation();
+
+            assertThat(xml)
+                    .contains("Jane Austen")
+                    .contains("Books by Jane Austen")
+                    .contains("</feed>");
+        }
+
+        @Test
+        void generateSeriesNavigation_shouldListSeries() {
+            mockAuthenticatedUser();
+            when(opdsBookService.getDistinctSeries(TEST_USER_ID)).thenReturn(List.of("Discworld"));
+
+            String xml = opdsFeedService.generateSeriesNavigation();
+
+            assertThat(xml)
+                    .contains("Discworld")
+                    .contains("Books in the Discworld series")
+                    .contains("</feed>");
+        }
+    }
+
+    @Nested
+    class CatalogFeedByMagicShelfAuthorSeries {
+
+        private void stubCommonRequestParams() {
+            when(request.getParameter("libraryId")).thenReturn(null);
+            when(request.getParameter("shelfId")).thenReturn(null);
+            when(request.getParameter("shelfIds")).thenReturn(null);
+            when(request.getParameter("q")).thenReturn(null);
+            when(request.getParameter("page")).thenReturn(null);
+            when(request.getParameter("size")).thenReturn(null);
+            when(request.getRequestURI()).thenReturn("/api/v1/opds/catalog");
+        }
+
+        @Test
+        void generateCatalogFeed_withMagicShelfId_usesMagicShelfBookService() {
+            mockAuthenticatedUser();
+            stubCommonRequestParams();
+            when(request.getParameter("magicShelfId")).thenReturn("7");
+            when(request.getParameter("author")).thenReturn(null);
+            when(request.getParameter("series")).thenReturn(null);
+
+            Book book = Book.builder().id(1L).addedOn(FIXED_INSTANT)
+                    .metadata(BookMetadata.builder().title("Magic Shelf Book").build())
+                    .build();
+            Page<Book> page = new PageImpl<>(List.of(book), PageRequest.of(0, 50), 1);
+            when(magicShelfBookService.getBooksByMagicShelfId(TEST_USER_ID, 7L, 0, 50)).thenReturn(page);
+            when(opdsBookService.applySortOrder(any(), any())).thenReturn(page);
+            when(magicShelfBookService.getMagicShelfName(7L)).thenReturn("Unread Favorites");
+
+            String xml = opdsFeedService.generateCatalogFeed(request);
+
+            assertThat(xml)
+                    .contains("Magic Shelf Book")
+                    .contains("urn:booklore:magic-shelf:7")
+                    .contains("Unread Favorites")
+                    .contains("</feed>");
+            verify(magicShelfBookService).getBooksByMagicShelfId(TEST_USER_ID, 7L, 0, 50);
+            verify(opdsBookService, never()).getBooksPage(any(), any(), any(), any(), anyInt(), anyInt());
+        }
+
+        @Test
+        void generateCatalogFeed_withAuthor_searchesByAuthorName() {
+            mockAuthenticatedUser();
+            stubCommonRequestParams();
+            when(request.getParameter("magicShelfId")).thenReturn(null);
+            when(request.getParameter("author")).thenReturn("Jane Austen");
+            when(request.getParameter("series")).thenReturn(null);
+
+            Book book = Book.builder().id(1L).addedOn(FIXED_INSTANT)
+                    .metadata(BookMetadata.builder().title("Pride and Prejudice").build())
+                    .build();
+            Page<Book> page = new PageImpl<>(List.of(book), PageRequest.of(0, 50), 1);
+            when(opdsBookService.getBooksByAuthorName(TEST_USER_ID, "Jane Austen", 0, 50)).thenReturn(page);
+            when(opdsBookService.applySortOrder(any(), any())).thenReturn(page);
+
+            String xml = opdsFeedService.generateCatalogFeed(request);
+
+            assertThat(xml)
+                    .contains("Pride and Prejudice")
+                    .contains("Books by Jane Austen")
+                    .contains("urn:booklore:author:Jane Austen")
+                    .contains("</feed>");
+            verify(opdsBookService).getBooksByAuthorName(TEST_USER_ID, "Jane Austen", 0, 50);
+        }
+
+        @Test
+        void generateCatalogFeed_withSeries_searchesBySeriesName() {
+            mockAuthenticatedUser();
+            stubCommonRequestParams();
+            when(request.getParameter("magicShelfId")).thenReturn(null);
+            when(request.getParameter("author")).thenReturn(null);
+            when(request.getParameter("series")).thenReturn("Discworld");
+
+            Book book = Book.builder().id(1L).addedOn(FIXED_INSTANT)
+                    .metadata(BookMetadata.builder().title("Guards! Guards!").build())
+                    .build();
+            Page<Book> page = new PageImpl<>(List.of(book), PageRequest.of(0, 50), 1);
+            when(opdsBookService.getBooksBySeriesName(TEST_USER_ID, "Discworld", 0, 50)).thenReturn(page);
+            when(opdsBookService.applySortOrder(any(), any())).thenReturn(page);
+
+            String xml = opdsFeedService.generateCatalogFeed(request);
+
+            assertThat(xml)
+                    .contains("Guards! Guards!")
+                    .contains("Discworld series")
+                    .contains("urn:booklore:series:Discworld")
+                    .contains("</feed>");
+            verify(opdsBookService).getBooksBySeriesName(TEST_USER_ID, "Discworld", 0, 50);
+        }
+    }
+
+    @Nested
+    class GetSortOrder {
+
+        private OpdsSortOrder invokeGetSortOrder() throws Exception {
+            var method = OpdsFeedService.class.getDeclaredMethod("getSortOrder");
+            method.setAccessible(true);
+            return (OpdsSortOrder) method.invoke(opdsFeedService);
+        }
+
+        @Test
+        void returnsUserPreferredSortOrder_whenSet() throws Exception {
+            OpdsUserDetails userDetails = mock(OpdsUserDetails.class);
+            OpdsUserV2 v2 = mock(OpdsUserV2.class);
+            when(userDetails.getOpdsUserV2()).thenReturn(v2);
+            when(v2.getSortOrder()).thenReturn(OpdsSortOrder.TITLE_ASC);
+            when(authenticationService.getOpdsUser()).thenReturn(userDetails);
+
+            assertThat(invokeGetSortOrder()).isEqualTo(OpdsSortOrder.TITLE_ASC);
+        }
+
+        @Test
+        void returnsRecent_whenSortOrderIsNull() throws Exception {
+            OpdsUserDetails userDetails = mock(OpdsUserDetails.class);
+            OpdsUserV2 v2 = mock(OpdsUserV2.class);
+            when(userDetails.getOpdsUserV2()).thenReturn(v2);
+            when(v2.getSortOrder()).thenReturn(null);
+            when(authenticationService.getOpdsUser()).thenReturn(userDetails);
+
+            assertThat(invokeGetSortOrder()).isEqualTo(OpdsSortOrder.RECENT);
+        }
+
+        @Test
+        void returnsRecent_whenNotAuthenticated() throws Exception {
+            when(authenticationService.getOpdsUser()).thenReturn(null);
+
+            assertThat(invokeGetSortOrder()).isEqualTo(OpdsSortOrder.RECENT);
+        }
     }
 }
