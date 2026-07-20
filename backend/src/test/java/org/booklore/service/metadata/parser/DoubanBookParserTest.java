@@ -105,6 +105,19 @@ class DoubanBookParserTest {
         mockJsoup.when(() -> Jsoup.parse(html, url)).thenCallRealMethod();
     }
 
+    private void mockConnectThrowing(String url, IOException toThrow) throws Exception {
+        Connection mockConnection = mock(Connection.class);
+        when(mockConnection.header(any(String.class), any(String.class))).thenReturn(mockConnection);
+        when(mockConnection.method(any(Connection.Method.class))).thenReturn(mockConnection);
+        when(mockConnection.timeout(any(Integer.class))).thenReturn(mockConnection);
+        when(mockConnection.ignoreContentType(any(Boolean.class))).thenReturn(mockConnection);
+        when(mockConnection.maxBodySize(any(Integer.class))).thenReturn(mockConnection);
+        when(mockConnection.followRedirects(any(Boolean.class))).thenReturn(mockConnection);
+        when(mockConnection.execute()).thenThrow(toThrow);
+
+        mockJsoup.when(() -> Jsoup.connect(url)).thenReturn(mockConnection);
+    }
+
     private Book bookWithTitle(String title) {
         return Book.builder().title(title).build();
     }
@@ -236,6 +249,43 @@ class DoubanBookParserTest {
                     Arguments.of("window.__DATA__ JSON is malformed",
                             "<html><body><script>window.__DATA__ = {not valid json};</script></body></html>"));
         }
+
+        @Test
+        @DisplayName("returns empty list when fetching the search page throws an IOException")
+        void returnsEmptyWhenSearchFetchThrows() throws Exception {
+            mockConnectThrowing("https://search.douban.com/book/subject_search?search_text=Foo",
+                    new IOException("connection reset"));
+
+            Book book = bookWithTitle("Foo");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Foo").build();
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results).isEmpty();
+        }
+
+        @Test
+        @DisplayName("skips a search item whose required fields are missing instead of throwing")
+        void skipsMalformedSearchItem() throws Exception {
+            mockReviewsSettingEmpty();
+            String html = "<html><body><script>window.__DATA__ = {\"items\": ["
+                    + "{\"title\": \"Broken\", \"url\": \"https://book.douban.com/subject/555/\"},"
+                    + "{\"title\": \"三体\", \"url\": \"https://book.douban.com/subject/2567698/\", "
+                    + "\"cover_url\": \"\", \"abstract\": \"\"}"
+                    + "]};</script></body></html>";
+            mockConnect("https://search.douban.com/book/subject_search?search_text=Mixed", html);
+            mockConnect("https://book.douban.com/subject/2567698", bookPageFixture);
+
+            Book book = bookWithTitle("Mixed");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Mixed").build();
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            // The malformed item (missing cover_url/abstract) throws inside parseSearchResultItem
+            // and is skipped; only the well-formed item survives.
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getDoubanId()).isEqualTo("2567698");
+        }
     }
 
     @Nested
@@ -312,6 +362,26 @@ class DoubanBookParserTest {
 
             assertThat(metadata).isNull();
         }
+
+        @Test
+        @DisplayName("fills in every missing detailed field from the search result when the detail page is entirely empty")
+        void mergesAllMissingFieldsFromSearchResultWhenDetailPageEmpty() throws Exception {
+            mockReviewsSetting(true, 5);
+            mockConnect("https://search.douban.com/book/subject_search?search_text=三体", searchResponseFixture);
+            mockConnect("https://book.douban.com/subject/2567698", bookPageEmptyFixture);
+
+            Book book = bookWithTitle("三体");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("三体").build();
+
+            BookMetadata metadata = parser.fetchTopMetadata(book, request);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getThumbnailUrl()).contains("s2768378.jpg");
+            assertThat(metadata.getAuthors()).containsExactly("刘慈欣");
+            assertThat(metadata.getPublisher()).isEqualTo("重庆出版社");
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2008, Month.JANUARY, 1));
+            assertThat(metadata.getDoubanRating()).isEqualTo(8.8);
+        }
     }
 
     @Nested
@@ -369,6 +439,33 @@ class DoubanBookParserTest {
             assertThat(metadata.getBookReviews()).hasSize(1);
             assertThat(metadata.getBookReviews().getFirst().getReviewerName()).isEqualTo("Reader C");
             assertThat(metadata.getBookReviews().getFirst().getBody()).isEqualTo("Fallback-selector review body.");
+        }
+
+        @Test
+        @DisplayName("falls back to the broadest [class*=comment] selector when neither standard selector matches")
+        void fallsBackToBroadestCommentSelector() throws Exception {
+            mockReviewsSetting(true, 5);
+            mockConnect("https://search.douban.com/book/subject_search?search_text=三体", searchResponseFixture);
+            String detailHtml = "<html><body>"
+                    + "<div class=\"reader-comment-panel\">"
+                    + "<div class=\"comment-info\"><a>Reader Z</a></div>"
+                    + "<p class=\"comment-content\">Broadest fallback body.</p>"
+                    + "</div>"
+                    + "</body></html>";
+            mockConnect("https://book.douban.com/subject/2567698", detailHtml);
+
+            Book book = bookWithTitle("三体");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("三体").build();
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results).hasSize(1);
+            // The broadest selector also matches the nested .comment-info/.comment-content elements
+            // (their class names contain "comment" too), so more than one candidate is produced;
+            // what matters for this branch is that the fallback selector fired and found the review body.
+            assertThat(results.getFirst().getBookReviews())
+                    .isNotEmpty()
+                    .anyMatch(review -> "Broadest fallback body.".equals(review.getBody()));
         }
     }
 
