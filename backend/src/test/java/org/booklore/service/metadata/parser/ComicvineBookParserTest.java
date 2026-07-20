@@ -407,6 +407,19 @@ class ComicvineBookParserTest {
         }
 
         @Test
+        @DisplayName("a special/one-shot reference with an explicit number is resolved via a structured volume+issue search")
+        void specialWithNumber_resolvesStructuredMatch() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume&query=Justice%20League", 200, "{\"results\": []}");
+            mockResponse("/volumes/?api_key=example&format=json&filter=name:Justice%20League", 200, readFixture("search.json"));
+            mockResponse("/issues/?api_key=example&format=json&filter=volume:60593,issue_number:3", 200, issuesFixtureWithIssueNumber("3"));
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("Justice League Special 3");
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getSeriesNumber()).isEqualTo(3.0f);
+        }
+
+        @Test
         @DisplayName("an annual reference with an explicit number is resolved via a structured volume+issue search")
         void annualWithNumber_resolvesStructuredMatch() throws IOException, InterruptedException {
             mockResponse("/search/?api_key=example&format=json&resources=volume&query=Justice%20League", 200, "{\"results\": []}");
@@ -506,6 +519,78 @@ class ComicvineBookParserTest {
             assertThat(results).hasSize(1);
             assertThat(results.getFirst().getSeriesName()).isEqualTo("Flash");
             assertThat(results.getFirst().getAuthors()).containsExactly("Joshua Williamson");
+        }
+
+        @Test
+        @DisplayName("retries with a colon in place of a hyphen when the hyphenated series name has no volumes at all")
+        void hyphenatedSeriesNameWithNoVolumes_retriesWithColon() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume&query=Batman%20-%20Legends", 200, "{\"results\": []}");
+            mockResponse("/volumes/?api_key=example&format=json&filter=name:Batman%20-%20Legends", 200, "{\"results\": []}");
+            mockResponse(
+                    "/search/?api_key=example&format=json&resources=volume&query=Batman:%20Legends",
+                    200,
+                    "{\"results\": [{\"id\": 400, \"name\": \"Batman: Legends\", \"start_year\": \"2021\", \"count_of_issues\": 12, \"publisher\": {\"name\": \"DC Comics\"}, \"resource_type\": \"volume\"}]}"
+            );
+            mockResponse(
+                    "/issues/?api_key=example&format=json&filter=volume:400,issue_number:5",
+                    200,
+                    "{\"results\": [{\"id\": 9003, \"issue_number\": \"5\", \"name\": \"Batman: Legends #5\", \"person_credits\": [{\"name\": \"Chip Zdarsky\", \"role\": \"writer\"}], \"volume\": {\"id\": 400, \"name\": \"Batman: Legends\"}}]}"
+            );
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("Batman - Legends 5");
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getSeriesName()).isEqualTo("Batman: Legends");
+            assertThat(results.getFirst().getAuthors()).containsExactly("Chip Zdarsky");
+        }
+    }
+
+    @Nested
+    @DisplayName("fetchTopMetadata detail-merge fallback")
+    class FetchTopMetadataDetailMergeTests {
+
+        @Test
+        @DisplayName("fetches full issue details to merge in comic metadata when the top result lacks character/team/location credits")
+        void issueMissingComicDetails_mergesFullDetails() throws IOException, InterruptedException {
+            mockResponse(
+                    "/search/?api_key=example&format=json&resources=volume,issue&query=Example%20Series%20%237",
+                    200,
+                    """
+                    {"results": [
+                      {
+                        "id": 7001,
+                        "resource_type": "issue",
+                        "issue_number": "7",
+                        "name": "Issue #7",
+                        "description": "A description",
+                        "volume": {"name": "Example Series"},
+                        "person_credits": [{"name": "Some Writer", "role": "writer"}],
+                        "site_detail_url": "https://comicvine.gamespot.com/example/4000-7001/"
+                      }
+                    ]}"""
+            );
+            mockResponse(
+                    "/issue/4000-7001/",
+                    200,
+                    """
+                    {"results": {
+                      "id": 7001,
+                      "issue_number": "7",
+                      "name": "Issue #7",
+                      "volume": {"name": "Example Series"},
+                      "person_credits": [{"name": "Some Writer", "role": "writer"}],
+                      "character_credits": [{"name": "Batman"}]
+                    }}"""
+            );
+
+            Book book = getBook(null);
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Example Series #7").build();
+
+            BookMetadata metadata = comicvineBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getComicMetadata()).isNotNull();
+            assertThat(metadata.getComicMetadata().getCharacters()).containsExactly("Batman");
         }
     }
 
