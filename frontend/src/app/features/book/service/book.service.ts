@@ -124,11 +124,14 @@ export class BookService {
     });
   }
 
-  private getBooksQueryOptions() {
+  getBooksQueryOptions() {
     return queryOptions({
       queryKey: BOOKS_QUERY_KEY,
       queryFn: () => lastValueFrom(this.http.get<Book[]>(this.url, {params: {stripForListView: false}})),
       staleTime: 5 * 60_000,
+      // Never retried: every attempt materializes the whole flat catalog, and on large catalogs
+      // the server refuses it with a 400 that no amount of retrying will change.
+      retry: false,
     });
   }
 
