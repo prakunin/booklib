@@ -13,9 +13,12 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.*;
 
 class BookdropMonitoringServiceTest {
@@ -187,6 +190,150 @@ class BookdropMonitoringServiceTest {
                 // Not paused anymore, so this call hits the "cannot resume" branch and is a no-op.
                 monitoringService.resumeMonitoring();
                 assertThat(readBooleanField("paused")).isFalse();
+            } finally {
+                monitoringService.stop();
+            }
+        }
+
+        @Test
+        @DisplayName("resumeMonitoring logs and stays paused when re-registering the watch fails")
+        void resumeMonitoring_swallowsIOException_whenBookdropFolderIsGone() throws Exception {
+            monitoringService.start();
+            try {
+                monitoringService.pauseMonitoring();
+                assertThat(readBooleanField("paused")).isTrue();
+
+                try (var files = Files.walk(tempDir)) {
+                    files.sorted(Comparator.reverseOrder()).forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (IOException ignored) {
+                            // best-effort cleanup for the test fixture
+                        }
+                    });
+                }
+
+                monitoringService.resumeMonitoring();
+                assertThat(readBooleanField("paused")).isTrue();
+            } finally {
+                Files.createDirectories(tempDir);
+                monitoringService.stop();
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("live watch events")
+    class LiveWatchEvents {
+
+        @Test
+        @DisplayName("enqueues a newly created supported file")
+        void handlesLiveFileCreation() throws Exception {
+            when(bookdropFileRepository.findAllFilePathsIn(anyList())).thenReturn(List.of());
+            monitoringService.start();
+            try {
+                Path newFile = tempDir.resolve("live-created.epub");
+                Files.createFile(newFile);
+
+                await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+                        verify(eventHandler).enqueueFile(newFile, StandardWatchEventKinds.ENTRY_CREATE));
+            } finally {
+                monitoringService.stop();
+            }
+        }
+
+        @Test
+        @DisplayName("ignores a newly created dot-file")
+        void ignoresLiveDotFileCreation() throws Exception {
+            when(bookdropFileRepository.findAllFilePathsIn(anyList())).thenReturn(List.of());
+            monitoringService.start();
+            try {
+                Path signalFile = tempDir.resolve("signal.epub");
+                Path dotFile = tempDir.resolve(".hidden-live.epub");
+                Files.createFile(dotFile);
+                Files.createFile(signalFile);
+
+                // Wait for the signal file (created after the dot-file) to be processed, then
+                // assert the dot-file was never enqueued — avoids a fixed sleep.
+                await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+                        verify(eventHandler).enqueueFile(signalFile, StandardWatchEventKinds.ENTRY_CREATE));
+                verify(eventHandler, never()).enqueueFile(eq(dotFile), any());
+            } finally {
+                monitoringService.stop();
+            }
+        }
+
+        @Test
+        @DisplayName("ignores a newly created file with an unsupported extension")
+        void ignoresLiveUnsupportedExtension() throws Exception {
+            when(bookdropFileRepository.findAllFilePathsIn(anyList())).thenReturn(List.of());
+            monitoringService.start();
+            try {
+                Path signalFile = tempDir.resolve("signal.epub");
+                Path unsupportedFile = tempDir.resolve("notes.txt");
+                Files.createFile(unsupportedFile);
+                Files.createFile(signalFile);
+
+                await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+                        verify(eventHandler).enqueueFile(signalFile, StandardWatchEventKinds.ENTRY_CREATE));
+                verify(eventHandler, never()).enqueueFile(eq(unsupportedFile), any());
+            } finally {
+                monitoringService.stop();
+            }
+        }
+
+        @Test
+        @DisplayName("recursively scans a newly created directory and enqueues only its supported files")
+        void handlesLiveDirectoryCreation() throws Exception {
+            when(bookdropFileRepository.findAllFilePathsIn(anyList())).thenReturn(List.of());
+            monitoringService.start();
+            try {
+                Path newDir = tempDir.resolve("live-new-dir");
+                Files.createDirectory(newDir);
+                Path supported = newDir.resolve("inside.epub");
+                Path unsupported = newDir.resolve("inside.txt");
+                Files.createFile(supported);
+                Files.createFile(unsupported);
+
+                await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+                        verify(eventHandler).enqueueFile(supported, StandardWatchEventKinds.ENTRY_CREATE));
+                verify(eventHandler, never()).enqueueFile(eq(unsupported), any());
+            } finally {
+                monitoringService.stop();
+            }
+        }
+
+        @Test
+        @DisplayName("enqueues a deleted file")
+        void handlesLiveFileDeletion() throws Exception {
+            when(bookdropFileRepository.findAllFilePathsIn(anyList())).thenReturn(List.of());
+            Path fileToDelete = tempDir.resolve("to-delete.epub");
+            Files.createFile(fileToDelete);
+
+            monitoringService.start();
+            try {
+                Files.delete(fileToDelete);
+
+                await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+                        verify(eventHandler).enqueueFile(fileToDelete, StandardWatchEventKinds.ENTRY_DELETE));
+            } finally {
+                monitoringService.stop();
+            }
+        }
+
+        @Test
+        @DisplayName("enqueues a deleted directory for bulk cleanup")
+        void handlesLiveDirectoryDeletion() throws Exception {
+            when(bookdropFileRepository.findAllFilePathsIn(anyList())).thenReturn(List.of());
+            Path dirToDelete = tempDir.resolve("dir-to-delete");
+            Files.createDirectory(dirToDelete);
+
+            monitoringService.start();
+            try {
+                Files.delete(dirToDelete);
+
+                await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+                        verify(eventHandler).enqueueFile(dirToDelete, StandardWatchEventKinds.ENTRY_DELETE));
             } finally {
                 monitoringService.stop();
             }
