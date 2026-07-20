@@ -341,7 +341,7 @@ class LibraryFileEventProcessorTest {
                 var captor = org.mockito.ArgumentCaptor.forClass(List.class);
                 verify(libraryProcessingService).processLibraryFiles(captor.capture(), eq(library));
                 assertThat(captor.getValue()).hasSize(2);
-                assertThat(captor.getValue()).allMatch(f -> f instanceof LibraryFile);
+                assertThat(captor.getValue()).allMatch(LibraryFile.class::isInstance);
                 verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
             });
         }

@@ -957,7 +957,7 @@ class OpdsBookServiceTest {
 
             when(bookOpdsRepository.findBookIdsByAuthorNameAndLibraryIds(eq("Author Y"), eq(Set.of(7L)), any()))
                     .thenReturn(new PageImpl<>(List.of(1L)));
-            when(bookOpdsRepository.findAllWithFullMetadataByIdsAndLibraryIds(eq(List.of(1L)), eq(Set.of(7L))))
+            when(bookOpdsRepository.findAllWithFullMetadataByIdsAndLibraryIds(List.of(1L), Set.of(7L)))
                     .thenReturn(List.of(bookEntity));
 
             Page<Book> result = opdsBookService.getBooksByAuthorName(2L, "Author Y", 0, 10);
@@ -1006,7 +1006,7 @@ class OpdsBookServiceTest {
 
             when(bookOpdsRepository.findBookIdsBySeriesNameAndLibraryIds(eq("Series Y"), eq(Set.of(7L)), any()))
                     .thenReturn(new PageImpl<>(List.of(1L)));
-            when(bookOpdsRepository.findAllWithFullMetadataByIdsAndLibraryIds(eq(List.of(1L)), eq(Set.of(7L))))
+            when(bookOpdsRepository.findAllWithFullMetadataByIdsAndLibraryIds(List.of(1L), Set.of(7L)))
                     .thenReturn(List.of(bookEntity));
 
             Page<Book> result = opdsBookService.getBooksBySeriesName(2L, "Series Y", 0, 10);

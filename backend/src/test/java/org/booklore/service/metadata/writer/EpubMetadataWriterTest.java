@@ -1037,8 +1037,7 @@ class EpubMetadataWriterTest {
             writer.replaceCoverImageFromBytes(bookEntity(epubFile), createMinimalPngImage());
 
             byte[] updated = readZipEntry(epubFile, "OEBPS/cover.jpg");
-            assertThat(updated).isNotEqualTo(new byte[]{1, 2, 3});
-            assertThat(updated).hasSizeGreaterThan(0);
+            assertThat(updated).isNotEqualTo(new byte[]{1, 2, 3}).hasSizeGreaterThan(0);
         }
 
         @Test
