@@ -1,0 +1,25 @@
+{
+  "error": "OK",
+  "limit": 1,
+  "offset": 0,
+  "number_of_page_results": 1,
+  "number_of_total_results": 1,
+  "status_code": 1,
+  "results": {
+    "id": 60593,
+    "name": "The Example",
+    "publisher": {
+      "id": 3027,
+      "name": "Gestalt Comics"
+    },
+    "start_year": "2009",
+    "count_of_issues": 3,
+    "description": "<p>Australian graphic novel.</p>",
+    "deck": null,
+    "image": {
+      "medium_url": "https://comicvine.gamespot.com/a/uploads/scale_medium/example-volume.jpg"
+    },
+    "site_detail_url": "https://comicvine.gamespot.com/the-example/4050-60593/"
+  },
+  "version": "1.0"
+}

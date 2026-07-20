@@ -2,18 +2,23 @@ package org.booklore.service.metadata.parser;
 
 
 import org.booklore.model.dto.Book;
+import org.booklore.model.dto.BookFile;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.request.FetchMetadataRequest;
 import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.MetadataProviderSettings;
 import org.booklore.model.dto.settings.MetadataPublicReviewsSettings;
+import org.booklore.model.enums.MetadataProvider;
 import org.booklore.service.appsettings.AppSettingService;
 import org.jsoup.Connection;
+import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.parser.Parser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -24,9 +29,17 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -89,6 +102,46 @@ class AmazonBookParserTest {
 
         mockJsoup.when(() -> Jsoup.connect(url))
                 .thenReturn(connection);
+    }
+
+    private void mockJsoupConnectThrowing(String url, Exception toThrow) throws Exception {
+        Connection mockConnection = mock(Connection.class);
+        when(mockConnection.header(any(String.class), any(String.class))).thenReturn(mockConnection);
+        when(mockConnection.method(any(Connection.Method.class))).thenReturn(mockConnection);
+        when(mockConnection.execute()).thenThrow(toThrow);
+
+        mockJsoup.when(() -> Jsoup.connect(url)).thenReturn(mockConnection);
+    }
+
+    private String readFixture(String fixtureName) throws IOException {
+        String filename = "amazon/" + fixtureName;
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(filename)) {
+            assert is != null;
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private AppSettings getAppSettingsWithReviews(String domain, int maxReviews) {
+        MetadataProviderSettings.Amazon amazonSettings = new MetadataProviderSettings.Amazon();
+        amazonSettings.setEnabled(true);
+        amazonSettings.setDomain(domain);
+
+        MetadataProviderSettings metadataProviderSettings = new MetadataProviderSettings();
+        metadataProviderSettings.setAmazon(amazonSettings);
+
+        MetadataPublicReviewsSettings.ReviewProviderConfig cfg = MetadataPublicReviewsSettings.ReviewProviderConfig.builder()
+                .provider(MetadataProvider.Amazon)
+                .enabled(true)
+                .maxReviews(maxReviews)
+                .build();
+        MetadataPublicReviewsSettings publicReviewsSettings = MetadataPublicReviewsSettings.builder()
+                .providers(Set.of(cfg))
+                .build();
+
+        return AppSettings.builder()
+                .metadataPublicReviewsSettings(publicReviewsSettings)
+                .metadataProviderSettings(metadataProviderSettings)
+                .build();
     }
 
     private void mockAmazonIDSearch(String keyword) throws Exception {
@@ -196,5 +249,278 @@ class AmazonBookParserTest {
 
         String actual = metadata.getDescription().replace("\n", "");
         assertEquals("<div>Hello</div><br><br><div>World</div>", actual);
+    }
+
+    @Nested
+    @DisplayName("full detail page parsing")
+    class FullDetailPageTests {
+
+        @Test
+        @DisplayName("parses every metadata field, including reviews, from a full RPI-driven detail page")
+        void parsesAllFieldsFromFullPage() throws Exception {
+            when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettingsWithReviews("com", 5));
+            mockJsoupConnect("https://www.amazon.com/dp/EXAMPLEA1B", readFixture("amazon-book-page-full.html"));
+
+            Book book = getBook("EXAMPLEA1B");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            BookMetadata metadata = amazonBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Example Book");
+            assertThat(metadata.getSubtitle()).isEqualTo("A Subtitle");
+            assertThat(metadata.getAuthors()).containsExactly("Author One", "Author Two");
+            assertThat(metadata.getDescription()).contains("First line.").contains("Second line.");
+            assertThat(metadata.getIsbn10()).isEqualTo("042519078X");
+            assertThat(metadata.getIsbn13()).isEqualTo("9780425190780");
+            assertThat(metadata.getPublisher()).isEqualTo("Ace");
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2019, 4, 1));
+            assertThat(metadata.getSeriesName()).isEqualTo("The Example Series");
+            assertThat(metadata.getSeriesNumber()).isEqualTo(3.0f);
+            assertThat(metadata.getSeriesTotal()).isEqualTo(6);
+            assertThat(metadata.getLanguage()).isEqualTo("en");
+            assertThat(metadata.getCategories()).containsExactlyInAnyOrder("Science Fiction", "Adventure");
+            assertThat(metadata.getAmazonRating()).isEqualTo(4.5);
+            assertThat(metadata.getAmazonReviewCount()).isEqualTo(1234);
+            assertThat(metadata.getThumbnailUrl()).isEqualTo("https://example.com/hires.jpg");
+            assertThat(metadata.getPageCount()).isEqualTo(412);
+            assertThat(metadata.getAsin()).isEqualTo("EXAMPLEA1B");
+
+            assertThat(metadata.getBookReviews()).hasSize(1);
+            var review = metadata.getBookReviews().getFirst();
+            assertThat(review.getReviewerName()).isEqualTo("Jane Reader");
+            assertThat(review.getTitle()).isEqualTo("Loved it");
+            assertThat(review.getRating()).isEqualTo(4.0f);
+            assertThat(review.getCountry()).isEqualTo("United States");
+            assertThat(review.getBody()).isEqualTo("Great book overall.");
+            assertThat(review.getDate()).isEqualTo(LocalDate.of(2019, 4, 1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant());
+        }
+
+        @Test
+        @DisplayName("falls back to detailBullets, parenthetical dates, alternate-language publisher headers, and a src thumbnail when RPI data is absent")
+        void fallsBackWhenRpiDataAbsent() throws Exception {
+            when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettingsWithReviews("de", 5));
+            mockJsoupConnect("https://www.amazon.de/dp/FALLBACK01", readFixture("amazon-book-page-fallbacks.html"));
+
+            Book book = getBook("FALLBACK01");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            BookMetadata metadata = amazonBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Fallback Title");
+            assertThat(metadata.getSubtitle()).isEqualTo("Fallback Subtitle");
+            assertThat(metadata.getAuthors()).containsExactly("Fallback Author");
+            assertThat(metadata.getDescription()).isEqualTo("Noscript description text.");
+            assertThat(metadata.getIsbn10()).isEqualTo("042519078X");
+            assertThat(metadata.getIsbn13()).isEqualTo("9780425190780");
+            assertThat(metadata.getPublisher()).isEqualTo("Beispielverlag");
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2019, 4, 1));
+            assertThat(metadata.getAmazonRating()).isEqualTo(3.8);
+            assertThat(metadata.getAmazonReviewCount()).isNull();
+            assertThat(metadata.getThumbnailUrl()).isEqualTo("https://example.com/fallback-only.jpg");
+            assertThat(metadata.getPageCount()).isNull();
+
+            assertThat(metadata.getBookReviews()).hasSize(1);
+            var review = metadata.getBookReviews().getFirst();
+            assertThat(review.getReviewerName()).isEqualTo("German Reader");
+            assertThat(review.getRating()).isEqualTo(5.0f);
+            // The "vom ... Januar ..." date only parses under the German-locale fallback loop,
+            // since "Januar" isn't recognized as a month name by the default English locale.
+            assertThat(review.getCountry()).isEqualTo("Deutschland");
+            assertThat(review.getDate()).isEqualTo(LocalDate.of(2019, 1, 2).atStartOfDay(java.time.ZoneOffset.UTC).toInstant());
+            assertThat(review.getBody()).isEqualTo("Sehr gutes Buch.");
+        }
+
+        @Test
+        @DisplayName("returns null fields when the detail page has no recognizable structure")
+        void handlesEmptyDetailPage() throws Exception {
+            mockJsoupConnect("https://www.amazon.com/dp/EMPTYPAGE1", "<html><body></body></html>");
+
+            Book book = getBook("EMPTYPAGE1");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            BookMetadata metadata = amazonBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isNull();
+            assertThat(metadata.getAuthors()).isEmpty();
+            assertThat(metadata.getIsbn10()).isNull();
+            assertThat(metadata.getIsbn13()).isNull();
+            assertThat(metadata.getPublisher()).isNull();
+            assertThat(metadata.getPublishedDate()).isNull();
+            assertThat(metadata.getSeriesName()).isNull();
+            assertThat(metadata.getLanguage()).isNull();
+            assertThat(metadata.getCategories()).isEmpty();
+            assertThat(metadata.getAmazonRating()).isNull();
+            assertThat(metadata.getAmazonReviewCount()).isNull();
+            assertThat(metadata.getThumbnailUrl()).isNull();
+            assertThat(metadata.getPageCount()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("search result filtering (getAmazonBookIds / resolveNewBookId / extractAmazonBookId)")
+    class SearchResultFilteringTests {
+
+        @Test
+        @DisplayName("skips box-set/collection/empty/missing-title items and dedupes by ASIN, picking the first valid item")
+        void fetchTopMetadata_pickFirstValidSearchResult() throws Exception {
+            mockJsoupConnect("https://www.amazon.com/s?k=Example", readFixture("amazon-search-results.html"));
+            mockJsoupConnect("https://www.amazon.com/dp/ASINONE1XX", "<html><body><span id=\"productTitle\">Example Book One</span></body></html>");
+
+            Book book = getBook(null);
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Example").build();
+
+            BookMetadata metadata = amazonBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getAsin()).isEqualTo("ASINONE1XX");
+        }
+
+        @Test
+        @DisplayName("fetchMetadata collects distinct valid results, including the data-asin fallback item")
+        void fetchMetadata_collectsDistinctResults() throws Exception {
+            mockJsoupConnect("https://www.amazon.com/s?k=Example", readFixture("amazon-search-results.html"));
+            mockJsoupConnect("https://www.amazon.com/dp/ASINONE1XX", "<html/>");
+            mockJsoupConnect("https://www.amazon.com/dp/DATAASIN1X", "<html/>");
+
+            Book book = getBook(null);
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Example").build();
+
+            List<BookMetadata> results = amazonBookParser.fetchMetadata(book, request);
+
+            assertThat(results).extracting(BookMetadata::getAsin).containsExactlyInAnyOrder("ASINONE1XX", "DATAASIN1X");
+        }
+    }
+
+    @Nested
+    @DisplayName("buildQueryUrl")
+    class BuildQueryUrlTests {
+
+        @Test
+        @DisplayName("prefers a cleaned ISBN over title/author when present")
+        void usesIsbnWhenPresent() throws Exception {
+            mockJsoupConnect("https://www.amazon.com/s?k=978-0425190780", "<html/>");
+
+            Book book = getBook(null);
+            FetchMetadataRequest request = FetchMetadataRequest.builder()
+                    .isbn("978-0425190780")
+                    .title("Ignored Title")
+                    .build();
+
+            amazonBookParser.fetchMetadata(book, request);
+
+            mockJsoup.verify(() -> Jsoup.connect("https://www.amazon.com/s?k=978-0425190780"));
+        }
+
+        @Test
+        @DisplayName("builds the search term from the cleaned file name when there is no title")
+        void usesCleanedFileNameWhenNoTitle() throws Exception {
+            mockJsoupConnect("https://www.amazon.com/s?k=My+Book", "<html/>");
+
+            BookFile file = BookFile.builder().fileName("My Book (2020).epub").build();
+            Book book = Book.builder().primaryFile(file).build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            amazonBookParser.fetchMetadata(book, request);
+
+            mockJsoup.verify(() -> Jsoup.connect("https://www.amazon.com/s?k=My+Book"));
+        }
+
+        @Test
+        @DisplayName("appends the author to the title-derived search term")
+        void appendsAuthorToTitle() throws Exception {
+            mockJsoupConnect("https://www.amazon.com/s?k=Foo+Bar+Baz", "<html/>");
+
+            Book book = getBook(null);
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Foo").author("Bar Baz").build();
+
+            amazonBookParser.fetchMetadata(book, request);
+
+            mockJsoup.verify(() -> Jsoup.connect("https://www.amazon.com/s?k=Foo+Bar+Baz"));
+        }
+
+        @Test
+        @DisplayName("returns empty results and never connects when there is no isbn, title, filename, or author")
+        void returnsEmptyWithoutConnecting() {
+            Book book = Book.builder().build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            List<BookMetadata> results = amazonBookParser.fetchMetadata(book, request);
+
+            assertThat(results).isEmpty();
+            mockJsoup.verify(() -> Jsoup.connect(anyString()), never());
+        }
+    }
+
+    @Nested
+    @DisplayName("fetchDetailedMetadata")
+    class FetchDetailedMetadataTests {
+
+        @Test
+        @DisplayName("fetches metadata directly for a given ASIN")
+        void fetchesDirectlyByAsin() throws Exception {
+            mockJsoupConnect("https://www.amazon.com/dp/DIRECTASIN", "<html><body><span id=\"productTitle\">Direct Fetch Title</span></body></html>");
+
+            BookMetadata metadata = amazonBookParser.fetchDetailedMetadata("DIRECTASIN");
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Direct Fetch Title");
+        }
+    }
+
+    @Nested
+    @DisplayName("fetchDocument error handling")
+    class FetchDocumentErrorTests {
+
+        @Test
+        @DisplayName("a 503 response is treated as anti-scraping and yields a null result, not an exception")
+        void status503_returnsNullGracefully() throws Exception {
+            mockJsoupConnectThrowing("https://www.amazon.com/dp/BLOCKED0001", new HttpStatusException("Service Unavailable", 503, "https://www.amazon.com/dp/BLOCKED0001"));
+
+            BookMetadata metadata = amazonBookParser.fetchDetailedMetadata("BLOCKED0001");
+
+            assertThat(metadata).isNull();
+        }
+
+        @Test
+        @DisplayName("a 500 response is also treated as anti-scraping and yields a null result")
+        void status500_returnsNullGracefully() throws Exception {
+            mockJsoupConnectThrowing("https://www.amazon.com/dp/SERVERERR01", new HttpStatusException("Internal Server Error", 500, "https://www.amazon.com/dp/SERVERERR01"));
+
+            BookMetadata metadata = amazonBookParser.fetchDetailedMetadata("SERVERERR01");
+
+            assertThat(metadata).isNull();
+        }
+
+        @Test
+        @DisplayName("a 503 during search yields no book ids, not an exception")
+        void status503DuringSearch_returnsNullGracefully() throws Exception {
+            mockJsoupConnectThrowing("https://www.amazon.com/s?k=Example", new HttpStatusException("Service Unavailable", 503, "https://www.amazon.com/s?k=Example"));
+
+            Book book = getBook(null);
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Example").build();
+
+            BookMetadata metadata = amazonBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata).isNull();
+        }
+
+        @Test
+        @DisplayName("a non-antiscraping HTTP status (e.g. 404) propagates as an UncheckedIOException")
+        void otherHttpStatus_propagatesUncheckedIOException() throws Exception {
+            mockJsoupConnectThrowing("https://www.amazon.com/dp/NOTFOUND001", new HttpStatusException("Not Found", 404, "https://www.amazon.com/dp/NOTFOUND001"));
+
+            assertThrows(UncheckedIOException.class, () -> amazonBookParser.fetchDetailedMetadata("NOTFOUND001"));
+        }
+
+        @Test
+        @DisplayName("a plain network IOException propagates as an UncheckedIOException")
+        void plainIOException_propagatesUncheckedIOException() throws Exception {
+            mockJsoupConnectThrowing("https://www.amazon.com/dp/NETDOWN0001", new IOException("network down"));
+
+            assertThrows(UncheckedIOException.class, () -> amazonBookParser.fetchDetailedMetadata("NETDOWN0001"));
+        }
     }
 }
