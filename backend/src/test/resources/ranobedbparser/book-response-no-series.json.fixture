@@ -1,0 +1,27 @@
+{
+  "book": {
+    "id": 67890,
+    "lang": "ja",
+    "olang": "ja",
+    "title": "Some Original Title",
+    "c_release_date": 20150620,
+    "titles": [
+      { "lang": "ja", "title": "Some Original Title", "official": true, "book_id": 67890 }
+    ],
+    "editions": [
+      {
+        "book_id": 67890,
+        "lang": "ja",
+        "title": "Original Edition",
+        "eid": 2,
+        "staff": [
+          { "name": "Jane Doe", "role_type": "author" }
+        ]
+      }
+    ],
+    "releases": [
+      { "lang": "ja", "id": 3, "release_date": 20150620, "title": "Original Release", "format": "print" }
+    ],
+    "publishers": []
+  }
+}

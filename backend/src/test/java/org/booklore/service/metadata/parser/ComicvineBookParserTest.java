@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
+import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -37,6 +38,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -432,6 +434,119 @@ class ComicvineBookParserTest {
 
         private String issuesFixtureWithIssueNumber(String issueNumber) throws IOException {
             return readFixture("issues.json").replace("\"issue_number\": \"1\"", "\"issue_number\": \"" + issueNumber + "\"");
+        }
+
+        @Test
+        @DisplayName("a returned issue number that doesn't match the request yields no results for that volume")
+        void mismatchedIssueNumber_yieldsNoResults() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume&query=The%20Example", 200, readFixture("search.json"));
+            mockResponse("/issues/?api_key=example&format=json&filter=volume:60593,issue_number:1", 200, issuesFixtureWithIssueNumber("99"));
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("The Example #1");
+
+            assertThat(results).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("volume scoring and selection")
+    class VolumeScoringTests {
+
+        private static final String MULTI_VOLUME_SEARCH = """
+                {"results": [
+                  {"id": 100, "name": "Justice League Annual", "start_year": "1960", "count_of_issues": 2, "publisher": {"name": "Random House"}, "resource_type": "volume"},
+                  {"id": 200, "name": "Justice League", "start_year": "2015", "count_of_issues": 10, "publisher": {"name": "DC Comics"}, "resource_type": "volume"}
+                ]}""";
+
+        private static final String WINNING_VOLUME_ISSUE = """
+                {"results": [
+                  {"id": 9001, "issue_number": "5", "name": "Crisis Begins", "person_credits": [{"name": "Grant Morrison", "role": "writer"}], "volume": {"id": 200, "name": "Justice League"}}
+                ]}""";
+
+        @Test
+        @DisplayName("a volume with an exact name match, matching year and major publisher outscores an older loosely-matching volume and is tried first")
+        void higherScoringVolumeIsTriedFirstAndShortCircuits() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume&query=Justice%20League", 200, MULTI_VOLUME_SEARCH);
+            mockResponse("/issues/?api_key=example&format=json&filter=volume:200,issue_number:5", 200, WINNING_VOLUME_ISSUE);
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("Justice League 2015 #5");
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getSeriesName()).isEqualTo("Justice League");
+            assertThat(results.getFirst().getSeriesNumber()).isEqualTo(5.0f);
+            assertThat(results.getFirst().getAuthors()).containsExactly("Grant Morrison");
+            // The lower-scoring 1960 volume is never queried: the year match on the 2015 volume
+            // short-circuits the search before the loop reaches it.
+            verify(httpClient, never()).send(argThat((HttpRequest r) -> r.uri().toString().contains("volume:100,")), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("alternative series name fallback")
+    class AlternativeSeriesNameTests {
+
+        @Test
+        @DisplayName("strips a 'The ' prefix and retries when the original series name has no matches")
+        void stripsThePrefixAndRetries() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume&query=The%20Flash", 200, "{\"results\": []}");
+            mockResponse("/volumes/?api_key=example&format=json&filter=name:The%20Flash", 200, "{\"results\": []}");
+            mockResponse(
+                    "/search/?api_key=example&format=json&resources=volume&query=Flash",
+                    200,
+                    "{\"results\": [{\"id\": 300, \"name\": \"Flash\", \"start_year\": \"2016\", \"count_of_issues\": 10, \"publisher\": {\"name\": \"DC Comics\"}, \"resource_type\": \"volume\"}]}"
+            );
+            mockResponse(
+                    "/issues/?api_key=example&format=json&filter=volume:300,issue_number:5",
+                    200,
+                    "{\"results\": [{\"id\": 9002, \"issue_number\": \"5\", \"name\": \"The Flash #5\", \"person_credits\": [{\"name\": \"Joshua Williamson\", \"role\": \"writer\"}], \"volume\": {\"id\": 300, \"name\": \"Flash\"}}]}"
+            );
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("The Flash 5");
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getSeriesName()).isEqualTo("Flash");
+            assertThat(results.getFirst().getAuthors()).containsExactly("Joshua Williamson");
+        }
+    }
+
+    @Nested
+    @DisplayName("general search issue mapping")
+    class GeneralSearchIssueMappingTests {
+
+        @Test
+        @DisplayName("a generic issue name is suppressed from the title and the deck is used when the description is blank")
+        void genericIssueName_suppressedTitle_deckFallback() throws IOException, InterruptedException {
+            mockResponse(
+                    "/search/?api_key=example&format=json&resources=volume,issue&query=Example%20Series%20%237",
+                    200,
+                    """
+                    {"results": [
+                      {
+                        "id": 7001,
+                        "resource_type": "issue",
+                        "issue_number": "7",
+                        "name": "Issue #7",
+                        "description": "",
+                        "deck": "A deck description",
+                        "volume": {"name": "Example Series"},
+                        "person_credits": [{"name": "Some Writer", "role": "writer"}],
+                        "site_detail_url": "https://comicvine.gamespot.com/example/4000-7001/"
+                      }
+                    ]}"""
+            );
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("Example Series #7");
+
+            assertThat(results).hasSize(1);
+            BookMetadata metadata = results.getFirst();
+            assertThat(metadata.getTitle()).isEqualTo("Example Series #7");
+            assertThat(metadata.getDescription()).isEqualTo("A deck description");
+            assertThat(metadata.getSeriesName()).isEqualTo("Example Series");
+            assertThat(metadata.getSeriesNumber()).isEqualTo(7.0f);
+            assertThat(metadata.getSeriesTotal()).isNull();
+            assertThat(metadata.getPublisher()).isNull();
+            assertThat(metadata.getAuthors()).containsExactly("Some Writer");
+            assertThat(metadata.getExternalUrl()).isEqualTo("https://comicvine.gamespot.com/example/4000-7001/");
         }
     }
 }

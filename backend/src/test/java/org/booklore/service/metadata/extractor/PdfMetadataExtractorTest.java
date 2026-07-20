@@ -205,6 +205,50 @@ class PdfMetadataExtractorTest {
         }
     }
 
+    // --- parsePdfDate format variants, driven through the CreationDate document-info field ---
+
+    @Nested
+    class ParsePdfDateTests {
+
+        private java.time.LocalDate publishedDateFor(String creationDate) throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.CREATION_DATE, creationDate);
+            });
+            return extractor.extractMetadata(pdf).getPublishedDate();
+        }
+
+        @Test
+        void plainIsoDate_withoutDPrefix_isParsed() throws Exception {
+            assertThat(publishedDateFor("2021-02-17")).isEqualTo(java.time.LocalDate.of(2021, java.time.Month.FEBRUARY, 17));
+        }
+
+        @Test
+        void plusTimezoneOffset_isStrippedBeforeParsing() throws Exception {
+            assertThat(publishedDateFor("D:20230615120000+05'00'")).isEqualTo(java.time.LocalDate.of(2023, java.time.Month.JUNE, 15));
+        }
+
+        @Test
+        void dashTimezoneOffset_isStrippedBeforeParsing() throws Exception {
+            assertThat(publishedDateFor("D:20230615120000-05'00'")).isEqualTo(java.time.LocalDate.of(2023, java.time.Month.JUNE, 15));
+        }
+
+        @Test
+        void yearAndMonthOnly_defaultsToFirstOfMonth() throws Exception {
+            assertThat(publishedDateFor("D:202306")).isEqualTo(java.time.LocalDate.of(2023, java.time.Month.JUNE, 1));
+        }
+
+        @Test
+        void yearOnly_defaultsToJanuaryFirst() throws Exception {
+            assertThat(publishedDateFor("D:2023")).isEqualTo(java.time.LocalDate.of(2023, java.time.Month.JANUARY, 1));
+        }
+
+        @Test
+        void unparseableDate_isIgnoredRatherThanThrowing() throws Exception {
+            assertThat(publishedDateFor("D:notadate")).isNull();
+        }
+    }
+
     // --- Dublin Core XMP ---
 
     @Nested
