@@ -655,12 +655,12 @@ public class DoubanBookParser implements BookParser {
 
     private BookReview parseReviewElement(Element reviewElement, DateTimeFormatter formatter) {
         Elements reviewerElements = reviewElement.select(".comment-info a");
-        String reviewerName = !reviewerElements.isEmpty() ? reviewerElements.first().text() : null;
+        String reviewerName = !reviewerElements.isEmpty() ? Objects.requireNonNull(reviewerElements.first()).text() : null;
 
         Elements ratingElements = reviewElement.select(".comment-info .rating");
         Float ratingValue = null;
         if (!ratingElements.isEmpty()) {
-            String ratingClass = ratingElements.first().className();
+            String ratingClass = Objects.requireNonNull(ratingElements.first()).className();
             Matcher matcher = RATING_NUMBER_PATTERN.matcher(ratingClass);
              if (matcher.find()) {
                  ratingValue = Float.parseFloat(matcher.group(1)) / 2.0f; // Convert 5-star scale to 10-star scale
@@ -671,7 +671,7 @@ public class DoubanBookParser implements BookParser {
         Instant dateInstant = parseReviewDate(dateElements, formatter);
 
         Elements bodyElements = reviewElement.select(".comment-content");
-        String body = !bodyElements.isEmpty() ? bodyElements.first().text() : null;
+        String body = !bodyElements.isEmpty() ? Objects.requireNonNull(bodyElements.first()).text() : null;
         if (body == null || body.isEmpty()) {
             return null;
         }

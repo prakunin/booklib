@@ -329,7 +329,7 @@ public class LubimyCzytacParser implements BookParser {
         // Series format: "Cykl: Series Name (tom 3)" or "Cykl: Series Name"
         Elements seriesElements = doc.select("span.d-none.d-sm-block.mt-1:contains(Cykl:)");
         if (!seriesElements.isEmpty()) {
-            String seriesText = seriesElements.first().text().trim();
+            String seriesText = Objects.requireNonNull(seriesElements.first()).text().trim();
             parseSeriesInfo(seriesText, metadata);
         }
     }

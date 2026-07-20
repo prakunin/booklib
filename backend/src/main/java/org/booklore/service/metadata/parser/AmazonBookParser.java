@@ -52,7 +52,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
     private static final Pattern PARENTHESES_WITH_WHITESPACE_PATTERN = Pattern.compile("\\s*\\([^\\)]*+\\)");
     private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^\\p{L}\\p{M}0-9]", Pattern.CANON_EQ);
     private static final Pattern ASIN_PATH_PATTERN = Pattern.compile("/dp/([A-Z0-9]{10})");
-    private static final Pattern REVIEWED_IN_ON_PATTERN = Pattern.compile("(?iu)(?:Reviewed in|Rezension aus|Beoordeeld in|Recensie uit|Commenté en|Recensito in|Revisado en)\\s+(.+?)\\s+(?:on|vom|op|le|il|el)\\s+(.+)", Pattern.CANON_EQ);
+    private static final Pattern REVIEWED_IN_ON_PATTERN = Pattern.compile("(?iu)(?:Reviewed in|Rezension aus|Beoordeeld in|Recensie uit|Commenté en|Recensito in|Revisado en)\\s++(.+?)\\s++(?:on|vom|op|le|il|el)\\s++(.+)", Pattern.CANON_EQ);
     private static final Pattern JAPANESE_REVIEW_DATE_PATTERN = Pattern.compile("(\\d{4}年\\d{1,2}月\\d{1,2}日).+");
     private static final String[] TITLE_SELECTORS = {"#productTitle", "#ebooksProductTitle", "h1#title", "span#productTitle"};
     private static final String[] DATE_PATTERNS = {
@@ -752,21 +752,21 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
 
     private BookReview parseReview(Element reviewElement, LocaleInfo localeInfo) {
         Elements reviewerNameElements = reviewElement.select(".a-profile-name");
-        String reviewerName = !reviewerNameElements.isEmpty() ? reviewerNameElements.first().text() : null;
+        String reviewerName = !reviewerNameElements.isEmpty() ? Objects.requireNonNull(reviewerNameElements.first()).text() : null;
 
         String title = null;
         Elements titleElements = reviewElement.select("[data-hook=review-title] span");
         if (!titleElements.isEmpty()) {
-            title = titleElements.last().text();
+            title = Objects.requireNonNull(titleElements.last()).text();
             if (title.isEmpty()) title = null;
         }
 
         Elements ratingElements = reviewElement.select("[data-hook=review-star-rating] .a-icon-alt");
-        String ratingText = !ratingElements.isEmpty() ? ratingElements.first().text() : "";
+        String ratingText = !ratingElements.isEmpty() ? Objects.requireNonNull(ratingElements.first()).text() : "";
         Float ratingValue = parseReviewRating(ratingText);
 
         Elements fullDateElements = reviewElement.select("[data-hook=review-date]");
-        String fullDateText = !fullDateElements.isEmpty() ? fullDateElements.first().text() : "";
+        String fullDateText = !fullDateElements.isEmpty() ? Objects.requireNonNull(fullDateElements.first()).text() : "";
         ReviewDateInfo dateInfo = parseReviewDateInfo(fullDateText, localeInfo);
 
         Elements bodyElements = reviewElement.select("[data-hook=review-body]");

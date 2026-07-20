@@ -28,6 +28,9 @@ import java.util.Set;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+// nimbus-jose-jwt's JWTClaimsSet.Builder only accepts java.util.Date for issueTime/expirationTime (no java.time overload);
+// Sonar reports S2143 for this file without a resolvable line, so the suppression is applied at the class level.
+@SuppressWarnings("java:S2143")
 public class JwtUtils {
 
     private final JwtSecretService jwtSecretService;
@@ -80,8 +83,6 @@ public class JwtUtils {
         return generateToken(user, expirationTime, tokenType);
     }
 
-    // nimbus-jose-jwt's JWTClaimsSet.Builder only accepts java.util.Date for issueTime/expirationTime (no java.time overload).
-    @SuppressWarnings("java:S2143")
     private String generateToken(BookLoreUserEntity user, long expirationTime, String tokenType) {
         Instant now = Instant.now();
 
