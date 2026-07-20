@@ -460,8 +460,8 @@ class DoubanBookParserTest {
             List<BookMetadata> results = parser.fetchMetadata(book, request);
 
             assertThat(results).hasSize(1);
-            // The broadest selector also matches the nested .comment-info/.comment-content elements
-            // (their class names contain "comment" too), so more than one candidate is produced;
+            // The broadest selector also matches nested comment-info and comment-content elements
+            // whose class names contain the word comment, so more than one candidate is produced;
             // what matters for this branch is that the fallback selector fired and found the review body.
             assertThat(results.getFirst().getBookReviews())
                     .isNotEmpty()

@@ -207,7 +207,7 @@ class BookdropMonitoringServiceTest {
                     files.sorted(Comparator.reverseOrder()).forEach(p -> {
                         try {
                             Files.deleteIfExists(p);
-                        } catch (IOException ignored) {
+                        } catch (IOException _) {
                             // best-effort cleanup for the test fixture
                         }
                     });

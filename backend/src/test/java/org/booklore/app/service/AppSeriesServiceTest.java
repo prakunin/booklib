@@ -192,46 +192,19 @@ class AppSeriesServiceTest {
             assertEquals(2.0f, series.getCoverBooks().get(1).getSeriesNumber());
         }
 
-        @Test
-        void getSeries_sortByName_asc() {
+        @ParameterizedTest
+        @CsvSource({
+                "name, asc",
+                "bookCount, desc",
+                "readProgress, asc",
+                "lastReadTime, desc"
+        })
+        void getSeries_sortsByField(String sortField, String sortDir) {
             mockAdminUser();
             mockAggregateQuery(Collections.emptyList());
             mockCountQuery(0L);
 
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "name", "asc", null, null, null);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        void getSeries_sortByBookCount_desc() {
-            mockAdminUser();
-            mockAggregateQuery(Collections.emptyList());
-            mockCountQuery(0L);
-
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "bookCount", "desc", null, null, null);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        void getSeries_sortByReadProgress_asc() {
-            mockAdminUser();
-            mockAggregateQuery(Collections.emptyList());
-            mockCountQuery(0L);
-
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "readProgress", "asc", null, null, null);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        void getSeries_sortByLastReadTime_desc() {
-            mockAdminUser();
-            mockAggregateQuery(Collections.emptyList());
-            mockCountQuery(0L);
-
-            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, "lastReadTime", "desc", null, null, null);
+            AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, sortField, sortDir, null, null, null);
 
             assertNotNull(result);
         }
