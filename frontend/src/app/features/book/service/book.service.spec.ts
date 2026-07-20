@@ -212,6 +212,14 @@ describe('BookService', () => {
     httpTestingController.expectNone(req => req.url.endsWith('/api/v1/books'));
   });
 
+  it('disables retries for the legacy flat catalog query', () => {
+    setup();
+
+    const options = service.getBooksQueryOptions();
+
+    expect(options.retry).toBe(false);
+  });
+
   it('disables retries for queued recommendation requests', () => {
     setup();
 
