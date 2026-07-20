@@ -13,6 +13,8 @@ import org.booklore.model.dto.Library;
 import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.ShelfEntity;
+import org.booklore.model.enums.ComicCreatorRole;
+import org.booklore.model.enums.ReadStatus;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.ShelfRepository;
 import org.booklore.repository.UserBookFileProgressRepository;
@@ -38,6 +40,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -310,6 +313,84 @@ class AppBookServiceFilterOptionsTest {
         assertFalse(jpql.isEmpty());
         assertTrue(jpql.stream().allMatch(q -> q.contains("b.hasFiles = true")),
                 "an oversized shell set must fall back to the flag predicate instead of a huge IN list");
+    }
+
+    // -------------------------------------------------------------------------
+    // Comic creator role labels / read-status UNSET bucket
+    // -------------------------------------------------------------------------
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFilterOptions_comicCreators_mapsEveryRoleToItsLabel() {
+        mockAdminUser();
+        mockJpqlQueries();
+
+        List<Tuple> creatorTuples = List.of(
+                creatorTuple("Alice", ComicCreatorRole.PENCILLER, 3L),
+                creatorTuple("Bob", ComicCreatorRole.INKER, 2L),
+                creatorTuple("Cara", ComicCreatorRole.COLORIST, 1L),
+                creatorTuple("Dev", ComicCreatorRole.LETTERER, 1L),
+                creatorTuple("Eve", ComicCreatorRole.COVER_ARTIST, 1L),
+                creatorTuple("Fay", ComicCreatorRole.EDITOR, 1L)
+        );
+        TypedQuery<Tuple> creatorQuery = mock(TypedQuery.class);
+        when(creatorQuery.setParameter(anyString(), any())).thenReturn(creatorQuery);
+        when(creatorQuery.setMaxResults(anyInt())).thenReturn(creatorQuery);
+        when(creatorQuery.getResultList()).thenReturn(creatorTuples);
+        when(entityManager.createQuery(argThat((String s) -> s != null && s.contains("mapping.role")), eq(Tuple.class)))
+                .thenReturn(creatorQuery);
+
+        AppFilterOptions result = service.getFilterOptions(null, null, null);
+
+        assertThat(result.comicCreators()).extracting(AppFilterOptions.CountedOption::name)
+                .containsExactlyInAnyOrder(
+                        "Alice:penciller", "Bob:inker", "Cara:colorist",
+                        "Dev:letterer", "Eve:coverArtist", "Fay:editor");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFilterOptions_readStatusUnsetCountPositive_prependsUnsetBucket() {
+        mockAdminUser();
+        mockJpqlQueries();
+
+        List<Tuple> readStatusTuples = List.of(readStatusTuple(ReadStatus.READ, 5L));
+        TypedQuery<Tuple> readStatusQuery = mock(TypedQuery.class);
+        when(readStatusQuery.setParameter(anyString(), any())).thenReturn(readStatusQuery);
+        when(readStatusQuery.getResultList()).thenReturn(readStatusTuples);
+        when(entityManager.createQuery(argThat((String s) -> s != null && s.contains("ubp.readStatus")), eq(Tuple.class)))
+                .thenReturn(readStatusQuery);
+
+        TypedQuery<Long> unsetCountQuery = mock(TypedQuery.class);
+        when(unsetCountQuery.setParameter(anyString(), any())).thenReturn(unsetCountQuery);
+        when(unsetCountQuery.getSingleResult()).thenReturn(4L);
+        when(entityManager.createQuery(
+                argThat((String s) -> s != null && s.contains("NOT IN") && s.contains("UserBookProgressEntity")),
+                eq(Long.class)))
+                .thenReturn(unsetCountQuery);
+
+        AppFilterOptions result = service.getFilterOptions(null, null, null);
+
+        assertThat(result.readStatuses()).extracting(AppFilterOptions.CountedOption::name)
+                .containsExactly("UNSET", "READ");
+        assertThat(result.readStatuses().get(0).count()).isEqualTo(4L);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Tuple creatorTuple(String name, ComicCreatorRole role, long count) {
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.get(0, String.class)).thenReturn(name);
+        when(tuple.get(1, ComicCreatorRole.class)).thenReturn(role);
+        when(tuple.get(2, Long.class)).thenReturn(count);
+        return tuple;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Tuple readStatusTuple(ReadStatus status, long count) {
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.get(0, ReadStatus.class)).thenReturn(status);
+        when(tuple.get(1, Long.class)).thenReturn(count);
+        return tuple;
     }
 
     // -------------------------------------------------------------------------
