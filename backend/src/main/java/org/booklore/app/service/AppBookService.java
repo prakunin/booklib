@@ -222,12 +222,6 @@ public class AppBookService {
                 countBooksByLibrary(visibleBooks));
     }
 
-    public long getCatalogBookCount() {
-        BookLoreUser user = authenticationService.getAuthenticatedUser();
-        return bookRepository.count(buildBaseSpecification(
-                getAccessibleLibraryIds(user), null, user.getId(), user.getPermissions().isAdmin()));
-    }
-
     public List<AppBookSummary> getBookSummariesByIds(Set<Long> bookIds) {
         if (bookIds == null || bookIds.isEmpty()) {
             return Collections.emptyList();
