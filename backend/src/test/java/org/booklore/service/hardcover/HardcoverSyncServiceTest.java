@@ -4,12 +4,14 @@ import org.booklore.model.dto.HardcoverSyncSettings;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.repository.BookRepository;
+import org.booklore.service.metadata.parser.hardcover.GraphQLRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -584,6 +586,132 @@ class HardcoverSyncServiceTest {
         when(responseSpec.body(Map.class)).thenReturn(null);
 
         assertNull(resolveHardcoverBook(null, "9781234567890", null));
+    }
+
+    @Test
+    @DisplayName("Returns null when isbn-only search finds a book with no valid editions")
+    void withIsbnOnly_bookHasNoEditions_returnsNull() throws Exception {
+        Map<String, Object> book = Map.of("id", 12345, "pages", 300, "editions", List.of());
+        when(responseSpec.body(Map.class)).thenReturn(Map.of("data", Map.of("books", List.of(book))));
+
+        assertNull(resolveHardcoverBook(null, "9781234567890", null));
+    }
+
+    // === Additional branch coverage ===
+
+    @Test
+    @DisplayName("Swallows an unexpected exception from outside the GraphQL transport")
+    void syncProgressToHardcover_whenUnexpectedExceptionOutsideTransport_shouldNotThrow() {
+        when(hardcoverSyncSettingsService.getSettingsForUserId(TEST_USER_ID))
+                .thenThrow(new IllegalStateException("settings lookup exploded"));
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        verify(restClient, never()).post();
+    }
+
+    @Test
+    @DisplayName("resolveByBookId swallows an unexpected exception thrown while parsing the response")
+    void resolveByBookId_unexpectedResponseShape_returnsNull() throws Exception {
+        // "books" is a String instead of a List, forcing a ClassCastException inside the try block
+        // that is distinct from the RestClientException path already covered elsewhere.
+        when(responseSpec.body(Map.class)).thenReturn(Map.of("data", Map.of("books", "not-a-list")));
+
+        assertNull(resolveHardcoverBook("12345", null, null));
+    }
+
+    @Test
+    @DisplayName("resolveByIsbn swallows an unexpected exception thrown while parsing the response")
+    void resolveByIsbn_unexpectedResponseShape_returnsNull() throws Exception {
+        when(responseSpec.body(Map.class)).thenReturn(Map.of("data", Map.of("books", "not-a-list")));
+
+        assertNull(resolveHardcoverBook(null, "9781234567890", null));
+    }
+
+    @Test
+    @DisplayName("Aborts when updateUserBookRead fails on an existing matching-edition read")
+    void syncProgressToHardcover_whenUpdateUserBookReadReturnsErrors_shouldAbort() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        Map<String, Object> existingRead = existingUserBookRead(6001, 10, "2024-01-01", null, 50);
+        Map<String, Object> updateReadErrorResponse = Map.of("errors", List.of(Map.of("message", "cannot update")));
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createGetUserBookAndReadsResponse(5001, 2, 10, List.of(existingRead)))
+                .thenReturn(updateReadErrorResponse);
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+
+        // Resolve (1) + getUserBookAndReads (2) + failing updateUserBookRead (3), then abort
+        verify(restClient, times(3)).post();
+    }
+
+    @Test
+    @DisplayName("Sets finishedAt when updating an existing matching-edition read and progress is finished")
+    void syncProgressToHardcover_whenCurrentlyReadingMatchingEditionAndFinished_setsFinishedAt() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        Map<String, Object> existingRead = existingUserBookRead(6001, 10, "2024-01-01", null, 50);
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createGetUserBookAndReadsResponse(5001, 2, 10, List.of(existingRead)))
+                .thenReturn(createUpdateUserBookReadResponse());
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 100.0f, TEST_USER_ID);
+
+        // Resolve (1) + getUserBookAndReads (2) + updateUserBookRead (3)
+        verify(restClient, times(3)).post();
+
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(requestBodySpec, atLeastOnce()).body(bodyCaptor.capture());
+        var lastRequest = (GraphQLRequest) bodyCaptor.getValue();
+        @SuppressWarnings("unchecked")
+        var readObject = (Map<String, Object>) lastRequest.getVariables().get("userBookReadObject");
+        assertNotNull(readObject.get("finished_at"));
+    }
+
+    @Test
+    @DisplayName("Logs failure when insertUserBookRead itself returns errors")
+    void syncProgressToHardcover_whenInsertUserBookReadReturnsErrors_shouldLogFailure() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        // Existing read has a different edition, so a new read must be inserted (not updated)
+        Map<String, Object> existingRead = existingUserBookRead(6001, 99, "2024-01-01", null, 50);
+        Map<String, Object> insertReadErrorResponse = Map.of("errors", List.of(Map.of("message", "cannot insert")));
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createGetUserBookAndReadsResponse(5001, 2, 10, List.of(existingRead)))
+                .thenReturn(insertReadErrorResponse);
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        // Resolve (1) + getUserBookAndReads (2) + failing insertUserBookRead (3)
+        verify(restClient, times(3)).post();
+    }
+
+    @Test
+    @DisplayName("Aborts insertUserBook when the top-level response carries an errors key")
+    void syncProgressToHardcover_whenInsertUserBookResponseHasErrorsKey_shouldAbort() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        Map<String, Object> insertUserBookErrorsResponse = Map.of("errors", List.of(Map.of("message", "not authorized")));
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createEmptyBooksResponse())
+                .thenReturn(insertUserBookErrorsResponse);
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+
+        // Resolve (1) + getUserBookAndReads (2) + insertUserBook with top-level errors (3), then abort
+        verify(restClient, times(3)).post();
     }
 
     // === Reflection helpers ===
