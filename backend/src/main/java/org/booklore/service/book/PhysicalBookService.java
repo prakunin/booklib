@@ -5,15 +5,14 @@ import org.booklore.exception.APIException;
 import org.booklore.mapper.BookMapper;
 import org.booklore.model.dto.Book;
 import org.booklore.model.dto.request.CreatePhysicalBookRequest;
-import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.CategoryEntity;
 import org.booklore.model.entity.LibraryEntity;
-import org.booklore.repository.AuthorRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.CategoryRepository;
 import org.booklore.repository.LibraryRepository;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.booklore.util.BookCoverUtils;
 import org.booklore.util.FileService;
 import lombok.AllArgsConstructor;
@@ -41,10 +40,10 @@ public class PhysicalBookService {
     private static final Pattern NON_ISBN_CHAR_PATTERN = Pattern.compile("[^0-9Xx]");
     private final BookRepository bookRepository;
     private final LibraryRepository libraryRepository;
-    private final AuthorRepository authorRepository;
     private final CategoryRepository categoryRepository;
     private final BookMapper bookMapper;
     private final FileService fileService;
+    private final AuthorLocalResolver authorLocalResolver;
 
     @Transactional
     public Book createPhysicalBook(CreatePhysicalBookRequest request) {
@@ -132,11 +131,10 @@ public class PhysicalBookService {
         if (bookEntity.getMetadata().getAuthors() == null) {
             bookEntity.getMetadata().setAuthors(new ArrayList<>());
         }
-        authors.stream()
-                .map(authorName -> truncate(authorName, 255))
-                .map(authorName -> authorRepository.findByName(authorName)
-                        .orElseGet(() -> authorRepository.save(AuthorEntity.builder().name(authorName).build())))
-                .forEach(authorEntity -> bookEntity.getMetadata().getAuthors().add(authorEntity));
+        for (String rawName : authors) {
+            authorLocalResolver.resolve(rawName)
+                    .ifPresent(author -> bookEntity.getMetadata().getAuthors().add(author));
+        }
         bookEntity.getMetadata().updateSearchText();
     }
 

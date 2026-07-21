@@ -15,6 +15,7 @@ import org.booklore.model.enums.ComicCreatorRole;
 import org.booklore.model.enums.MetadataReplaceMode;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.booklore.service.file.FileMoveService;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.service.metadata.writer.MetadataWriter;
@@ -51,7 +52,6 @@ class BookMetadataUpdaterTest {
     private static final String TEST_BOOK_EPUB = "book.epub";
 
     @Mock private AppProperties appProperties;
-    @Mock private AuthorRepository authorRepository;
     @Mock private CategoryRepository categoryRepository;
     @Mock private MoodRepository moodRepository;
     @Mock private TagRepository tagRepository;
@@ -68,6 +68,7 @@ class BookMetadataUpdaterTest {
     @Mock private BookReviewUpdateService bookReviewUpdateService;
     @Mock private FileMoveService fileMoveService;
     @Mock private SidecarMetadataWriter sidecarMetadataWriter;
+    @Mock private AuthorLocalResolver authorLocalResolver;
 
     @InjectMocks
     private BookMetadataUpdater updater;
@@ -323,7 +324,7 @@ class BookMetadataUpdaterTest {
         metadataEntity.setAuthors(new ArrayList<>(List.of(existing)));
 
         AuthorEntity newAuthor = AuthorEntity.builder().id(2L).name("New Author").build();
-        when(authorRepository.findByName("New Author")).thenReturn(Optional.of(newAuthor));
+        when(authorLocalResolver.resolve("New Author")).thenReturn(Optional.of(newAuthor));
 
         BookMetadata newMeta = BookMetadata.builder().title("T").authors(List.of("New Author")).build();
         MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
@@ -358,7 +359,7 @@ class BookMetadataUpdaterTest {
     void setBookMetadata_authorsReplaceMissing_addsWhenEmpty() {
         metadataEntity.setAuthors(new ArrayList<>());
         AuthorEntity newAuthor = AuthorEntity.builder().id(2L).name("New").build();
-        when(authorRepository.findByName("New")).thenReturn(Optional.of(newAuthor));
+        when(authorLocalResolver.resolve("New")).thenReturn(Optional.of(newAuthor));
 
         BookMetadata newMeta = BookMetadata.builder().title("T").authors(List.of("New")).build();
         MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_MISSING);
@@ -535,8 +536,7 @@ class BookMetadataUpdaterTest {
     void setBookMetadata_createsNewAuthorWhenNotFound() {
         metadataEntity.setAuthors(new ArrayList<>());
         AuthorEntity created = AuthorEntity.builder().id(5L).name("Brand New").build();
-        when(authorRepository.findByName("Brand New")).thenReturn(Optional.empty());
-        when(authorRepository.save(any(AuthorEntity.class))).thenReturn(created);
+        when(authorLocalResolver.resolve("Brand New")).thenReturn(Optional.of(created));
 
         BookMetadata newMeta = BookMetadata.builder().title("T").authors(List.of("Brand New")).build();
         MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
@@ -546,7 +546,7 @@ class BookMetadataUpdaterTest {
 
             updater.setBookMetadata(context);
 
-            verify(authorRepository).save(any(AuthorEntity.class));
+            assertThat(metadataEntity.getAuthors()).containsExactly(created);
         }
     }
 
@@ -1452,7 +1452,7 @@ class BookMetadataUpdaterTest {
             metadataEntity.setAuthors(new ArrayList<>(List.of(existing)));
 
             AuthorEntity newAuthor = AuthorEntity.builder().id(2L).name("New").build();
-            when(authorRepository.findByName("New")).thenReturn(Optional.of(newAuthor));
+            when(authorLocalResolver.resolve("New")).thenReturn(Optional.of(newAuthor));
 
             BookMetadata newMeta = BookMetadata.builder().title("T").authors(List.of("New")).build();
             MetadataUpdateContext context = buildContext(newMeta, null);

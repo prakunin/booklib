@@ -8,10 +8,10 @@ import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
 import org.booklore.model.enums.BookFileType;
-import org.booklore.repository.AuthorRepository;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.CategoryRepository;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,9 +44,9 @@ class InpxBatchWriterTest {
     @Mock
     private BookFileRepository bookFileRepository;
     @Mock
-    private AuthorRepository authorRepository;
-    @Mock
     private CategoryRepository categoryRepository;
+    @Mock
+    private AuthorLocalResolver authorLocalResolver;
     @Mock
     private EntityManager entityManager;
 
@@ -137,7 +138,7 @@ class InpxBatchWriterTest {
     @Test
     void reusesAnExistingAuthorAndCachesItAcrossBatches() {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
-        when(authorRepository.findByName("Strugatsky Arkady"))
+        when(authorLocalResolver.resolve("Strugatsky Arkady"))
                 .thenReturn(Optional.of(AuthorEntity.builder().id(42L).name("Strugatsky Arkady").build()));
         when(entityManager.getReference(AuthorEntity.class, 42L))
                 .thenReturn(AuthorEntity.builder().id(42L).name("Strugatsky Arkady").build());
@@ -145,29 +146,23 @@ class InpxBatchWriterTest {
         writer.persist(List.of(book("fb2-1.zip", "a", "A", "Strugatsky Arkady", null)), 7L, 3L, caches);
         writer.persist(List.of(book("fb2-1.zip", "b", "B", "Strugatsky Arkady", null)), 7L, 3L, caches);
 
-        verify(authorRepository, never()).save(any(AuthorEntity.class));
-        // second batch must hit the cache, not the repository
-        verify(authorRepository).findByName("Strugatsky Arkady");
+        // second batch must hit the cache, not the resolver
+        verify(authorLocalResolver, times(1)).resolve("Strugatsky Arkady");
         assertThat(caches.authors()).containsEntry("strugatsky arkady", 42L);
     }
 
     @Test
     void createsAnUnknownAuthorOnce() {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
-        when(authorRepository.findByName("New Author")).thenReturn(Optional.empty());
-        when(authorRepository.save(any(AuthorEntity.class)))
-                .thenAnswer(invocation -> {
-                    AuthorEntity saved = invocation.getArgument(0);
-                    saved.setId(99L);
-                    return saved;
-                });
+        when(authorLocalResolver.resolve("New Author"))
+                .thenReturn(Optional.of(AuthorEntity.builder().id(99L).name("New Author").build()));
         when(entityManager.getReference(AuthorEntity.class, 99L))
                 .thenReturn(AuthorEntity.builder().id(99L).name("New Author").build());
 
         writer.persist(List.of(book("fb2-1.zip", "a", "A", "New Author", null)), 7L, 3L, caches);
         writer.persist(List.of(book("fb2-1.zip", "b", "B", "New Author", null)), 7L, 3L, caches);
 
-        verify(authorRepository).save(any(AuthorEntity.class));
+        verify(authorLocalResolver, times(1)).resolve("New Author");
         assertThat(caches.authors()).containsEntry("new author", 99L);
     }
 
@@ -177,7 +172,7 @@ class InpxBatchWriterTest {
 
         writer.persist(List.of(book("fb2-1.zip", "a", "A", null, null)), 7L, 3L, caches);
 
-        verify(authorRepository, never()).findAll();
+        verifyNoInteractions(authorLocalResolver);
         verify(categoryRepository, never()).findAll();
     }
 
@@ -240,12 +235,8 @@ class InpxBatchWriterTest {
     @Test
     void reusesANewAuthorWithinTheSameBatchWithoutSavingTwice() {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
-        when(authorRepository.findByName("New Author")).thenReturn(Optional.empty());
-        when(authorRepository.save(any(AuthorEntity.class))).thenAnswer(invocation -> {
-            AuthorEntity saved = invocation.getArgument(0);
-            saved.setId(99L);
-            return saved;
-        });
+        when(authorLocalResolver.resolve("New Author"))
+                .thenReturn(Optional.of(AuthorEntity.builder().id(99L).name("New Author").build()));
         when(entityManager.getReference(AuthorEntity.class, 99L))
                 .thenReturn(AuthorEntity.builder().id(99L).name("New Author").build());
 
@@ -254,18 +245,14 @@ class InpxBatchWriterTest {
                 book("fb2-1.zip", "b", "B", "New Author", null)),
                 7L, 3L, caches);
 
-        verify(authorRepository, times(1)).save(any(AuthorEntity.class));
+        verify(authorLocalResolver, times(1)).resolve("New Author");
     }
 
     @Test
     void newAuthorEntersTheScanWideCacheOnlyAfterItsBatchCommits() {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
-        when(authorRepository.findByName("New Author")).thenReturn(Optional.empty());
-        when(authorRepository.save(any(AuthorEntity.class))).thenAnswer(invocation -> {
-            AuthorEntity saved = invocation.getArgument(0);
-            saved.setId(99L);
-            return saved;
-        });
+        when(authorLocalResolver.resolve("New Author"))
+                .thenReturn(Optional.of(AuthorEntity.builder().id(99L).name("New Author").build()));
         when(entityManager.getReference(AuthorEntity.class, 99L))
                 .thenReturn(AuthorEntity.builder().id(99L).name("New Author").build());
 
@@ -288,12 +275,8 @@ class InpxBatchWriterTest {
     @Test
     void newAuthorDoesNotPoisonTheScanWideCacheWhenItsBatchRollsBack() {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
-        when(authorRepository.findByName("New Author")).thenReturn(Optional.empty());
-        when(authorRepository.save(any(AuthorEntity.class))).thenAnswer(invocation -> {
-            AuthorEntity saved = invocation.getArgument(0);
-            saved.setId(99L);
-            return saved;
-        });
+        when(authorLocalResolver.resolve("New Author"))
+                .thenReturn(Optional.of(AuthorEntity.builder().id(99L).name("New Author").build()));
         when(entityManager.getReference(AuthorEntity.class, 99L))
                 .thenReturn(AuthorEntity.builder().id(99L).name("New Author").build());
 
@@ -316,19 +299,23 @@ class InpxBatchWriterTest {
     }
 
     @Test
-    void queriesTheAuthorRepositoryWithTheStrippedNameSoWhitespaceCannotDuplicateAnAuthor() {
+    void passesTheRawNameToTheResolverButCachesByNormalizedKeySoWhitespaceCannotDuplicateAnAuthor() {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
-        when(authorRepository.findByName("Padded Author"))
+        when(authorLocalResolver.resolve("  Padded Author  "))
                 .thenReturn(Optional.of(AuthorEntity.builder().id(11L).name("Padded Author").build()));
         when(entityManager.getReference(AuthorEntity.class, 11L))
                 .thenReturn(AuthorEntity.builder().id(11L).name("Padded Author").build());
 
+        // Cleaning/trimming the name is AuthorLocalResolver's job now, so the writer passes
+        // the raw (padded) name straight through to it...
         writer.persist(List.of(book("fb2-1.zip", "a", "A", "  Padded Author  ", null)), 7L, 3L, caches);
+        // ...but the cache key is AuthorNames.normalizeKey(), so a second batch with an
+        // unpadded variant of the same name must hit the cache rather than calling the
+        // resolver again - otherwise "  Padded Author  " and "Padded Author" would be
+        // treated as different authors.
+        writer.persist(List.of(book("fb2-1.zip", "b", "B", "Padded Author", null)), 7L, 3L, caches);
 
-        // The cache key is normalized with strip(); the repository lookup must use the
-        // same stripped value, otherwise "  Padded Author  " and "Padded Author" would
-        // be treated as different authors by the database.
-        verify(authorRepository).findByName("Padded Author");
-        verify(authorRepository, never()).findByName("  Padded Author  ");
+        verify(authorLocalResolver).resolve("  Padded Author  ");
+        verify(authorLocalResolver, never()).resolve("Padded Author");
     }
 }

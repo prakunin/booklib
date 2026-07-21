@@ -12,10 +12,11 @@ import org.booklore.model.entity.CategoryEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LibraryPathEntity;
 import org.booklore.model.enums.BookFileType;
-import org.booklore.repository.AuthorRepository;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.CategoryRepository;
+import org.booklore.service.author.AuthorLocalResolver;
+import org.booklore.util.AuthorNames;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,8 +42,8 @@ public class InpxBatchWriter {
 
     private final BookRepository bookRepository;
     private final BookFileRepository bookFileRepository;
-    private final AuthorRepository authorRepository;
     private final CategoryRepository categoryRepository;
+    private final AuthorLocalResolver authorLocalResolver;
     @PersistenceContext
     private final EntityManager entityManager;
 
@@ -202,32 +203,24 @@ public class InpxBatchWriter {
                                               Map<String, Long> pendingCache) {
         List<AuthorEntity> result = new ArrayList<>();
         for (String name : names) {
-            String key = normalize(name);
-            if (name == null || key.isBlank()) {
+            String cleaned = AuthorNames.cleanDisplayName(name);
+            if (cleaned.isEmpty()) {
                 continue;
             }
+            String key = AuthorNames.normalizeKey(cleaned);
             Long id = committedCache.get(key);
             if (id == null) {
                 id = pendingCache.get(key);
             }
             if (id == null) {
-                String strippedName = name.strip();
-                // Plain equality, not findByNameIgnoreCase: author.name is utf8mb4_unicode_ci
-                // (already case-insensitive at the DB level) and carries a unique index
-                // (unique_name). Wrapping the column in upper()/lower() makes the predicate
-                // non-sargable, so MariaDB can't use unique_name and does a full index scan on
-                // every lookup - measured at ~65k rows scanned per call across 421k books.
-                Optional<AuthorEntity> found = authorRepository.findByName(strippedName);
-                if (found.isPresent()) {
-                    // Already committed: safe to cache scan-wide immediately.
-                    id = found.get().getId();
-                    committedCache.put(key, id);
-                } else {
-                    // Not yet committed: reusable within this batch, but only promoted
-                    // scan-wide once this batch's transaction commits.
-                    id = authorRepository.save(AuthorEntity.builder().name(strippedName).build()).getId();
-                    pendingCache.put(key, id);
+                Optional<AuthorEntity> resolved = authorLocalResolver.resolve(name);
+                if (resolved.isEmpty()) {
+                    continue;
                 }
+                // Not yet promoted scan-wide: reusable within this batch, but only promoted
+                // scan-wide once this batch's transaction commits (see registerCachePromotion).
+                id = resolved.get().getId();
+                pendingCache.put(key, id);
             }
             result.add(entityManager.getReference(AuthorEntity.class, id));
         }
