@@ -62,4 +62,39 @@ class AuthorLocalResolverRedirectTest {
             verify(creator).createInNewTransaction("Ambiguous Name", "ambiguous name");
         }
     }
+
+    @Nested
+    class CycleGuard {
+        @Test
+        void selfRedirectDoesNotLoopAndReturnsSameAuthor() {
+            AuthorEntity selfLoop = AuthorEntity.builder().id(1L).name("Loopy").mergedIntoAuthorId(1L).build();
+            when(repo.findByName("Loopy")).thenReturn(Optional.of(selfLoop));
+            when(repo.findById(1L)).thenReturn(Optional.of(selfLoop));
+
+            assertThat(resolver.resolve("Loopy")).contains(selfLoop);
+            verifyNoInteractions(creator);
+        }
+
+        @Test
+        void twoNodeCycleTerminatesAndReturnsLastVisited() {
+            AuthorEntity a = AuthorEntity.builder().id(1L).name("A").mergedIntoAuthorId(2L).build();
+            AuthorEntity b = AuthorEntity.builder().id(2L).name("B").mergedIntoAuthorId(1L).build();
+            when(repo.findByName("A")).thenReturn(Optional.of(a));
+            when(repo.findById(2L)).thenReturn(Optional.of(b));
+            when(repo.findById(1L)).thenReturn(Optional.of(a));
+
+            assertThat(resolver.resolve("A")).contains(a);
+            verifyNoInteractions(creator);
+        }
+
+        @Test
+        void danglingRedirectReturnsLastGoodNode() {
+            AuthorEntity a = AuthorEntity.builder().id(1L).name("A").mergedIntoAuthorId(99L).build();
+            when(repo.findByName("A")).thenReturn(Optional.of(a));
+            when(repo.findById(99L)).thenReturn(Optional.empty());
+
+            assertThat(resolver.resolve("A")).contains(a);
+            verifyNoInteractions(creator);
+        }
+    }
 }
