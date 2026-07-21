@@ -2,7 +2,9 @@ package org.booklore.app.service;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.browse.SortParser;
 import org.booklore.browse.SortTerm;
@@ -210,11 +212,15 @@ public class AppBookService {
 
     private AppCatalogSummary computeCatalogSummary(BookLoreUser user, Set<Long> accessibleLibraryIds, boolean admin) {
         Long userId = user.getId();
-        Specification<BookEntity> visibleBooks = buildBaseSpecification(
-                accessibleLibraryIds, null, userId, admin);
+        // Aggregate-scoped spec: excludes shell books by id instead of the "(hasFiles OR isPhysical)"
+        // OR, so these whole-catalog aggregates can use indexes (see BookSpecifications#notShellBook).
+        Specification<BookEntity> visibleBooks = buildAggregateSpecification(accessibleLibraryIds, userId, admin);
+        // The author-side fast count is only valid when visibility adds no correlated subqueries.
+        // Admins and users without content restrictions have such a spec; both are the heavy cases.
+        boolean simpleVisibility = admin || !userHasContentRestrictions(userId);
 
         long totalBooks = bookRepository.count(visibleBooks);
-        long totalAuthors = countDistinctAuthors(visibleBooks);
+        long totalAuthors = countDistinctAuthors(visibleBooks, simpleVisibility);
         long totalSeries = countDistinctSeries(visibleBooks);
         long unshelvedBooks = bookRepository.count(visibleBooks.and(BookSpecifications.unshelved()));
         return new AppCatalogSummary(
@@ -240,7 +246,35 @@ public class AppBookService {
                 .toList();
     }
 
-    private long countDistinctAuthors(Specification<BookEntity> spec) {
+    /**
+     * Counts distinct authors with at least one visible book. Two shapes: the book-side
+     * COUNT(DISTINCT author_id) fans out to one row per (book, author) pair and dedups author_id
+     * across the whole mapping table (~1.8s on a 630k-book catalog); the author-side COUNT(*) with
+     * an EXISTS avoids both the fan-out and the DISTINCT. The fast path is only correct when the
+     * visibility spec touches nothing but the book root - a spec that adds correlated subqueries
+     * (content restrictions) cannot be applied inside the EXISTS subquery, so those callers use the
+     * book-side query. {@code simpleVisibility} is true for admins and users without restrictions.
+     */
+    // Package-private for AppBookServiceCountDistinctAuthorsTest, which characterizes that the
+    // author-side fast path returns the same count as the book-side query it replaces.
+    long countDistinctAuthors(Specification<BookEntity> spec, boolean simpleVisibility) {
+        if (!simpleVisibility) {
+            return countDistinctAuthorsBookSide(spec);
+        }
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<AuthorEntity> author = query.from(AuthorEntity.class);
+        Subquery<Long> sub = query.subquery(Long.class);
+        Root<BookEntity> book = sub.from(BookEntity.class);
+        Join<Object, Object> authors = book.join("metadata").join("authors");
+        sub.select(cb.literal(1L)).where(cb.and(
+                cb.equal(authors.get("id"), author.get("id")),
+                spec.toPredicate(book, query, cb)));
+        query.select(cb.count(author.get("id"))).where(cb.exists(sub));
+        return entityManager.createQuery(query).getSingleResult();
+    }
+
+    private long countDistinctAuthorsBookSide(Specification<BookEntity> spec) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Long> query = cb.createQuery(Long.class);
         Root<BookEntity> root = query.from(BookEntity.class);
@@ -1081,6 +1115,28 @@ public class AppBookService {
             return (root, query, cb) -> cb.conjunction();
         }
         return ContentRestrictionSpecification.from(restrictionRepository.findByUserId(userId));
+    }
+
+    /**
+     * Visibility spec for whole-catalog aggregates (the summary counts). Identical semantics to
+     * {@link #buildBaseSpecification} but swaps the "(hasFiles OR isPhysical)" OR for the id-based
+     * {@link BookSpecifications#notShellBook} so MariaDB can serve the scan from indexes instead of
+     * walking the whole book table per aggregate.
+     */
+    private Specification<BookEntity> buildAggregateSpecification(
+            Set<Long> accessibleLibraryIds, Long userId, boolean isAdmin) {
+        List<Specification<BookEntity>> specs = new ArrayList<>();
+        specs.add(BookSpecifications.notDeleted());
+        specs.add(BookSpecifications.notShellBook(findShellBookIds(), MAX_SHELL_IDS_IN_CLAUSE));
+        specs.add(contentRestrictions(userId, isAdmin));
+        if (accessibleLibraryIds != null) {
+            specs.add(BookSpecifications.inLibraries(accessibleLibraryIds));
+        }
+        return BookSpecifications.combine(specs.toArray(Specification[]::new));
+    }
+
+    private boolean userHasContentRestrictions(Long userId) {
+        return !restrictionRepository.findByUserId(userId).isEmpty();
     }
 
     private AppPageResponse<AppBookSummary> buildPageResponse(

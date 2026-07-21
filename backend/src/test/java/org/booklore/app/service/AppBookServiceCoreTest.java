@@ -75,7 +75,7 @@ class AppBookServiceCoreTest {
                 shelfRepository, authenticationService, mobileBookMapper, appBookProgressService,
                 magicShelfBookService, entityManager, restrictionRepository,
                 new AppContentRestrictionQueryService(restrictionRepository), bookSortRegistry,
-                eventPublisher, new CatalogSummaryCache(), new FilterOptionsCache(), new ShellBookIdsCache());
+                eventPublisher, new CatalogSummaryCache(60), new FilterOptionsCache(), new ShellBookIdsCache());
     }
 
     private BookLoreUser adminUser() {

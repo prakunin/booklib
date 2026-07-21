@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public class BookSpecifications {
 
@@ -220,10 +221,9 @@ public class BookSpecifications {
     }
 
     public static Specification<BookEntity> notDeleted() {
-        return (root, query, cb) -> cb.or(
-                cb.isNull(root.get("deleted")),
-                cb.equal(root.get("deleted"), false)
-        );
+        // `deleted` is NOT NULL since V157, so this collapses to a sargable equality that
+        // idx_book_deleted can serve - no more "(deleted IS NULL OR deleted = false)" OR.
+        return (root, query, cb) -> cb.isFalse(root.get("deleted"));
     }
 
     public static Specification<BookEntity> hasScannedOn() {
@@ -239,6 +239,29 @@ public class BookSpecifications {
                 cb.isTrue(root.get("hasFiles")),
                 cb.equal(root.get("isPhysical"), true)
         );
+    }
+
+    /**
+     * Aggregate-scan equivalent of {@link #hasDigitalFileOrIsPhysical()} that excludes "shell"
+     * books (no files and not physical) by id instead of via the "(hasFiles OR isPhysical)" OR,
+     * which MariaDB cannot resolve through an index. The shell set is almost always empty and is
+     * resolved+cached once by the caller (see {@code AppBookService#findShellBookIds}); an empty
+     * set is a no-op, and a set larger than {@code maxInClause} falls back to the OR so the IN
+     * list stays bounded. Mirrors {@code AppBookService#visibilityClause} for the Criteria path.
+     */
+    public static Specification<BookEntity> notShellBook(Set<Long> shellBookIds, int maxInClause) {
+        return (root, query, cb) -> {
+            if (shellBookIds == null || shellBookIds.isEmpty()) {
+                return cb.conjunction();
+            }
+            if (shellBookIds.size() > maxInClause) {
+                return cb.or(
+                        cb.isTrue(root.get("hasFiles")),
+                        cb.equal(root.get("isPhysical"), true)
+                );
+            }
+            return cb.not(root.get("id").in(shellBookIds));
+        };
     }
 
     public static Specification<BookEntity> hasAudiobookFile() {

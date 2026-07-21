@@ -156,7 +156,7 @@ public class BookEntity {
         }
     }
 
-    @Column(name = "deleted")
+    @Column(name = "deleted", nullable = false)
     @Builder.Default
     private Boolean deleted = Boolean.FALSE;
 
