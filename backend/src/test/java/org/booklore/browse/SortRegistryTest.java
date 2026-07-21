@@ -33,8 +33,8 @@ class SortRegistryTest {
     @Test
     void registersAndExposesKeysInOrder() {
         SortRegistry<Object> registry = new SortRegistry<>()
-                .register("id", ascOn("id"))
-                .register("title", ascOn("title"));
+                .register("id", ascOn())
+                .register("title", ascOn());
         assertTrue(registry.has("id"));
         assertTrue(registry.has("title"));
         assertEquals(List.of("id", "title"), List.copyOf(registry.keys()));
@@ -72,13 +72,13 @@ class SortRegistryTest {
 
     @Test
     void unknownKeyThrows() {
-        SortRegistry<Object> registry = new SortRegistry<>().register("id", ascOn("id"));
+        SortRegistry<Object> registry = new SortRegistry<>().register("id", ascOn());
         List<SortTerm> terms = List.of(new SortTerm("bogus", false));
         assertThrows(APIException.class,
                 () -> registry.toOrders(terms, root, query, cb, null));
     }
 
-    private SortOrderBuilder<Object> ascOn(String attribute) {
+    private SortOrderBuilder<Object> ascOn() {
         return ctx -> List.of(mock(Order.class));
     }
 }

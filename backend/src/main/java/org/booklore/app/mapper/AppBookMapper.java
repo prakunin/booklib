@@ -212,6 +212,8 @@ public interface AppBookMapper {
     }
 
     @Named("mapReadProgress")
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     default Float mapReadProgress(UserBookProgressEntity progress) {
         if (progress == null) {
             return null;
@@ -235,6 +237,8 @@ public interface AppBookMapper {
     }
 
     @Named("mapEpubProgress")
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     default AppBookDetail.EpubProgress mapEpubProgress(UserBookProgressEntity progress) {
         if (progress == null || progress.getEpubProgress() == null) {
             return null;
@@ -248,6 +252,8 @@ public interface AppBookMapper {
     }
 
     @Named("mapPdfProgress")
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     default AppBookDetail.PdfProgress mapPdfProgress(UserBookProgressEntity progress) {
         if (progress == null || progress.getPdfProgress() == null) {
             return null;
@@ -260,6 +266,8 @@ public interface AppBookMapper {
     }
 
     @Named("mapCbxProgress")
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     default AppBookDetail.CbxProgress mapCbxProgress(UserBookProgressEntity progress) {
         if (progress == null || progress.getCbxProgress() == null) {
             return null;

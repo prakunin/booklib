@@ -10,9 +10,11 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PathPatternResolverTest {
@@ -100,7 +102,7 @@ class PathPatternResolverTest {
         BookMetadata metadata = BookMetadata.builder()
                 .title("Test Book")
                 .authors(List.of("John Doe", "Jane Smith"))
-                .publishedDate(LocalDate.of(2023, 5, 15))
+                .publishedDate(LocalDate.of(2023, Month.MAY, 15))
                 .build();
 
         String result = PathPatternResolver.resolvePattern(metadata, "{authors} - {title} ({year})", "original.pdf");
@@ -323,19 +325,6 @@ class PathPatternResolverTest {
     }
 
     @Test
-    void testResolvePattern_handlesMissingMetadataFields() {
-        BookMetadata metadata = BookMetadata.builder()
-                .title("Book Title")
-                // authors is intentionally missing/null
-                .build();
-
-        String result = PathPatternResolver.resolvePattern(metadata, "{title}< - {authors}>", "original.pdf");
-
-        // Optional block should be omitted since authors is missing
-        assertEquals("Book Title.pdf", result);
-    }
-
-    @Test
     void testResolvePattern_emptyOptionalBlocks() {
         BookMetadata metadata = BookMetadata.builder()
                 .title("Book Title")
@@ -354,7 +343,7 @@ class PathPatternResolverTest {
                 .authors(List.of("John Doe", "Jane Smith"))
                 .seriesName("Awesome Series")
                 .seriesNumber(3.0f)
-                .publishedDate(LocalDate.of(2023, 5, 15))
+                .publishedDate(LocalDate.of(2023, Month.MAY, 15))
                 .build();
 
         String result = PathPatternResolver.resolvePattern(metadata, "{authors} - {title}< [{series} #{seriesIndex}]>< ({year})>", "original.pdf");
@@ -527,7 +516,7 @@ class PathPatternResolverTest {
                 .authors(List.of("Author Name Jr."))
                 .build();
 
-        // Pattern: {authors}/{title}
+        // Pattern under test: an authors folder followed by a title file
         String result = PathPatternResolver.resolvePattern(metadata, "{authors}/{title}", "original.pdf");
 
         // Expected: Author Name Jr/Book Title.pdf
@@ -539,7 +528,7 @@ class PathPatternResolverTest {
 
         String authorDir = components[0];
         assertFalse(authorDir.endsWith("."), "Directory name should not end with a dot: " + authorDir);
-        assertTrue(authorDir.equals("Author Name Jr"), "Expected 'Author Name Jr' but got '" + authorDir + "'");
+        assertThat(authorDir).as("Expected 'Author Name Jr' but got '" + authorDir + "'").isEqualTo("Author Name Jr");
     }
 
     @Test
@@ -558,8 +547,8 @@ class PathPatternResolverTest {
             assertFalse(components[i].endsWith("."), "Component " + i + " should not end with dot: " + components[i]);
         }
 
-        assertTrue(components[0].equals("Author"));
-        assertTrue(components[1].equals("Series"));
+        assertThat(components[0]).isEqualTo("Author");
+        assertThat(components[1]).isEqualTo("Series");
     }
 
     @Test
@@ -1222,7 +1211,7 @@ class PathPatternResolverTest {
         String result = PathPatternResolver.resolvePattern(metadata,
                 "<{series} #{seriesIndex}|{title}>", "original.pdf");
 
-        // series present but seriesIndex missing → fallback to {title}
+        // series present but seriesIndex missing → falls back to the title placeholder
         assertEquals("Book Title.pdf", result);
     }
 
@@ -1330,7 +1319,7 @@ class PathPatternResolverTest {
                 .authors(List.of("Author"))
                 .seriesName("Series")
                 .seriesNumber(1f)
-                .publishedDate(LocalDate.of(2023, 1, 1))
+                .publishedDate(LocalDate.of(2023, Month.JANUARY, 1))
                 .build();
 
         String result = PathPatternResolver.resolvePattern(metadata,

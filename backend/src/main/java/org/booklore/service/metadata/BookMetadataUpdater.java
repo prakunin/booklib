@@ -111,65 +111,98 @@ public class BookMetadataUpdater {
         updateTagsIfNeeded(newMetadata, metadata, clearFlags, mergeTags, replaceMode);
         bookReviewUpdateService.updateBookReviews(newMetadata, metadata, clearFlags, mergeCategories);
         updateThumbnailIfNeeded(bookId, bookEntity, newMetadata, metadata, updateThumbnail, bookType);
-        updateAudiobookMetadataIfNeeded(bookEntity, newMetadata, metadata, clearFlags, replaceMode);
+        updateAudiobookMetadataIfNeeded(newMetadata, metadata, clearFlags, replaceMode);
         updateComicMetadataIfNeeded(newMetadata, metadata, replaceMode);
         updateLocks(newMetadata, metadata);
 
         bookEntity.setMetadataUpdatedAt(Instant.now());
         bookRepository.save(bookEntity);
+        calculateAndSetMatchScore(bookEntity, bookId);
+        writeMetadataToFileIfNeeded(new FileWriteRequest(bookEntity, metadata, newMetadata, clearFlags, writeToFile,
+                primaryFile, bookType, updateThumbnail, thumbnailRequiresUpdate, hasValueChangesForFileWrite, bookId));
+        writeSidecarMetadataIfEnabled(bookEntity, bookId);
+        moveFilesToLibraryPatternIfEnabled(settings, primaryFile, metadata, bookId);
+    }
+
+    private void calculateAndSetMatchScore(BookEntity bookEntity, Long bookId) {
         try {
             Float score = metadataMatchService.calculateMatchScore(bookEntity);
             bookEntity.setMetadataMatchScore(score);
         } catch (Exception e) {
             log.warn("Failed to calculate metadata match score for book ID {}: {}", bookId, e.getMessage());
         }
+    }
 
-        if (appProperties.isLocalStorage() && primaryFile != null && bookType != null && ((writeToFile.isAnyFormatEnabled() && hasValueChangesForFileWrite) || thumbnailRequiresUpdate)) {
-            metadataWriterFactory.getWriter(bookType).ifPresent(writer -> {
-                try {
-                    String thumbnailUrl = updateThumbnail ? newMetadata.getThumbnailUrl() : null;
-                    if ((StringUtils.hasText(thumbnailUrl) && isLocalOrPrivateUrl(thumbnailUrl) || Boolean.TRUE.equals(metadata.getCoverLocked()))) {
-                        log.debug("Blocked local/private thumbnail URL: {}", thumbnailUrl);
-                        thumbnailUrl = null;
-                    }
-                    File file = new File(bookEntity.getFullFilePath().toUri());
-                    writer.saveMetadataToFile(file, metadata, thumbnailUrl, clearFlags);
-                    updateFileNameIfConverted(primaryFile, file.toPath());
-                    String newHash = file.isDirectory()
-                            ? FileFingerprint.generateFolderHash(bookEntity.getFullFilePath())
-                            : FileFingerprint.generateHash(bookEntity.getFullFilePath());
-                    bookEntity.setMetadataForWriteUpdatedAt(Instant.now());
-                    primaryFile.setCurrentHash(newHash);
-                    bookRepository.save(bookEntity);
-                } catch (Exception e) {
-                    log.warn("Failed to write metadata for book ID {}: {}", bookId, e.getMessage());
-                }
-            });
+    private boolean shouldWriteMetadataToFile(BookFileEntity primaryFile, BookFileType bookType,
+                                              MetadataPersistenceSettings.SaveToOriginalFile writeToFile,
+                                              boolean thumbnailRequiresUpdate, boolean hasValueChangesForFileWrite) {
+        return appProperties.isLocalStorage() && primaryFile != null && bookType != null
+                && ((writeToFile.isAnyFormatEnabled() && hasValueChangesForFileWrite) || thumbnailRequiresUpdate);
+    }
+
+    private record FileWriteRequest(BookEntity bookEntity, BookMetadataEntity metadata, BookMetadata newMetadata,
+                                    MetadataClearFlags clearFlags, MetadataPersistenceSettings.SaveToOriginalFile writeToFile,
+                                    BookFileEntity primaryFile, BookFileType bookType, boolean updateThumbnail,
+                                    boolean thumbnailRequiresUpdate, boolean hasValueChangesForFileWrite, Long bookId) {
+    }
+
+    private void writeMetadataToFileIfNeeded(FileWriteRequest request) {
+        if (!shouldWriteMetadataToFile(request.primaryFile(), request.bookType(), request.writeToFile(),
+                request.thumbnailRequiresUpdate(), request.hasValueChangesForFileWrite())) {
+            return;
         }
-
-        if (sidecarMetadataWriter.isWriteOnUpdateEnabled()) {
+        metadataWriterFactory.getWriter(request.bookType()).ifPresent(writer -> {
             try {
-                sidecarMetadataWriter.writeSidecarMetadata(bookEntity);
-            } catch (Exception e) {
-                log.warn("Failed to write sidecar metadata for book ID {}: {}", bookId, e.getMessage());
-            }
-        }
-
-        boolean moveFilesToLibraryPattern = settings.isMoveFilesToLibraryPattern();
-        if (moveFilesToLibraryPattern && primaryFile != null) {
-            try {
-                BookEntity book = metadata.getBook();
-                FileMoveResult result = fileMoveService.moveSingleFile(book);
-                if (result.isMoved()) {
-                    var bookPrimaryFile = book.getPrimaryBookFile();
-                    if (bookPrimaryFile != null) {
-                        bookPrimaryFile.setFileName(result.getNewFileName());
-                        bookPrimaryFile.setFileSubPath(result.getNewFileSubPath());
-                    }
+                String thumbnailUrl = request.updateThumbnail() ? request.newMetadata().getThumbnailUrl() : null;
+                if ((StringUtils.hasText(thumbnailUrl) && isLocalOrPrivateUrl(thumbnailUrl) || Boolean.TRUE.equals(request.metadata().getCoverLocked()))) {
+                    log.debug("Blocked local/private thumbnail URL: {}", thumbnailUrl);
+                    thumbnailUrl = null;
                 }
+                BookEntity bookEntity = request.bookEntity();
+                BookFileEntity primaryFile = request.primaryFile();
+                File file = new File(bookEntity.getFullFilePath().toUri());
+                writer.saveMetadataToFile(file, request.metadata(), thumbnailUrl, request.clearFlags());
+                updateFileNameIfConverted(primaryFile, file.toPath());
+                String newHash = file.isDirectory()
+                        ? FileFingerprint.generateFolderHash(bookEntity.getFullFilePath())
+                        : FileFingerprint.generateHash(bookEntity.getFullFilePath());
+                bookEntity.setMetadataForWriteUpdatedAt(Instant.now());
+                primaryFile.setCurrentHash(newHash);
+                bookRepository.save(bookEntity);
             } catch (Exception e) {
-                log.warn("Failed to move files for book ID {} after metadata update: {}", bookId, e.getMessage());
+                log.warn("Failed to write metadata for book ID {}: {}", request.bookId(), e.getMessage());
             }
+        });
+    }
+
+    private void writeSidecarMetadataIfEnabled(BookEntity bookEntity, Long bookId) {
+        if (!sidecarMetadataWriter.isWriteOnUpdateEnabled()) {
+            return;
+        }
+        try {
+            sidecarMetadataWriter.writeSidecarMetadata(bookEntity);
+        } catch (Exception e) {
+            log.warn("Failed to write sidecar metadata for book ID {}: {}", bookId, e.getMessage());
+        }
+    }
+
+    private void moveFilesToLibraryPatternIfEnabled(MetadataPersistenceSettings settings, BookFileEntity primaryFile,
+                                                    BookMetadataEntity metadata, Long bookId) {
+        if (!settings.isMoveFilesToLibraryPattern() || primaryFile == null) {
+            return;
+        }
+        try {
+            BookEntity book = metadata.getBook();
+            FileMoveResult result = fileMoveService.moveSingleFile(book);
+            if (result.isMoved()) {
+                var bookPrimaryFile = book.getPrimaryBookFile();
+                if (bookPrimaryFile != null) {
+                    bookPrimaryFile.setFileName(result.getNewFileName());
+                    bookPrimaryFile.setFileSubPath(result.getNewFileSubPath());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to move files for book ID {} after metadata update: {}", bookId, e.getMessage());
         }
     }
 
@@ -212,6 +245,10 @@ public class BookMetadataUpdater {
         handleFieldUpdate(e.getContentRatingLocked(), clear.isContentRating(), m.getContentRating(), v -> e.setContentRating(nullIfBlank(v)), e::getContentRating, replaceMode);
     }
 
+    // S6916 false positive: "when" guards only attach to type/record patterns, not plain enum
+    // constant case labels (JLS), so the suggested guard form for REPLACE_MISSING/REPLACE_WHEN_PROVIDED
+    // below would not compile.
+    @SuppressWarnings("java:S6916")
     private <T> void handleFieldUpdate(Boolean locked, boolean shouldClear, T newValue, Consumer<T> setter, Supplier<T> getter, MetadataReplaceMode mode) {
         if (Boolean.TRUE.equals(locked)) return;
         if (shouldClear) {
@@ -260,34 +297,40 @@ public class BookMetadataUpdater {
             return;
         }
 
-        List<AuthorEntity> newAuthors = authorNames.stream()
+        List<AuthorEntity> newAuthors = resolveAuthors(authorNames);
+
+        if (newAuthors.isEmpty()) return;
+
+        applyAuthors(e, authors, newAuthors, merge, replaceMode);
+    }
+
+    private List<AuthorEntity> resolveAuthors(List<String> authorNames) {
+        return authorNames.stream()
                 .filter(name -> name != null && !name.isBlank())
                 .map(name -> authorRepository.findByName(name)
                         .orElseGet(() -> authorRepository.save(AuthorEntity.builder().name(name).build())))
                 .toList();
+    }
 
-        if (newAuthors.isEmpty()) return;
-
+    private void applyAuthors(BookMetadataEntity e, List<AuthorEntity> authors, List<AuthorEntity> newAuthors, boolean merge, MetadataReplaceMode replaceMode) {
         if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED) {
-            if (!merge) e.getAuthors().clear();
-            for (AuthorEntity author : newAuthors) {
-                if (!e.getAuthors().contains(author)) {
-                    e.getAuthors().add(author);
-                }
-            }
-            e.updateSearchText();
+            addAuthorsMerged(e, newAuthors, merge);
         } else if (replaceMode == MetadataReplaceMode.REPLACE_MISSING && authors.isEmpty()) {
             authors.addAll(newAuthors);
             e.updateSearchText();
         } else if (replaceMode == null) {
-            if (!merge) e.getAuthors().clear();
-            for (AuthorEntity author : newAuthors) {
-                if (!e.getAuthors().contains(author)) {
-                    e.getAuthors().add(author);
-                }
-            }
-            e.updateSearchText();
+            addAuthorsMerged(e, newAuthors, merge);
         }
+    }
+
+    private void addAuthorsMerged(BookMetadataEntity e, List<AuthorEntity> newAuthors, boolean merge) {
+        if (!merge) e.getAuthors().clear();
+        for (AuthorEntity author : newAuthors) {
+            if (!e.getAuthors().contains(author)) {
+                e.getAuthors().add(author);
+            }
+        }
+        e.updateSearchText();
     }
 
     private void updateCategoriesIfNeeded(BookMetadata m, BookMetadataEntity e, MetadataClearFlags clear, boolean merge, MetadataReplaceMode replaceMode) {
@@ -306,21 +349,26 @@ public class BookMetadataUpdater {
             return;
         }
 
-        Set<CategoryEntity> newCategories = categoryNames.stream()
+        Set<CategoryEntity> newCategories = resolveCategories(categoryNames);
+
+        if (newCategories.isEmpty()) return;
+
+        applyCategories(e, newCategories, merge, replaceMode);
+    }
+
+    private Set<CategoryEntity> resolveCategories(Set<String> categoryNames) {
+        return categoryNames.stream()
                 .filter(name -> name != null && !name.isBlank())
                 .map(name -> categoryRepository.findByName(name)
                         .orElseGet(() -> categoryRepository.save(CategoryEntity.builder().name(name).build())))
                 .collect(Collectors.toSet());
+    }
 
-        if (newCategories.isEmpty()) return;
-
-        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED) {
+    private void applyCategories(BookMetadataEntity e, Set<CategoryEntity> newCategories, boolean merge, MetadataReplaceMode replaceMode) {
+        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED || replaceMode == null) {
             if (!merge) e.getCategories().clear();
             e.getCategories().addAll(newCategories);
         } else if (replaceMode == MetadataReplaceMode.REPLACE_MISSING && e.getCategories().isEmpty()) {
-            e.getCategories().addAll(newCategories);
-        } else if (replaceMode == null) {
-            if (!merge) e.getCategories().clear();
             e.getCategories().addAll(newCategories);
         }
     }
@@ -341,21 +389,26 @@ public class BookMetadataUpdater {
             return;
         }
 
-        Set<MoodEntity> newMoods = moodNames.stream()
+        Set<MoodEntity> newMoods = resolveMoods(moodNames);
+
+        if (newMoods.isEmpty()) return;
+
+        applyMoods(e, newMoods, merge, replaceMode);
+    }
+
+    private Set<MoodEntity> resolveMoods(Set<String> moodNames) {
+        return moodNames.stream()
                 .filter(name -> name != null && !name.isBlank())
                 .map(name -> moodRepository.findByName(name)
                         .orElseGet(() -> moodRepository.save(MoodEntity.builder().name(name).build())))
                 .collect(Collectors.toSet());
+    }
 
-        if (newMoods.isEmpty()) return;
-
-        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED) {
+    private void applyMoods(BookMetadataEntity e, Set<MoodEntity> newMoods, boolean merge, MetadataReplaceMode replaceMode) {
+        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED || replaceMode == null) {
             if (!merge) e.getMoods().clear();
             e.getMoods().addAll(newMoods);
         } else if (replaceMode == MetadataReplaceMode.REPLACE_MISSING && e.getMoods().isEmpty()) {
-            e.getMoods().addAll(newMoods);
-        } else if (replaceMode == null) {
-            if (!merge) e.getMoods().clear();
             e.getMoods().addAll(newMoods);
         }
     }
@@ -376,26 +429,31 @@ public class BookMetadataUpdater {
             return;
         }
 
-        Set<TagEntity> newTags = tagNames.stream()
+        Set<TagEntity> newTags = resolveTags(tagNames);
+
+        if (newTags.isEmpty()) return;
+
+        applyTags(e, newTags, merge, replaceMode);
+    }
+
+    private Set<TagEntity> resolveTags(Set<String> tagNames) {
+        return tagNames.stream()
                 .filter(name -> name != null && !name.isBlank())
                 .map(name -> tagRepository.findByName(name)
                         .orElseGet(() -> tagRepository.save(TagEntity.builder().name(name).build())))
                 .collect(Collectors.toSet());
+    }
 
-        if (newTags.isEmpty()) return;
-
-        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED) {
+    private void applyTags(BookMetadataEntity e, Set<TagEntity> newTags, boolean merge, MetadataReplaceMode replaceMode) {
+        if (replaceMode == MetadataReplaceMode.REPLACE_ALL || replaceMode == MetadataReplaceMode.REPLACE_WHEN_PROVIDED || replaceMode == null) {
             if (!merge) e.getTags().clear();
             e.getTags().addAll(newTags);
         } else if (replaceMode == MetadataReplaceMode.REPLACE_MISSING && e.getTags().isEmpty()) {
             e.getTags().addAll(newTags);
-        } else if (replaceMode == null) {
-            if (!merge) e.getTags().clear();
-            e.getTags().addAll(newTags);
         }
     }
 
-    private void updateAudiobookMetadataIfNeeded(BookEntity bookEntity, BookMetadata m, BookMetadataEntity e, MetadataClearFlags clear, MetadataReplaceMode replaceMode) {
+    private void updateAudiobookMetadataIfNeeded(BookMetadata m, BookMetadataEntity e, MetadataClearFlags clear, MetadataReplaceMode replaceMode) {
         if (clear == null) {
             clear = new MetadataClearFlags();
         }
@@ -422,7 +480,19 @@ public class BookMetadataUpdater {
 
         ComicMetadataEntity c = comic;
 
-        // Update basic fields
+        updateComicBasicFields(c, comicDto, replaceMode);
+        updateComicRelationships(c, comicDto, replaceMode);
+        applyComicLocks(c, comicDto);
+
+        e.setComicMetadata(comicMetadataRepository.save(c));
+
+        comicCharacterRepository.deleteOrphaned();
+        comicTeamRepository.deleteOrphaned();
+        comicLocationRepository.deleteOrphaned();
+        comicCreatorRepository.deleteOrphaned();
+    }
+
+    private void updateComicBasicFields(ComicMetadataEntity c, ComicMetadata comicDto, MetadataReplaceMode replaceMode) {
         handleFieldUpdate(c.getIssueNumberLocked(), false, comicDto.getIssueNumber(), v -> c.setIssueNumber(nullIfBlank(v)), c::getIssueNumber, replaceMode);
         handleFieldUpdate(c.getVolumeNameLocked(), false, comicDto.getVolumeName(), v -> c.setVolumeName(nullIfBlank(v)), c::getVolumeName, replaceMode);
         handleFieldUpdate(c.getVolumeNumberLocked(), false, comicDto.getVolumeNumber(), c::setVolumeNumber, c::getVolumeNumber, replaceMode);
@@ -437,8 +507,9 @@ public class BookMetadataUpdater {
         handleFieldUpdate(c.getReadingDirectionLocked(), false, comicDto.getReadingDirection(), v -> c.setReadingDirection(nullIfBlank(v)), c::getReadingDirection, replaceMode);
         handleFieldUpdate(c.getWebLinkLocked(), false, comicDto.getWebLink(), v -> c.setWebLink(nullIfBlank(v)), c::getWebLink, replaceMode);
         handleFieldUpdate(c.getNotesLocked(), false, comicDto.getNotes(), v -> c.setNotes(nullIfBlank(v)), c::getNotes, replaceMode);
+    }
 
-        // Update relationships if not locked
+    private void updateComicRelationships(ComicMetadataEntity c, ComicMetadata comicDto, MetadataReplaceMode replaceMode) {
         if (!Boolean.TRUE.equals(c.getCharactersLocked())) {
             updateComicCharacters(c, comicDto.getCharacters(), replaceMode);
         }
@@ -449,42 +520,45 @@ public class BookMetadataUpdater {
             updateComicLocations(c, comicDto.getLocations(), replaceMode);
         }
         updateComicCreatorsPerRole(c, comicDto, replaceMode);
+    }
 
-        // Update locks if provided
-        if (comicDto.getIssueNumberLocked() != null) c.setIssueNumberLocked(comicDto.getIssueNumberLocked());
-        if (comicDto.getVolumeNameLocked() != null) c.setVolumeNameLocked(comicDto.getVolumeNameLocked());
-        if (comicDto.getVolumeNumberLocked() != null) c.setVolumeNumberLocked(comicDto.getVolumeNumberLocked());
-        if (comicDto.getStoryArcLocked() != null) c.setStoryArcLocked(comicDto.getStoryArcLocked());
-        if (comicDto.getStoryArcNumberLocked() != null) c.setStoryArcNumberLocked(comicDto.getStoryArcNumberLocked());
-        if (comicDto.getAlternateSeriesLocked() != null) c.setAlternateSeriesLocked(comicDto.getAlternateSeriesLocked());
-        if (comicDto.getAlternateIssueLocked() != null) c.setAlternateIssueLocked(comicDto.getAlternateIssueLocked());
-        if (comicDto.getImprintLocked() != null) c.setImprintLocked(comicDto.getImprintLocked());
-        if (comicDto.getFormatLocked() != null) c.setFormatLocked(comicDto.getFormatLocked());
-        if (comicDto.getBlackAndWhiteLocked() != null) c.setBlackAndWhiteLocked(comicDto.getBlackAndWhiteLocked());
-        if (comicDto.getMangaLocked() != null) c.setMangaLocked(comicDto.getMangaLocked());
-        if (comicDto.getReadingDirectionLocked() != null) c.setReadingDirectionLocked(comicDto.getReadingDirectionLocked());
-        if (comicDto.getWebLinkLocked() != null) c.setWebLinkLocked(comicDto.getWebLinkLocked());
-        if (comicDto.getNotesLocked() != null) c.setNotesLocked(comicDto.getNotesLocked());
-        if (comicDto.getCreatorsLocked() != null) c.setCreatorsLocked(comicDto.getCreatorsLocked());
-        if (comicDto.getPencillersLocked() != null) c.setPencillersLocked(comicDto.getPencillersLocked());
-        if (comicDto.getInkersLocked() != null) c.setInkersLocked(comicDto.getInkersLocked());
-        if (comicDto.getColoristsLocked() != null) c.setColoristsLocked(comicDto.getColoristsLocked());
-        if (comicDto.getLetterersLocked() != null) c.setLetterersLocked(comicDto.getLetterersLocked());
-        if (comicDto.getCoverArtistsLocked() != null) c.setCoverArtistsLocked(comicDto.getCoverArtistsLocked());
-        if (comicDto.getEditorsLocked() != null) c.setEditorsLocked(comicDto.getEditorsLocked());
-        if (comicDto.getCharactersLocked() != null) c.setCharactersLocked(comicDto.getCharactersLocked());
-        if (comicDto.getTeamsLocked() != null) c.setTeamsLocked(comicDto.getTeamsLocked());
-        if (comicDto.getLocationsLocked() != null) c.setLocationsLocked(comicDto.getLocationsLocked());
-
-        e.setComicMetadata(comicMetadataRepository.save(c));
-
-        comicCharacterRepository.deleteOrphaned();
-        comicTeamRepository.deleteOrphaned();
-        comicLocationRepository.deleteOrphaned();
-        comicCreatorRepository.deleteOrphaned();
+    private void applyComicLocks(ComicMetadataEntity c, ComicMetadata comicDto) {
+        List<Pair<Boolean, Consumer<Boolean>>> lockMappings = List.of(
+                Pair.of(comicDto.getIssueNumberLocked(), c::setIssueNumberLocked),
+                Pair.of(comicDto.getVolumeNameLocked(), c::setVolumeNameLocked),
+                Pair.of(comicDto.getVolumeNumberLocked(), c::setVolumeNumberLocked),
+                Pair.of(comicDto.getStoryArcLocked(), c::setStoryArcLocked),
+                Pair.of(comicDto.getStoryArcNumberLocked(), c::setStoryArcNumberLocked),
+                Pair.of(comicDto.getAlternateSeriesLocked(), c::setAlternateSeriesLocked),
+                Pair.of(comicDto.getAlternateIssueLocked(), c::setAlternateIssueLocked),
+                Pair.of(comicDto.getImprintLocked(), c::setImprintLocked),
+                Pair.of(comicDto.getFormatLocked(), c::setFormatLocked),
+                Pair.of(comicDto.getBlackAndWhiteLocked(), c::setBlackAndWhiteLocked),
+                Pair.of(comicDto.getMangaLocked(), c::setMangaLocked),
+                Pair.of(comicDto.getReadingDirectionLocked(), c::setReadingDirectionLocked),
+                Pair.of(comicDto.getWebLinkLocked(), c::setWebLinkLocked),
+                Pair.of(comicDto.getNotesLocked(), c::setNotesLocked),
+                Pair.of(comicDto.getCreatorsLocked(), c::setCreatorsLocked),
+                Pair.of(comicDto.getPencillersLocked(), c::setPencillersLocked),
+                Pair.of(comicDto.getInkersLocked(), c::setInkersLocked),
+                Pair.of(comicDto.getColoristsLocked(), c::setColoristsLocked),
+                Pair.of(comicDto.getLetterersLocked(), c::setLetterersLocked),
+                Pair.of(comicDto.getCoverArtistsLocked(), c::setCoverArtistsLocked),
+                Pair.of(comicDto.getEditorsLocked(), c::setEditorsLocked),
+                Pair.of(comicDto.getCharactersLocked(), c::setCharactersLocked),
+                Pair.of(comicDto.getTeamsLocked(), c::setTeamsLocked),
+                Pair.of(comicDto.getLocationsLocked(), c::setLocationsLocked)
+        );
+        lockMappings.forEach(pair -> {
+            if (pair.getLeft() != null) pair.getRight().accept(pair.getLeft());
+        });
     }
 
     private boolean hasComicData(ComicMetadata dto) {
+        return hasComicScalarData(dto) || hasComicCollectionData(dto);
+    }
+
+    private boolean hasComicScalarData(ComicMetadata dto) {
         return StringUtils.hasText(dto.getIssueNumber())
                 || StringUtils.hasText(dto.getVolumeName())
                 || dto.getVolumeNumber() != null
@@ -498,16 +572,23 @@ public class BookMetadataUpdater {
                 || dto.getManga() != null
                 || StringUtils.hasText(dto.getReadingDirection())
                 || StringUtils.hasText(dto.getWebLink())
-                || StringUtils.hasText(dto.getNotes())
-                || (dto.getCharacters() != null && !dto.getCharacters().isEmpty())
-                || (dto.getTeams() != null && !dto.getTeams().isEmpty())
-                || (dto.getLocations() != null && !dto.getLocations().isEmpty())
-                || (dto.getPencillers() != null && !dto.getPencillers().isEmpty())
-                || (dto.getInkers() != null && !dto.getInkers().isEmpty())
-                || (dto.getColorists() != null && !dto.getColorists().isEmpty())
-                || (dto.getLetterers() != null && !dto.getLetterers().isEmpty())
-                || (dto.getCoverArtists() != null && !dto.getCoverArtists().isEmpty())
-                || (dto.getEditors() != null && !dto.getEditors().isEmpty());
+                || StringUtils.hasText(dto.getNotes());
+    }
+
+    private boolean hasComicCollectionData(ComicMetadata dto) {
+        return isNotEmpty(dto.getCharacters())
+                || isNotEmpty(dto.getTeams())
+                || isNotEmpty(dto.getLocations())
+                || isNotEmpty(dto.getPencillers())
+                || isNotEmpty(dto.getInkers())
+                || isNotEmpty(dto.getColorists())
+                || isNotEmpty(dto.getLetterers())
+                || isNotEmpty(dto.getCoverArtists())
+                || isNotEmpty(dto.getEditors());
+    }
+
+    private static boolean isNotEmpty(Collection<?> collection) {
+        return collection != null && !collection.isEmpty();
     }
 
     private boolean hasComicLocks(ComicMetadata dto) {

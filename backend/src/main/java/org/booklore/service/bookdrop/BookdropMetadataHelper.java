@@ -49,7 +49,7 @@ public class BookdropMetadataHelper {
             file.setFetchedMetadata(updatedMetadataJson);
         } catch (Exception e) {
             log.error("Error serializing metadata for file {}: {}", file.getId(), e.getMessage());
-            throw new RuntimeException("Failed to update metadata", e);
+            throw new IllegalStateException("Failed to update metadata", e);
         }
     }
 

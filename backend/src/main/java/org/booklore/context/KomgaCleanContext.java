@@ -10,6 +10,9 @@ package org.booklore.context;
 public class KomgaCleanContext {
     private static final ThreadLocal<Boolean> cleanModeEnabled = ThreadLocal.withInitial(() -> false);
 
+    private KomgaCleanContext() {
+    }
+
     public static void setCleanMode(boolean enabled) {
         cleanModeEnabled.set(enabled);
     }

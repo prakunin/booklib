@@ -38,6 +38,7 @@ public interface BookMapper {
     @Mapping(source = "bookFiles", target = "supplementaryFiles", qualifiedByName = "mapSupplementaryFiles")
     Book toBookWithDescription(BookEntity bookEntity, @Context boolean includeDescription);
 
+    @SuppressWarnings("java:S1168") // Book/BookMetadata use @JsonInclude(NON_NULL); returning an empty collection instead of null would add a previously-omitted JSON key (wire-format change) for the many non-BookQueryService callers of this mapper
     default List<String> mapAuthors(List<AuthorEntity> authors) {
         if (authors == null) return null;
         return authors.stream()
@@ -45,6 +46,7 @@ public interface BookMapper {
                 .toList();
     }
 
+    @SuppressWarnings("java:S1168") // Book/BookMetadata use @JsonInclude(NON_NULL); returning an empty collection instead of null would add a previously-omitted JSON key (wire-format change) for the many non-BookQueryService callers of this mapper
     default Set<String> mapCategories(Set<CategoryEntity> categories) {
         if (categories == null) return null;
         return categories.stream()
@@ -52,6 +54,7 @@ public interface BookMapper {
                 .collect(Collectors.toSet());
     }
 
+    @SuppressWarnings("java:S1168") // Book/BookMetadata use @JsonInclude(NON_NULL); returning an empty collection instead of null would add a previously-omitted JSON key (wire-format change) for the many non-BookQueryService callers of this mapper
     default Set<String> mapMoods(Set<MoodEntity> moods) {
         if (moods == null) return null;
         return moods.stream()
@@ -59,6 +62,7 @@ public interface BookMapper {
                 .collect(Collectors.toSet());
     }
 
+    @SuppressWarnings("java:S1168") // Book/BookMetadata use @JsonInclude(NON_NULL); returning an empty collection instead of null would add a previously-omitted JSON key (wire-format change) for the many non-BookQueryService callers of this mapper
     default Set<String> mapTags(Set<TagEntity> tags) {
         if (tags == null) return null;
         return tags.stream()
@@ -84,6 +88,7 @@ public interface BookMapper {
     }
 
     @Named("mapAlternativeFormats")
+    @SuppressWarnings("java:S1168") // Book uses @JsonInclude(NON_NULL); returning an empty list instead of null would add a previously-omitted JSON key (wire-format change) for callers that don't strip empty collections the way BookQueryService does
     default List<BookFile> mapAlternativeFormats(List<BookFileEntity> bookFiles) {
         if (bookFiles == null) return null;
         return bookFiles.stream()
@@ -94,6 +99,7 @@ public interface BookMapper {
     }
 
     @Named("mapSupplementaryFiles")
+    @SuppressWarnings("java:S1168") // Book uses @JsonInclude(NON_NULL); returning an empty list instead of null would add a previously-omitted JSON key (wire-format change) for callers that don't strip empty collections the way BookQueryService does
     default List<BookFile> mapSupplementaryFiles(List<BookFileEntity> bookFiles) {
         if (bookFiles == null)
             return null;

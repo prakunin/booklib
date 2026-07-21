@@ -145,24 +145,14 @@ public class PendingDeletionPool {
         for (PendingDeletion pending : pendingByPath.values()) {
             if (!pending.isDirectory()) continue;
 
-            Map<String, FileSnapshot> matchedFiles = new HashMap<>();
-            int totalPendingFiles = 0;
+            FolderOverlap overlap = computeFolderOverlap(pending, fileHashes);
 
-            for (BookSnapshot bookSnap : pending.affectedBooks().values()) {
-                for (FileSnapshot fileSnap : bookSnap.files()) {
-                    totalPendingFiles++;
-                    if (fileHashes.containsValue(fileSnap.currentHash())) {
-                        matchedFiles.put(fileSnap.currentHash(), fileSnap);
-                    }
-                }
-            }
-
-            if (totalPendingFiles > 0) {
-                double ratio = (double) matchedFiles.size() / totalPendingFiles;
-                if (ratio >= 0.5 && matchedFiles.size() > bestOverlap) {
-                    bestOverlap = matchedFiles.size();
+            if (overlap.totalPendingFiles() > 0) {
+                double ratio = (double) overlap.matchedFiles().size() / overlap.totalPendingFiles();
+                if (ratio >= 0.5 && overlap.matchedFiles().size() > bestOverlap) {
+                    bestOverlap = overlap.matchedFiles().size();
                     bestMatch = pending;
-                    bestFileMap = matchedFiles;
+                    bestFileMap = overlap.matchedFiles();
                 }
             }
         }
@@ -178,6 +168,24 @@ public class PendingDeletionPool {
         }
 
         return Optional.empty();
+    }
+
+    private record FolderOverlap(Map<String, FileSnapshot> matchedFiles, int totalPendingFiles) {}
+
+    private FolderOverlap computeFolderOverlap(PendingDeletion pending, Map<Path, String> fileHashes) {
+        Map<String, FileSnapshot> matchedFiles = new HashMap<>();
+        int totalPendingFiles = 0;
+
+        for (BookSnapshot bookSnap : pending.affectedBooks().values()) {
+            for (FileSnapshot fileSnap : bookSnap.files()) {
+                totalPendingFiles++;
+                if (fileHashes.containsValue(fileSnap.currentHash())) {
+                    matchedFiles.put(fileSnap.currentHash(), fileSnap);
+                }
+            }
+        }
+
+        return new FolderOverlap(matchedFiles, totalPendingFiles);
     }
 
     @Transactional
@@ -276,24 +284,34 @@ public class PendingDeletionPool {
             return true;
         }
 
+        return cancelWithinDirectoryDeletion(filePath);
+    }
+
+    private boolean cancelWithinDirectoryDeletion(Path filePath) {
         for (var entry : pendingByPath.entrySet()) {
             PendingDeletion pd = entry.getValue();
-            if (pd.isDirectory() && filePath.startsWith(entry.getKey())) {
-                for (BookSnapshot bookSnap : pd.affectedBooks().values()) {
-                    for (FileSnapshot fileSnap : bookSnap.files()) {
-                        String relPath = entry.getKey().getParent() != null
-                                ? entry.getKey().getParent().relativize(filePath).toString() : filePath.toString();
-                        if (relPath.endsWith(fileSnap.fileName())) {
-                            pd.hashToBookFileId().remove(fileSnap.currentHash());
-                            hashIndex.remove(fileSnap.currentHash());
-                            if (pd.hashToBookFileId().isEmpty()) {
-                                pd.timer().cancel(false);
-                                pendingByPath.remove(entry.getKey());
-                                log.debug("[POOL] All files matched for path='{}', cancelled timer", entry.getKey());
-                            }
-                            return true;
-                        }
+            if (pd.isDirectory() && filePath.startsWith(entry.getKey())
+                    && cancelFileInDirectory(entry.getKey(), pd, filePath)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean cancelFileInDirectory(Path folderKey, PendingDeletion pd, Path filePath) {
+        for (BookSnapshot bookSnap : pd.affectedBooks().values()) {
+            for (FileSnapshot fileSnap : bookSnap.files()) {
+                String relPath = folderKey.getParent() != null
+                        ? folderKey.getParent().relativize(filePath).toString() : filePath.toString();
+                if (relPath.endsWith(fileSnap.fileName())) {
+                    pd.hashToBookFileId().remove(fileSnap.currentHash());
+                    hashIndex.remove(fileSnap.currentHash());
+                    if (pd.hashToBookFileId().isEmpty()) {
+                        pd.timer().cancel(false);
+                        pendingByPath.remove(folderKey);
+                        log.debug("[POOL] All files matched for path='{}', cancelled timer", folderKey);
                     }
+                    return true;
                 }
             }
         }

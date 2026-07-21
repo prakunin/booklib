@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -18,7 +19,7 @@ public class SuccessResponse<T> {
         this.status = status;
         this.message = message;
         this.data = data;
-        this.timestamp = LocalDateTime.now();
+        this.timestamp = LocalDateTime.now(ZoneId.systemDefault());
     }
 
     public SuccessResponse(int status, String message) {

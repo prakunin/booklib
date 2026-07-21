@@ -4,10 +4,14 @@ import org.booklore.model.dto.HardcoverSyncSettings;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.repository.BookRepository;
+import org.booklore.service.metadata.parser.hardcover.GraphQLRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -164,9 +168,10 @@ class HardcoverSyncServiceTest {
 
     // === Tests for successful sync (API calls should be made) ===
 
-    @Test
+    @ParameterizedTest(name = "progress {0} with stored bookId makes API calls")
     @DisplayName("Should use stored hardcoverBookId when available")
-    void syncProgressToHardcover_withStoredBookId_shouldUseStoredId() {
+    @ValueSource(floats = {50.0f, 99.0f, 30.0f})
+    void syncProgressToHardcover_withStoredBookId_shouldUseStoredId(float progress) {
         testMetadata.setHardcoverBookId("12345");
         testMetadata.setPageCount(300);
 
@@ -177,7 +182,7 @@ class HardcoverSyncServiceTest {
                 .thenReturn(createEmptyUserBookReadsResponse())
                 .thenReturn(createInsertUserBookReadResponse());
 
-        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+        service.syncProgressToHardcover(TEST_BOOK_ID, progress, TEST_USER_ID);
 
         // Verify API was called at least once (using stored ID, no search needed)
         verify(restClient, atLeastOnce()).post();
@@ -208,40 +213,6 @@ class HardcoverSyncServiceTest {
 
         // Should call search only
         verify(restClient, times(1)).post();
-    }
-
-    @Test
-    @DisplayName("Should set status to READ when progress >= 99%")
-    void syncProgressToHardcover_whenProgress99Percent_shouldMakeApiCalls() {
-        testMetadata.setHardcoverBookId("12345");
-        testMetadata.setPageCount(300);
-
-        when(responseSpec.body(Map.class))
-                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
-                .thenReturn(createInsertUserBookResponse(5001, null))
-                .thenReturn(createEmptyUserBookReadsResponse())
-                .thenReturn(createInsertUserBookReadResponse());
-
-        service.syncProgressToHardcover(TEST_BOOK_ID, 99.0f, TEST_USER_ID);
-
-        verify(restClient, atLeastOnce()).post();
-    }
-
-    @Test
-    @DisplayName("Should set status to CURRENTLY_READING when progress < 99%")
-    void syncProgressToHardcover_whenProgressLessThan99_shouldMakeApiCalls() {
-        testMetadata.setHardcoverBookId("12345");
-        testMetadata.setPageCount(300);
-
-        when(responseSpec.body(Map.class))
-                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
-                .thenReturn(createInsertUserBookResponse(5001, null))
-                .thenReturn(createEmptyUserBookReadsResponse())
-                .thenReturn(createInsertUserBookReadResponse());
-
-        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
-
-        verify(restClient, atLeastOnce()).post();
     }
 
     @Test
@@ -296,6 +267,40 @@ class HardcoverSyncServiceTest {
         service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
 
         verify(restClient, atLeastOnce()).post();
+    }
+
+    @Test
+    @DisplayName("Should handle a RestClientException from the transport itself gracefully")
+    void syncProgressToHardcover_whenTransportThrowsRestClientException_shouldNotThrow() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        when(responseSpec.body(Map.class)).thenThrow(new org.springframework.web.client.RestClientException("connection refused"));
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        verify(restClient, times(1)).post();
+    }
+
+    @Test
+    @DisplayName("Should abort when updateUserBook mutation itself returns an error field")
+    void syncProgressToHardcover_whenUpdateUserBookReturnsError_shouldAbort() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        Map<String, Object> updateUserBookErrorResponse = Map.of(
+                "data", Map.of("update_user_book", Map.of("error", "Cannot update finished book"))
+        );
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createGetUserBookAndReadsResponse(5001, 1, 10, List.of()))
+                .thenReturn(updateUserBookErrorResponse);
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+
+        // resolveByBookId + getUserBookAndReads + the failing update_user_book call, then abort (no further calls)
+        verify(restClient, times(3)).post();
     }
 
     // === Tests for error handling ===
@@ -581,6 +586,180 @@ class HardcoverSyncServiceTest {
         when(responseSpec.body(Map.class)).thenReturn(null);
 
         assertNull(resolveHardcoverBook(null, "9781234567890", null));
+    }
+
+    @Test
+    @DisplayName("Returns null when isbn-only search finds a book with no valid editions")
+    void withIsbnOnly_bookHasNoEditions_returnsNull() throws Exception {
+        Map<String, Object> book = Map.of("id", 12345, "pages", 300, "editions", List.of());
+        when(responseSpec.body(Map.class)).thenReturn(Map.of("data", Map.of("books", List.of(book))));
+
+        assertNull(resolveHardcoverBook(null, "9781234567890", null));
+    }
+
+    // === Additional branch coverage ===
+
+    @Test
+    @DisplayName("Swallows an unexpected exception from outside the GraphQL transport")
+    void syncProgressToHardcover_whenUnexpectedExceptionOutsideTransport_shouldNotThrow() {
+        when(hardcoverSyncSettingsService.getSettingsForUserId(TEST_USER_ID))
+                .thenThrow(new IllegalStateException("settings lookup exploded"));
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        verify(restClient, never()).post();
+    }
+
+    @Test
+    @DisplayName("resolveByBookId swallows an unexpected exception thrown while parsing the response")
+    void resolveByBookId_unexpectedResponseShape_returnsNull() throws Exception {
+        // "books" is a String instead of a List, forcing a ClassCastException inside the try block
+        // that is distinct from the RestClientException path already covered elsewhere.
+        when(responseSpec.body(Map.class)).thenReturn(Map.of("data", Map.of("books", "not-a-list")));
+
+        assertNull(resolveHardcoverBook("12345", null, null));
+    }
+
+    @Test
+    @DisplayName("resolveByIsbn swallows an unexpected exception thrown while parsing the response")
+    void resolveByIsbn_unexpectedResponseShape_returnsNull() throws Exception {
+        when(responseSpec.body(Map.class)).thenReturn(Map.of("data", Map.of("books", "not-a-list")));
+
+        assertNull(resolveHardcoverBook(null, "9781234567890", null));
+    }
+
+    @Test
+    @DisplayName("Aborts when updateUserBookRead fails on an existing matching-edition read")
+    void syncProgressToHardcover_whenUpdateUserBookReadReturnsErrors_shouldAbort() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        Map<String, Object> existingRead = existingUserBookRead(6001, 10, "2024-01-01", null, 50);
+        Map<String, Object> updateReadErrorResponse = Map.of("errors", List.of(Map.of("message", "cannot update")));
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createGetUserBookAndReadsResponse(5001, 2, 10, List.of(existingRead)))
+                .thenReturn(updateReadErrorResponse);
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+
+        // Resolve (1) + getUserBookAndReads (2) + failing updateUserBookRead (3), then abort
+        verify(restClient, times(3)).post();
+    }
+
+    @Test
+    @DisplayName("Sets finishedAt when updating an existing matching-edition read and progress is finished")
+    void syncProgressToHardcover_whenCurrentlyReadingMatchingEditionAndFinished_setsFinishedAt() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        Map<String, Object> existingRead = existingUserBookRead(6001, 10, "2024-01-01", null, 50);
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createGetUserBookAndReadsResponse(5001, 2, 10, List.of(existingRead)))
+                .thenReturn(createUpdateUserBookReadResponse());
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 100.0f, TEST_USER_ID);
+
+        // Resolve (1) + getUserBookAndReads (2) + updateUserBookRead (3)
+        verify(restClient, times(3)).post();
+
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(requestBodySpec, atLeastOnce()).body(bodyCaptor.capture());
+        var lastRequest = (GraphQLRequest) bodyCaptor.getValue();
+        @SuppressWarnings("unchecked")
+        var readObject = (Map<String, Object>) lastRequest.getVariables().get("userBookReadObject");
+        assertNotNull(readObject.get("finished_at"));
+    }
+
+    @Test
+    @DisplayName("Logs failure when insertUserBookRead itself returns errors")
+    void syncProgressToHardcover_whenInsertUserBookReadReturnsErrors_shouldLogFailure() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        // Existing read has a different edition, so a new read must be inserted (not updated)
+        Map<String, Object> existingRead = existingUserBookRead(6001, 99, "2024-01-01", null, 50);
+        Map<String, Object> insertReadErrorResponse = Map.of("errors", List.of(Map.of("message", "cannot insert")));
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createGetUserBookAndReadsResponse(5001, 2, 10, List.of(existingRead)))
+                .thenReturn(insertReadErrorResponse);
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        // Resolve (1) + getUserBookAndReads (2) + failing insertUserBookRead (3)
+        verify(restClient, times(3)).post();
+    }
+
+    @Test
+    @DisplayName("Aborts insertUserBook when the top-level response carries an errors key")
+    void syncProgressToHardcover_whenInsertUserBookResponseHasErrorsKey_shouldAbort() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        Map<String, Object> insertUserBookErrorsResponse = Map.of("errors", List.of(Map.of("message", "not authorized")));
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createEmptyBooksResponse())
+                .thenReturn(insertUserBookErrorsResponse);
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+
+        // Resolve (1) + getUserBookAndReads (2) + insertUserBook with top-level errors (3), then abort
+        verify(restClient, times(3)).post();
+    }
+
+    @Test
+    @DisplayName("getUserBookAndReads swallows its own IllegalStateException when the GraphQL response is null")
+    void syncProgressToHardcover_whenGetUserBookAndReadsResponseNull_shouldNotThrow() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(null);
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        // Resolve (1) + the null-response getUserBookAndReads call (2), then abort
+        verify(restClient, times(2)).post();
+    }
+
+    @Test
+    @DisplayName("getUserBookAndReads swallows its own IllegalStateException when the response has no data key")
+    void syncProgressToHardcover_whenGetUserBookAndReadsResponseHasNoData_shouldNotThrow() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(Map.of("extensions", Map.of()));
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        verify(restClient, times(2)).post();
+    }
+
+    @Test
+    @DisplayName("insertUserBook returns null when the response has neither errors nor a data key")
+    void syncProgressToHardcover_whenInsertUserBookResponseHasNoData_shouldAbort() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createEmptyBooksResponse())
+                .thenReturn(Map.of("extensions", Map.of()));
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+
+        // Resolve (1) + getUserBookAndReads (2) + insertUserBook with no data key (3), then abort
+        verify(restClient, times(3)).post();
     }
 
     // === Reflection helpers ===

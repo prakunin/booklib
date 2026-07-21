@@ -29,6 +29,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.time.ZoneId;
 import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
@@ -55,8 +56,8 @@ public class ReadingSessionService {
 
     private PeriodBounds computeYearBounds(int year) {
         ZoneId zone = ZoneId.systemDefault();
-        Instant start = LocalDate.of(year, 1, 1).atStartOfDay(zone).toInstant();
-        Instant end = LocalDate.of(year + 1, 1, 1).atStartOfDay(zone).toInstant();
+        Instant start = LocalDate.of(year, Month.JANUARY, 1).atStartOfDay(zone).toInstant();
+        Instant end = LocalDate.of(year + 1, Month.JANUARY, 1).atStartOfDay(zone).toInstant();
         return new PeriodBounds(start, end);
     }
 
@@ -180,7 +181,7 @@ public class ReadingSessionService {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
 
-        LocalDate date = LocalDate.of(year, 1, 1)
+        LocalDate date = LocalDate.of(year, Month.JANUARY, 1)
                 .with(WeekFields.ISO.weekOfYear(), week);
         LocalDateTime startOfWeek = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
         LocalDateTime endOfWeek = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).plusDays(1).atStartOfDay();
@@ -204,8 +205,8 @@ public class ReadingSessionService {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
 
-        LocalDateTime periodStart = LocalDateTime.of(year, 1, 1, 0, 0);
-        LocalDateTime periodEnd = LocalDateTime.of(year + 1, 1, 1, 0, 0);
+        LocalDateTime periodStart = LocalDateTime.of(year, Month.JANUARY, 1, 0, 0);
+        LocalDateTime periodEnd = LocalDateTime.of(year + 1, Month.JANUARY, 1, 0, 0);
 
         return readingSessionRepository.findReadingSpeedByUserAndYear(userId, periodStart, periodEnd)
                 .stream()
@@ -332,7 +333,7 @@ public class ReadingSessionService {
         BookLoreUser authenticatedUser = authenticationService.getAuthenticatedUser();
         Long userId = authenticatedUser.getId();
 
-        int currentYear = LocalDate.now().getYear();
+        int currentYear = LocalDate.now(ZoneId.systemDefault()).getYear();
         int startYear = currentYear - 9;
 
         return userBookProgressRepository.findBookCompletionHeatmap(userId, startYear, currentYear)
@@ -684,7 +685,10 @@ public class ReadingSessionService {
         int n = values.size();
         if (n < 2) return 0.0;
 
-        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        double sumX = 0;
+        double sumY = 0;
+        double sumXY = 0;
+        double sumX2 = 0;
         for (int i = 0; i < n; i++) {
             sumX += i;
             sumY += values.get(i);
@@ -837,13 +841,14 @@ public class ReadingSessionService {
 
         for (var dto : progressList) {
             float maxProg = dto.getMaxProgress() != null ? dto.getMaxProgress() : 0f;
-            if (maxProg > 0f) {
-                totalStarted++;
-                if (maxProg >= 0.25f) reached25++;
-                if (maxProg >= 0.50f) reached50++;
-                if (maxProg >= 0.75f) reached75++;
-                if (maxProg >= 0.98f) completed++;
+            if (maxProg <= 0f) {
+                continue;
             }
+            totalStarted++;
+            if (maxProg >= 0.25f) reached25++;
+            if (maxProg >= 0.50f) reached50++;
+            if (maxProg >= 0.75f) reached75++;
+            if (maxProg >= 0.98f) completed++;
         }
 
         return ListeningFinishFunnelResponse.builder()

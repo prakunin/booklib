@@ -126,7 +126,7 @@ class ContentRestrictionSpecificationTest {
         book("age-12", null, 12, List.of(), List.of(), List.of());
         book("age-null", null, null, List.of(), List.of(), List.of());
         book("bare-metadata", null, null, List.of(), List.of(), List.of());
-        bookWithoutMetadata("no-metadata");
+        bookWithoutMetadata();
 
         em.flush();
     }
@@ -147,7 +147,7 @@ class ContentRestrictionSpecificationTest {
         return bookEntity;
     }
 
-    private void bookWithoutMetadata(String title) {
+    private void bookWithoutMetadata() {
         BookEntity bookEntity = BookEntity.builder()
                 .library(library).libraryPath(libraryPath).addedOn(Instant.now()).deleted(false).build();
         em.persist(bookEntity);

@@ -1,0 +1,8 @@
+{
+  "books": [
+    { "id": 12345 }
+  ],
+  "count": "1",
+  "currentPage": 1,
+  "totalPages": 1
+}

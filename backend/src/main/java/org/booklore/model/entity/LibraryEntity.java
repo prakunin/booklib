@@ -80,6 +80,7 @@ public class LibraryEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "organization_mode")
     @Builder.Default
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat default for pre-existing libraries; no replacement exists
     private LibraryOrganizationMode organizationMode = LibraryOrganizationMode.AUTO_DETECT;
 
     @Enumerated(EnumType.STRING)

@@ -33,6 +33,7 @@ public class AudioFileChapterListConverter implements AttributeConverter<List<Au
     }
 
     @Override
+    @SuppressWarnings("java:S1168") // callers distinguish null (no chapters recorded) from empty (see BookMapper#mapAudiobookMetadata); returning List.of() would change AttributeConverter round-trip semantics
     public List<AudioFileChapter> convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.isEmpty()) {
             return null;

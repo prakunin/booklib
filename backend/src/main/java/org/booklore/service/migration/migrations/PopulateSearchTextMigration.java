@@ -37,34 +37,45 @@ public class PopulateSearchTextMigration implements Migration {
         int processedCount = 0;
         long lastId = 0;
 
-        while (true) {
+        boolean moreBatches = true;
+        while (moreBatches) {
             List<BookEntity> bookBatch = bookRepository.findBooksForMigrationBatch(lastId, PageRequest.of(0, batchSize));
-            if (bookBatch.isEmpty()) break;
+            if (bookBatch.isEmpty()) {
+                moreBatches = false;
+            } else {
+                processedCount += processBatch(bookBatch);
+                lastId = bookBatch.getLast().getId();
 
-            List<Long> bookIds = bookBatch.stream().map(BookEntity::getId).toList();
-            List<BookEntity> books = bookRepository.findBooksWithMetadataAndAuthors(bookIds);
+                log.info("Migration progress: {} books processed", processedCount);
 
-            for (BookEntity book : books) {
-                BookMetadataEntity m = book.getMetadata();
-                if (m != null) {
-                    try {
-                        m.setSearchText(BookUtils.buildSearchText(m));
-                    } catch (Exception ex) {
-                        log.warn("Failed to build search text for book {}: {}", book.getId(), ex.getMessage());
-                    }
-                }
+                moreBatches = bookBatch.size() >= batchSize;
             }
-
-            bookRepository.saveAll(books);
-            processedCount += books.size();
-            lastId = bookBatch.getLast().getId();
-
-            log.info("Migration progress: {} books processed", processedCount);
-
-            if (bookBatch.size() < batchSize) break;
         }
 
         log.info("Completed migration '{}'. Total books processed: {}", getKey(), processedCount);
+    }
+
+    private int processBatch(List<BookEntity> bookBatch) {
+        List<Long> bookIds = bookBatch.stream().map(BookEntity::getId).toList();
+        List<BookEntity> books = bookRepository.findBooksWithMetadataAndAuthors(bookIds);
+
+        for (BookEntity book : books) {
+            updateSearchTextQuietly(book);
+        }
+
+        bookRepository.saveAll(books);
+        return books.size();
+    }
+
+    private void updateSearchTextQuietly(BookEntity book) {
+        BookMetadataEntity m = book.getMetadata();
+        if (m != null) {
+            try {
+                m.setSearchText(BookUtils.buildSearchText(m));
+            } catch (Exception ex) {
+                log.warn("Failed to build search text for book {}: {}", book.getId(), ex.getMessage());
+            }
+        }
     }
 }
 

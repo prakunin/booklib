@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,8 +48,8 @@ class SystemInfoServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Benign default so blocks unrelated to the database don't have to know about it;
-        // DatabaseBlock tests below override this per-case.
+        // Benign default so blocks unrelated to the database don't have to know about it —
+        // DatabaseBlock tests below override this per case.
         Connection defaultConnection = mock(Connection.class);
         DatabaseMetaData defaultMetaData = mock(DatabaseMetaData.class);
         lenient().when(dataSource.getConnection()).thenReturn(defaultConnection);
@@ -203,6 +204,7 @@ class SystemInfoServiceTest {
         }
 
         @Test
+        @SuppressWarnings("java:S2925") // simulates a genuinely slow (but finite) DB call so the guard's real wall-clock timeout can be exercised; not a wait-for-condition
         void aSlowConfiguredLibraryPathsCallDoesNotEatTheDatabaseBlocksBudget() throws Exception {
             TimeoutGuard shortGuard = new TimeoutGuard(1);
             SystemInfoService boundedService =
@@ -291,7 +293,7 @@ class SystemInfoServiceTest {
 
             assertThat(info.getLibraryPaths()).extracting(LibraryPathInfo::getPath).containsExactly("/books/shared");
             // configuredLibraryPaths() is fetched exactly once per request, not once per block.
-            verify(storageInfoService, org.mockito.Mockito.times(1)).configuredLibraryPaths();
+            verify(storageInfoService, times(1)).configuredLibraryPaths();
         }
 
         @Test

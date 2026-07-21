@@ -23,6 +23,10 @@ public class BookFileGroupingUtils {
     private static final Pattern UNDERSCORE_PATTERN = Pattern.compile("_");
 
     // Matches trailing author: " - J.R.R. Tolkien", " - George Orwell", " - J.K. Rowling"
+    // Not split: the bounded repetition against a single end-anchor is not safely decomposable
+    // into independent sub-patterns without risking different match boundaries on edge-case
+    // filenames (sonar java:S5843 - accepted complexity for this file-grouping heuristic).
+    @SuppressWarnings("java:S5843")
     private static final Pattern TRAILING_AUTHOR_PATTERN = Pattern.compile(
             "\\s*[-–—]\\s+(?:[A-Z](?:\\.[A-Z])*\\.\\s+)?[A-Z][a-z]+(?:\\s+[A-Z](?:\\.[A-Z])*\\.?)?(?:\\s+[A-Z][a-z]+){0,10}\\s*$"
     );
@@ -46,6 +50,11 @@ public class BookFileGroupingUtils {
     // Part/disc indicators: "(part 1)", "[pt 2]", "- disc 1", "cd 3", etc.
     // "part" requires brackets or dash prefix to avoid conflict with series labels ("Part 1" = series entry).
     // "pt", "disc", "disk", "cd" are unambiguous and can be matched bare.
+    // Not split: splitting into independently-tried sub-patterns can change which alternative
+    // wins when more than one branch could match at different start positions in the same
+    // string, which single-pass alternation resolves via leftmost-match precedence
+    // (sonar java:S5843 - accepted complexity for this file-grouping heuristic).
+    @SuppressWarnings("java:S5843")
     private static final Pattern PART_INDICATOR_PATTERN = Pattern.compile(
             "\\s*(?:" +
                     "[\\(\\[]\\s*(?:part|pt|dis[ck]|cd)\\s*\\d+\\s*[\\)\\]]" +
@@ -62,6 +71,11 @@ public class BookFileGroupingUtils {
 
     // Edition/version patterns that should NOT prevent grouping
     // Includes format indicators (audiobook, ebook) and edition descriptors
+    // Not split: this is used with replaceAll() to strip all matches from a key; splitting into
+    // sequential independent replaceAll passes is not provably identical to single-pass
+    // alternation when branch matches are adjacent or overlapping in the input
+    // (sonar java:S5843 - accepted complexity for this file-grouping heuristic).
+    @SuppressWarnings("java:S5843")
     private static final Pattern EDITION_PATTERN = Pattern.compile(
             "(?:tenth|first|second|third|\\d+(?:st|nd|rd|th)?)\\s*(?:anniversary|edition|ed\\.?)|" +
                     "(?:unabridged|abridged|complete|full\\s*cast|deluxe|special|collector)|" +
@@ -162,30 +176,31 @@ public class BookFileGroupingUtils {
 
         // Process each folder
         for (Map.Entry<String, List<LibraryFile>> folderEntry : byFolder.entrySet()) {
-            List<LibraryFile> filesInFolder = folderEntry.getValue();
+            addFolderGroups(folderEntry.getValue(), result);
+        }
 
-            if (filesInFolder.isEmpty()) {
-                continue;
+        return result;
+    }
+
+    private void addFolderGroups(List<LibraryFile> filesInFolder, Map<String, List<LibraryFile>> result) {
+        if (filesInFolder.isEmpty()) {
+            return;
+        }
+
+        String fileSubPath = filesInFolder.getFirst().getFileSubPath();
+        Long libraryPathId = filesInFolder.getFirst().getLibraryPathEntity().getId();
+
+        // Root-level files: use exact grouping
+        if (fileSubPath == null || fileSubPath.isEmpty()) {
+            for (LibraryFile file : filesInFolder) {
+                String key = libraryPathId + "::" + extractGroupingKey(file.getFileName());
+                result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
             }
-
-            String fileSubPath = filesInFolder.getFirst().getFileSubPath();
-            Long libraryPathId = filesInFolder.getFirst().getLibraryPathEntity().getId();
-
-            // Root-level files: use exact grouping
-            if (fileSubPath == null || fileSubPath.isEmpty()) {
-                for (LibraryFile file : filesInFolder) {
-                    String key = libraryPathId + "::" + extractGroupingKey(file.getFileName());
-                    result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
-                }
-                continue;
-            }
-
+        } else {
             // Files in subfolder: use folder-centric grouping
             Map<String, List<LibraryFile>> folderGroups = groupFilesInFolder(filesInFolder, fileSubPath, libraryPathId);
             result.putAll(folderGroups);
         }
-
-        return result;
     }
 
     /**
@@ -198,7 +213,32 @@ public class BookFileGroupingUtils {
         String folderName = extractFolderName(fileSubPath);
         String folderKey = extractGroupingKey(folderName);
 
-        // Categorize files
+        FolderCategorization categorized = categorizeFilesInFolder(files, folderKey, fileSubPath, libraryPathId);
+
+        // Group files that match folder name, separating by trailing number
+        appendFolderMatches(result, categorized.matchesFolderByNumber(), folderName, folderKey, fileSubPath, libraryPathId);
+
+        // Add series entries as separate groups
+        result.putAll(categorized.seriesEntries());
+
+        // Handle unmatched files - try to cluster by similarity
+        if (!categorized.unmatched().isEmpty()) {
+            Map<String, List<LibraryFile>> clusters = clusterBySimilarity(categorized.unmatched(), libraryPathId, fileSubPath);
+            result.putAll(clusters);
+        }
+
+        return result;
+    }
+
+    private record FolderCategorization(Map<String, List<LibraryFile>> matchesFolderByNumber,
+                                        Map<String, List<LibraryFile>> seriesEntries,
+                                        List<LibraryFile> unmatched) {
+    }
+
+    // Splits a folder's files into: matches on the folder's own name (grouped by trailing
+    // number), series entries whose base title matches the folder, and everything else.
+    private FolderCategorization categorizeFilesInFolder(List<LibraryFile> files, String folderKey,
+                                                          String fileSubPath, Long libraryPathId) {
         Map<String, List<LibraryFile>> matchesFolderByNumber = new LinkedHashMap<>();
         Map<String, List<LibraryFile>> seriesEntries = new LinkedHashMap<>();
         List<LibraryFile> unmatched = new ArrayList<>();
@@ -227,7 +267,11 @@ public class BookFileGroupingUtils {
             }
         }
 
-        // Group files that match folder name, separating by trailing number
+        return new FolderCategorization(matchesFolderByNumber, seriesEntries, unmatched);
+    }
+
+    private void appendFolderMatches(Map<String, List<LibraryFile>> result, Map<String, List<LibraryFile>> matchesFolderByNumber,
+                                     String folderName, String folderKey, String fileSubPath, Long libraryPathId) {
         for (Map.Entry<String, List<LibraryFile>> entry : matchesFolderByNumber.entrySet()) {
             List<LibraryFile> filesWithNumber = entry.getValue();
             String numberSuffix = "none".equals(entry.getKey()) ? "" : ":" + entry.getKey();
@@ -237,17 +281,6 @@ public class BookFileGroupingUtils {
                     numberSuffix.isEmpty() ? "" : " (num=" + entry.getKey() + ")",
                     filesWithNumber.stream().map(LibraryFile::getFileName).toList());
         }
-
-        // Add series entries as separate groups
-        result.putAll(seriesEntries);
-
-        // Handle unmatched files - try to cluster by similarity
-        if (!unmatched.isEmpty()) {
-            Map<String, List<LibraryFile>> clusters = clusterBySimilarity(unmatched, libraryPathId, fileSubPath);
-            result.putAll(clusters);
-        }
-
-        return result;
     }
 
     /**
@@ -321,6 +354,15 @@ public class BookFileGroupingUtils {
      * Extracts series information (base title and number) from a grouping key.
      */
     private SeriesInfo extractSeriesInfo(String key) {
+        SeriesInfo labeled = extractLabeledSeriesInfo(key);
+        if (labeled != null) {
+            return labeled;
+        }
+        // Fallback: bare-number prefix like "1. title" or "01 - title"
+        return extractBareNumberSeriesInfo(key);
+    }
+
+    private SeriesInfo extractLabeledSeriesInfo(String key) {
         Matcher matcher = SERIES_NUMBER_PATTERN.matcher(key);
         if (matcher.find()) {
             String number = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
@@ -334,8 +376,10 @@ public class BookFileGroupingUtils {
                 }
             }
         }
+        return null;
+    }
 
-        // Fallback: bare-number prefix like "1. title" or "01 - title"
+    private SeriesInfo extractBareNumberSeriesInfo(String key) {
         Matcher bareMatcher = BARE_NUMBER_PREFIX_PATTERN.matcher(key);
         if (bareMatcher.matches()) {
             String number = bareMatcher.group(1);
@@ -345,7 +389,6 @@ public class BookFileGroupingUtils {
                 return new SeriesInfo(baseTitle, number);
             }
         }
-
         return null;
     }
 
@@ -369,20 +412,25 @@ public class BookFileGroupingUtils {
                 .map(f -> extractGroupingKey(f.getFileName()))
                 .toList();
 
-        // Union-Find for clustering
-        int[] parent = new int[files.size()];
+        int[] parent = buildSimilarityUnionFind(keys);
+
+        return collectClusters(parent, files, libraryPathId, fileSubPath);
+    }
+
+    // Compares each pair of keys and unions the similar ones (edition-stripped substring match
+    // or fuzzy similarity), except pairs with different trailing numbers - this prevents
+    // "book1" and "book2" from being grouped together.
+    private int[] buildSimilarityUnionFind(List<String> keys) {
+        int[] parent = new int[keys.size()];
         for (int i = 0; i < parent.length; i++) {
             parent[i] = i;
         }
 
-        // Compare each pair and union if similar
-        for (int i = 0; i < files.size(); i++) {
-            for (int j = i + 1; j < files.size(); j++) {
+        for (int i = 0; i < keys.size(); i++) {
+            for (int j = i + 1; j < keys.size(); j++) {
                 String key1 = stripEditionInfo(keys.get(i));
                 String key2 = stripEditionInfo(keys.get(j));
 
-                // Don't cluster files that have different trailing numbers
-                // This prevents "book1" and "book2" from being grouped
                 if (hasDifferentTrailingNumbers(key1, key2)) {
                     continue;
                 }
@@ -396,6 +444,12 @@ public class BookFileGroupingUtils {
                 }
             }
         }
+
+        return parent;
+    }
+
+    private Map<String, List<LibraryFile>> collectClusters(int[] parent, List<LibraryFile> files, Long libraryPathId, String fileSubPath) {
+        Map<String, List<LibraryFile>> result = new LinkedHashMap<>();
 
         // Group files by their root
         Map<Integer, List<LibraryFile>> clusters = new LinkedHashMap<>();

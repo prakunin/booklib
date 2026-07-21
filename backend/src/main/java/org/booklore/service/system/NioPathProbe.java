@@ -19,9 +19,9 @@ public class NioPathProbe implements PathProbe {
     @Override
     public Optional<Boolean> isDirectory(Path path) {
         // Files.isDirectory declares no checked exception and, on a hung network mount, can block
-        // the underlying syscall forever without ever throwing — a plain catch(Exception) cannot
-        // see that. timeoutGuard.run bounds the wait; see its javadoc for why the call is simply
-        // abandoned, not cancelled, when the budget runs out.
+        // the underlying syscall forever without ever throwing — a plain catch block for Exception
+        // cannot see that. timeoutGuard.run bounds the wait; see its javadoc for why the call is
+        // simply abandoned, not cancelled, when the budget runs out.
         return timeoutGuard.run("Files.isDirectory(" + path + ")", () -> Files.isDirectory(path));
     }
 

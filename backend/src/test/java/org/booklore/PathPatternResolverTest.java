@@ -8,6 +8,7 @@ import org.booklore.util.PathPatternResolver;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -77,14 +78,14 @@ class PathPatternResolverTest {
     }
 
     @Test void multipleOptionalBlocks_partialValues() {
-        var book = createBook("Title", List.of("Author"), LocalDate.of(2020, 1, 1),
+        var book = createBook("Title", List.of("Author"), LocalDate.of(2020, Month.JANUARY, 1),
                 "Series", 1f, null, null, null, null, "f.epub");
         String p = "<{series}/><{seriesIndex}. ><{language}/>{title}";
         assertThat(PathPatternResolver.resolvePattern(book, p)).isEqualTo("Series/01. Title.epub");
     }
 
     @Test void placeholdersOutsideOptional_replacedWithEmpty() {
-        var book = createBook("Title", null, LocalDate.of(2020, 1, 1), null, null, null, null, null, null, "file.cbz");
+        var book = createBook("Title", null, LocalDate.of(2020, Month.JANUARY, 1), null, null, null, null, null, null, "file.cbz");
         String p = "{title} - {authors} - {publisher}";
         assertThat(PathPatternResolver.resolvePattern(book, p)).isEqualTo("Title -  - .cbz");
     }
@@ -98,7 +99,7 @@ class PathPatternResolverTest {
     }
 
     @Test void sanitizes_illegalCharsAndWhitespace() {
-        var book = createBook(" Ti:tle/<>|*? ", List.of("Au:thor|?*"), LocalDate.of(2000, 1, 1),
+        var book = createBook(" Ti:tle/<>|*? ", List.of("Au:thor|?*"), LocalDate.of(2000, Month.JANUARY, 1),
                 "Se:ries", 1f, "Lang<>", "Pub|?", "123:456", "654|321", "file?.pdf");
         String p = "{title} - {authors} - {series} - {language} - {publisher} - {isbn}";
         String result = PathPatternResolver.resolvePattern(book, p);
@@ -112,7 +113,7 @@ class PathPatternResolverTest {
     }
 
     @Test void complexPattern_allPlaceholdersPresent() {
-        var book = createBook("Complex Title", List.of("Author One"), LocalDate.of(2010, 5, 5),
+        var book = createBook("Complex Title", List.of("Author One"), LocalDate.of(2010, Month.MAY, 5),
                 "Complex Series", 12.5f, "English", "Publisher", "ISBN13", "ISBN10", "complex.cbz");
         String p = "<{series}/><{seriesIndex}. ><{language}/><{publisher}/>{title} - {authors} - {year} - {isbn}";
         assertThat(PathPatternResolver.resolvePattern(book, p))
@@ -264,7 +265,7 @@ class PathPatternResolverTest {
     }
 
     @Test void complexPatternWithSubtitle_allPlaceholdersPresent() {
-        var book = createBook("Main Title", "The Great Subtitle", List.of("Author One"), LocalDate.of(2010, 5, 5),
+        var book = createBook("Main Title", "The Great Subtitle", List.of("Author One"), LocalDate.of(2010, Month.MAY, 5),
                 "Series", 1f, "English", "Publisher", "ISBN13", "ISBN10", "complex.epub");
         String pattern = "<{series}/>{title}< - {subtitle}> - {authors} - {year}";
         assertThat(PathPatternResolver.resolvePattern(book, pattern))
@@ -417,7 +418,7 @@ class PathPatternResolverTest {
     }
 
     @Test void elseClause_existingPatternsUnchanged() {
-        var book = createBook("Title", List.of("Author"), LocalDate.of(2023, 1, 1), "Series", 1f, null, null, null, null, "f.epub");
+        var book = createBook("Title", List.of("Author"), LocalDate.of(2023, Month.JANUARY, 1), "Series", 1f, null, null, null, null, "f.epub");
         assertThat(PathPatternResolver.resolvePattern(book, "{authors}/<{series}/><{seriesIndex}. >{title}< ({year})>"))
                 .isEqualTo("Author/Series/01. Title (2023).epub");
     }

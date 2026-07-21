@@ -2,7 +2,6 @@ package org.booklore.service.metadata.parser;
 
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.dto.Book;
-import org.booklore.model.dto.BookFile;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.request.FetchMetadataRequest;
 import org.booklore.model.dto.response.GoogleBooksApiResponse;
@@ -22,6 +21,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -82,6 +82,10 @@ public class GoogleParser implements BookParser {
         String author = fetchMetadataRequest.getAuthor();
         String fileName = book.getPrimaryFile() != null ? book.getPrimaryFile().getFileName() : null;
 
+        return searchByTitleAuthorOrFilename(title, author, fileName, bookLanguage);
+    }
+
+    private List<BookMetadata> searchByTitleAuthorOrFilename(String title, String author, String fileName, String bookLanguage) {
         List<BookMetadata> results = Collections.emptyList();
 
         // 2. Try Title + Author Search
@@ -284,30 +288,12 @@ public class GoogleParser implements BookParser {
 
     private SeriesData extractSeriesInfo(GoogleBooksApiResponse.Item.VolumeInfo volumeInfo) {
         if (volumeInfo.getSeriesInfo() != null) {
-            GoogleBooksApiResponse.Item.SeriesInfo seriesInfo = volumeInfo.getSeriesInfo();
-            String seriesTitle = seriesInfo.getShortSeriesBookTitle();
-            Float seriesNumber = null;
-            
-            if (seriesInfo.getVolumeSeries() != null && !seriesInfo.getVolumeSeries().isEmpty()) {
-                Integer orderNum = seriesInfo.getVolumeSeries().getFirst().getOrderNumber();
-                if (orderNum != null) {
-                    seriesNumber = orderNum.floatValue();
-                }
-            }
-            
-            if (seriesNumber == null && seriesInfo.getBookDisplayNumber() != null) {
-                try {
-                    seriesNumber = Float.parseFloat(seriesInfo.getBookDisplayNumber());
-                } catch (NumberFormatException _) {
-                    // Not a valid number, ignore
-                }
-            }
-            
-            if (seriesTitle != null || seriesNumber != null) {
-                return new SeriesData(seriesTitle, seriesNumber);
+            SeriesData fromSeriesInfo = extractSeriesFromSeriesInfo(volumeInfo.getSeriesInfo());
+            if (fromSeriesInfo != null) {
+                return fromSeriesInfo;
             }
         }
-        
+
         String title = volumeInfo.getTitle();
         if (title != null) {
             // Try patterns like "Title, Vol. 1", "Title Vol 1", "Title Volume 1"
@@ -316,8 +302,33 @@ public class GoogleParser implements BookParser {
                 return fromTitle;
             }
         }
-        
+
         return new SeriesData(null, null);
+    }
+
+    private SeriesData extractSeriesFromSeriesInfo(GoogleBooksApiResponse.Item.SeriesInfo seriesInfo) {
+        String seriesTitle = seriesInfo.getShortSeriesBookTitle();
+        Float seriesNumber = null;
+
+        if (seriesInfo.getVolumeSeries() != null && !seriesInfo.getVolumeSeries().isEmpty()) {
+            Integer orderNum = seriesInfo.getVolumeSeries().getFirst().getOrderNumber();
+            if (orderNum != null) {
+                seriesNumber = orderNum.floatValue();
+            }
+        }
+
+        if (seriesNumber == null && seriesInfo.getBookDisplayNumber() != null) {
+            try {
+                seriesNumber = Float.parseFloat(seriesInfo.getBookDisplayNumber());
+            } catch (NumberFormatException _) {
+                // Not a valid number, ignore
+            }
+        }
+
+        if (seriesTitle != null || seriesNumber != null) {
+            return new SeriesData(seriesTitle, seriesNumber);
+        }
+        return null;
     }
 
     /**
@@ -488,22 +499,6 @@ public class GoogleParser implements BookParser {
                 ));
     }
 
-    private String getSearchTerm(Book book, FetchMetadataRequest request) {
-        String searchTerm = Optional.ofNullable(request.getTitle())
-                .filter(title -> !title.isEmpty())
-                .orElseGet(() -> Optional.ofNullable(book.getPrimaryFile())
-                        .map(BookFile::getFileName)
-                        .filter(fileName -> !fileName.isEmpty())
-                        .map(BookUtils::cleanFileName)
-                        .orElse(null));
-
-        if (searchTerm == null) {
-            return null;
-        }
-
-        return searchTerm;
-    }
-
     private String truncateToMaxWords(String input) {
         String[] words = WHITESPACE_PATTERN.split(input);
         StringBuilder truncated = new StringBuilder();
@@ -558,7 +553,7 @@ public class GoogleParser implements BookParser {
                 int year = Integer.parseInt(yearMatcher.group(1));
                 // Basic year validation
                 if (year >= 1000 && year <= 9999) {
-                    return LocalDate.of(year, 1, 1);
+                    return LocalDate.of(year, Month.JANUARY, 1);
                 }
             }
             
@@ -653,24 +648,44 @@ public class GoogleParser implements BookParser {
     }
 
     private static int countPopulatedFields(BookMetadata metadata) {
+        return countDescriptiveFields(metadata)
+                + countBibliographicFields(metadata)
+                + countSeriesAndIdFields(metadata);
+    }
+
+    private static int countDescriptiveFields(BookMetadata metadata) {
         int count = 0;
-        
+
         if (metadata.getTitle() != null && !metadata.getTitle().isBlank()) count++;
         if (metadata.getSubtitle() != null && !metadata.getSubtitle().isBlank()) count++;
         if (metadata.getAuthors() != null && !metadata.getAuthors().isEmpty()) count++;
         if (metadata.getPublisher() != null && !metadata.getPublisher().isBlank()) count++;
         if (metadata.getPublishedDate() != null) count++;
         if (metadata.getDescription() != null && !metadata.getDescription().isBlank()) count++;
+
+        return count;
+    }
+
+    private static int countBibliographicFields(BookMetadata metadata) {
+        int count = 0;
+
         if (metadata.getIsbn13() != null && !metadata.getIsbn13().isBlank()) count++;
         if (metadata.getIsbn10() != null && !metadata.getIsbn10().isBlank()) count++;
         if (metadata.getPageCount() != null && metadata.getPageCount() > 0) count++;
         if (metadata.getLanguage() != null && !metadata.getLanguage().isBlank()) count++;
         if (metadata.getCategories() != null && !metadata.getCategories().isEmpty()) count++;
         if (metadata.getThumbnailUrl() != null && !metadata.getThumbnailUrl().isBlank()) count++;
+
+        return count;
+    }
+
+    private static int countSeriesAndIdFields(BookMetadata metadata) {
+        int count = 0;
+
         if (metadata.getSeriesName() != null && !metadata.getSeriesName().isBlank()) count++;
         if (metadata.getSeriesNumber() != null) count++;
         if (metadata.getGoogleId() != null && !metadata.getGoogleId().isBlank()) count++;
-        
+
         return count;
     }
 }

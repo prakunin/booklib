@@ -65,26 +65,26 @@ public class BookLoreUser {
 
     @Data
     public static class UserSettings {
-        public PerBookSetting perBookSetting;
-        public PdfReaderSetting pdfReaderSetting;
-        public NewPdfReaderSetting newPdfReaderSetting;
-        public EpubReaderSetting epubReaderSetting;
-        public EbookReaderSetting ebookReaderSetting;
-        public CbxReaderSetting cbxReaderSetting;
-        public SidebarSortOption sidebarLibrarySorting;
-        public SidebarSortOption sidebarShelfSorting;
-        public SidebarSortOption sidebarMagicShelfSorting;
-        public EntityViewPreferences entityViewPreferences;
-        public List<TableColumnPreference> tableColumnPreference;
-        public String filterMode;
-        public String filterSortingMode;
-        public String metadataCenterViewMode;
-        public boolean koReaderEnabled;
-        public boolean enableSeriesView;
-        public boolean autoSaveMetadata;
-        public List<String> visibleFilters;
-        public List<String> visibleSortFields;
-        public DashboardConfig dashboardConfig;
+        private PerBookSetting perBookSetting;
+        private PdfReaderSetting pdfReaderSetting;
+        private NewPdfReaderSetting newPdfReaderSetting;
+        private EpubReaderSetting epubReaderSetting;
+        private EbookReaderSetting ebookReaderSetting;
+        private CbxReaderSetting cbxReaderSetting;
+        private SidebarSortOption sidebarLibrarySorting;
+        private SidebarSortOption sidebarShelfSorting;
+        private SidebarSortOption sidebarMagicShelfSorting;
+        private EntityViewPreferences entityViewPreferences;
+        private List<TableColumnPreference> tableColumnPreference;
+        private String filterMode;
+        private String filterSortingMode;
+        private String metadataCenterViewMode;
+        private boolean koReaderEnabled;
+        private boolean enableSeriesView;
+        private boolean autoSaveMetadata;
+        private List<String> visibleFilters;
+        private List<String> visibleSortFields;
+        private DashboardConfig dashboardConfig;
 
         @Data
         @Builder
@@ -237,6 +237,7 @@ public class BookLoreUser {
             private GlobalOrIndividual cbx;
             private GlobalOrIndividual newPdf;
 
+            @SuppressWarnings("java:S115") // constant names are serialized JSON values for the stored per-book setting
             public enum GlobalOrIndividual {
                 Global, Individual
             }

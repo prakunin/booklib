@@ -58,6 +58,8 @@ import java.util.zip.ZipFile;
 @Transactional(readOnly = true)
 public class LibraryService {
 
+    private static final String AUDIT_ENTITY_LIBRARY = "Library";
+
     private final LibraryRepository libraryRepository;
     private final LibraryPathRepository libraryPathRepository;
     private final BookRepository bookRepository;
@@ -158,7 +160,7 @@ public class LibraryService {
             scheduleBackgroundScanAfterCommit(libraryId);
         }
 
-        auditService.log(AuditAction.LIBRARY_UPDATED, "Library", libraryId, "Updated library: " + library.getName());
+        auditService.log(AuditAction.LIBRARY_UPDATED, AUDIT_ENTITY_LIBRARY, libraryId, "Updated library: " + library.getName());
         return libraryMapper.toLibrary(savedLibrary);
     }
 
@@ -211,14 +213,14 @@ public class LibraryService {
 
         scheduleBackgroundScanAfterCommit(libraryId);
 
-        auditService.log(AuditAction.LIBRARY_CREATED, "Library", libraryEntity.getId(), "Created library: " + libraryEntity.getName());
+        auditService.log(AuditAction.LIBRARY_CREATED, AUDIT_ENTITY_LIBRARY, libraryEntity.getId(), "Created library: " + libraryEntity.getName());
         return libraryMapper.toLibrary(libraryEntity);
     }
 
     @Transactional
     public void rescanLibrary(long libraryId) {
         LibraryEntity lib = libraryRepository.findById(libraryId).orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
-        auditService.log(AuditAction.LIBRARY_SCANNED, "Library", libraryId, "Scanned library: " + lib.getName());
+        auditService.log(AuditAction.LIBRARY_SCANNED, AUDIT_ENTITY_LIBRARY, libraryId, "Scanned library: " + lib.getName());
 
         taskExecutor.execute(() -> {
             if (!beginScan(libraryId)) {
@@ -308,7 +310,7 @@ public class LibraryService {
         fileService.deleteBookCovers(bookIds);
         String libraryName = library.getName();
         libraryRepository.deleteById(id);
-        auditService.log(AuditAction.LIBRARY_DELETED, "Library", id, "Deleted library: " + libraryName);
+        auditService.log(AuditAction.LIBRARY_DELETED, AUDIT_ENTITY_LIBRARY, id, "Deleted library: " + libraryName);
         log.info("Library deleted successfully: {}", id);
     }
 
@@ -334,7 +336,7 @@ public class LibraryService {
         LibraryEntity library = libraryRepository.findById(libraryId).orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
         library.setFileNamingPattern(pattern);
         Library result = libraryMapper.toLibrary(libraryRepository.save(library));
-        auditService.log(AuditAction.NAMING_PATTERN_CHANGED, "Library", libraryId, "Changed naming pattern for library: " + library.getName() + " to: " + pattern);
+        auditService.log(AuditAction.NAMING_PATTERN_CHANGED, AUDIT_ENTITY_LIBRARY, libraryId, "Changed naming pattern for library: " + library.getName() + " to: " + pattern);
         return result;
     }
 

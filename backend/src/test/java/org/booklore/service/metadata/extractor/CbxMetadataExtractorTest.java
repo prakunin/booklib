@@ -7,6 +7,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -17,6 +21,7 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -100,31 +105,22 @@ class CbxMetadataExtractorTest {
     @Nested
     class ExtractMetadataFromZip {
 
-        @Test
-        void extractsTitleFromComicInfo() throws IOException {
-            Path cbz = mockComicInfo("<Title>Batman: Year One</Title>");
+        @ParameterizedTest(name = "[{index}] {0} -> title=\"{1}\"")
+        @MethodSource("titleExtractionCases")
+        void extractsOrFallsBackToTitle(String innerXml, String expectedTitle) throws IOException {
+            Path cbz = mockComicInfo(innerXml);
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
-            assertThat(metadata.getTitle()).isEqualTo("Batman: Year One");
+            assertThat(metadata.getTitle()).isEqualTo(expectedTitle);
         }
 
-        @Test
-        void fallsBackToFilenameWhenTitleMissing() throws IOException {
-            Path cbz = mockComicInfo("<Publisher>DC Comics</Publisher>");
-
-            BookMetadata metadata = extractor.extractMetadata(cbz);
-
-            assertThat(metadata.getTitle()).isEqualTo("test");
-        }
-
-        @Test
-        void fallsBackToFilenameWhenTitleBlank() throws IOException {
-            Path cbz = mockComicInfo("<Title>   </Title>");
-
-            BookMetadata metadata = extractor.extractMetadata(cbz);
-
-            assertThat(metadata.getTitle()).isEqualTo("test");
+        private static Stream<Arguments> titleExtractionCases() {
+            return Stream.of(
+                    Arguments.of("<Title>Batman: Year One</Title>", "Batman: Year One"),
+                    Arguments.of("<Publisher>DC Comics</Publisher>", "test"),
+                    Arguments.of("<Title>   </Title>", "test")
+            );
         }
 
         @Test
@@ -290,7 +286,7 @@ class CbxMetadataExtractorTest {
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, 6, 15));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, Month.JUNE, 15));
         }
 
         @Test
@@ -299,7 +295,7 @@ class CbxMetadataExtractorTest {
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(1986, 1, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(1986, Month.JANUARY, 1));
         }
 
         @Test
@@ -311,7 +307,7 @@ class CbxMetadataExtractorTest {
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 11, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.NOVEMBER, 1));
         }
 
         @Test
@@ -352,54 +348,28 @@ class CbxMetadataExtractorTest {
     @Nested
     class IsbnParsing {
 
-        @Test
-        void extractsValid13DigitGtin() throws IOException {
-            Path cbz = mockComicInfo("<GTIN>9781234567890</GTIN>");
+        @ParameterizedTest(name = "[{index}] GTIN \"{0}\" -> 9781234567890")
+        @ValueSource(strings = {
+                "9781234567890",
+                "978-1-234-56789-0",
+                "978 1 234 56789 0"
+        })
+        void extractsAndNormalizesValidGtin(String gtin) throws IOException {
+            Path cbz = mockComicInfo("<GTIN>%s</GTIN>".formatted(gtin));
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
             assertThat(metadata.getIsbn13()).isEqualTo("9781234567890");
         }
 
-        @Test
-        void normalizesGtinWithDashes() throws IOException {
-            Path cbz = mockComicInfo("<GTIN>978-1-234-56789-0</GTIN>");
-
-            BookMetadata metadata = extractor.extractMetadata(cbz);
-
-            assertThat(metadata.getIsbn13()).isEqualTo("9781234567890");
-        }
-
-        @Test
-        void normalizesGtinWithSpaces() throws IOException {
-            Path cbz = mockComicInfo("<GTIN>978 1 234 56789 0</GTIN>");
-
-            BookMetadata metadata = extractor.extractMetadata(cbz);
-
-            assertThat(metadata.getIsbn13()).isEqualTo("9781234567890");
-        }
-
-        @Test
-        void rejectsInvalidGtin() throws IOException {
-            Path cbz = mockComicInfo("<GTIN>12345</GTIN>");
-
-            BookMetadata metadata = extractor.extractMetadata(cbz);
-
-            assertThat(metadata.getIsbn13()).isNull();
-        }
-
-        @Test
-        void rejectsNonNumericGtin() throws IOException {
-            Path cbz = mockComicInfo("<GTIN>978ABC1234567</GTIN>");
-
-            BookMetadata metadata = extractor.extractMetadata(cbz);
-
-            assertThat(metadata.getIsbn13()).isNull();
-        }
-
-        @Test
-        void ignoresBlankGtin() throws IOException {
-            Path cbz = mockComicInfo("<GTIN>   </GTIN>");
+        @ParameterizedTest(name = "[{index}] GTIN \"{0}\" -> null isbn13")
+        @ValueSource(strings = {
+                "12345",
+                "978ABC1234567",
+                "   "
+        })
+        void rejectsInvalidOrBlankGtin(String gtin) throws IOException {
+            Path cbz = mockComicInfo("<GTIN>%s</GTIN>".formatted(gtin));
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
@@ -1142,14 +1112,23 @@ class CbxMetadataExtractorTest {
 
             BookMetadata metadata = extractor.extractMetadata(cbz);
 
+            assertTopLevelMetadata(metadata);
+            assertCategorizationAndIdentifiers(metadata);
+            assertComicMetadata(metadata.getComicMetadata());
+        }
+
+        private void assertTopLevelMetadata(BookMetadata metadata) {
             assertThat(metadata.getTitle()).isEqualTo("Batman: The Dark Knight Returns");
             assertThat(metadata.getSeriesName()).isEqualTo("Batman");
             assertThat(metadata.getSeriesNumber()).isEqualTo(1f);
             assertThat(metadata.getSeriesTotal()).isEqualTo(4);
             assertThat(metadata.getDescription()).isEqualTo("In a bleak future, Bruce Wayne returns as Batman.");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(1986, 2, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(1986, Month.FEBRUARY, 1));
             assertThat(metadata.getAuthors()).containsExactly("Frank Miller");
             assertThat(metadata.getPublisher()).isEqualTo("DC Comics");
+        }
+
+        private void assertCategorizationAndIdentifiers(BookMetadata metadata) {
             assertThat(metadata.getCategories()).containsExactlyInAnyOrder("Superhero", "Action", "Drama");
             assertThat(metadata.getTags()).containsExactlyInAnyOrder("dark", "classic");
             assertThat(metadata.getPageCount()).isEqualTo(48);
@@ -1159,8 +1138,9 @@ class CbxMetadataExtractorTest {
             assertThat(metadata.getMoods()).containsExactlyInAnyOrder("dark", "intense", "brooding");
             assertThat(metadata.getIsbn10()).isEqualTo("1563893428");
             assertThat(metadata.getGoodreadsId()).isEqualTo("59960");
+        }
 
-            ComicMetadata comic = metadata.getComicMetadata();
+        private void assertComicMetadata(ComicMetadata comic) {
             assertThat(comic).isNotNull();
             assertThat(comic.getIssueNumber()).isEqualTo("1");
             assertThat(comic.getVolumeName()).isEqualTo("Batman");

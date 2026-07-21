@@ -16,6 +16,7 @@ import org.grimmory.epub4j.domain.*;
 import org.grimmory.epub4j.epub.CoverDetector;
 import org.grimmory.epub4j.epub.EpubReader;
 import org.grimmory.epub4j.native_parsing.NativeArchive;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -36,9 +37,9 @@ public class EpubReaderService {
     private static final int MAX_CACHE_ENTRIES = 50;
 
     private static final Map<String, String> CONTENT_TYPE_MAP = Map.ofEntries(
-            Map.entry(".xhtml", "application/xhtml+xml"),
-            Map.entry(".html", "application/xhtml+xml"),
-            Map.entry(".htm", "application/xhtml+xml"),
+            Map.entry(".xhtml", MediaType.APPLICATION_XHTML_XML_VALUE),
+            Map.entry(".html", MediaType.APPLICATION_XHTML_XML_VALUE),
+            Map.entry(".htm", MediaType.APPLICATION_XHTML_XML_VALUE),
             Map.entry(".css", "text/css"),
             Map.entry(".js", "application/javascript"),
             Map.entry(".jpg", "image/jpeg"),
@@ -82,7 +83,7 @@ public class EpubReaderService {
         }
 
         private static Set<String> buildValidPaths(EpubBookInfo bookInfo) {
-            Set<String> paths = new HashSet<>(bookInfo.getManifest().size() + 2);
+            Set<String> paths = HashSet.newHashSet(bookInfo.getManifest().size() + 2);
             paths.add(CONTAINER_PATH);
             if (bookInfo.getContainerPath() != null) {
                 paths.add(bookInfo.getContainerPath());
@@ -94,7 +95,7 @@ public class EpubReaderService {
         }
 
         private static Map<String, EpubManifestItem> buildManifestByHref(EpubBookInfo bookInfo) {
-            Map<String, EpubManifestItem> byHref = new HashMap<>(bookInfo.getManifest().size());
+            Map<String, EpubManifestItem> byHref = HashMap.newHashMap(bookInfo.getManifest().size());
             for (EpubManifestItem item : bookInfo.getManifest()) {
                 byHref.put(item.getHref(), item);
             }
@@ -284,15 +285,7 @@ public class EpubReaderService {
         String title = md.getFirstTitle();
         if (title != null && !title.isEmpty()) metadata.put("title", title);
 
-        List<Author> authors = md.getAuthors();
-        if (authors != null && !authors.isEmpty()) {
-            Author first = authors.getFirst();
-            String name = first.getFirstname();
-            if (first.getLastname() != null && !first.getLastname().isEmpty()) {
-                name = (name != null && !name.isEmpty()) ? name + " " + first.getLastname() : first.getLastname();
-            }
-            if (name != null && !name.isEmpty()) metadata.put("creator", name);
-        }
+        putCreator(metadata, md.getAuthors());
 
         String language = md.getLanguage();
         if (language != null && !language.isEmpty()) metadata.put("language", language);
@@ -306,6 +299,24 @@ public class EpubReaderService {
         List<String> descriptions = md.getDescriptions();
         if (descriptions != null && !descriptions.isEmpty()) metadata.put("description", descriptions.getFirst());
 
+        putRenditionProperties(metadata, md, book);
+
+        return metadata;
+    }
+
+    private void putCreator(Map<String, Object> metadata, List<Author> authors) {
+        if (authors == null || authors.isEmpty()) {
+            return;
+        }
+        Author first = authors.getFirst();
+        String name = first.getFirstname();
+        if (first.getLastname() != null && !first.getLastname().isEmpty()) {
+            name = (name != null && !name.isEmpty()) ? name + " " + first.getLastname() : first.getLastname();
+        }
+        if (name != null && !name.isEmpty()) metadata.put("creator", name);
+    }
+
+    private void putRenditionProperties(Map<String, Object> metadata, Metadata md, Book book) {
         // EPUB3 rendition properties
         if (md.getRenditionLayout() != null) metadata.put("rendition:layout", md.getRenditionLayout());
         if (md.getRenditionOrientation() != null) metadata.put("rendition:orientation", md.getRenditionOrientation());
@@ -315,8 +326,6 @@ public class EpubReaderService {
         // Page progression direction from spine
         String ppd = book.getSpine().getPageProgressionDirection();
         if (ppd != null && !ppd.isEmpty()) metadata.put("page-progression-direction", ppd);
-
-        return metadata;
     }
 
     private EpubTocItem mapToc(TableOfContents toc, String rootPath) {
@@ -386,12 +395,12 @@ public class EpubReaderService {
     }
 
     private String guessContentType(String path) {
-        if (path == null) return "application/octet-stream";
+        if (path == null) return MediaType.APPLICATION_OCTET_STREAM_VALUE;
 
         int lastDot = path.lastIndexOf('.');
-        if (lastDot < 0) return "application/octet-stream";
+        if (lastDot < 0) return MediaType.APPLICATION_OCTET_STREAM_VALUE;
 
         String extension = path.substring(lastDot).toLowerCase();
-        return CONTENT_TYPE_MAP.getOrDefault(extension, "application/octet-stream");
+        return CONTENT_TYPE_MAP.getOrDefault(extension, MediaType.APPLICATION_OCTET_STREAM_VALUE);
     }
 }

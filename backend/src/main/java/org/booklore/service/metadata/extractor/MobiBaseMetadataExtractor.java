@@ -10,6 +10,7 @@ import java.io.RandomAccessFile;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -43,6 +44,7 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
      * without a cover: both used to return the same {@code null} as a book that simply has no cover
      * record, so a truncated {@code .mobi} was indistinguishable from a coverless one.
      */
+    @SuppressWarnings("java:S1168") // null (not empty array) means "proven no cover"; BookCoverGenerator/BookdropMetadataService branch on == null
     public byte[] extractCover(File file) {
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
             PalmDB palmDB = readPalmDB(raf);
@@ -111,42 +113,11 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
 
             // Extract metadata from EXTH records
             for (var entry : mobiHeader.exthData.entrySet()) {
-                int recordType = entry.getKey();
                 String value = entry.getValue();
-
                 if (StringUtils.isBlank(value)) {
                     continue;
                 }
-
-                switch (recordType) {
-                    case EXTH_AUTHOR -> authors.add(value.trim());
-                    case EXTH_PUBLISHER -> builder.publisher(value.trim());
-                    case EXTH_DESCRIPTION -> builder.description(value.trim());
-                    case EXTH_ISBN -> {
-                        String isbn = ISBN_INVALID_CHARS_PATTERN.matcher(value).replaceAll("");
-                        if (isbn.length() == 13) {
-                            builder.isbn13(isbn);
-                        } else if (isbn.length() == 10) {
-                            builder.isbn10(isbn);
-                        }
-                    }
-                    case EXTH_SUBJECT -> {
-                        for (String category : CATEGORY_SEPARATOR_PATTERN.split(value)) {
-                            String trimmed = category.trim();
-                            if (StringUtils.isNotBlank(trimmed)) {
-                                categories.add(trimmed);
-                            }
-                        }
-                    }
-                    case EXTH_PUBLISHED_DATE -> {
-                        LocalDate date = parseDate(value.trim());
-                        if (date != null) {
-                            builder.publishedDate(date);
-                        }
-                    }
-                    case EXTH_LANGUAGE -> builder.language(value.trim());
-                    case EXTH_ASIN -> builder.asin(value.trim());
-                }
+                applyExthRecord(builder, authors, categories, entry.getKey(), value);
             }
 
             builder.authors(authors);
@@ -156,6 +127,44 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         } catch (Exception e) {
             log.error("Failed to extract metadata from {}: {}", getFormatName(), file.getName(), e);
             return null;
+        }
+    }
+
+    private void applyExthRecord(BookMetadata.BookMetadataBuilder builder, List<String> authors,
+                                 Set<String> categories, int recordType, String value) {
+        switch (recordType) {
+            case EXTH_AUTHOR -> authors.add(value.trim());
+            case EXTH_PUBLISHER -> builder.publisher(value.trim());
+            case EXTH_DESCRIPTION -> builder.description(value.trim());
+            case EXTH_ISBN -> applyIsbn(builder, value);
+            case EXTH_SUBJECT -> addCategories(categories, value);
+            case EXTH_PUBLISHED_DATE -> {
+                LocalDate date = parseDate(value.trim());
+                if (date != null) {
+                    builder.publishedDate(date);
+                }
+            }
+            case EXTH_LANGUAGE -> builder.language(value.trim());
+            case EXTH_ASIN -> builder.asin(value.trim());
+            default -> log.debug("Unhandled EXTH record type: {}", recordType);
+        }
+    }
+
+    private void applyIsbn(BookMetadata.BookMetadataBuilder builder, String value) {
+        String isbn = ISBN_INVALID_CHARS_PATTERN.matcher(value).replaceAll("");
+        if (isbn.length() == 13) {
+            builder.isbn13(isbn);
+        } else if (isbn.length() == 10) {
+            builder.isbn10(isbn);
+        }
+    }
+
+    private void addCategories(Set<String> categories, String value) {
+        for (String category : CATEGORY_SEPARATOR_PATTERN.split(value)) {
+            String trimmed = category.trim();
+            if (StringUtils.isNotBlank(trimmed)) {
+                categories.add(trimmed);
+            }
         }
     }
 
@@ -194,20 +203,20 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
         // Read record list
         raf.seek(78);
         for (int i = 0; i < palmDB.numRecords; i++) {
-            PalmDBRecord record = new PalmDBRecord();
-            record.offset = readInt(raf);
-            record.attributes = raf.read();
-            record.id = readThreeBytes(raf);
-            palmDB.records.add(record);
+            PalmDBRecord palmRecord = new PalmDBRecord();
+            palmRecord.offset = readInt(raf);
+            palmRecord.attributes = raf.read();
+            palmRecord.id = readThreeBytes(raf);
+            palmDB.records.add(palmRecord);
         }
 
         // Calculate record sizes
         for (int i = 0; i < palmDB.records.size(); i++) {
-            PalmDBRecord record = palmDB.records.get(i);
+            PalmDBRecord palmRecord = palmDB.records.get(i);
             if (i < palmDB.records.size() - 1) {
-                record.size = palmDB.records.get(i + 1).offset - record.offset;
+                palmRecord.size = palmDB.records.get(i + 1).offset - palmRecord.offset;
             } else {
-                record.size = (int) (raf.length() - record.offset);
+                palmRecord.size = (int) (raf.length() - palmRecord.offset);
             }
         }
 
@@ -336,36 +345,49 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
                 break;
             }
 
-            int dataLength = recordLength - 8;
-            byte[] data = new byte[dataLength];
+            byte[] data = new byte[recordLength - 8];
             raf.readFully(data);
 
-            if (recordType == EXTH_COVER_OFFSET || recordType == EXTH_THUMB_OFFSET) {
-                if (dataLength >= 4) {
-                    int value = ((data[0] & 0xFF) << 24) | ((data[1] & 0xFF) << 16) |
-                               ((data[2] & 0xFF) << 8) | (data[3] & 0xFF);
-                    header.exthRecords.put(recordType, value);
-                    log.debug("EXTH record {} (int): {}", recordType, value);
-                }
-            } else {
-                String value = new String(data, charset).trim();
-                value = value.replace("\0", "");
-                if (!value.isEmpty()) {
-                    header.exthData.put(recordType, value);
-                    log.debug("EXTH record {} (string): {}", recordType,
-                             value.length() > 100 ? value.substring(0, 100) + "..." : value);
-                }
-            }
+            storeExthRecord(header, charset, recordType, data);
         }
     }
 
-    protected byte[] extractImageFromRecord(RandomAccessFile raf, PalmDBRecord record) throws IOException {
-        if (record.size <= 0 || record.size > 10_000_000) {
+    private void storeExthRecord(MobiHeader header, Charset charset, int recordType, byte[] data) {
+        if (recordType == EXTH_COVER_OFFSET || recordType == EXTH_THUMB_OFFSET) {
+            storeExthIntRecord(header, recordType, data);
+        } else {
+            storeExthStringRecord(header, charset, recordType, data);
+        }
+    }
+
+    private void storeExthIntRecord(MobiHeader header, int recordType, byte[] data) {
+        if (data.length >= 4) {
+            int value = ((data[0] & 0xFF) << 24) | ((data[1] & 0xFF) << 16) |
+                       ((data[2] & 0xFF) << 8) | (data[3] & 0xFF);
+            header.exthRecords.put(recordType, value);
+            log.debug("EXTH record {} (int): {}", recordType, value);
+        }
+    }
+
+    private void storeExthStringRecord(MobiHeader header, Charset charset, int recordType, byte[] data) {
+        String value = new String(data, charset).trim();
+        value = value.replace("\0", "");
+        if (!value.isEmpty()) {
+            header.exthData.put(recordType, value);
+            log.debug("EXTH record {} (string): {}", recordType,
+                     value.length() > 100 ? value.substring(0, 100) + "..." : value);
+        }
+    }
+
+    // S1168: null (not empty array) flows straight through to extractCover's null-means-no-cover contract.
+    @SuppressWarnings("java:S1168")
+    protected byte[] extractImageFromRecord(RandomAccessFile raf, PalmDBRecord palmRecord) throws IOException {
+        if (palmRecord.size <= 0 || palmRecord.size > 10_000_000) {
             return null;
         }
 
-        raf.seek(record.offset);
-        byte[] data = new byte[record.size];
+        raf.seek(palmRecord.offset);
+        byte[] data = new byte[palmRecord.size];
         raf.readFully(data);
 
         // Check for image magic bytes
@@ -392,7 +414,7 @@ public abstract class MobiBaseMetadataExtractor implements FileMetadataExtractor
             }
 
             if (YEAR_ONLY_PATTERN.matcher(dateString).matches()) {
-                return LocalDate.of(Integer.parseInt(dateString), 1, 1);
+                return LocalDate.of(Integer.parseInt(dateString), Month.JANUARY, 1);
             }
 
             if (DATE_SLASH_FORMAT_PATTERN.matcher(dateString).matches()) {

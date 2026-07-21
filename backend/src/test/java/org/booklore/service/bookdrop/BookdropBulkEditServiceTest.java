@@ -34,7 +34,7 @@ class BookdropBulkEditServiceTest {
     @Captor
     private ArgumentCaptor<List<BookdropFileEntity>> filesCaptor;
 
-    private BookdropFileEntity createFileEntity(Long id, String fileName, BookMetadata metadata) {
+    private BookdropFileEntity createFileEntity(Long id, String fileName) {
         BookdropFileEntity entity = new BookdropFileEntity();
         entity.setId(id);
         entity.setFileName(fileName);
@@ -53,8 +53,8 @@ class BookdropBulkEditServiceTest {
         BookMetadata existingMetadata = new BookMetadata();
         existingMetadata.setSeriesName("Old Series");
         
-        BookdropFileEntity file1 = createFileEntity(1L, "file1.cbz", existingMetadata);
-        BookdropFileEntity file2 = createFileEntity(2L, "file2.cbz", existingMetadata);
+        BookdropFileEntity file1 = createFileEntity(1L, "file1.cbz");
+        BookdropFileEntity file2 = createFileEntity(2L, "file2.cbz");
 
         when(metadataHelper.resolveFileIds(false, null, List.of(1L, 2L)))
                 .thenReturn(List.of(1L, 2L));
@@ -92,7 +92,7 @@ class BookdropBulkEditServiceTest {
 
         when(metadataHelper.getCurrentMetadata(any())).thenReturn(existingMetadata);
         
-        BookdropFileEntity file = createFileEntity(1L, "file.cbz", existingMetadata);
+        BookdropFileEntity file = createFileEntity(1L, "file.cbz");
 
         when(metadataHelper.resolveFileIds(false, null, List.of(1L)))
                 .thenReturn(List.of(1L));
@@ -133,7 +133,7 @@ class BookdropBulkEditServiceTest {
 
         when(metadataHelper.getCurrentMetadata(any())).thenReturn(existingMetadata);
         
-        BookdropFileEntity file = createFileEntity(1L, "file.cbz", existingMetadata);
+        BookdropFileEntity file = createFileEntity(1L, "file.cbz");
 
         when(metadataHelper.resolveFileIds(false, null, List.of(1L)))
                 .thenReturn(List.of(1L));
@@ -169,7 +169,7 @@ class BookdropBulkEditServiceTest {
 
         when(metadataHelper.getCurrentMetadata(any())).thenReturn(existingMetadata);
         
-        BookdropFileEntity file = createFileEntity(1L, "file.cbz", existingMetadata);
+        BookdropFileEntity file = createFileEntity(1L, "file.cbz");
 
         when(metadataHelper.resolveFileIds(false, null, List.of(1L)))
                 .thenReturn(List.of(1L));
@@ -199,8 +199,8 @@ class BookdropBulkEditServiceTest {
 
     @Test
     void bulkEdit_WithSelectAll_ShouldProcessAllFiles() {
-        BookdropFileEntity file1 = createFileEntity(1L, "file1.cbz", new BookMetadata());
-        BookdropFileEntity file3 = createFileEntity(3L, "file3.cbz", new BookMetadata());
+        BookdropFileEntity file1 = createFileEntity(1L, "file1.cbz");
+        BookdropFileEntity file3 = createFileEntity(3L, "file3.cbz");
 
         when(metadataHelper.resolveFileIds(true, List.of(2L), null))
                 .thenReturn(List.of(1L, 3L));
@@ -226,9 +226,9 @@ class BookdropBulkEditServiceTest {
 
     @Test
     void bulkEdit_WithOneFileError_ShouldContinueWithOthers() {
-        BookdropFileEntity file1 = createFileEntity(1L, "file1.cbz", new BookMetadata());
-        BookdropFileEntity file2 = createFileEntity(2L, "file2.cbz", new BookMetadata());
-        BookdropFileEntity file3 = createFileEntity(3L, "file3.cbz", new BookMetadata());
+        BookdropFileEntity file1 = createFileEntity(1L, "file1.cbz");
+        BookdropFileEntity file2 = createFileEntity(2L, "file2.cbz");
+        BookdropFileEntity file3 = createFileEntity(3L, "file3.cbz");
 
         when(metadataHelper.resolveFileIds(false, null, List.of(1L, 2L, 3L)))
                 .thenReturn(List.of(1L, 2L, 3L));
@@ -264,7 +264,7 @@ class BookdropBulkEditServiceTest {
 
     @Test
     void bulkEdit_WithEmptyEnabledFields_ShouldNotUpdateAnything() {
-        BookdropFileEntity file = createFileEntity(1L, "file.cbz", new BookMetadata());
+        BookdropFileEntity file = createFileEntity(1L, "file.cbz");
 
         when(metadataHelper.resolveFileIds(false, null, List.of(1L)))
                 .thenReturn(List.of(1L));
@@ -300,7 +300,7 @@ class BookdropBulkEditServiceTest {
         
         for (long i = 1; i <= 1500; i++) {
             manyIds.add(i);
-            BookdropFileEntity file = createFileEntity(i, "file" + i + ".cbz", new BookMetadata());
+            BookdropFileEntity file = createFileEntity(i, "file" + i + ".cbz");
             if (i <= 500) {
                 batch1.add(file);
             } else if (i <= 1000) {

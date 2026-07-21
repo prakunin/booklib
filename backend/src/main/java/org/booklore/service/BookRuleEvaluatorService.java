@@ -21,11 +21,26 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 @Slf4j
 @Service
 @AllArgsConstructor
 public class BookRuleEvaluatorService {
+
+    private static final String FIELD_USER_BOOK_PROGRESS = "userBookProgress";
+    private static final String FIELD_READ_STATUS = "readStatus";
+    private static final String FIELD_METADATA = "metadata";
+    private static final String FIELD_SERIES_NAME = "seriesName";
+    private static final String FIELD_SERIES_NUMBER = "seriesNumber";
+    private static final String FIELD_SERIES_TOTAL = "seriesTotal";
+    private static final String FIELD_PERSONAL_RATING = "personalRating";
+    private static final String FIELD_AUTHORS = "authors";
+    private static final String FIELD_CATEGORIES = "categories";
+    private static final String FIELD_MOODS = "moods";
+    private static final String FIELD_BOOK_FILES = "bookFiles";
+    private static final String FUNCTION_FLOOR = "FLOOR";
+    private static final String READ_STATUS_UNSET = "UNSET";
 
     private final ObjectMapper objectMapper;
 
@@ -40,7 +55,7 @@ public class BookRuleEvaluatorService {
             // content reflect unique BookEntity results.
             query.distinct(true);
 
-            Join<BookEntity, UserBookProgressEntity> progressJoin = root.join("userBookProgress", JoinType.LEFT);
+            Join<BookEntity, UserBookProgressEntity> progressJoin = root.join(FIELD_USER_BOOK_PROGRESS, JoinType.LEFT);
 
             Predicate userPredicate = cb.or(
                     cb.isNull(progressJoin.get("user").get("id")),
@@ -61,26 +76,7 @@ public class BookRuleEvaluatorService {
         List<Predicate> predicates = new ArrayList<>();
 
         for (Object ruleObj : group.getRules()) {
-            if (ruleObj == null) continue;
-
-            Map<String, Object> ruleMap = objectMapper.convertValue(ruleObj, new TypeReference<>() {
-            });
-            String type = (String) ruleMap.get("type");
-
-            if ("group".equals(type)) {
-                GroupRule subGroup = objectMapper.convertValue(ruleObj, GroupRule.class);
-                predicates.add(buildPredicate(subGroup, query, cb, root, progressJoin, userId));
-            } else {
-                try {
-                    Rule rule = objectMapper.convertValue(ruleObj, Rule.class);
-                    Predicate rulePredicate = buildRulePredicate(rule, query, cb, root, progressJoin, userId);
-                    if (rulePredicate != null) {
-                        predicates.add(rulePredicate);
-                    }
-                } catch (Exception e) {
-                    log.error("Failed to parse rule: {}, error: {}", ruleObj, e.getMessage(), e);
-                }
-            }
+            addRulePredicate(ruleObj, predicates, query, cb, root, progressJoin, userId);
         }
 
         if (predicates.isEmpty()) {
@@ -90,6 +86,29 @@ public class BookRuleEvaluatorService {
         return group.getJoin() == org.booklore.model.dto.JoinType.AND
                 ? cb.and(predicates.toArray(Predicate[]::new))
                 : cb.or(predicates.toArray(Predicate[]::new));
+    }
+
+    private void addRulePredicate(Object ruleObj, List<Predicate> predicates, CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, Join<BookEntity, UserBookProgressEntity> progressJoin, Long userId) {
+        if (ruleObj == null) return;
+
+        Map<String, Object> ruleMap = objectMapper.convertValue(ruleObj, new TypeReference<>() {
+        });
+        String type = (String) ruleMap.get("type");
+
+        if ("group".equals(type)) {
+            GroupRule subGroup = objectMapper.convertValue(ruleObj, GroupRule.class);
+            predicates.add(buildPredicate(subGroup, query, cb, root, progressJoin, userId));
+        } else {
+            try {
+                Rule rule = objectMapper.convertValue(ruleObj, Rule.class);
+                Predicate rulePredicate = buildRulePredicate(rule, query, cb, root, progressJoin, userId);
+                if (rulePredicate != null) {
+                    predicates.add(rulePredicate);
+                }
+            } catch (Exception e) {
+                log.error("Failed to parse rule: {}, error: {}", ruleObj, e.getMessage(), e);
+            }
+        }
     }
 
     private Predicate buildRulePredicate(Rule rule, CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, Join<BookEntity, UserBookProgressEntity> progressJoin, Long userId) {
@@ -110,7 +129,7 @@ public class BookRuleEvaluatorService {
             case DOES_NOT_CONTAIN -> {
                 Predicate notContains = cb.not(buildContains(rule, query, cb, root, progressJoin));
                 if (rule.getField() == RuleField.READ_STATUS) {
-                    yield cb.or(cb.isNull(progressJoin.get("readStatus")), notContains);
+                    yield cb.or(cb.isNull(progressJoin.get(FIELD_READ_STATUS)), notContains);
                 }
                 yield notContains;
             }
@@ -165,7 +184,7 @@ public class BookRuleEvaluatorService {
         if (field == null) return cb.conjunction();
 
         String period = rule.getValue() != null ? rule.getValue().toString().toLowerCase() : "year";
-        LocalDate now = LocalDate.now();
+        LocalDate now = LocalDate.now(ZoneId.systemDefault());
         LocalDate start = switch (period) {
             case "week" -> now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
             case "month" -> now.withDayOfMonth(1);
@@ -193,7 +212,7 @@ public class BookRuleEvaluatorService {
             }
         }
         String unit = rule.getValueEnd() != null ? rule.getValueEnd().toString().toLowerCase() : "days";
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
         LocalDateTime threshold = switch (unit) {
             case "weeks" -> now.minusWeeks(amount);
             case "months" -> now.minusMonths(amount);
@@ -207,8 +226,8 @@ public class BookRuleEvaluatorService {
         boolean negate = rule.getOperator() == RuleOperator.NOT_EQUALS;
         String value = rule.getValue() != null ? rule.getValue().toString().toLowerCase() : "";
         Predicate hasSeries = cb.and(
-                cb.isNotNull(root.get("metadata").get("seriesName")),
-                cb.notEqual(cb.trim(root.get("metadata").get("seriesName").as(String.class)), "")
+                cb.isNotNull(root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.notEqual(cb.trim(root.get(FIELD_METADATA).get(FIELD_SERIES_NAME).as(String.class)), "")
         );
 
         Predicate result = switch (rule.getField()) {
@@ -234,7 +253,7 @@ public class BookRuleEvaluatorService {
             case "thumbnailUrl" -> cb.isNotNull(root.get("bookCoverHash"));
 
             // Personal rating — on progress join
-            case "personalRating" -> cb.isNotNull(progressJoin.get("personalRating"));
+            case FIELD_PERSONAL_RATING -> cb.isNotNull(progressJoin.get(FIELD_PERSONAL_RATING));
 
             // Audiobook duration — on BookFileEntity
             case "audiobookDuration" -> {
@@ -248,9 +267,9 @@ public class BookRuleEvaluatorService {
             }
 
             // Collection fields on BookMetadataEntity
-            case "authors" -> collectionPresence(query, cb, root, "authors");
-            case "categories" -> collectionPresence(query, cb, root, "categories");
-            case "moods" -> collectionPresence(query, cb, root, "moods");
+            case FIELD_AUTHORS -> collectionPresence(query, cb, root, FIELD_AUTHORS);
+            case FIELD_CATEGORIES -> collectionPresence(query, cb, root, FIELD_CATEGORIES);
+            case FIELD_MOODS -> collectionPresence(query, cb, root, FIELD_MOODS);
             case "tags" -> collectionPresence(query, cb, root, "tags");
 
             // Comic collection fields
@@ -267,18 +286,18 @@ public class BookRuleEvaluatorService {
             case "comicEditors" -> comicCreatorPresence(query, cb, root, ComicCreatorRole.EDITOR);
 
             // String fields on BookMetadataEntity
-            case "title", "subtitle", "description", "publisher", "language", "seriesName",
+            case "title", "subtitle", "description", "publisher", "language", FIELD_SERIES_NAME,
                  "isbn13", "isbn10", "asin", "contentRating", "narrator",
                  "goodreadsId", "hardcoverId", "googleId", "audibleId",
                  "lubimyczytacId", "ranobedbId", "comicvineId" ->
-                    stringPresence(cb, root.get("metadata").get(metadataField));
+                    stringPresence(cb, root.get(FIELD_METADATA).get(metadataField));
 
             // Numeric/date/boolean fields on BookMetadataEntity
-            case "pageCount", "seriesNumber", "seriesTotal", "ageRating", "publishedDate", "abridged",
+            case "pageCount", FIELD_SERIES_NUMBER, FIELD_SERIES_TOTAL, "ageRating", "publishedDate", "abridged",
                  "amazonRating", "goodreadsRating", "hardcoverRating", "ranobedbRating",
                  "lubimyczytacRating", "audibleRating",
                  "amazonReviewCount", "goodreadsReviewCount", "hardcoverReviewCount", "audibleReviewCount" ->
-                    cb.isNotNull(root.get("metadata").get(metadataField));
+                    cb.isNotNull(root.get(FIELD_METADATA).get(metadataField));
 
             default -> cb.conjunction();
         };
@@ -291,7 +310,7 @@ public class BookRuleEvaluatorService {
     private Predicate collectionPresence(CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, String collectionName) {
         Subquery<Long> sub = query.subquery(Long.class);
         Root<BookEntity> subRoot = sub.from(BookEntity.class);
-        Join<Object, Object> metadataJoin = subRoot.join("metadata", JoinType.INNER);
+        Join<Object, Object> metadataJoin = subRoot.join(FIELD_METADATA, JoinType.INNER);
         metadataJoin.join(collectionName, JoinType.INNER);
         sub.select(cb.literal(1L)).where(cb.equal(subRoot.get("id"), root.get("id")));
         return cb.exists(sub);
@@ -300,7 +319,7 @@ public class BookRuleEvaluatorService {
     private Predicate comicCollectionPresence(CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, String collectionName) {
         Subquery<Long> sub = query.subquery(Long.class);
         Root<BookEntity> subRoot = sub.from(BookEntity.class);
-        Join<Object, Object> metadataJoin = subRoot.join("metadata", JoinType.INNER);
+        Join<Object, Object> metadataJoin = subRoot.join(FIELD_METADATA, JoinType.INNER);
         Join<Object, Object> comicJoin = metadataJoin.join("comicMetadata", JoinType.INNER);
         comicJoin.join(collectionName, JoinType.INNER);
         sub.select(cb.literal(1L)).where(cb.equal(subRoot.get("id"), root.get("id")));
@@ -332,16 +351,16 @@ public class BookRuleEvaluatorService {
     private Predicate seriesHasReadStatus(CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, Long userId, List<String> statuses) {
         Subquery<Long> sub = query.subquery(Long.class);
         Root<BookEntity> subRoot = sub.from(BookEntity.class);
-        Join<Object, Object> subProgress = subRoot.join("userBookProgress", JoinType.INNER);
+        Join<Object, Object> subProgress = subRoot.join(FIELD_USER_BOOK_PROGRESS, JoinType.INNER);
 
         List<ReadStatus> readStatuses = statuses.stream()
                 .map(ReadStatus::valueOf)
                 .toList();
 
         sub.select(cb.literal(1L)).where(
-                cb.equal(subRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
+                cb.equal(subRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
                 cb.equal(subProgress.get("user").get("id"), userId),
-                subProgress.get("readStatus").in(readStatuses)
+                subProgress.get(FIELD_READ_STATUS).in(readStatuses)
         );
         return cb.exists(sub);
     }
@@ -349,11 +368,11 @@ public class BookRuleEvaluatorService {
     private Predicate seriesAllRead(CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, Long userId) {
         Subquery<Long> notReadSub = query.subquery(Long.class);
         Root<BookEntity> nrRoot = notReadSub.from(BookEntity.class);
-        Join<Object, Object> nrProgress = nrRoot.join("userBookProgress", JoinType.INNER);
+        Join<Object, Object> nrProgress = nrRoot.join(FIELD_USER_BOOK_PROGRESS, JoinType.INNER);
         notReadSub.select(cb.literal(1L)).where(
-                cb.equal(nrRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
+                cb.equal(nrRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
                 cb.equal(nrProgress.get("user").get("id"), userId),
-                cb.notEqual(nrProgress.get("readStatus"), ReadStatus.READ)
+                cb.notEqual(nrProgress.get(FIELD_READ_STATUS), ReadStatus.READ)
         );
 
         return cb.and(
@@ -365,17 +384,17 @@ public class BookRuleEvaluatorService {
     private Predicate seriesOwnsLastBook(CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root) {
         Subquery<Integer> totalSub = query.subquery(Integer.class);
         Root<BookEntity> totalRoot = totalSub.from(BookEntity.class);
-        totalSub.select(cb.max(totalRoot.get("metadata").get("seriesTotal"))).where(
-                cb.equal(totalRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(totalRoot.get("metadata").get("seriesTotal"))
+        totalSub.select(cb.max(totalRoot.get(FIELD_METADATA).get(FIELD_SERIES_TOTAL))).where(
+                cb.equal(totalRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(totalRoot.get(FIELD_METADATA).get(FIELD_SERIES_TOTAL))
         );
 
         Subquery<Long> existsSub = query.subquery(Long.class);
         Root<BookEntity> subRoot = existsSub.from(BookEntity.class);
         existsSub.select(cb.literal(1L)).where(
-                cb.equal(subRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
+                cb.equal(subRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
                 cb.equal(
-                        cb.function("FLOOR", Integer.class, subRoot.get("metadata").get("seriesNumber")),
+                        cb.function(FUNCTION_FLOOR, Integer.class, subRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER)),
                         totalSub
                 )
         );
@@ -386,8 +405,8 @@ public class BookRuleEvaluatorService {
         Subquery<Long> sub = query.subquery(Long.class);
         Root<BookEntity> subRoot = sub.from(BookEntity.class);
         sub.select(cb.literal(1L)).where(
-                cb.equal(subRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(subRoot.get("metadata").get("seriesTotal"))
+                cb.equal(subRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(subRoot.get(FIELD_METADATA).get(FIELD_SERIES_TOTAL))
         );
         return cb.exists(sub);
     }
@@ -406,16 +425,16 @@ public class BookRuleEvaluatorService {
     private Predicate seriesHasAnyGap(CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root) {
         Subquery<Long> countSub = query.subquery(Long.class);
         Root<BookEntity> cRoot = countSub.from(BookEntity.class);
-        countSub.select(cb.countDistinct(cb.function("FLOOR", Integer.class, cRoot.get("metadata").get("seriesNumber")))).where(
-                cb.equal(cRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(cRoot.get("metadata").get("seriesNumber"))
+        countSub.select(cb.countDistinct(cb.function(FUNCTION_FLOOR, Integer.class, cRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER)))).where(
+                cb.equal(cRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(cRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER))
         );
 
         Subquery<Integer> maxSub = query.subquery(Integer.class);
         Root<BookEntity> mRoot = maxSub.from(BookEntity.class);
-        maxSub.select(cb.max(cb.function("FLOOR", Integer.class, mRoot.get("metadata").get("seriesNumber")))).where(
-                cb.equal(mRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(mRoot.get("metadata").get("seriesNumber"))
+        maxSub.select(cb.max(cb.function(FUNCTION_FLOOR, Integer.class, mRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER)))).where(
+                cb.equal(mRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(mRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER))
         );
 
         return cb.lt(countSub, maxSub.as(Long.class));
@@ -425,8 +444,8 @@ public class BookRuleEvaluatorService {
         Subquery<Long> sub = query.subquery(Long.class);
         Root<BookEntity> subRoot = sub.from(BookEntity.class);
         sub.select(cb.literal(1L)).where(
-                cb.equal(subRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.equal(cb.function("FLOOR", Integer.class, subRoot.get("metadata").get("seriesNumber")), 1)
+                cb.equal(subRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.equal(cb.function(FUNCTION_FLOOR, Integer.class, subRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER)), 1)
         );
         return cb.not(cb.exists(sub));
     }
@@ -435,22 +454,22 @@ public class BookRuleEvaluatorService {
         Subquery<Long> totalSub = query.subquery(Long.class);
         Root<BookEntity> tRoot = totalSub.from(BookEntity.class);
         totalSub.select(cb.count(tRoot)).where(
-                cb.equal(tRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(tRoot.get("metadata").get("seriesNumber"))
+                cb.equal(tRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(tRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER))
         );
 
         Subquery<Long> distinctSub = query.subquery(Long.class);
         Root<BookEntity> dRoot = distinctSub.from(BookEntity.class);
-        distinctSub.select(cb.countDistinct(dRoot.get("metadata").get("seriesNumber"))).where(
-                cb.equal(dRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(dRoot.get("metadata").get("seriesNumber"))
+        distinctSub.select(cb.countDistinct(dRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER))).where(
+                cb.equal(dRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(dRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER))
         );
 
         return cb.gt(totalSub, distinctSub);
     }
 
     private Predicate buildSeriesPositionPredicate(String value, CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, Join<BookEntity, UserBookProgressEntity> progressJoin, Predicate hasSeries, Long userId) {
-        Predicate hasNumber = cb.isNotNull(root.get("metadata").get("seriesNumber"));
+        Predicate hasNumber = cb.isNotNull(root.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER));
         Predicate condition = switch (value) {
             case "next_unread" -> isNextUnread(query, cb, root, progressJoin, userId);
             case "first_in_series" -> isFirstInSeries(query, cb, root);
@@ -463,39 +482,39 @@ public class BookRuleEvaluatorService {
     private Predicate isFirstInSeries(CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root) {
         Subquery<Float> minSub = query.subquery(Float.class);
         Root<BookEntity> mRoot = minSub.from(BookEntity.class);
-        minSub.select(cb.min(mRoot.get("metadata").get("seriesNumber"))).where(
-                cb.equal(mRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(mRoot.get("metadata").get("seriesNumber"))
+        minSub.select(cb.min(mRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER))).where(
+                cb.equal(mRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(mRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER))
         );
-        return cb.equal(root.get("metadata").get("seriesNumber"), minSub);
+        return cb.equal(root.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER), minSub);
     }
 
     private Predicate isLastInSeries(CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root) {
         Subquery<Float> maxSub = query.subquery(Float.class);
         Root<BookEntity> mRoot = maxSub.from(BookEntity.class);
-        maxSub.select(cb.max(mRoot.get("metadata").get("seriesNumber"))).where(
-                cb.equal(mRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(mRoot.get("metadata").get("seriesNumber"))
+        maxSub.select(cb.max(mRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER))).where(
+                cb.equal(mRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(mRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER))
         );
-        return cb.equal(root.get("metadata").get("seriesNumber"), maxSub);
+        return cb.equal(root.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER), maxSub);
     }
 
     private Predicate isNextUnread(CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, Join<BookEntity, UserBookProgressEntity> progressJoin, Long userId) {
         Predicate notRead = cb.or(
-                cb.isNull(progressJoin.get("readStatus")),
-                cb.notEqual(progressJoin.get("readStatus"), ReadStatus.READ)
+                cb.isNull(progressJoin.get(FIELD_READ_STATUS)),
+                cb.notEqual(progressJoin.get(FIELD_READ_STATUS), ReadStatus.READ)
         );
 
         Subquery<Long> lowerUnreadSub = query.subquery(Long.class);
         Root<BookEntity> luRoot = lowerUnreadSub.from(BookEntity.class);
-        Join<Object, Object> luProgress = luRoot.join("userBookProgress", JoinType.LEFT);
+        Join<Object, Object> luProgress = luRoot.join(FIELD_USER_BOOK_PROGRESS, JoinType.LEFT);
         lowerUnreadSub.select(cb.literal(1L)).where(
-                cb.equal(luRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(luRoot.get("metadata").get("seriesNumber")),
-                cb.lt(luRoot.get("metadata").get("seriesNumber"), root.get("metadata").get("seriesNumber")),
+                cb.equal(luRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(luRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER)),
+                cb.lt(luRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER), root.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER)),
                 cb.or(
-                        cb.isNull(luProgress.get("readStatus")),
-                        cb.notEqual(luProgress.get("readStatus"), ReadStatus.READ)
+                        cb.isNull(luProgress.get(FIELD_READ_STATUS)),
+                        cb.notEqual(luProgress.get(FIELD_READ_STATUS), ReadStatus.READ)
                 ),
                 cb.or(
                         cb.isNull(luProgress.get("user").get("id")),
@@ -506,13 +525,13 @@ public class BookRuleEvaluatorService {
 
         Subquery<Long> priorReadSub = query.subquery(Long.class);
         Root<BookEntity> prRoot = priorReadSub.from(BookEntity.class);
-        Join<Object, Object> prProgress = prRoot.join("userBookProgress", JoinType.INNER);
+        Join<Object, Object> prProgress = prRoot.join(FIELD_USER_BOOK_PROGRESS, JoinType.INNER);
         priorReadSub.select(cb.literal(1L)).where(
-                cb.equal(prRoot.get("metadata").get("seriesName"), root.get("metadata").get("seriesName")),
-                cb.isNotNull(prRoot.get("metadata").get("seriesNumber")),
-                cb.lt(prRoot.get("metadata").get("seriesNumber"), root.get("metadata").get("seriesNumber")),
+                cb.equal(prRoot.get(FIELD_METADATA).get(FIELD_SERIES_NAME), root.get(FIELD_METADATA).get(FIELD_SERIES_NAME)),
+                cb.isNotNull(prRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER)),
+                cb.lt(prRoot.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER), root.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER)),
                 cb.equal(prProgress.get("user").get("id"), userId),
-                cb.equal(prProgress.get("readStatus"), ReadStatus.READ)
+                cb.equal(prProgress.get(FIELD_READ_STATUS), ReadStatus.READ)
         );
         Predicate hasPriorRead = cb.exists(priorReadSub);
 
@@ -539,7 +558,7 @@ public class BookRuleEvaluatorService {
         } else if (value instanceof LocalDateTime) {
             return cb.equal(field, value);
         } else if (rule.getField() == RuleField.READ_STATUS) {
-            if ("UNSET".equals(value.toString())) {
+            if (READ_STATUS_UNSET.equals(value.toString())) {
                 return cb.isNull(field);
             }
             ReadStatus status = ReadStatus.valueOf(value.toString());
@@ -552,8 +571,8 @@ public class BookRuleEvaluatorService {
 
     private Predicate buildNotEquals(Rule rule, CriteriaQuery<?> query, CriteriaBuilder cb, Root<BookEntity> root, Join<BookEntity, UserBookProgressEntity> progressJoin) {
         Predicate negated = cb.not(buildEquals(rule, query, cb, root, progressJoin));
-        if (rule.getField() == RuleField.READ_STATUS && !"UNSET".equals(String.valueOf(rule.getValue()))) {
-            return cb.or(cb.isNull(progressJoin.get("readStatus")), negated);
+        if (rule.getField() == RuleField.READ_STATUS && !READ_STATUS_UNSET.equals(String.valueOf(rule.getValue()))) {
+            return cb.or(cb.isNull(progressJoin.get(FIELD_READ_STATUS)), negated);
         }
         return negated;
     }
@@ -680,7 +699,7 @@ public class BookRuleEvaluatorService {
             if (rule.getField() == RuleField.SHELF) {
                 subRoot.join("shelves", JoinType.INNER);
             } else {
-                Join<Object, Object> metadataJoin = subRoot.join("metadata", JoinType.INNER);
+                Join<Object, Object> metadataJoin = subRoot.join(FIELD_METADATA, JoinType.INNER);
                 joinArrayField(rule.getField(), metadataJoin);
             }
 
@@ -713,8 +732,8 @@ public class BookRuleEvaluatorService {
         }
 
         Predicate negated = cb.not(buildFieldInPredicate(rule.getField(), field -> field, ruleList, cb, root, progressJoin));
-        if (rule.getField() == RuleField.READ_STATUS && ruleList.stream().noneMatch("UNSET"::equals)) {
-            return cb.or(cb.isNull(progressJoin.get("readStatus")), negated);
+        if (rule.getField() == RuleField.READ_STATUS && ruleList.stream().noneMatch(READ_STATUS_UNSET::equals)) {
+            return cb.or(cb.isNull(progressJoin.get(FIELD_READ_STATUS)), negated);
         }
         return negated;
     }
@@ -730,7 +749,7 @@ public class BookRuleEvaluatorService {
     }
 
     private Predicate buildFieldInPredicate(RuleField ruleField,
-                                            Function<Expression<?>, Expression<?>> fieldTransformer,
+                                            UnaryOperator<Expression<?>> fieldTransformer,
                                             List<String> ruleList,
                                             CriteriaBuilder cb,
                                             Root<BookEntity> root,
@@ -739,9 +758,9 @@ public class BookRuleEvaluatorService {
         if (field == null) return cb.conjunction();
 
         if (ruleField == RuleField.READ_STATUS) {
-            boolean hasUnset = ruleList.stream().anyMatch("UNSET"::equals);
+            boolean hasUnset = ruleList.stream().anyMatch(READ_STATUS_UNSET::equals);
             List<String> nonUnsetValues = ruleList.stream()
-                    .filter(v -> !"UNSET".equals(v))
+                    .filter(v -> !READ_STATUS_UNSET.equals(v))
                     .toList();
 
             List<ReadStatus> statuses = nonUnsetValues.stream()
@@ -768,43 +787,43 @@ public class BookRuleEvaluatorService {
         return switch (field) {
             case LIBRARY -> root.get("library").get("id");
             case SHELF -> null;
-            case READ_STATUS -> progressJoin.get("readStatus");
+            case READ_STATUS -> progressJoin.get(FIELD_READ_STATUS);
             case DATE_FINISHED -> progressJoin.get("dateFinished");
             case LAST_READ_TIME -> progressJoin.get("lastReadTime");
-            case PERSONAL_RATING -> progressJoin.get("personalRating");
-            case FILE_SIZE -> root.join("bookFiles", JoinType.LEFT).get("fileSizeKb");
+            case PERSONAL_RATING -> progressJoin.get(FIELD_PERSONAL_RATING);
+            case FILE_SIZE -> root.join(FIELD_BOOK_FILES, JoinType.LEFT).get("fileSizeKb");
             case METADATA_SCORE -> root.get("metadataMatchScore");
-            case TITLE -> root.get("metadata").get("title");
-            case SUBTITLE -> root.get("metadata").get("subtitle");
-            case PUBLISHER -> root.get("metadata").get("publisher");
-            case PUBLISHED_DATE -> root.get("metadata").get("publishedDate");
-            case PAGE_COUNT -> root.get("metadata").get("pageCount");
-            case LANGUAGE -> root.get("metadata").get("language");
-            case SERIES_NAME -> root.get("metadata").get("seriesName");
-            case SERIES_NUMBER -> root.get("metadata").get("seriesNumber");
-            case SERIES_TOTAL -> root.get("metadata").get("seriesTotal");
-            case ISBN13 -> root.get("metadata").get("isbn13");
-            case ISBN10 -> root.get("metadata").get("isbn10");
-            case AMAZON_RATING -> root.get("metadata").get("amazonRating");
-            case AMAZON_REVIEW_COUNT -> root.get("metadata").get("amazonReviewCount");
-            case GOODREADS_RATING -> root.get("metadata").get("goodreadsRating");
-            case GOODREADS_REVIEW_COUNT -> root.get("metadata").get("goodreadsReviewCount");
-            case HARDCOVER_RATING -> root.get("metadata").get("hardcoverRating");
-            case HARDCOVER_REVIEW_COUNT -> root.get("metadata").get("hardcoverReviewCount");
-            case RANOBEDB_RATING -> root.get("metadata").get("ranobedbRating");
-            case AGE_RATING -> root.get("metadata").get("ageRating");
-            case CONTENT_RATING -> root.get("metadata").get("contentRating");
+            case TITLE -> root.get(FIELD_METADATA).get("title");
+            case SUBTITLE -> root.get(FIELD_METADATA).get("subtitle");
+            case PUBLISHER -> root.get(FIELD_METADATA).get("publisher");
+            case PUBLISHED_DATE -> root.get(FIELD_METADATA).get("publishedDate");
+            case PAGE_COUNT -> root.get(FIELD_METADATA).get("pageCount");
+            case LANGUAGE -> root.get(FIELD_METADATA).get("language");
+            case SERIES_NAME -> root.get(FIELD_METADATA).get(FIELD_SERIES_NAME);
+            case SERIES_NUMBER -> root.get(FIELD_METADATA).get(FIELD_SERIES_NUMBER);
+            case SERIES_TOTAL -> root.get(FIELD_METADATA).get(FIELD_SERIES_TOTAL);
+            case ISBN13 -> root.get(FIELD_METADATA).get("isbn13");
+            case ISBN10 -> root.get(FIELD_METADATA).get("isbn10");
+            case AMAZON_RATING -> root.get(FIELD_METADATA).get("amazonRating");
+            case AMAZON_REVIEW_COUNT -> root.get(FIELD_METADATA).get("amazonReviewCount");
+            case GOODREADS_RATING -> root.get(FIELD_METADATA).get("goodreadsRating");
+            case GOODREADS_REVIEW_COUNT -> root.get(FIELD_METADATA).get("goodreadsReviewCount");
+            case HARDCOVER_RATING -> root.get(FIELD_METADATA).get("hardcoverRating");
+            case HARDCOVER_REVIEW_COUNT -> root.get(FIELD_METADATA).get("hardcoverReviewCount");
+            case RANOBEDB_RATING -> root.get(FIELD_METADATA).get("ranobedbRating");
+            case AGE_RATING -> root.get(FIELD_METADATA).get("ageRating");
+            case CONTENT_RATING -> root.get(FIELD_METADATA).get("contentRating");
             case ADDED_ON -> root.get("addedOn");
-            case LUBIMYCZYTAC_RATING -> root.get("metadata").get("lubimyczytacRating");
-            case DESCRIPTION -> root.get("metadata").get("description");
-            case NARRATOR -> root.get("metadata").get("narrator");
-            case AUDIBLE_RATING -> root.get("metadata").get("audibleRating");
-            case AUDIBLE_REVIEW_COUNT -> root.get("metadata").get("audibleReviewCount");
-            case ABRIDGED -> root.get("metadata").get("abridged");
-            case AUDIOBOOK_DURATION -> root.join("bookFiles", JoinType.LEFT).get("durationSeconds");
-            case AUDIOBOOK_CODEC -> root.join("bookFiles", JoinType.LEFT).get("codec");
-            case AUDIOBOOK_CHAPTER_COUNT -> root.join("bookFiles", JoinType.LEFT).get("chapterCount");
-            case AUDIOBOOK_BITRATE -> root.join("bookFiles", JoinType.LEFT).get("bitrate");
+            case LUBIMYCZYTAC_RATING -> root.get(FIELD_METADATA).get("lubimyczytacRating");
+            case DESCRIPTION -> root.get(FIELD_METADATA).get("description");
+            case NARRATOR -> root.get(FIELD_METADATA).get("narrator");
+            case AUDIBLE_RATING -> root.get(FIELD_METADATA).get("audibleRating");
+            case AUDIBLE_REVIEW_COUNT -> root.get(FIELD_METADATA).get("audibleReviewCount");
+            case ABRIDGED -> root.get(FIELD_METADATA).get("abridged");
+            case AUDIOBOOK_DURATION -> root.join(FIELD_BOOK_FILES, JoinType.LEFT).get("durationSeconds");
+            case AUDIOBOOK_CODEC -> root.join(FIELD_BOOK_FILES, JoinType.LEFT).get("codec");
+            case AUDIOBOOK_CHAPTER_COUNT -> root.join(FIELD_BOOK_FILES, JoinType.LEFT).get("chapterCount");
+            case AUDIOBOOK_BITRATE -> root.join(FIELD_BOOK_FILES, JoinType.LEFT).get("bitrate");
             case IS_PHYSICAL -> root.get("isPhysical");
             case READING_PROGRESS -> {
                 Expression<Float> koreader = cb.coalesce(progressJoin.get("koreaderProgressPercent"), 0f);
@@ -815,7 +834,7 @@ public class BookRuleEvaluatorService {
                 yield cb.function("GREATEST", Float.class, koreader, kobo, pdf, epub, cbx);
             }
             case FILE_TYPE -> cb.function("SUBSTRING_INDEX", String.class,
-                    root.join("bookFiles", JoinType.LEFT).get("fileName"), cb.literal("."), cb.literal(-1));
+                    root.join(FIELD_BOOK_FILES, JoinType.LEFT).get("fileName"), cb.literal("."), cb.literal(-1));
             default -> null;
         };
     }
@@ -830,7 +849,7 @@ public class BookRuleEvaluatorService {
         if (field == RuleField.SHELF) {
             return root.join("shelves", JoinType.INNER);
         }
-        Join<Object, Object> metadataJoin = root.join("metadata", JoinType.INNER);
+        Join<Object, Object> metadataJoin = root.join(FIELD_METADATA, JoinType.INNER);
         return joinArrayField(field, metadataJoin);
     }
 
@@ -843,11 +862,11 @@ public class BookRuleEvaluatorService {
 
     private Join<?, ?> joinArrayField(RuleField field, Join<Object, Object> metadataJoin) {
         return switch (field) {
-            case AUTHORS -> metadataJoin.join("authors", JoinType.INNER);
-            case CATEGORIES -> metadataJoin.join("categories", JoinType.INNER);
-            case MOODS -> metadataJoin.join("moods", JoinType.INNER);
+            case AUTHORS -> metadataJoin.join(FIELD_AUTHORS, JoinType.INNER);
+            case CATEGORIES -> metadataJoin.join(FIELD_CATEGORIES, JoinType.INNER);
+            case MOODS -> metadataJoin.join(FIELD_MOODS, JoinType.INNER);
             case TAGS -> metadataJoin.join("tags", JoinType.INNER);
-            case GENRE -> metadataJoin.join("categories", JoinType.INNER);
+            case GENRE -> metadataJoin.join(FIELD_CATEGORIES, JoinType.INNER);
             default -> throw new IllegalArgumentException("Not an array field: " + field);
         };
     }

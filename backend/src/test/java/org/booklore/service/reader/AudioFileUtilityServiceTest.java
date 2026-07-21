@@ -124,16 +124,8 @@ class AudioFileUtilityServiceTest {
     // ==================== isAudioFile tests ====================
 
     @ParameterizedTest
-    @ValueSource(strings = {"track.mp3", "book.m4b", "audio.m4a"})
+    @ValueSource(strings = {"track.mp3", "book.m4b", "audio.m4a", "TRACK.MP3", "Book.M4B", "Audio.M4A"})
     void isAudioFile_returnsTrueForAudioExtensions(String filename) throws IOException {
-        Path file = tempDir.resolve(filename);
-        Files.createFile(file);
-        assertTrue(audioFileUtility.isAudioFile(file));
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"TRACK.MP3", "Book.M4B", "Audio.M4A"})
-    void isAudioFile_isCaseInsensitive(String filename) throws IOException {
         Path file = tempDir.resolve(filename);
         Files.createFile(file);
         assertTrue(audioFileUtility.isAudioFile(file));
@@ -160,22 +152,11 @@ class AudioFileUtilityServiceTest {
     @CsvSource({
             "track.m4b, audio/mp4",
             "track.m4a, audio/mp4",
-            "track.mp3, audio/mpeg"
-    })
-    void getContentType_returnsCorrectMimeType(String filename, String expectedMimeType) {
-        Path file = tempDir.resolve(filename);
-        try (MockedStatic<MimeDetector> mockedMime = mockStatic(MimeDetector.class)) {
-            mockedMime.when(() -> MimeDetector.detectSafe(file)).thenReturn(expectedMimeType);
-            assertEquals(expectedMimeType, audioFileUtility.getContentType(file));
-        }
-    }
-
-    @ParameterizedTest
-    @CsvSource({
+            "track.mp3, audio/mpeg",
             "TRACK.M4B, audio/mp4",
             "TRACK.MP3, audio/mpeg"
     })
-    void getContentType_isCaseInsensitive(String filename, String expectedMimeType) {
+    void getContentType_returnsCorrectMimeType(String filename, String expectedMimeType) {
         Path file = tempDir.resolve(filename);
         try (MockedStatic<MimeDetector> mockedMime = mockStatic(MimeDetector.class)) {
             mockedMime.when(() -> MimeDetector.detectSafe(file)).thenReturn(expectedMimeType);

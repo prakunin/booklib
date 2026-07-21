@@ -20,6 +20,7 @@ import java.util.*;
 public class BookGroupingService {
 
     private static final double FILELESS_MATCH_THRESHOLD = 0.85;
+    private static final String PATH_SEPARATOR = "/";
 
     private final BookRepository bookRepository;
 
@@ -28,6 +29,7 @@ public class BookGroupingService {
             Map<String, List<LibraryFile>> newBookGroups
     ) {}
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode with distinct fuzzy-matching behavior; no replacement exists
     public Map<String, List<LibraryFile>> groupForInitialScan(List<LibraryFile> newFiles, LibraryEntity libraryEntity) {
         LibraryOrganizationMode mode = getOrganizationMode(libraryEntity);
 
@@ -38,6 +40,7 @@ public class BookGroupingService {
         };
     }
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode with distinct fuzzy-matching behavior; no replacement exists
     public GroupingResult groupForRescan(List<LibraryFile> newFiles, LibraryEntity libraryEntity) {
         LibraryOrganizationMode mode = getOrganizationMode(libraryEntity);
 
@@ -101,20 +104,7 @@ public class BookGroupingService {
                 String key = pathId + "::" + file.getFileName();
                 result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
             } else if (file.getBookFileType() == BookFileType.AUDIOBOOK) {
-                // Folder-based audiobook entries represent a collapsed directory (e.g., subPath="Author",
-                // fileName="audiobook-folder"). Their subPath points to the parent because getRelativeSubPath
-                // takes .getParent() (designed for files, not directories). Reconstruct the actual folder path
-                // so sibling audiobook folders stay separate and absorption searches from the correct level.
-                String effectiveSubPath = file.isFolderBased()
-                        ? subPath + "/" + file.getFileName()
-                        : subPath;
-                String ancestorKey = findNearestEbookAncestor(pathId, effectiveSubPath, ebookFolders);
-                if (ancestorKey != null) {
-                    result.computeIfAbsent(ancestorKey, k -> new ArrayList<>()).add(file);
-                } else {
-                    String key = pathId + ":" + effectiveSubPath;
-                    result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
-                }
+                addAudiobookFileToGroup(file, pathId, subPath, ebookFolders, result);
             } else {
                 String key = pathId + ":" + subPath;
                 result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
@@ -123,6 +113,24 @@ public class BookGroupingService {
 
         log.debug("BOOK_PER_FOLDER grouping: {} files into {} groups", files.size(), result.size());
         return result;
+    }
+
+    private void addAudiobookFileToGroup(LibraryFile file, Long pathId, String subPath,
+                                         Set<String> ebookFolders, Map<String, List<LibraryFile>> result) {
+        // Folder-based audiobook entries represent a collapsed directory (e.g., subPath="Author",
+        // fileName="audiobook-folder"). Their subPath points to the parent because getRelativeSubPath
+        // takes .getParent() (designed for files, not directories). Reconstruct the actual folder path
+        // so sibling audiobook folders stay separate and absorption searches from the correct level.
+        String effectiveSubPath = file.isFolderBased()
+                ? subPath + PATH_SEPARATOR + file.getFileName()
+                : subPath;
+        String ancestorKey = findNearestEbookAncestor(pathId, effectiveSubPath, ebookFolders);
+        if (ancestorKey != null) {
+            result.computeIfAbsent(ancestorKey, k -> new ArrayList<>()).add(file);
+        } else {
+            String key = pathId + ":" + effectiveSubPath;
+            result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
+        }
     }
 
     private String findNearestEbookAncestor(Long pathId, String subPath, Set<String> ebookFolders) {
@@ -144,6 +152,7 @@ public class BookGroupingService {
         return null;
     }
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode with distinct fuzzy-matching behavior; no replacement exists
     private BookEntity findMatchingBook(LibraryFile file, LibraryOrganizationMode mode) {
         BookEntity filelessMatch = switch (mode) {
             case BOOK_PER_FILE, BOOK_PER_FOLDER -> findExactFilelessMatch(file, file.getLibraryEntity());
@@ -178,7 +187,7 @@ public class BookGroupingService {
 
         return switch (mode) {
             case BOOK_PER_FILE -> null;
-            case BOOK_PER_FOLDER -> findMatchBookPerFolderWithAbsorption(file, activeBooksInDirectory);
+            case BOOK_PER_FOLDER -> findMatchBookPerFolderWithAbsorption(activeBooksInDirectory);
             case AUTO_DETECT -> findMatchAutoDetect(file, activeBooksInDirectory);
         };
     }
@@ -236,7 +245,7 @@ public class BookGroupingService {
         return null;
     }
 
-    private BookEntity findMatchBookPerFolderWithAbsorption(LibraryFile file, List<BookEntity> booksInDirectory) {
+    private BookEntity findMatchBookPerFolderWithAbsorption(List<BookEntity> booksInDirectory) {
         List<BookEntity> booksWithFiles = booksInDirectory.stream()
                 .filter(BookEntity::hasFiles)
                 .toList();
@@ -344,6 +353,7 @@ public class BookGroupingService {
         return BookFileGroupingUtils.calculateSimilarity(fileKey, bookKey) >= 0.85;
     }
 
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat default for pre-existing libraries; no replacement exists
     private LibraryOrganizationMode getOrganizationMode(LibraryEntity library) {
         LibraryOrganizationMode mode = library.getOrganizationMode();
         return mode != null ? mode : LibraryOrganizationMode.AUTO_DETECT;

@@ -106,6 +106,9 @@ public class BookVectorService {
         }
     }
 
+    // null is intentional here and distinct from an empty vector: BookRecommendationComputationService
+    // branches on `targetVector != null` to pick embedding-based vs. entity-based similarity scoring.
+    @SuppressWarnings("java:S1168")
     public double[] deserializeVector(String vectorJson) {
         if (vectorJson == null || vectorJson.isEmpty()) {
             return null;

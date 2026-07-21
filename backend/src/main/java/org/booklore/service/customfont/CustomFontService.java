@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -49,6 +50,7 @@ public class CustomFontService {
     private static final long MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024L * 1024L;
     private static final String CUSTOM_FONTS_DIR = "custom-fonts";
     private static final int MAX_FONT_NAME_LENGTH = 100;
+    private static final String FONT_NOT_FOUND_MESSAGE = "Font not found or access denied";
 
     @Transactional
     public CustomFontDto uploadFont(MultipartFile file, String fontName, Long userId) {
@@ -91,7 +93,7 @@ public class CustomFontService {
                     .originalFileName(originalFilename)
                     .format(format)
                     .fileSize(file.getSize())
-                    .uploadedAt(LocalDateTime.now())
+                    .uploadedAt(LocalDateTime.now(ZoneId.systemDefault()))
                     .build();
 
             savedEntity = customFontRepository.save(entity);
@@ -124,7 +126,7 @@ public class CustomFontService {
     @Transactional
     public void deleteFont(Long fontId, Long userId) {
         CustomFontEntity font = customFontRepository.findByIdAndUserId(fontId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("Font not found or access denied"));
+                .orElseThrow(() -> new IllegalArgumentException(FONT_NOT_FOUND_MESSAGE));
 
         IOException fileDeleteException = null;
 
@@ -160,7 +162,7 @@ public class CustomFontService {
 
     public Resource getFontFile(Long fontId, Long userId) {
         CustomFontEntity font = customFontRepository.findByIdAndUserId(fontId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("Font not found or access denied"));
+                .orElseThrow(() -> new IllegalArgumentException(FONT_NOT_FOUND_MESSAGE));
 
         Path fontDir = getFontDirectory(userId);
         Path fontPath = fontDir.resolve(font.getFileName());
@@ -183,7 +185,7 @@ public class CustomFontService {
 
     public FontFormat getFontFormat(Long fontId, Long userId) {
         CustomFontEntity font = customFontRepository.findByIdAndUserId(fontId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("Font not found or access denied"));
+                .orElseThrow(() -> new IllegalArgumentException(FONT_NOT_FOUND_MESSAGE));
         return font.getFormat();
     }
 

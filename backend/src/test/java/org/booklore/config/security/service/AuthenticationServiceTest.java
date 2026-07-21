@@ -214,7 +214,7 @@ class AuthenticationServiceTest {
 
         verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
         RefreshTokenEntity saved = refreshTokenCaptor.getValue();
-        Instant expectedExpiry = before.plusMillis(JwtUtils.refreshTokenExpirationMs);
+        Instant expectedExpiry = before.plusMillis(JwtUtils.REFRESH_TOKEN_EXPIRATION_MS);
         assertThat(saved.getExpiryDate()).isCloseTo(expectedExpiry, within(5, ChronoUnit.SECONDS));
     }
 

@@ -46,11 +46,11 @@ public class BookQueryService {
         return mapBooksToDto(books, includeDescription, null, stripForListView);
     }
 
-    public List<Book> getAllBooksByLibraryIds(Set<Long> libraryIds, boolean includeDescription, boolean StripForListView, Long userId) {
+    public List<Book> getAllBooksByLibraryIds(Set<Long> libraryIds, boolean includeDescription, boolean stripForListView, Long userId) {
         List<BookEntity> books = bookRepository.findAllWithMetadataByLibraryIdsPage(libraryIds, LEGACY_FULL_CATALOG_PAGE)
                 .getContent();
         books = contentRestrictionService.applyRestrictions(books, userId);
-        return mapBooksToDto(books, includeDescription, userId, StripForListView);
+        return mapBooksToDto(books, includeDescription, userId, stripForListView);
     }
 
     public Page<Book> getAllBooksPaged(Pageable pageable) {
@@ -283,61 +283,70 @@ public class BookQueryService {
             m.setLubimyczytacRating(null);
 
             // Strip empty metadata collections
-            if (m.getMoods() != null && m.getMoods().isEmpty()) m.setMoods(null);
-            if (m.getTags() != null && m.getTags().isEmpty()) m.setTags(null);
-            if (m.getAuthors() != null && m.getAuthors().isEmpty()) m.setAuthors(null);
-            if (m.getCategories() != null && m.getCategories().isEmpty()) m.setCategories(null);
+            stripEmptyMetadataCollections(m);
 
             // Strip ComicMetadata fields
-            ComicMetadata cm = m.getComicMetadata();
-            if (cm != null) {
-                // Strip comic lock flags
-                cm.setIssueNumberLocked(null);
-                cm.setVolumeNameLocked(null);
-                cm.setVolumeNumberLocked(null);
-                cm.setStoryArcLocked(null);
-                cm.setStoryArcNumberLocked(null);
-                cm.setAlternateSeriesLocked(null);
-                cm.setAlternateIssueLocked(null);
-                cm.setImprintLocked(null);
-                cm.setFormatLocked(null);
-                cm.setBlackAndWhiteLocked(null);
-                cm.setMangaLocked(null);
-                cm.setReadingDirectionLocked(null);
-                cm.setWebLinkLocked(null);
-                cm.setNotesLocked(null);
-                cm.setCreatorsLocked(null);
-                cm.setPencillersLocked(null);
-                cm.setInkersLocked(null);
-                cm.setColoristsLocked(null);
-                cm.setLetterersLocked(null);
-                cm.setCoverArtistsLocked(null);
-                cm.setEditorsLocked(null);
-                cm.setCharactersLocked(null);
-                cm.setTeamsLocked(null);
-                cm.setLocationsLocked(null);
-
-                // Strip non-filter detail fields
-                cm.setIssueNumber(null);
-                cm.setVolumeName(null);
-                cm.setVolumeNumber(null);
-                cm.setStoryArc(null);
-                cm.setStoryArcNumber(null);
-                cm.setAlternateSeries(null);
-                cm.setAlternateIssue(null);
-                cm.setImprint(null);
-                cm.setFormat(null);
-                cm.setBlackAndWhite(null);
-                cm.setManga(null);
-                cm.setReadingDirection(null);
-                cm.setWebLink(null);
-                cm.setNotes(null);
-            }
+            stripComicMetadata(m);
         }
 
         // Strip empty book-level collections
         if (dto.getAlternativeFormats() != null && dto.getAlternativeFormats().isEmpty()) dto.setAlternativeFormats(null);
         if (dto.getSupplementaryFiles() != null && dto.getSupplementaryFiles().isEmpty()) dto.setSupplementaryFiles(null);
+    }
+
+    private void stripEmptyMetadataCollections(BookMetadata m) {
+        if (m.getMoods() != null && m.getMoods().isEmpty()) m.setMoods(null);
+        if (m.getTags() != null && m.getTags().isEmpty()) m.setTags(null);
+        if (m.getAuthors() != null && m.getAuthors().isEmpty()) m.setAuthors(null);
+        if (m.getCategories() != null && m.getCategories().isEmpty()) m.setCategories(null);
+    }
+
+    private void stripComicMetadata(BookMetadata m) {
+        ComicMetadata cm = m.getComicMetadata();
+        if (cm == null) {
+            return;
+        }
+        // Strip comic lock flags
+        cm.setIssueNumberLocked(null);
+        cm.setVolumeNameLocked(null);
+        cm.setVolumeNumberLocked(null);
+        cm.setStoryArcLocked(null);
+        cm.setStoryArcNumberLocked(null);
+        cm.setAlternateSeriesLocked(null);
+        cm.setAlternateIssueLocked(null);
+        cm.setImprintLocked(null);
+        cm.setFormatLocked(null);
+        cm.setBlackAndWhiteLocked(null);
+        cm.setMangaLocked(null);
+        cm.setReadingDirectionLocked(null);
+        cm.setWebLinkLocked(null);
+        cm.setNotesLocked(null);
+        cm.setCreatorsLocked(null);
+        cm.setPencillersLocked(null);
+        cm.setInkersLocked(null);
+        cm.setColoristsLocked(null);
+        cm.setLetterersLocked(null);
+        cm.setCoverArtistsLocked(null);
+        cm.setEditorsLocked(null);
+        cm.setCharactersLocked(null);
+        cm.setTeamsLocked(null);
+        cm.setLocationsLocked(null);
+
+        // Strip non-filter detail fields
+        cm.setIssueNumber(null);
+        cm.setVolumeName(null);
+        cm.setVolumeNumber(null);
+        cm.setStoryArc(null);
+        cm.setStoryArcNumber(null);
+        cm.setAlternateSeries(null);
+        cm.setAlternateIssue(null);
+        cm.setImprint(null);
+        cm.setFormat(null);
+        cm.setBlackAndWhite(null);
+        cm.setManga(null);
+        cm.setReadingDirection(null);
+        cm.setWebLink(null);
+        cm.setNotes(null);
     }
 
     private boolean computeAllMetadataLocked(BookMetadata m) {

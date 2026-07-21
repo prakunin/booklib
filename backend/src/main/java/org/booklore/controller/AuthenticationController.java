@@ -41,7 +41,7 @@ public class AuthenticationController {
     @ApiResponse(responseCode = "403", description = "Forbidden")
     @PostMapping("/register")
     @PreAuthorize("@securityUtil.isAdmin()")
-    public ResponseEntity<?> registerUser(
+    public ResponseEntity<Void> registerUser(
             @Parameter(description = "User registration request") @RequestBody @Valid UserCreateRequest userCreateRequest) {
         userProvisioningService.provisionInternalUser(userCreateRequest);
         return ResponseEntity.noContent().build();

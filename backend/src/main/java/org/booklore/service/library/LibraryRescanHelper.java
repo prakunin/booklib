@@ -82,50 +82,11 @@ public class LibraryRescanHelper {
                 }
                 afterId = Math.max(afterId, bookId);
 
-                if (taskId != null && cancellationManager.isTaskCancelled(taskId)) {
-                    log.info("Library rescan for library {} was cancelled", libraryId);
-                    sendTaskProgressNotification(taskId, progressPercentage(processedBooks, totalBooks),
-                            String.format("Rescan cancelled for library: %s (%d/%d books processed)", libraryName, processedBooks, totalBooks),
-                            TaskStatus.CANCELLED);
+                RescanStepOutcome outcome = processBookForRescan(
+                        context, libraryId, libraryName, taskId, bookId, processedBooks, totalBooks);
+                processedBooks = outcome.processedBooks();
+                if (outcome.cancelled()) {
                     return;
-                }
-
-                BookEntity bookEntity = findBookForRescan(bookId, libraryId);
-                if (bookEntity == null) {
-                    continue;
-                }
-
-                // Skip fileless books (e.g., physical books) - they have no file to extract metadata from
-                if (!bookEntity.hasFiles()) {
-                    processedBooks++;
-                    continue;
-                }
-
-                BookFileEntity primaryFile = bookEntity.getPrimaryBookFile();
-                Path fullFilePath = bookEntity.getFullFilePath();
-                if (primaryFile == null || fullFilePath == null) {
-                    processedBooks++;
-                    continue;
-                }
-
-                log.info("Processing book: library={}, bookId={}, fileName={}", libraryName, bookId, primaryFile.getFileName());
-
-                sendTaskProgressNotification(taskId, progressPercentage(processedBooks, totalBooks),
-                        String.format("Processing: %s (Library: %s)", primaryFile.getFileName(), libraryName),
-                        TaskStatus.IN_PROGRESS);
-
-                try {
-                    BookFileType bookType = primaryFile.getBookType();
-                    BookMetadata bookMetadata = metadataExtractorFactory.extractMetadata(bookType, fullFilePath.toFile());
-                    if (bookMetadata == null) {
-                        log.warn("No metadata extracted for book id={} path={}", bookId, fullFilePath);
-                        continue;
-                    }
-                    updateBookMetadataInTransaction(context, libraryId, bookId, bookMetadata);
-                } catch (Exception e) {
-                    log.error("Failed to update metadata for book id={} path={}: {}", bookId, fullFilePath, e.getMessage(), e);
-                } finally {
-                    processedBooks++;
                 }
             }
         }
@@ -133,6 +94,60 @@ public class LibraryRescanHelper {
         sendTaskProgressNotification(taskId, 100,
                 String.format("Rescan completed for library: %s (%d books processed)", libraryName, processedBooks),
                 TaskStatus.COMPLETED);
+    }
+
+    private record RescanStepOutcome(int processedBooks, boolean cancelled) {
+    }
+
+    /**
+     * Processes a single book during a library rescan. Returns the updated {@code processedBooks}
+     * count and whether the task was cancelled, so the caller's loop can update its counter and
+     * stop the whole rescan without needing more than one {@code continue} in its loop.
+     */
+    private RescanStepOutcome processBookForRescan(RescanLibraryContext context, long libraryId, String libraryName,
+                                                    String taskId, Long bookId, int processedBooks, int totalBooks) {
+        if (taskId != null && cancellationManager.isTaskCancelled(taskId)) {
+            log.info("Library rescan for library {} was cancelled", libraryId);
+            sendTaskProgressNotification(taskId, progressPercentage(processedBooks, totalBooks),
+                    String.format("Rescan cancelled for library: %s (%d/%d books processed)", libraryName, processedBooks, totalBooks),
+                    TaskStatus.CANCELLED);
+            return new RescanStepOutcome(processedBooks, true);
+        }
+
+        BookEntity bookEntity = findBookForRescan(bookId, libraryId);
+        if (bookEntity == null) {
+            return new RescanStepOutcome(processedBooks, false);
+        }
+
+        // Skip fileless books (e.g., physical books) - they have no file to extract metadata from
+        if (!bookEntity.hasFiles()) {
+            return new RescanStepOutcome(processedBooks + 1, false);
+        }
+
+        BookFileEntity primaryFile = bookEntity.getPrimaryBookFile();
+        Path fullFilePath = bookEntity.getFullFilePath();
+        if (primaryFile == null || fullFilePath == null) {
+            return new RescanStepOutcome(processedBooks + 1, false);
+        }
+
+        log.info("Processing book: library={}, bookId={}, fileName={}", libraryName, bookId, primaryFile.getFileName());
+
+        sendTaskProgressNotification(taskId, progressPercentage(processedBooks, totalBooks),
+                String.format("Processing: %s (Library: %s)", primaryFile.getFileName(), libraryName),
+                TaskStatus.IN_PROGRESS);
+
+        try {
+            BookFileType bookType = primaryFile.getBookType();
+            BookMetadata bookMetadata = metadataExtractorFactory.extractMetadata(bookType, fullFilePath.toFile());
+            if (bookMetadata == null) {
+                log.warn("No metadata extracted for book id={} path={}", bookId, fullFilePath);
+                return new RescanStepOutcome(processedBooks + 1, false);
+            }
+            updateBookMetadataInTransaction(context, libraryId, bookId, bookMetadata);
+        } catch (Exception e) {
+            log.error("Failed to update metadata for book id={} path={}: {}", bookId, fullFilePath, e.getMessage(), e);
+        }
+        return new RescanStepOutcome(processedBooks + 1, false);
     }
 
     private BookEntity findBookForRescan(Long bookId, Long libraryId) {

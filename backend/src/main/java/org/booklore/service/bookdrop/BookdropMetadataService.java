@@ -92,7 +92,7 @@ public class BookdropMetadataService {
                 Thread.sleep(ThreadLocalRandom.current().nextLong(250, 1250));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
+                throw new IllegalStateException(e);
             }
         }
 

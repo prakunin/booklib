@@ -21,6 +21,7 @@ import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -48,10 +49,13 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
     private static final String BASE_BOOK_URL_SUFFIX = "/dp/";
     private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("[^\\d]");
     private static final Pattern SERIES_FORMAT_PATTERN = Pattern.compile("Book (\\d+(?:\\.\\d+)?) of (\\d+)");
-    private static final Pattern PARENTHESES_WITH_WHITESPACE_PATTERN = Pattern.compile("\\s*\\(.*?\\)");
-    private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^\\p{L}\\p{M}0-9]");
+    private static final Pattern PARENTHESES_WITH_WHITESPACE_PATTERN = Pattern.compile("\\s*\\([^\\)]*+\\)");
+    private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^\\p{L}\\p{M}0-9]", Pattern.CANON_EQ);
     private static final Pattern ASIN_PATH_PATTERN = Pattern.compile("/dp/([A-Z0-9]{10})");
-    private static final Pattern REVIEWED_IN_ON_PATTERN = Pattern.compile("(?iu)(?:Reviewed in|Rezension aus|Beoordeeld in|Recensie uit|Commenté en|Recensito in|Revisado en)\\s+(.+?)\\s+(?:on|vom|op|le|il|el)\\s+(.+)");
+    // The (.+?) location group is worst-case quadratic on mismatch, but the input is a single short
+    // Amazon review header (<~200 chars), so the bound is harmless; an unambiguous rewrite exceeds the regex complexity limit.
+    @SuppressWarnings("java:S8786")
+    private static final Pattern REVIEWED_IN_ON_PATTERN = Pattern.compile("(?iu)(?:Reviewed in|Rezension aus|Beoordeeld in|Recensie uit|Commenté en|Recensito in|Revisado en)\\s++(.+?)\\s++(?:on|vom|op|le|il|el)\\s++(.+)", Pattern.CANON_EQ);
     private static final Pattern JAPANESE_REVIEW_DATE_PATTERN = Pattern.compile("(\\d{4}年\\d{1,2}月\\d{1,2}日).+");
     private static final String[] TITLE_SELECTORS = {"#productTitle", "#ebooksProductTitle", "h1#title", "span#productTitle"};
     private static final String[] DATE_PATTERNS = {
@@ -59,33 +63,41 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
             "MMM. d, yyyy", "d MMM yyyy", "d MMM. yyyy", "d. MMM yyyy",
             "yyyy/M/d", "yyyy/MM/dd", "yyyy年M月d日"
     };
+    private static final String ACCEPT_LANGUAGE_EN_US = "en-US,en;q=0.9";
+    private static final String ACCEPT_LANGUAGE_EN_GB = "en-GB,en;q=0.9";
+    private static final String ACCEPT_LANGUAGE_EN_US_AR = "en-US,en;q=0.9,ar;q=0.8";
+    private static final String AMAZON_BASE_URL_PREFIX = "https://www.amazon.";
+    private static final String AUTHOR_LINK_SELECTOR = ".author a";
+    private static final String DETAIL_BULLETS_FEATURE_DIV_ID = "detailBullets_feature_div";
+    private static final String BOLD_TEXT_SELECTOR = "span.a-text-bold";
+    private static final String HTML_CLASS_ATTR = "class";
 
     private static final Map<String, LocaleInfo> DOMAIN_LOCALE_MAP = Map.ofEntries(
-            Map.entry("com", new LocaleInfo("en-US,en;q=0.9", Locale.US)),
-            Map.entry("co.uk", new LocaleInfo("en-GB,en;q=0.9", Locale.UK)),
+            Map.entry("com", new LocaleInfo(ACCEPT_LANGUAGE_EN_US, Locale.US)),
+            Map.entry("co.uk", new LocaleInfo(ACCEPT_LANGUAGE_EN_GB, Locale.UK)),
             Map.entry("de", new LocaleInfo("en-GB,en;q=0.9,de;q=0.8", Locale.GERMANY)),
             Map.entry("fr", new LocaleInfo("en-GB,en;q=0.9,fr;q=0.8", Locale.FRANCE)),
             Map.entry("it", new LocaleInfo("en-GB,en;q=0.9,it;q=0.8", Locale.ITALY)),
             Map.entry("es", new LocaleInfo("en-GB,en;q=0.9,es;q=0.8", new Locale.Builder().setLanguage("es").setRegion("ES").build())),
-            Map.entry("ca", new LocaleInfo("en-US,en;q=0.9", Locale.CANADA)),
-            Map.entry("com.au", new LocaleInfo("en-GB,en;q=0.9", new Locale.Builder().setLanguage("en").setRegion("AU").build())),
+            Map.entry("ca", new LocaleInfo(ACCEPT_LANGUAGE_EN_US, Locale.CANADA)),
+            Map.entry("com.au", new LocaleInfo(ACCEPT_LANGUAGE_EN_GB, new Locale.Builder().setLanguage("en").setRegion("AU").build())),
             Map.entry("co.jp", new LocaleInfo("en-GB,en;q=0.9,ja;q=0.8", Locale.JAPAN)),
-            Map.entry("in", new LocaleInfo("en-GB,en;q=0.9", new Locale.Builder().setLanguage("en").setRegion("IN").build())),
+            Map.entry("in", new LocaleInfo(ACCEPT_LANGUAGE_EN_GB, new Locale.Builder().setLanguage("en").setRegion("IN").build())),
             Map.entry("com.br", new LocaleInfo("en-GB,en;q=0.9,pt;q=0.8", new Locale.Builder().setLanguage("pt").setRegion("BR").build())),
             Map.entry("com.mx", new LocaleInfo("en-US,en;q=0.9,es;q=0.8", new Locale.Builder().setLanguage("es").setRegion("MX").build())),
             Map.entry("nl", new LocaleInfo("en-GB,en;q=0.9,nl;q=0.8", new Locale.Builder().setLanguage("nl").setRegion("NL").build())),
             Map.entry("se", new LocaleInfo("en-GB,en;q=0.9,sv;q=0.8", new Locale.Builder().setLanguage("sv").setRegion("SE").build())),
             Map.entry("pl", new LocaleInfo("en-GB,en;q=0.9,pl;q=0.8", new Locale.Builder().setLanguage("pl").setRegion("PL").build())),
-            Map.entry("ae", new LocaleInfo("en-US,en;q=0.9,ar;q=0.8", new Locale.Builder().setLanguage("en").setRegion("AE").build())),
-            Map.entry("sa", new LocaleInfo("en-US,en;q=0.9,ar;q=0.8", new Locale.Builder().setLanguage("en").setRegion("SA").build())),
+            Map.entry("ae", new LocaleInfo(ACCEPT_LANGUAGE_EN_US_AR, new Locale.Builder().setLanguage("en").setRegion("AE").build())),
+            Map.entry("sa", new LocaleInfo(ACCEPT_LANGUAGE_EN_US_AR, new Locale.Builder().setLanguage("en").setRegion("SA").build())),
             Map.entry("cn", new LocaleInfo("zh-CN,zh;q=0.9", Locale.CHINA)),
-            Map.entry("sg", new LocaleInfo("en-GB,en;q=0.9", new Locale.Builder().setLanguage("en").setRegion("SG").build())),
+            Map.entry("sg", new LocaleInfo(ACCEPT_LANGUAGE_EN_GB, new Locale.Builder().setLanguage("en").setRegion("SG").build())),
             Map.entry("tr", new LocaleInfo("en-GB,en;q=0.9,tr;q=0.8", new Locale.Builder().setLanguage("tr").setRegion("TR").build())),
-            Map.entry("eg", new LocaleInfo("en-US,en;q=0.9,ar;q=0.8", new Locale.Builder().setLanguage("en").setRegion("EG").build())),
+            Map.entry("eg", new LocaleInfo(ACCEPT_LANGUAGE_EN_US_AR, new Locale.Builder().setLanguage("en").setRegion("EG").build())),
             Map.entry("com.be", new LocaleInfo("en-GB,en;q=0.9,fr;q=0.8,nl;q=0.8", new Locale.Builder().setLanguage("fr").setRegion("BE").build()))
     );
 
-    private static final LocaleInfo DEFAULT_LOCALE_INFO = new LocaleInfo("en-US,en;q=0.9", Locale.US);
+    private static final LocaleInfo DEFAULT_LOCALE_INFO = new LocaleInfo(ACCEPT_LANGUAGE_EN_US, Locale.US);
 
     private final AppSettingService appSettingService;
 
@@ -188,32 +200,10 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                 log.error("No items found in the search results.");
             } else {
                 for (Element item : items) {
-                    if (item.text().contains("Collects books from")) {
-                        log.debug("Skipping box set item (collects books): {}", extractAmazonBookId(item));
-                        continue;
+                    String bookId = resolveNewBookId(item, bookIds);
+                    if (bookId != null) {
+                        bookIds.add(bookId);
                     }
-                    Element titleDiv = item.selectFirst("div[data-cy=title-recipe]");
-                    if (titleDiv == null) {
-                        log.debug("Skipping item with missing title div: {}", extractAmazonBookId(item));
-                        continue;
-                    }
-
-                    String titleText = titleDiv.text().trim();
-                    if (titleText.isEmpty()) {
-                        log.debug("Skipping item with empty title: {}", extractAmazonBookId(item));
-                        continue;
-                    }
-
-                    String lowerTitle = titleText.toLowerCase();
-                    if (lowerTitle.contains("books set") || lowerTitle.contains("box set") || lowerTitle.contains("collection set") || lowerTitle.contains("summary & study guide")) {
-                        log.debug("Skipping box set item (matched filtered phrase) in title: {}", extractAmazonBookId(item));
-                        continue;
-                    }
-                    String bookId = extractAmazonBookId(item);
-                    if (bookId == null || bookIds.contains(bookId)) {
-                        continue;
-                    }
-                    bookIds.add(bookId);
                 }
             }
         } catch (AmazonAntiScrapingException _) {
@@ -224,6 +214,35 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         }
         log.info("Amazon: Found {} book ids", bookIds.size());
         return bookIds;
+    }
+
+    private String resolveNewBookId(Element item, LinkedList<String> existingBookIds) {
+        if (item.text().contains("Collects books from")) {
+            log.debug("Skipping box set item (collects books): {}", extractAmazonBookId(item));
+            return null;
+        }
+        Element titleDiv = item.selectFirst("div[data-cy=title-recipe]");
+        if (titleDiv == null) {
+            log.debug("Skipping item with missing title div: {}", extractAmazonBookId(item));
+            return null;
+        }
+
+        String titleText = titleDiv.text().trim();
+        if (titleText.isEmpty()) {
+            log.debug("Skipping item with empty title: {}", extractAmazonBookId(item));
+            return null;
+        }
+
+        String lowerTitle = titleText.toLowerCase();
+        if (lowerTitle.contains("books set") || lowerTitle.contains("box set") || lowerTitle.contains("collection set") || lowerTitle.contains("summary & study guide")) {
+            log.debug("Skipping box set item (matched filtered phrase) in title: {}", extractAmazonBookId(item));
+            return null;
+        }
+        String bookId = extractAmazonBookId(item);
+        if (bookId == null || existingBookIds.contains(bookId)) {
+            return null;
+        }
+        return bookId;
     }
 
     private String extractAmazonBookId(Element item) {
@@ -265,7 +284,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         String domain = appSettingService.getAppSettings().getMetadataProviderSettings().getAmazon().getDomain();
         Document doc;
         try {
-            doc = fetchDocument("https://www.amazon." + domain + BASE_BOOK_URL_SUFFIX + amazonBookId);
+            doc = fetchDocument(AMAZON_BASE_URL_PREFIX + domain + BASE_BOOK_URL_SUFFIX + amazonBookId);
         } catch (AmazonAntiScrapingException _) {
             log.debug("Aborting metadata fetch for ID {} due to status code (503).", amazonBookId);
             return null;
@@ -315,7 +334,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         String domain = appSettingService.getAppSettings().getMetadataProviderSettings().getAmazon().getDomain();
         String isbnCleaned = ParserUtils.cleanIsbn(fetchMetadataRequest.getIsbn());
         if (isbnCleaned != null && !isbnCleaned.isEmpty()) {
-            String url = "https://www.amazon." + domain + "/s?k=" + fetchMetadataRequest.getIsbn();
+            String url = AMAZON_BASE_URL_PREFIX + domain + "/s?k=" + fetchMetadataRequest.getIsbn();
             log.info("Amazon Query URL (ISBN): {}", url);
             return url;
         }
@@ -345,7 +364,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         }
 
         String encodedSearchTerm = searchTerm.toString().replace(" ", "+");
-        String url = "https://www.amazon." + domain + "/s?k=" + encodedSearchTerm;
+        String url = AMAZON_BASE_URL_PREFIX + domain + "/s?k=" + encodedSearchTerm;
         log.info("Amazon Query URL: {}", url);
         return url;
     }
@@ -388,18 +407,18 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         try {
             Element bylineDiv = doc.selectFirst("#bylineInfo_feature_div");
             if (bylineDiv != null) {
-                authors.addAll(bylineDiv.select(".author a").stream().map(Element::text).toList());
+                authors.addAll(bylineDiv.select(AUTHOR_LINK_SELECTOR).stream().map(Element::text).toList());
             }
 
             if (authors.isEmpty()) {
                 Element bylineInfo = doc.selectFirst("#bylineInfo");
                 if (bylineInfo != null) {
-                    authors.addAll(bylineInfo.select(".author a").stream().map(Element::text).toList());
+                    authors.addAll(bylineInfo.select(AUTHOR_LINK_SELECTOR).stream().map(Element::text).toList());
                 }
             }
 
             if (authors.isEmpty()) {
-                authors.addAll(doc.select(".author a").stream().map(Element::text).toList());
+                authors.addAll(doc.select(AUTHOR_LINK_SELECTOR).stream().map(Element::text).toList());
             }
 
             if (authors.isEmpty()) {
@@ -459,33 +478,16 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
 
     private String getPublisher(Document doc) {
         try {
-            Element featureElement = doc.getElementById("detailBullets_feature_div");
-            if (featureElement != null) {
-                Elements listItems = featureElement.select("li");
-                for (Element listItem : listItems) {
-                    Element boldText = listItem.selectFirst("span.a-text-bold");
-                    if (boldText != null) {
-                        String header = boldText.text().toLowerCase();
-                        if (header.contains("publisher") ||
-                            header.contains("herausgeber") || 
-                            header.contains("éditeur") || 
-                            header.contains("editoriale") || 
-                            header.contains("editorial") || 
-                            header.contains("uitgever") || 
-                            header.contains("wydawca") ||
-                            header.contains("出版社") ||
-                            header.contains("editora")) {
-                            
-                            Element publisherSpan = boldText.nextElementSibling();
-                            if (publisherSpan != null) {
-                                String fullPublisher = publisherSpan.text().trim();
-                                return PARENTHESES_WITH_WHITESPACE_PATTERN.matcher(fullPublisher.split(";")[0].trim()).replaceAll("").trim();
-                            }
-                        }
-                    }
-                }
-            } else {
+            Element featureElement = doc.getElementById(DETAIL_BULLETS_FEATURE_DIV_ID);
+            if (featureElement == null) {
                 log.debug("Failed to parse publisher: Element 'detailBullets_feature_div' not found.");
+                return null;
+            }
+            for (Element listItem : featureElement.select("li")) {
+                String publisher = extractPublisherFromListItem(listItem);
+                if (publisher != null) {
+                    return publisher;
+                }
             }
         } catch (Exception e) {
             log.warn("Failed to parse publisher: {}", e.getMessage());
@@ -493,7 +495,43 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         return null;
     }
 
+    private String extractPublisherFromListItem(Element listItem) {
+        Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
+        if (boldText == null) {
+            return null;
+        }
+        if (!isPublisherHeader(boldText.text().toLowerCase())) {
+            return null;
+        }
+        Element publisherSpan = boldText.nextElementSibling();
+        if (publisherSpan == null) {
+            return null;
+        }
+        String fullPublisher = publisherSpan.text().trim();
+        return PARENTHESES_WITH_WHITESPACE_PATTERN.matcher(fullPublisher.split(";")[0].trim()).replaceAll("").trim();
+    }
+
+    private static boolean isPublisherHeader(String header) {
+        return header.contains("publisher") ||
+                header.contains("herausgeber") ||
+                header.contains("éditeur") ||
+                header.contains("editoriale") ||
+                header.contains("editorial") ||
+                header.contains("uitgever") ||
+                header.contains("wydawca") ||
+                header.contains("出版社") ||
+                header.contains("editora");
+    }
+
     private LocalDate getPublicationDate(Document doc) {
+        LocalDate rpiDate = parsePublicationDateFromRpi(doc);
+        if (rpiDate != null) {
+            return rpiDate;
+        }
+        return parsePublicationDateFromDetailBullets(doc);
+    }
+
+    private LocalDate parsePublicationDateFromRpi(Document doc) {
         try {
             Element publicationDateElement = doc.select("#rpi-attribute-book_details-publication_date .rpi-attribute-value span").first();
             if (publicationDateElement != null) {
@@ -504,40 +542,48 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         } catch (Exception e) {
             log.debug("RPI Publication Date extraction failed: {}", e.getMessage());
         }
+        return null;
+    }
 
+    private LocalDate parsePublicationDateFromDetailBullets(Document doc) {
         try {
-            Element featureElement = doc.getElementById("detailBullets_feature_div");
+            Element featureElement = doc.getElementById(DETAIL_BULLETS_FEATURE_DIV_ID);
             if (featureElement != null) {
-                Elements listItems = featureElement.select("li");
-                for (Element listItem : listItems) {
-                    Element boldText = listItem.selectFirst("span.a-text-bold");
-                    Element valueSpan = boldText != null ? boldText.nextElementSibling() : null;
-                    
-                    if (valueSpan != null) {
-                         LocalDate d = parseDate(valueSpan.text());
-                         if (d != null) return d;
-
-                         Matcher matcher = Pattern.compile("\\((.*?)\\)").matcher(valueSpan.text());
-                         while (matcher.find()) {
-                             LocalDate pd = parseDate(matcher.group(1));
-                             if (pd != null) return pd;
-                         }
-                    }
+                for (Element listItem : featureElement.select("li")) {
+                    LocalDate date = parseDateFromDetailBulletItem(listItem);
+                    if (date != null) return date;
                 }
             }
         } catch (Exception e) {
              log.warn("DetailBullets Publication Date extraction failed: {}", e.getMessage());
         }
-        
+        return null;
+    }
+
+    private LocalDate parseDateFromDetailBulletItem(Element listItem) {
+        Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
+        Element valueSpan = boldText != null ? boldText.nextElementSibling() : null;
+        if (valueSpan == null) {
+            return null;
+        }
+
+        LocalDate d = parseDate(valueSpan.text());
+        if (d != null) return d;
+
+        Matcher matcher = Pattern.compile("\\((.*?)\\)").matcher(valueSpan.text());
+        while (matcher.find()) {
+            LocalDate pd = parseDate(matcher.group(1));
+            if (pd != null) return pd;
+        }
         return null;
     }
 
     private String extractFromDetailBullets(Document doc, String keyPart) {
-        Element featureElement = doc.getElementById("detailBullets_feature_div");
+        Element featureElement = doc.getElementById(DETAIL_BULLETS_FEATURE_DIV_ID);
         if (featureElement != null) {
             Elements listItems = featureElement.select("li");
             for (Element listItem : listItems) {
-                Element boldText = listItem.selectFirst("span.a-text-bold");
+                Element boldText = listItem.selectFirst(BOLD_TEXT_SELECTOR);
                 if (boldText != null && boldText.text().contains(keyPart)) {
                     Element valueSpan = boldText.nextElementSibling();
                     if (valueSpan != null) {
@@ -629,6 +675,63 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
         return null;
     }
 
+    private record ReviewDateInfo(String country, Instant dateInstant) {}
+
+    private Float parseReviewRating(String ratingText) {
+        if (ratingText.isEmpty()) {
+            return null;
+        }
+        try {
+            Pattern ratingPattern = Pattern.compile("^(\\d+([.,]\\d+)?)");
+            Matcher ratingMatcher = ratingPattern.matcher(ratingText);
+            if (ratingMatcher.find()) {
+                String ratingStr = ratingMatcher.group(1).replace(',', '.');
+                return Float.parseFloat(ratingStr);
+            }
+            return null;
+        } catch (NumberFormatException e) {
+            log.warn("Failed to parse rating '{}': {}", ratingText, e.getMessage());
+            return null;
+        }
+    }
+
+    private ReviewDateInfo parseReviewDateInfo(String fullDateText, LocaleInfo localeInfo) {
+        String country = null;
+        Instant dateInstant = null;
+
+        if (fullDateText.isEmpty()) {
+            return new ReviewDateInfo(null, null);
+        }
+
+        try {
+            Matcher matcher = REVIEWED_IN_ON_PATTERN.matcher(fullDateText);
+            String datePart = fullDateText;
+
+            if (matcher.find() && matcher.groupCount() == 2) {
+                country = matcher.group(1).trim();
+                if (country.toLowerCase().startsWith("the ")) {
+                    country = country.substring(4).trim();
+                }
+                datePart = matcher.group(2).trim();
+            } else {
+                Matcher japaneseMatcher = JAPANESE_REVIEW_DATE_PATTERN.matcher(fullDateText);
+                if (japaneseMatcher.find()) {
+                    datePart = japaneseMatcher.group(1);
+                    country = "日本";
+                }
+            }
+
+            LocalDate localDate = parseDate(datePart, localeInfo);
+            if (localDate != null) {
+                dateInstant = localDate.atStartOfDay(ZoneOffset.UTC).toInstant();
+            }
+        } catch (Exception e) {
+            log.warn("Error parsing date string '{}': {}", fullDateText, e.getMessage());
+        }
+
+        return new ReviewDateInfo(country, dateInstant);
+    }
+
     private List<BookReview> getReviews(Document doc, int maxReviews) {
         List<BookReview> reviews = new ArrayList<>();
         String domain = appSettingService.getAppSettings().getMetadataProviderSettings().getAmazon().getDomain();
@@ -636,105 +739,67 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
 
         try {
             Elements reviewElements = doc.select("li[data-hook=review]");
-            int count = 0;
             int index = 0;
-
-            while (count < maxReviews && index < reviewElements.size()) {
-                Element reviewElement = reviewElements.get(index);
+            while (reviews.size() < maxReviews && index < reviewElements.size()) {
+                BookReview review = parseReview(reviewElements.get(index), localeInfo);
                 index++;
-
-                Elements reviewerNameElements = reviewElement.select(".a-profile-name");
-                String reviewerName = !reviewerNameElements.isEmpty() ? reviewerNameElements.first().text() : null;
-
-                String title = null;
-                Elements titleElements = reviewElement.select("[data-hook=review-title] span");
-                if (!titleElements.isEmpty()) {
-                    title = titleElements.last().text();
-                    if (title.isEmpty()) title = null;
+                if (review != null) {
+                    reviews.add(review);
                 }
-
-                Float ratingValue = null;
-                Elements ratingElements = reviewElement.select("[data-hook=review-star-rating] .a-icon-alt");
-                String ratingText = !ratingElements.isEmpty() ? ratingElements.first().text() : "";
-                if (!ratingText.isEmpty()) {
-                    try {
-                        Pattern ratingPattern = Pattern.compile("^([0-9]+([.,][0-9]+)?)");
-                        Matcher ratingMatcher = ratingPattern.matcher(ratingText);
-                        if (ratingMatcher.find()) {
-                            String ratingStr = ratingMatcher.group(1).replace(',', '.');
-                            ratingValue = Float.parseFloat(ratingStr);
-                        }
-                    } catch (NumberFormatException e) {
-                        log.warn("Failed to parse rating '{}': {}", ratingText, e.getMessage());
-                    }
-                }
-
-                Elements fullDateElements = reviewElement.select("[data-hook=review-date]");
-                String fullDateText = !fullDateElements.isEmpty() ? fullDateElements.first().text() : "";
-                String country = null;
-                Instant dateInstant = null;
-
-                if (!fullDateText.isEmpty()) {
-                    try {
-                        Matcher matcher = REVIEWED_IN_ON_PATTERN.matcher(fullDateText);
-                        String datePart = fullDateText;
-
-                        if (matcher.find() && matcher.groupCount() == 2) {
-                            country = matcher.group(1).trim();
-                            if (country.toLowerCase().startsWith("the ")) {
-                                country = country.substring(4).trim();
-                            }
-                            datePart = matcher.group(2).trim();
-                        } else {
-                            Matcher japaneseMatcher = JAPANESE_REVIEW_DATE_PATTERN.matcher(fullDateText);
-                            if (japaneseMatcher.find()) {
-                                datePart = japaneseMatcher.group(1);
-                                country = "日本"; 
-                            }
-                        }
-
-                        LocalDate localDate = parseDate(datePart, localeInfo);
-                        if (localDate != null) {
-                            dateInstant = localDate.atStartOfDay(ZoneOffset.UTC).toInstant();
-                        }
-
-                    } catch (Exception e) {
-                        log.warn("Error parsing date string '{}': {}", fullDateText, e.getMessage());
-                    }
-                }
-
-                Elements bodyElements = reviewElement.select("[data-hook=review-body]");
-                String body = !bodyElements.isEmpty() ? Objects.requireNonNull(bodyElements.first()).text() : null;
-                if (body != null && body.isEmpty()) {
-                    body = null;
-                } else if (body != null) {
-                    String toRemove = " Read more";
-                    int lastIndex = body.lastIndexOf(toRemove);
-                    if (lastIndex != -1) {
-                        body = body.substring(0, lastIndex) + body.substring(lastIndex + toRemove.length());
-                    }
-                }
-
-                if (body == null) {
-                    continue;
-                }
-
-                reviews.add(BookReview.builder()
-                        .metadataProvider(MetadataProvider.Amazon)
-                        .reviewerName(reviewerName != null ? reviewerName.trim() : null)
-                        .title(title != null ? title.trim() : null)
-                        .rating(ratingValue)
-                        .country(country != null ? country.trim() : null)
-                        .date(dateInstant)
-                        .body(body.trim())
-                        .build());
-
-                count++;
             }
         } catch (Exception e) {
             log.warn("Failed to parse reviews: {}", e.getMessage());
         }
         return reviews;
+    }
+
+    private BookReview parseReview(Element reviewElement, LocaleInfo localeInfo) {
+        Elements reviewerNameElements = reviewElement.select(".a-profile-name");
+        String reviewerName = !reviewerNameElements.isEmpty() ? Objects.requireNonNull(reviewerNameElements.first()).text() : null;
+
+        String title = null;
+        Elements titleElements = reviewElement.select("[data-hook=review-title] span");
+        if (!titleElements.isEmpty()) {
+            title = Objects.requireNonNull(titleElements.last()).text();
+            if (title.isEmpty()) title = null;
+        }
+
+        Elements ratingElements = reviewElement.select("[data-hook=review-star-rating] .a-icon-alt");
+        String ratingText = !ratingElements.isEmpty() ? Objects.requireNonNull(ratingElements.first()).text() : "";
+        Float ratingValue = parseReviewRating(ratingText);
+
+        Elements fullDateElements = reviewElement.select("[data-hook=review-date]");
+        String fullDateText = !fullDateElements.isEmpty() ? Objects.requireNonNull(fullDateElements.first()).text() : "";
+        ReviewDateInfo dateInfo = parseReviewDateInfo(fullDateText, localeInfo);
+
+        Elements bodyElements = reviewElement.select("[data-hook=review-body]");
+        String rawBody = !bodyElements.isEmpty() ? Objects.requireNonNull(bodyElements.first()).text() : null;
+        String body = cleanReviewBody(rawBody);
+        if (body == null) {
+            return null;
+        }
+
+        return BookReview.builder()
+                .metadataProvider(MetadataProvider.Amazon)
+                .reviewerName(reviewerName != null ? reviewerName.trim() : null)
+                .title(title != null ? title.trim() : null)
+                .rating(ratingValue)
+                .country(dateInfo.country() != null ? dateInfo.country().trim() : null)
+                .date(dateInfo.dateInstant())
+                .body(body.trim())
+                .build();
+    }
+
+    private String cleanReviewBody(String body) {
+        if (body == null || body.isEmpty()) {
+            return null;
+        }
+        String toRemove = " Read more";
+        int lastIndex = body.lastIndexOf(toRemove);
+        if (lastIndex != -1) {
+            return body.substring(0, lastIndex) + body.substring(lastIndex + toRemove.length());
+        }
+        return body;
     }
 
     private Integer getReviewCount(Document doc) {
@@ -807,7 +872,7 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                     .header("downlink", "10")
                     .header("dpr", "2")
                     .header("ect", "4g")
-                    .header("origin", "https://www.amazon." + domain)
+                    .header("origin", AMAZON_BASE_URL_PREFIX + domain)
                     .header("priority", "u=1, i")
                     .header("rtt", "50")
                     .header("sec-ch-device-memory", "8")
@@ -841,10 +906,10 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
                 throw new AmazonAntiScrapingException("Amazon 500 Internal Server Error");
             }
             log.error("HTTP error fetching URL. Status={}, URL=[{}]", e.getStatusCode(), url, e);
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         } catch (IOException e) {
             log.error("Error parsing url: {}", url, e);
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -901,63 +966,72 @@ public class AmazonBookParser implements BookParser, DetailedMetadataProvider {
     private String cleanDescriptionHtml(String html) {
         try {
             Document document = Jsoup.parse(html);
-            document.select("span.a-text-bold").tagName("b").removeAttr("class");
-            document.select("span.a-text-italic").tagName("i").removeAttr("class");
-            for (Element span : document.select("span.a-list-item")) {
-                span.unwrap();
-            }
-            document.select("ol.a-ordered-list.a-vertical").tagName("ol").removeAttr("class");
-            document.select("ul.a-unordered-list.a-vertical").tagName("ul").removeAttr("class");
-            for (Element span : document.select("span")) {
-                span.unwrap();
-            }
-            document.select("li").forEach(li -> {
-                Element prev = li.previousElementSibling();
-                if (prev != null && "br".equals(prev.tagName())) {
-                    prev.remove();
-                }
-                Element next = li.nextElementSibling();
-                if (next != null && "br".equals(next.tagName())) {
-                    next.remove();
-                }
-            });
-            document.select("p").stream()
-                    .filter(p -> p.text().trim().isEmpty())
-                    .forEach(Element::remove);
-
-            // Remove excessive line breaks (more than 2 consecutive <br> tags)
-            Elements brTags = document.select("br");
-            for (Element br : brTags) {
-                int consecutiveBrCount = 1;
-                Element next = br.nextElementSibling();
-
-                // Count consecutive <br> tags
-                while (next != null && "br".equals(next.tagName())) {
-                    consecutiveBrCount++;
-                    Element temp = next;
-                    next = next.nextElementSibling();
-
-                    // Remove extra <br> tags beyond the first two
-                    if (consecutiveBrCount > 2) {
-                        temp.remove();
-                    }
-                }
-            }
-
-            // "trim" the start and end of the document of whitespace & <br>
-            Node node;
-            while ((node = document.body().firstChild()) != null && isWhitespaceNode(node)) {
-                node.remove();
-            }
-            while ((node = document.body().lastChild()) != null && isWhitespaceNode(node)) {
-                node.remove();
-            }
-
+            simplifyDescriptionTags(document);
+            collapseConsecutiveBrTags(document);
+            trimBoundaryWhitespace(document);
             // Clean up any remaining whitespace issues
             return document.body().html().trim();
         } catch (Exception e) {
             log.warn("Error cleaning html description, Error: {}", e.getMessage());
         }
         return html;
+    }
+
+    private void simplifyDescriptionTags(Document document) {
+        document.select(BOLD_TEXT_SELECTOR).tagName("b").removeAttr(HTML_CLASS_ATTR);
+        document.select("span.a-text-italic").tagName("i").removeAttr(HTML_CLASS_ATTR);
+        for (Element span : document.select("span.a-list-item")) {
+            span.unwrap();
+        }
+        document.select("ol.a-ordered-list.a-vertical").tagName("ol").removeAttr(HTML_CLASS_ATTR);
+        document.select("ul.a-unordered-list.a-vertical").tagName("ul").removeAttr(HTML_CLASS_ATTR);
+        for (Element span : document.select("span")) {
+            span.unwrap();
+        }
+        document.select("li").forEach(li -> {
+            Element prev = li.previousElementSibling();
+            if (prev != null && "br".equals(prev.tagName())) {
+                prev.remove();
+            }
+            Element next = li.nextElementSibling();
+            if (next != null && "br".equals(next.tagName())) {
+                next.remove();
+            }
+        });
+        document.select("p").stream()
+                .filter(p -> p.text().trim().isEmpty())
+                .forEach(Element::remove);
+    }
+
+    // Remove excessive line breaks (more than 2 consecutive <br> tags)
+    private void collapseConsecutiveBrTags(Document document) {
+        Elements brTags = document.select("br");
+        for (Element br : brTags) {
+            int consecutiveBrCount = 1;
+            Element next = br.nextElementSibling();
+
+            // Count consecutive <br> tags
+            while (next != null && "br".equals(next.tagName())) {
+                consecutiveBrCount++;
+                Element temp = next;
+                next = next.nextElementSibling();
+
+                // Remove extra <br> tags beyond the first two
+                if (consecutiveBrCount > 2) {
+                    temp.remove();
+                }
+            }
+        }
+    }
+
+    // "trim" the start and end of the document of whitespace & <br>
+    private void trimBoundaryWhitespace(Document document) {
+        Node node;
+        while ((node = document.body().firstChild()) != null && isWhitespaceNode(node)) {
+            node.remove();
+        }
+        while ((node = document.body().lastChild()) != null && isWhitespaceNode(node)) {
+            node.remove();
+        }
     }
 }

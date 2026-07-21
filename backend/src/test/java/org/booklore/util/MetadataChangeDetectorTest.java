@@ -2,15 +2,25 @@ package org.booklore.util;
 
 import org.booklore.model.MetadataClearFlags;
 import org.booklore.model.dto.BookMetadata;
+import org.booklore.model.dto.ComicMetadata;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.CategoryEntity;
+import org.booklore.model.entity.ComicCharacterEntity;
+import org.booklore.model.entity.ComicCreatorEntity;
+import org.booklore.model.entity.ComicCreatorMappingEntity;
+import org.booklore.model.entity.ComicLocationEntity;
+import org.booklore.model.entity.ComicMetadataEntity;
+import org.booklore.model.entity.ComicTeamEntity;
 import org.booklore.model.entity.MoodEntity;
 import org.booklore.model.entity.TagEntity;
+import org.booklore.model.enums.ComicCreatorRole;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -35,7 +45,7 @@ class MetadataChangeDetectorTest {
                 .title("Original Title")
                 .subtitle("Original Subtitle")
                 .publisher("Original Publisher")
-                .publishedDate(LocalDate.of(2020, 1, 1))
+                .publishedDate(LocalDate.of(2020, Month.JANUARY, 1))
                 .description("Original Description")
                 .seriesName("Original Series")
                 .seriesNumber(1.0f)
@@ -108,7 +118,7 @@ class MetadataChangeDetectorTest {
                 .title("Original Title")
                 .subtitle("Original Subtitle")
                 .publisher("Original Publisher")
-                .publishedDate(LocalDate.of(2020, 1, 1))
+                .publishedDate(LocalDate.of(2020, Month.JANUARY, 1))
                 .description("Original Description")
                 .seriesName("Original Series")
                 .seriesNumber(1.0f)
@@ -187,7 +197,7 @@ class MetadataChangeDetectorTest {
             Arguments.of("title", (Consumer<BookMetadata>) m -> m.setTitle("New Title")),
             Arguments.of("subtitle", (Consumer<BookMetadata>) m -> m.setSubtitle("New Subtitle")),
             Arguments.of("publisher", (Consumer<BookMetadata>) m -> m.setPublisher("New Publisher")),
-            Arguments.of("publishedDate", (Consumer<BookMetadata>) m -> m.setPublishedDate(LocalDate.of(2021, 6, 15))),
+            Arguments.of("publishedDate", (Consumer<BookMetadata>) m -> m.setPublishedDate(LocalDate.of(2021, Month.JUNE, 15))),
             Arguments.of("description", (Consumer<BookMetadata>) m -> m.setDescription("New Description")),
             Arguments.of("seriesName", (Consumer<BookMetadata>) m -> m.setSeriesName("New Series")),
             Arguments.of("seriesNumber", (Consumer<BookMetadata>) m -> m.setSeriesNumber(2.0f)),
@@ -771,13 +781,6 @@ class MetadataChangeDetectorTest {
     }
 
     @Test
-    void testIsDifferent_whenCoverLockChanges_returnsTrue() {
-        newMeta.setCoverLocked(true);
-        boolean result = MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags);
-        assertTrue(result, "Should return true when cover lock changes");
-    }
-
-    @Test
     void testIsDifferent_whenCoverLockUnchanged_returnsFalse() {
         existingMeta.setCoverLocked(true);
         newMeta.setCoverLocked(true);
@@ -812,5 +815,281 @@ class MetadataChangeDetectorTest {
     void testHasValueChanges_whenFloatSeriesNumberUnchanged_returnsFalse() {
         boolean result = MetadataChangeDetector.hasValueChanges(newMeta, existingMeta, clearFlags);
         assertFalse(result, "Should return false when series number unchanged");
+    }
+
+    @Nested
+    @DisplayName("hasLockChanges()")
+    class HasLockChangesTests {
+
+        @Test
+        void noChanges_returnsFalse() {
+            assertFalse(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should return false when no lock differs");
+        }
+
+        @Test
+        void simpleFieldLockChanges_returnsTrue() {
+            newMeta.setTitleLocked(true);
+            assertTrue(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should return true when a simple field lock changes");
+        }
+
+        @Test
+        void collectionFieldLockChanges_returnsTrue() {
+            newMeta.setAuthorsLocked(true);
+            assertTrue(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should return true when a collection field lock changes");
+        }
+
+        @Test
+        void coverLockChanges_returnsTrue() {
+            newMeta.setCoverLocked(true);
+            assertTrue(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should return true when cover lock changes");
+        }
+
+        @Test
+        void audiobookCoverLockChanges_returnsTrue() {
+            newMeta.setAudiobookCoverLocked(true);
+            assertTrue(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should return true when audiobook cover lock changes");
+        }
+
+        @Test
+        void reviewsLockChanges_returnsTrue() {
+            newMeta.setReviewsLocked(true);
+            assertTrue(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should return true when reviews lock changes");
+        }
+    }
+
+    @Nested
+    @DisplayName("Comic metadata value comparison")
+    class ComicMetadataValueTests {
+
+        private ComicMetadata comicDto;
+        private ComicMetadataEntity comicEntity;
+
+        @BeforeEach
+        void setupComic() {
+            comicDto = baselineComicDto();
+            comicEntity = baselineComicEntity();
+            newMeta.setComicMetadata(comicDto);
+            existingMeta.setComicMetadata(comicEntity);
+        }
+
+        @Test
+        void matchingComicMetadata_returnsFalse() {
+            assertFalse(MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags),
+                    "Should return false when comic metadata matches");
+        }
+
+        @Test
+        void bothSidesHaveNoComicMetadata_returnsFalse() {
+            newMeta.setComicMetadata(null);
+            existingMeta.setComicMetadata(null);
+            assertFalse(MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags),
+                    "Should return false when neither side has comic metadata");
+        }
+
+        @Test
+        void entityHasNoComicMetadata_dtoHasNonEmptyValue_returnsTrue() {
+            existingMeta.setComicMetadata(null);
+            assertTrue(MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags),
+                    "Should return true when only the DTO carries comic data");
+        }
+
+        @Test
+        void entityHasNoComicMetadata_dtoEmpty_returnsFalse() {
+            existingMeta.setComicMetadata(null);
+            newMeta.setComicMetadata(ComicMetadata.builder().build());
+            assertFalse(MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags),
+                    "Should return false when the DTO's comic metadata is entirely empty");
+        }
+
+        @ParameterizedTest(name = "comic {0} differs")
+        @MethodSource("org.booklore.util.MetadataChangeDetectorTest#comicFieldChangeProvider")
+        void singleFieldDiffers_returnsTrue(String field, Consumer<ComicMetadata> modifier) {
+            modifier.accept(comicDto);
+            assertTrue(MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags),
+                    "Should detect comic change in " + field);
+        }
+
+        @Test
+        void creatorsPresentOnDtoOnly_returnsTrue() {
+            comicDto.setPencillers(Set.of("Penciller One"));
+            assertTrue(MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags),
+                    "Should return true when only the DTO lists creators");
+        }
+
+        @Test
+        void creatorsMatchInCount_returnsFalse() {
+            comicDto.setPencillers(Set.of("Penciller One"));
+            comicEntity.setCreatorMappings(Set.of(creatorMapping(comicEntity, "Penciller One", ComicCreatorRole.PENCILLER)));
+            assertFalse(MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags),
+                    "Should return false when creator counts match on both sides");
+        }
+
+        @Test
+        void creatorsDifferInCount_returnsTrue() {
+            comicDto.setPencillers(Set.of("P1", "P2"));
+            comicEntity.setCreatorMappings(Set.of(creatorMapping(comicEntity, "P1", ComicCreatorRole.PENCILLER)));
+            assertTrue(MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags),
+                    "Should return true when creator counts differ");
+        }
+
+        @Test
+        void bothSidesHaveNoCreators_returnsFalse() {
+            assertFalse(MetadataChangeDetector.isDifferent(newMeta, existingMeta, clearFlags),
+                    "Should return false when neither side lists creators");
+        }
+    }
+
+    static Stream<Arguments> comicFieldChangeProvider() {
+        return Stream.of(
+                Arguments.of("issueNumber", (Consumer<ComicMetadata>) m -> m.setIssueNumber("2")),
+                Arguments.of("volumeName", (Consumer<ComicMetadata>) m -> m.setVolumeName("Different Volume")),
+                Arguments.of("volumeNumber", (Consumer<ComicMetadata>) m -> m.setVolumeNumber(99)),
+                Arguments.of("storyArc", (Consumer<ComicMetadata>) m -> m.setStoryArc("Different Arc")),
+                Arguments.of("storyArcNumber", (Consumer<ComicMetadata>) m -> m.setStoryArcNumber(99)),
+                Arguments.of("alternateSeries", (Consumer<ComicMetadata>) m -> m.setAlternateSeries("Different Series")),
+                Arguments.of("alternateIssue", (Consumer<ComicMetadata>) m -> m.setAlternateIssue("Different Issue")),
+                Arguments.of("imprint", (Consumer<ComicMetadata>) m -> m.setImprint("Different Imprint")),
+                Arguments.of("format", (Consumer<ComicMetadata>) m -> m.setFormat("Different Format")),
+                Arguments.of("blackAndWhite", (Consumer<ComicMetadata>) m -> m.setBlackAndWhite(true)),
+                Arguments.of("manga", (Consumer<ComicMetadata>) m -> m.setManga(true)),
+                Arguments.of("readingDirection", (Consumer<ComicMetadata>) m -> m.setReadingDirection("rtl")),
+                Arguments.of("webLink", (Consumer<ComicMetadata>) m -> m.setWebLink("https://different.example")),
+                Arguments.of("notes", (Consumer<ComicMetadata>) m -> m.setNotes("Different notes")),
+                Arguments.of("characters", (Consumer<ComicMetadata>) m -> m.setCharacters(Set.of("Villain"))),
+                Arguments.of("teams", (Consumer<ComicMetadata>) m -> m.setTeams(Set.of("Other Team"))),
+                Arguments.of("locations", (Consumer<ComicMetadata>) m -> m.setLocations(Set.of("Other City")))
+        );
+    }
+
+    @Nested
+    @DisplayName("Comic metadata lock comparison")
+    class ComicMetadataLockTests {
+
+        private ComicMetadata comicDto;
+        private ComicMetadataEntity comicEntity;
+
+        @BeforeEach
+        void setupComic() {
+            comicDto = baselineComicDto();
+            comicEntity = baselineComicEntity();
+            newMeta.setComicMetadata(comicDto);
+            existingMeta.setComicMetadata(comicEntity);
+        }
+
+        @Test
+        void matchingLocks_returnsFalse() {
+            assertFalse(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should return false when comic locks match");
+        }
+
+        @Test
+        void dtoHasNoComicMetadata_returnsFalse() {
+            newMeta.setComicMetadata(null);
+            assertFalse(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should return false when the DTO has no comic metadata to compare locks against");
+        }
+
+        @Test
+        void entityHasNoComicMetadata_returnsFalse() {
+            existingMeta.setComicMetadata(null);
+            assertFalse(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should return false when the entity has no comic metadata to compare locks against");
+        }
+
+        @ParameterizedTest(name = "comic {0} differs")
+        @MethodSource("org.booklore.util.MetadataChangeDetectorTest#comicLockChangeProvider")
+        void singleLockDiffers_returnsTrue(String field, Consumer<ComicMetadata> modifier) {
+            modifier.accept(comicDto);
+            assertTrue(MetadataChangeDetector.hasLockChanges(newMeta, existingMeta),
+                    "Should detect comic lock change in " + field);
+        }
+    }
+
+    static Stream<Arguments> comicLockChangeProvider() {
+        return Stream.of(
+                Arguments.of("issueNumberLocked", (Consumer<ComicMetadata>) m -> m.setIssueNumberLocked(true)),
+                Arguments.of("volumeNameLocked", (Consumer<ComicMetadata>) m -> m.setVolumeNameLocked(true)),
+                Arguments.of("volumeNumberLocked", (Consumer<ComicMetadata>) m -> m.setVolumeNumberLocked(true)),
+                Arguments.of("storyArcLocked", (Consumer<ComicMetadata>) m -> m.setStoryArcLocked(true)),
+                Arguments.of("storyArcNumberLocked", (Consumer<ComicMetadata>) m -> m.setStoryArcNumberLocked(true)),
+                Arguments.of("alternateSeriesLocked", (Consumer<ComicMetadata>) m -> m.setAlternateSeriesLocked(true)),
+                Arguments.of("alternateIssueLocked", (Consumer<ComicMetadata>) m -> m.setAlternateIssueLocked(true)),
+                Arguments.of("imprintLocked", (Consumer<ComicMetadata>) m -> m.setImprintLocked(true)),
+                Arguments.of("formatLocked", (Consumer<ComicMetadata>) m -> m.setFormatLocked(true)),
+                Arguments.of("blackAndWhiteLocked", (Consumer<ComicMetadata>) m -> m.setBlackAndWhiteLocked(true)),
+                Arguments.of("mangaLocked", (Consumer<ComicMetadata>) m -> m.setMangaLocked(true)),
+                Arguments.of("readingDirectionLocked", (Consumer<ComicMetadata>) m -> m.setReadingDirectionLocked(true)),
+                Arguments.of("webLinkLocked", (Consumer<ComicMetadata>) m -> m.setWebLinkLocked(true)),
+                Arguments.of("notesLocked", (Consumer<ComicMetadata>) m -> m.setNotesLocked(true)),
+                Arguments.of("creatorsLocked", (Consumer<ComicMetadata>) m -> m.setCreatorsLocked(true)),
+                Arguments.of("pencillersLocked", (Consumer<ComicMetadata>) m -> m.setPencillersLocked(true)),
+                Arguments.of("inkersLocked", (Consumer<ComicMetadata>) m -> m.setInkersLocked(true)),
+                Arguments.of("coloristsLocked", (Consumer<ComicMetadata>) m -> m.setColoristsLocked(true)),
+                Arguments.of("letterersLocked", (Consumer<ComicMetadata>) m -> m.setLetterersLocked(true)),
+                Arguments.of("coverArtistsLocked", (Consumer<ComicMetadata>) m -> m.setCoverArtistsLocked(true)),
+                Arguments.of("editorsLocked", (Consumer<ComicMetadata>) m -> m.setEditorsLocked(true)),
+                Arguments.of("charactersLocked", (Consumer<ComicMetadata>) m -> m.setCharactersLocked(true)),
+                Arguments.of("teamsLocked", (Consumer<ComicMetadata>) m -> m.setTeamsLocked(true)),
+                Arguments.of("locationsLocked", (Consumer<ComicMetadata>) m -> m.setLocationsLocked(true))
+        );
+    }
+
+    private static ComicMetadata baselineComicDto() {
+        return ComicMetadata.builder()
+                .issueNumber("1")
+                .volumeName("Volume One")
+                .volumeNumber(1)
+                .storyArc("Arc One")
+                .storyArcNumber(1)
+                .alternateSeries("Alt Series")
+                .alternateIssue("Alt Issue")
+                .imprint("Imprint")
+                .format("Format")
+                .blackAndWhite(false)
+                .manga(false)
+                .readingDirection("ltr")
+                .webLink("http://example.com")
+                .notes("Some notes")
+                .characters(Set.of("Hero"))
+                .teams(Set.of("Team"))
+                .locations(Set.of("City"))
+                .build();
+    }
+
+    private static ComicMetadataEntity baselineComicEntity() {
+        return ComicMetadataEntity.builder()
+                .issueNumber("1")
+                .volumeName("Volume One")
+                .volumeNumber(1)
+                .storyArc("Arc One")
+                .storyArcNumber(1)
+                .alternateSeries("Alt Series")
+                .alternateIssue("Alt Issue")
+                .imprint("Imprint")
+                .format("Format")
+                .blackAndWhite(false)
+                .manga(false)
+                .readingDirection("ltr")
+                .webLink("http://example.com")
+                .notes("Some notes")
+                .characters(Set.of(ComicCharacterEntity.builder().id(1L).name("Hero").build()))
+                .teams(Set.of(ComicTeamEntity.builder().id(1L).name("Team").build()))
+                .locations(Set.of(ComicLocationEntity.builder().id(1L).name("City").build()))
+                .build();
+    }
+
+    private static ComicCreatorMappingEntity creatorMapping(ComicMetadataEntity owner, String creatorName, ComicCreatorRole role) {
+        return ComicCreatorMappingEntity.builder()
+                .id(1L)
+                .comicMetadata(owner)
+                .creator(ComicCreatorEntity.builder().id(1L).name(creatorName).build())
+                .role(role)
+                .build();
     }
 }

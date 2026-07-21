@@ -90,7 +90,7 @@ class KoboInitializationServiceTest {
             assertEquals(200, response.getStatusCode().value());
             assertNotNull(response.getBody());
             JsonNode result = response.getBody().getResources();
-            assertEquals("https://storeapi.kobo.com/v1/library/sync", result.get("example").asText());
+            assertEquals("https://storeapi.kobo.com/v1/library/sync", result.get("example").asString());
         }
 
         @Test
@@ -108,7 +108,7 @@ class KoboInitializationServiceTest {
             ResponseEntity<KoboResources> response = service.initialize("test-token");
 
             JsonNode result = response.getBody().getResources();
-            assertEquals("http://localhost:8080", result.get("image_host").asText());
+            assertEquals("http://localhost:8080", result.get("image_host").asString());
         }
 
         @Test
@@ -126,7 +126,7 @@ class KoboInitializationServiceTest {
             ResponseEntity<KoboResources> response = service.initialize("test-token");
 
             JsonNode result = response.getBody().getResources();
-            assertTrue(result.get("image_url_template").asText().contains("localhost:8080"));
+            assertTrue(result.get("image_url_template").asString().contains("localhost:8080"));
         }
     }
 
@@ -172,7 +172,7 @@ class KoboInitializationServiceTest {
             var body = response.getBody();
 
             assertNotNull(body);
-            assertEquals("http://127.0.0.1/v1/library/sync", body.getResources().get("example").asText());
+            assertEquals("http://127.0.0.1/v1/library/sync", body.getResources().get("example").asString());
         }
 
         @Test
@@ -208,7 +208,7 @@ class KoboInitializationServiceTest {
 
             verify(koboResourcesComponent).getResources();
             assertEquals("https://storeapi.kobo.com/v1/example",
-                    response.getBody().getResources().get("example").asText());
+                    response.getBody().getResources().get("example").asString());
         }
 
         @Test

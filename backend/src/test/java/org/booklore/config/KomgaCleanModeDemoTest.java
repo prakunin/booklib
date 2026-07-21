@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Demonstrates the JSON output differences with and without clean mode.
  */
-class KomgaCleanModeDemo {
+class KomgaCleanModeDemoTest {
 
     private ObjectMapper objectMapper;
 

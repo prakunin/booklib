@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 @SpringBootTest(classes = BookloreApplication.class)
 @Transactional
@@ -84,13 +86,13 @@ class BookBrowseRegistryTest {
         @Bean("flyway")
         @Primary
         public Flyway flyway() {
-            return org.mockito.Mockito.mock(Flyway.class);
+            return mock(Flyway.class);
         }
 
         @Bean
         @Primary
         public TaskCronService taskCronService() {
-            return org.mockito.Mockito.mock(TaskCronService.class);
+            return mock(TaskCronService.class);
         }
     }
 
@@ -116,7 +118,7 @@ class BookBrowseRegistryTest {
         em.persist(bookEntity);
         BookMetadataEntity metadata = BookMetadataEntity.builder()
                 .book(bookEntity).title(title).seriesName(seriesName).seriesNumber(seriesNumber)
-                .isbn13(isbn13).publishedDate(LocalDate.of(2020, 1, 1)).build();
+                .isbn13(isbn13).publishedDate(LocalDate.of(2020, Month.JANUARY, 1)).build();
         metadata.setCategories(categoryNames.stream().map(this::category).collect(Collectors.toSet()));
         metadata.setAuthors(authorNames.stream().map(this::author).toList());
         em.persist(metadata);
@@ -124,6 +126,8 @@ class BookBrowseRegistryTest {
         return bookEntity;
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void progress(BookEntity book, BookLoreUserEntity forUser, Integer personalRating,
                           ReadStatus status, Float epubPercent, Float pdfPercent) {
         UserBookProgressEntity p = UserBookProgressEntity.builder()

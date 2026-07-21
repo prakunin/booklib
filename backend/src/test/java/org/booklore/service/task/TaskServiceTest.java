@@ -76,7 +76,7 @@ class TaskServiceTest {
     }
 
     @Test
-    @Disabled
+    @Disabled("guess: introduced already disabled with the initial task-scheduling implementation (#1427) and never re-enabled; no reason recorded in history, and TaskService/TaskType have since evolved — a maintainer should confirm whether it still fails before re-enabling")
     void testGetAvailableTasksReturnsNonNull() {
         CronConfig cronConfig = CronConfig.builder()
                 .taskType(TaskType.CLEANUP_TEMP_METADATA)

@@ -7,6 +7,7 @@ import org.hibernate.Hibernate;
 import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -108,7 +109,7 @@ public class BookLoreUserEntity {
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneId.systemDefault());
     }
 
     @Override

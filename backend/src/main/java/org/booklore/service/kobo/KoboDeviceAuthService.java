@@ -3,6 +3,7 @@ package org.booklore.service.kobo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.booklore.exception.ApiError;
 import org.booklore.model.dto.kobo.KoboAuthentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -31,7 +32,7 @@ public class KoboDeviceAuthService {
         auth.setAccessToken(RandomStringUtils.secure().nextAlphanumeric(24));
         auth.setRefreshToken(RandomStringUtils.secure().nextAlphanumeric(24));
         auth.setTrackingId(UUID.randomUUID().toString());
-        auth.setUserKey(requestBody.get("UserKey").asText());
+        auth.setUserKey(requestBody.get("UserKey").asString());
 
         return ResponseEntity.ok()
                 .header("Content-Type", "application/json; charset=utf-8")
@@ -39,12 +40,12 @@ public class KoboDeviceAuthService {
                 .body(auth);
     }
 
-    public byte[] toJsonBytes(KoboAuthentication KoboAuthentication) {
+    public byte[] toJsonBytes(KoboAuthentication koboAuthentication) {
         try {
-            return objectMapper.writeValueAsString(KoboAuthentication).getBytes(StandardCharsets.UTF_8);
+            return objectMapper.writeValueAsString(koboAuthentication).getBytes(StandardCharsets.UTF_8);
         } catch (JacksonException e) {
             log.error("Failed to serialize AuthDto to JSON", e);
-            throw new RuntimeException("Failed to serialize AuthDto", e);
+            throw ApiError.INTERNAL_SERVER_ERROR.createException("Failed to serialize AuthDto");
         }
     }
 }

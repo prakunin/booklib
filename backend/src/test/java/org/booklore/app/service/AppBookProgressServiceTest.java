@@ -79,6 +79,8 @@ class AppBookProgressServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void updateBookProgress_success_mapsAllFieldsFromAppRequest() {
         mockAdminUser();
         mockBookWithLibrary(bookId, libraryId);

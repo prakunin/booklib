@@ -1,5 +1,6 @@
 package org.booklore.service.watcher;
 
+import org.booklore.model.dto.settings.LibraryFile;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.LibraryEntity;
@@ -19,15 +20,20 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import java.util.Comparator;
+import java.util.concurrent.TimeUnit;
 
 class LibraryFileEventProcessorTest {
 
@@ -50,6 +56,7 @@ class LibraryFileEventProcessorTest {
     Path tempDir;
 
     @BeforeEach
+    @SuppressWarnings("java:S1874") // AUTO_DETECT is a deprecated but still-supported compat mode; no replacement exists
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
         processor = new LibraryFileEventProcessor(
@@ -113,11 +120,10 @@ class LibraryFileEventProcessorTest {
             // Immediately follow with CREATE (simulates quick rename)
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, file, false);
 
-            // The DELETE should have been cancelled. Wait a bit for debounce to settle.
-            Thread.sleep(1000);
-
-            // The DELETE event should not have been processed
-            verify(bookFilePersistenceService, never()).findBookFileByLibraryPathSubPathAndFileName(anyLong(), anyString(), anyString());
+            // The DELETE should have been cancelled. Wait out the debounce window, then confirm
+            // the DELETE event was never processed.
+            await().pollDelay(1000, TimeUnit.MILLISECONDS).atMost(1500, TimeUnit.MILLISECONDS).untilAsserted(() ->
+                    verify(bookFilePersistenceService, never()).findBookFileByLibraryPathSubPathAndFileName(anyLong(), anyString(), anyString()));
         }
 
         @Test
@@ -157,10 +163,9 @@ class LibraryFileEventProcessorTest {
             // Queue a modify event for a non-book file
             processor.processEvent(StandardWatchEventKinds.ENTRY_MODIFY, 1L, textFile, false);
 
-            // Wait for processing
-            Thread.sleep(200);
-
-            verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            // Wait for processing to have had a chance to run, then confirm it never handled the file
+            await().pollDelay(200, TimeUnit.MILLISECONDS).atMost(700, TimeUnit.MILLISECONDS).untilAsserted(() ->
+                    verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any()));
         }
     }
 
@@ -178,10 +183,9 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
 
-            // Folder debounce is 5s, then queue processing
-            Thread.sleep(8000);
-
-            verify(bookFileTransactionalHandler, times(2)).handleNewBookFile(eq(1L), any());
+            // Folder debounce is 5s, then queue processing; poll until both files have been handled
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() ->
+                    verify(bookFileTransactionalHandler, times(2)).handleNewBookFile(eq(1L), any()));
         }
 
         @Test
@@ -195,11 +199,12 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
 
-            Thread.sleep(8000);
-
-            verify(bookFileTransactionalHandler).handleNewFolderAudiobook(1L, folder);
-            verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
-            verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
+            // Folder debounce is 5s, then queue processing; poll until the audiobook folder has been handled
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+                verify(bookFileTransactionalHandler).handleNewFolderAudiobook(1L, folder);
+                verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+                verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
+            });
         }
 
         @Test
@@ -213,11 +218,12 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
 
-            Thread.sleep(8000);
-
-            verify(bookFileTransactionalHandler).handleNewFolderAudiobook(1L, folder);
-            verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
-            verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
+            // Folder debounce is 5s, then queue processing; poll until the audiobook folder has been handled
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+                verify(bookFileTransactionalHandler).handleNewFolderAudiobook(1L, folder);
+                verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+                verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
+            });
         }
 
         @Test
@@ -231,9 +237,9 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
 
-            Thread.sleep(8000);
-
-            verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            // Wait out the folder debounce + processing window, then confirm it was never handled
+            await().pollDelay(8000, TimeUnit.MILLISECONDS).atMost(8500, TimeUnit.MILLISECONDS).untilAsserted(() ->
+                    verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any()));
         }
 
         @Test
@@ -251,10 +257,9 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
 
-            Thread.sleep(8000);
-
             // Only good.epub should be processed, not hidden.epub
-            verify(bookFileTransactionalHandler, times(1)).handleNewBookFile(eq(1L), any());
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() ->
+                    verify(bookFileTransactionalHandler, times(1)).handleNewBookFile(eq(1L), any()));
         }
 
         @Test
@@ -266,10 +271,11 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
 
-            Thread.sleep(8000);
-
-            verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
-            verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            // Wait out the folder debounce + processing window, then confirm nothing was processed
+            await().pollDelay(8000, TimeUnit.MILLISECONDS).atMost(8500, TimeUnit.MILLISECONDS).untilAsserted(() -> {
+                verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
+                verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            });
         }
 
         @Test
@@ -280,10 +286,10 @@ class LibraryFileEventProcessorTest {
 
                 processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, outsideFolder, true);
 
-                Thread.sleep(8000);
-
-                // handleEvent should skip because path is outside library
-                verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+                // Wait out the folder debounce + processing window, then confirm handleEvent skipped
+                // it because the path is outside the library
+                await().pollDelay(8000, TimeUnit.MILLISECONDS).atMost(8500, TimeUnit.MILLISECONDS).untilAsserted(() ->
+                        verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any()));
             } finally {
                 try (var stream = Files.walk(outsideFolder)) {
                     stream.sorted(Comparator.reverseOrder()).forEach(p -> {
@@ -292,13 +298,105 @@ class LibraryFileEventProcessorTest {
                 }
             }
         }
+
+        @Test
+        void autoDetectMode_walksAndProcessesFilesIndividually() throws Exception {
+            // library.organizationMode is AUTO_DETECT by default (set in setUp)
+            Path folder = tempDir.resolve("autoDetect");
+            Files.createDirectory(folder);
+            Files.writeString(folder.resolve("book1.epub"), "content1");
+            Files.writeString(folder.resolve("book2.pdf"), "content2");
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
+
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() ->
+                    verify(bookFileTransactionalHandler, times(2)).handleNewBookFile(eq(1L), any()));
+        }
+    }
+
+    @Nested
+    class BookPerFolderHashResolution {
+
+        @BeforeEach
+        void setUpBookPerFolder() {
+            library.setOrganizationMode(LibraryOrganizationMode.BOOK_PER_FOLDER);
+        }
+
+        @Test
+        void unmatchedFiles_processedAsNewBooksViaLibraryProcessingService() throws Exception {
+            when(pendingDeletionPool.matchFolderByHashes(any())).thenReturn(Optional.empty());
+            when(pendingDeletionPool.matchByHash(anyString())).thenReturn(Optional.empty());
+            when(bookRepository.findByCurrentHashIncludingRecentlyDeleted(anyString(), any(Instant.class)))
+                    .thenReturn(Optional.empty());
+
+            Path folder = tempDir.resolve("newBookFolder");
+            Files.createDirectory(folder);
+            Files.writeString(folder.resolve("part1.epub"), "content1");
+            Files.writeString(folder.resolve("part2.epub"), "content2");
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
+
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+                @SuppressWarnings("unchecked")
+                var captor = org.mockito.ArgumentCaptor.forClass(List.class);
+                verify(libraryProcessingService).processLibraryFiles(captor.capture(), eq(library));
+                assertThat(captor.getValue()).hasSize(2);
+                assertThat(captor.getValue()).allMatch(LibraryFile.class::isInstance);
+                verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            });
+        }
+
+        @Test
+        void hashMatchesExistingBook_updatesPathInsteadOfCreatingNewBook() throws Exception {
+            BookEntity existingBook = BookEntity.builder().id(20L).library(library).libraryPath(libraryPath).build();
+
+            when(pendingDeletionPool.matchFolderByHashes(any())).thenReturn(Optional.empty());
+            when(pendingDeletionPool.matchByHash(anyString())).thenReturn(Optional.empty());
+            when(bookRepository.findByCurrentHashIncludingRecentlyDeleted(anyString(), any(Instant.class)))
+                    .thenReturn(Optional.of(existingBook));
+
+            Path folder = tempDir.resolve("movedBookFolder");
+            Files.createDirectory(folder);
+            Files.writeString(folder.resolve("moved.epub"), "moved content");
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
+
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+                verify(bookFilePersistenceService).updatePathIfChanged(eq(existingBook), eq(library), any(), anyString());
+                verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
+            });
+        }
+
+        @Test
+        void poolMatchesEntireFolder_recoversBooksWithoutNewProcessing() throws Exception {
+            PendingDeletionPool.BookSnapshot bookSnapshot =
+                    new PendingDeletionPool.BookSnapshot(30L, 1L, "sub", List.of());
+            PendingDeletionPool.PendingDeletion pendingDeletion = new PendingDeletionPool.PendingDeletion(
+                    tempDir, true, 1L, Instant.now(), null, Map.of(), Map.of(30L, bookSnapshot));
+            PendingDeletionPool.FolderMatchResult folderMatch =
+                    new PendingDeletionPool.FolderMatchResult(pendingDeletion, Map.of());
+
+            when(pendingDeletionPool.matchFolderByHashes(any())).thenReturn(Optional.of(folderMatch));
+
+            Path folder = tempDir.resolve("recoveredFolder");
+            Files.createDirectory(folder);
+            Files.writeString(folder.resolve("recovered.epub"), "recovered content");
+
+            processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, folder, true);
+
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+                verify(bookFilePersistenceService).recoverFolderBook(eq(bookSnapshot), eq(libraryPath), eq(folder), any());
+                verify(libraryProcessingService, never()).processLibraryFiles(any(), any());
+                verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            });
+        }
     }
 
     @Nested
     class FolderDeleteHandling {
 
         @Test
-        void folderWithBooks_addsToPool() throws Exception {
+        void folderWithBooks_addsToPool() {
             BookEntity book = BookEntity.builder()
                     .id(10L)
                     .library(library)
@@ -321,13 +419,12 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_DELETE, 1L, folder, true);
 
-            Thread.sleep(2000);
-
-            verify(pendingDeletionPool).addFolderDeletion(any(), eq(1L), eq(List.of(book)), any());
+            await().atMost(4, TimeUnit.SECONDS).untilAsserted(() ->
+                    verify(pendingDeletionPool).addFolderDeletion(any(), eq(1L), eq(List.of(book)), any()));
         }
 
         @Test
-        void folderWithNoBooks_doesNotAddToPool() throws Exception {
+        void folderWithNoBooks_doesNotAddToPool() {
             when(bookRepository.findBooksWithFilesUnderPath(eq(1L), anyString()))
                     .thenReturn(List.of());
 
@@ -335,9 +432,9 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_DELETE, 1L, folder, true);
 
-            Thread.sleep(2000);
-
-            verify(pendingDeletionPool, never()).addFolderDeletion(any(), anyLong(), any(), any());
+            // Wait out the processing window, then confirm nothing was added to the pool
+            await().pollDelay(2000, TimeUnit.MILLISECONDS).atMost(2500, TimeUnit.MILLISECONDS).untilAsserted(() ->
+                    verify(pendingDeletionPool, never()).addFolderDeletion(any(), anyLong(), any(), any()));
         }
     }
 
@@ -345,7 +442,7 @@ class LibraryFileEventProcessorTest {
     class FileDeleteHandling {
 
         @Test
-        void bookFileFound_addsToPool() throws Exception {
+        void bookFileFound_addsToPool() {
             BookEntity book = BookEntity.builder()
                     .id(10L).library(library).libraryPath(libraryPath).deleted(false)
                     .bookFiles(new ArrayList<>()).build();
@@ -360,13 +457,12 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_DELETE, 1L, file, false);
 
-            Thread.sleep(2000);
-
-            verify(pendingDeletionPool).addFileDeletion(any(), eq(1L), eq(bookFile), eq(book), any());
+            await().atMost(4, TimeUnit.SECONDS).untilAsserted(() ->
+                    verify(pendingDeletionPool).addFileDeletion(any(), eq(1L), eq(bookFile), eq(book), any()));
         }
 
         @Test
-        void bookFileNotFound_logsAndContinues() throws Exception {
+        void bookFileNotFound_logsAndContinues() {
             when(bookFilePersistenceService.findBookFileByLibraryPathSubPathAndFileName(anyLong(), anyString(), anyString()))
                     .thenReturn(Optional.empty());
 
@@ -374,9 +470,9 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_DELETE, 1L, file, false);
 
-            Thread.sleep(2000);
-
-            verify(pendingDeletionPool, never()).addFileDeletion(any(), anyLong(), any(), any(), any());
+            // Wait out the processing window, then confirm nothing was added to the pool
+            await().pollDelay(2000, TimeUnit.MILLISECONDS).atMost(2500, TimeUnit.MILLISECONDS).untilAsserted(() ->
+                    verify(pendingDeletionPool, never()).addFileDeletion(any(), anyLong(), any(), any(), any()));
         }
     }
 
@@ -390,10 +486,9 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, file, false);
 
-            // Wait for stability check + processing
-            Thread.sleep(4000);
-
-            verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            // Wait out the stability check + processing window, then confirm it was never handled
+            await().pollDelay(4000, TimeUnit.MILLISECONDS).atMost(4500, TimeUnit.MILLISECONDS).untilAsserted(() ->
+                    verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any()));
         }
 
         @Test
@@ -403,9 +498,8 @@ class LibraryFileEventProcessorTest {
 
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, file, false);
 
-            Thread.sleep(4000);
-
-            verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any());
+            await().pollDelay(4000, TimeUnit.MILLISECONDS).atMost(4500, TimeUnit.MILLISECONDS).untilAsserted(() ->
+                    verify(bookFileTransactionalHandler, never()).handleNewBookFile(anyLong(), any()));
         }
 
         @Test
@@ -416,10 +510,9 @@ class LibraryFileEventProcessorTest {
             processor.processEvent(StandardWatchEventKinds.ENTRY_CREATE, 1L, file, false);
 
             // Stability check needs file to be stable for STABILITY_CHECK_INTERVAL_MS (3s)
-            // then event goes to queue and is processed by virtual thread
-            Thread.sleep(7000);
-
-            verify(bookFileTransactionalHandler).handleNewBookFile(eq(1L), any());
+            // then event goes to queue and is processed by virtual thread; poll until handled
+            await().atMost(10, TimeUnit.SECONDS).untilAsserted(() ->
+                    verify(bookFileTransactionalHandler).handleNewBookFile(eq(1L), any()));
         }
     }
 
@@ -428,8 +521,7 @@ class LibraryFileEventProcessorTest {
 
         @Test
         void stopCompletesCleanly() {
-            // Just verify stop doesn't throw
-            processor.stop();
+            assertThatCode(() -> processor.stop()).doesNotThrowAnyException();
 
             // Reinitialize so tearDown's shutdown doesn't fail
             processor = new LibraryFileEventProcessor(

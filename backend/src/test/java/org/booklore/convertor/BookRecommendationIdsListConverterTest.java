@@ -3,6 +3,9 @@ package org.booklore.convertor;
 import org.booklore.model.dto.BookRecommendationLite;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Set;
@@ -65,25 +68,11 @@ class BookRecommendationIdsListConverterTest {
         assertEquals(0.87, book2.getS(), 0.001);
     }
 
-    @Test
-    void convertToEntityAttribute_withNull_shouldReturnEmptySet() {
-        Set<BookRecommendationLite> result = converter.convertToEntityAttribute(null);
-
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void convertToEntityAttribute_withEmptyString_shouldReturnEmptySet() {
-        Set<BookRecommendationLite> result = converter.convertToEntityAttribute("");
-
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void convertToEntityAttribute_withBlankString_shouldReturnEmptySet() {
-        Set<BookRecommendationLite> result = converter.convertToEntityAttribute("   ");
+    @ParameterizedTest(name = "convertToEntityAttribute with [{0}] returns empty set")
+    @NullSource
+    @ValueSource(strings = {"", "   "})
+    void convertToEntityAttribute_withNullOrBlankInput_shouldReturnEmptySet(String input) {
+        Set<BookRecommendationLite> result = converter.convertToEntityAttribute(input);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());

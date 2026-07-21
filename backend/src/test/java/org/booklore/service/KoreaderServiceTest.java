@@ -232,7 +232,7 @@ class KoreaderServiceTest {
                 .thenReturn(Optional.empty());
 
         var dto = KoreaderProgress.builder()
-                .document("h").progress("x").percentage(0.6F).device("d").device_id("id").build();
+                .document("h").progress("x").percentage(0.6F).device("d").deviceId("id").build();
         service.saveProgress("h", dto);
 
         ArgumentCaptor<UserBookProgressEntity> cap = ArgumentCaptor.forClass(UserBookProgressEntity.class);
@@ -259,7 +259,7 @@ class KoreaderServiceTest {
                 .thenReturn(Optional.of(existing));
 
         var dto = KoreaderProgress.builder()
-                .document("h").progress("y").percentage(0.4F).device("d").device_id("id").build();
+                .document("h").progress("y").percentage(0.4F).device("d").deviceId("id").build();
         service.saveProgress("h", dto);
 
         verify(progressRepo).save(existing);
@@ -283,7 +283,7 @@ class KoreaderServiceTest {
                 .thenReturn(Optional.of(existing));
 
         var dto = KoreaderProgress.builder()
-                .document("h").progress("y").percentage(0.4F).device("d").device_id("id").build();
+                .document("h").progress("y").percentage(0.4F).device("d").deviceId("id").build();
         service.saveProgress("h", dto);
 
         verify(progressRepo).save(existing);
@@ -300,6 +300,8 @@ class KoreaderServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void syncProgressToKoreader_whenEnabled_updatesPercentAndXPointer() {
         BookEntity book = epubBook(11L);
         BookLoreUserEntity user = user(42L);
@@ -322,6 +324,8 @@ class KoreaderServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void syncProgressToKoreader_whenConversionFails_clearsStaleXPointerButKeepsPercent() {
         BookEntity book = epubBook(11L);
         BookLoreUserEntity user = user(42L);
@@ -376,6 +380,8 @@ class KoreaderServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void syncProgressToKoreader_whenNotEpub_clearsStaleXPointer() {
         BookEntity book = bookWithPrimaryFile(11L, BookFileType.PDF);
         BookLoreUserEntity user = user(42L);

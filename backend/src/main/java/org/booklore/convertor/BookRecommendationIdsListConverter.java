@@ -28,7 +28,7 @@ public class BookRecommendationIdsListConverter implements AttributeConverter<Se
             return objectMapper.writeValueAsString(recommendations);
         } catch (JacksonException e) {
             log.error("Failed to convert BookRecommendation set to JSON string: {}", recommendations, e);
-            throw new RuntimeException("Error converting BookRecommendation list to JSON", e);
+            throw new IllegalStateException("Error converting BookRecommendation list to JSON", e);
         }
     }
 

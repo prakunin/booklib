@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.Year;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -29,6 +30,9 @@ import java.time.MonthDay;
 public class FilenamePatternExtractor {
 
     private static final Pattern PATTERN = Pattern.compile("[,;&]");
+    private static final String NON_GREEDY_TEXT_PATTERN = "(.+?)";
+    private static final String PLACEHOLDER_PUBLISHED = "Published";
+    private static final String TWO_DIGIT_PATTERN = "\\d{2}";
     private final BookdropFileRepository bookdropFileRepository;
     private final BookdropMetadataHelper metadataHelper;
     private final ExecutorService regexExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -42,13 +46,13 @@ public class FilenamePatternExtractor {
     private static final int COMPACT_DATE_LENGTH = 8;
 
     private static final Map<String, PlaceholderConfig> PLACEHOLDER_CONFIGS = Map.ofEntries(
-            Map.entry("SeriesName", new PlaceholderConfig("(.+?)", "seriesName")),
-            Map.entry("Title", new PlaceholderConfig("(.+?)", "title")),
-            Map.entry("Subtitle", new PlaceholderConfig("(.+?)", "subtitle")),
-            Map.entry("Authors", new PlaceholderConfig("(.+?)", "authors")),
+            Map.entry("SeriesName", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "seriesName")),
+            Map.entry("Title", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "title")),
+            Map.entry("Subtitle", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "subtitle")),
+            Map.entry("Authors", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "authors")),
             Map.entry("SeriesNumber", new PlaceholderConfig("(\\d+(?:\\.\\d+)?)", "seriesNumber")),
-            Map.entry("Published", new PlaceholderConfig("(.+?)", "publishedDate")),
-            Map.entry("Publisher", new PlaceholderConfig("(.+?)", "publisher")),
+            Map.entry(PLACEHOLDER_PUBLISHED, new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "publishedDate")),
+            Map.entry("Publisher", new PlaceholderConfig(NON_GREEDY_TEXT_PATTERN, "publisher")),
             Map.entry("Language", new PlaceholderConfig("([a-zA-Z]+)", "language")),
             Map.entry("SeriesTotal", new PlaceholderConfig("(\\d+)", "seriesTotal")),
             Map.entry("ISBN10", new PlaceholderConfig("(\\d{9}[0-9Xx])", "isbn10")),
@@ -59,7 +63,7 @@ public class FilenamePatternExtractor {
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{(\\w+)(?::(.*?))?}|\\*");
     
     private static final Pattern FOUR_DIGIT_YEAR_PATTERN = Pattern.compile("\\d{4}");
-    private static final Pattern TWO_DIGIT_YEAR_PATTERN = Pattern.compile("\\d{2}");
+    private static final Pattern TWO_DIGIT_YEAR_PATTERN = Pattern.compile(TWO_DIGIT_PATTERN);
     private static final Pattern COMPACT_DATE_PATTERN = Pattern.compile("\\d{8}");
     private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("(\\d{4})([^\\d])(\\d{1,2})");
     private static final Pattern MONTH_YEAR_PATTERN = Pattern.compile("(\\d{1,2})([^\\d])(\\d{4})");
@@ -274,8 +278,8 @@ public class FilenamePatternExtractor {
 
             String regexForPlaceholder;
             if ("*".equals(placeholderName)) {
-                regexForPlaceholder = shouldUseGreedyMatching ? "(.+)" : "(.+?)";
-            } else if ("Published".equals(placeholderName) && formatParameter != null) {
+                regexForPlaceholder = shouldUseGreedyMatching ? "(.+)" : NON_GREEDY_TEXT_PATTERN;
+            } else if (PLACEHOLDER_PUBLISHED.equals(placeholderName) && formatParameter != null) {
                 regexForPlaceholder = buildRegexForDateFormat(formatParameter);
             } else {
                 PlaceholderConfig config = PLACEHOLDER_CONFIGS.get(placeholderName);
@@ -335,19 +339,10 @@ public class FilenamePatternExtractor {
             if (dateFormat.startsWith("yyyy", i)) {
                 result.append("\\d{4}");
                 i += 4;
-            } else if (dateFormat.startsWith("yy", i)) {
-                result.append("\\d{2}");
+            } else if (dateFormat.startsWith("yy", i) || dateFormat.startsWith("MM", i) || dateFormat.startsWith("dd", i)) {
+                result.append(TWO_DIGIT_PATTERN);
                 i += 2;
-            } else if (dateFormat.startsWith("MM", i)) {
-                result.append("\\d{2}");
-                i += 2;
-            } else if (i < dateFormat.length() && dateFormat.charAt(i) == 'M') {
-                result.append("\\d{1,2}");
-                i += 1;
-            } else if (dateFormat.startsWith("dd", i)) {
-                result.append("\\d{2}");
-                i += 2;
-            } else if (i < dateFormat.length() && dateFormat.charAt(i) == 'd') {
+            } else if (i < dateFormat.length() && (dateFormat.charAt(i) == 'M' || dateFormat.charAt(i) == 'd')) {
                 result.append("\\d{1,2}");
                 i += 1;
             } else {
@@ -362,7 +357,7 @@ public class FilenamePatternExtractor {
     private String determineRegexForPlaceholder(PlaceholderConfig config, boolean shouldUseGreedyMatching) {
         if (config != null) {
             String configuredRegex = config.regex();
-            boolean isNonGreedyTextPattern = "(.+?)".equals(configuredRegex);
+            boolean isNonGreedyTextPattern = NON_GREEDY_TEXT_PATTERN.equals(configuredRegex);
             
             if (shouldUseGreedyMatching && isNonGreedyTextPattern) {
                 return "(.+)";
@@ -370,7 +365,7 @@ public class FilenamePatternExtractor {
             return configuredRegex;
         }
         
-        return shouldUseGreedyMatching ? "(.+)" : "(.+?)";
+        return shouldUseGreedyMatching ? "(.+)" : NON_GREEDY_TEXT_PATTERN;
     }
 
     private BookMetadata buildMetadataFromMatch(Matcher matcher, List<String> placeholderOrder) {
@@ -404,13 +399,16 @@ public class FilenamePatternExtractor {
             case "Subtitle" -> metadata.setSubtitle(value);
             case "Authors" -> metadata.setAuthors(parseAuthors(value));
             case "SeriesNumber" -> setSeriesNumber(metadata, value);
-            case "Published" -> setPublishedDate(metadata, value, formatParameter);
+            case PLACEHOLDER_PUBLISHED -> setPublishedDate(metadata, value, formatParameter);
             case "Publisher" -> metadata.setPublisher(value);
             case "Language" -> metadata.setLanguage(value);
             case "SeriesTotal" -> setSeriesTotal(metadata, value);
             case "ISBN10" -> metadata.setIsbn10(value);
             case "ISBN13" -> metadata.setIsbn13(value);
             case "ASIN" -> metadata.setAsin(value);
+            default -> {
+                // no-op: unrecognized placeholder name, nothing to apply
+            }
         }
     }
 
@@ -447,7 +445,7 @@ public class FilenamePatternExtractor {
         try {
             if ("yyyy".equals(detectedFormat)) {
                 Year year = Year.parse(value, DateTimeFormatter.ofPattern("yyyy"));
-                metadata.setPublishedDate(year.atMonthDay(MonthDay.of(1, 1)));
+                metadata.setPublishedDate(year.atMonthDay(MonthDay.of(Month.JANUARY, 1)));
                 return;
             }
             
@@ -456,7 +454,7 @@ public class FilenamePatternExtractor {
                 if (year < 100) {
                     year += (year < TWO_DIGIT_YEAR_CUTOFF) ? 2000 : TWO_DIGIT_YEAR_CENTURY_BASE;
                 }
-                metadata.setPublishedDate(LocalDate.of(year, 1, 1));
+                metadata.setPublishedDate(LocalDate.of(year, Month.JANUARY, 1));
                 return;
             }
             
@@ -529,7 +527,9 @@ public class FilenamePatternExtractor {
         String part2 = matcher.group(3);
         String part3 = matcher.group(4);
         
-        int val1, val2, val3;
+        int val1;
+        int val2;
+        int val3;
         try {
             val1 = Integer.parseInt(part1);
             val2 = Integer.parseInt(part2);
@@ -537,15 +537,14 @@ public class FilenamePatternExtractor {
         } catch (NumberFormatException _) {
             return null;
         }
-        
-        String format1, format2, format3;
-        
+
+        String format1;
+        String format2;
+        String format3;
+
         if (isYearValue(part1, val1)) {
             format1 = buildYearFormat(part1);
-            if (val2 <= 12 && val3 > 12) {
-                format2 = buildMonthFormat(part2);
-                format3 = buildDayFormat(part3);
-            } else if (val3 <= 12 && val2 > 12) {
+            if (val3 <= 12 && val2 > 12) {
                 format2 = buildDayFormat(part2);
                 format3 = buildMonthFormat(part3);
             } else {
@@ -557,9 +556,6 @@ public class FilenamePatternExtractor {
             if (val1 <= 12 && val2 > 12) {
                 format1 = buildMonthFormat(part1);
                 format2 = buildDayFormat(part2);
-            } else if (val2 <= 12 && val1 > 12) {
-                format1 = buildDayFormat(part1);
-                format2 = buildMonthFormat(part2);
             } else {
                 format1 = buildDayFormat(part1);
                 format2 = buildMonthFormat(part2);
@@ -606,28 +602,7 @@ public class FilenamePatternExtractor {
         Set<Long> failedFileIds = new HashSet<>();
 
         for (BookdropPatternExtractResult.FileExtractionResult result : results) {
-            if (!result.isSuccess() || result.getExtractedMetadata() == null) {
-                continue;
-            }
-
-            BookdropFileEntity file = fileMap.get(result.getFileId());
-            if (file == null) {
-                continue;
-            }
-
-            try {
-                BookMetadata currentMetadata = metadataHelper.getCurrentMetadata(file);
-                BookMetadata extractedMetadata = result.getExtractedMetadata();
-                metadataHelper.mergeMetadata(currentMetadata, extractedMetadata);
-                metadataHelper.updateFetchedMetadata(file, currentMetadata);
-
-            } catch (RuntimeException e) {
-                log.error("Error persisting extracted metadata for file {} ({}): {}", 
-                         file.getId(), file.getFileName(), e.getMessage(), e);
-                failedFileIds.add(file.getId());
-                result.setSuccess(false);
-                result.setErrorMessage("Failed to save metadata: " + e.getMessage());
-            }
+            persistSingleExtractedResult(result, fileMap, failedFileIds);
         }
 
         List<BookdropFileEntity> filesToSave = files.stream()
@@ -638,7 +613,34 @@ public class FilenamePatternExtractor {
             bookdropFileRepository.saveAll(filesToSave);
         }
     }
-    
+
+    private void persistSingleExtractedResult(BookdropPatternExtractResult.FileExtractionResult result,
+                                               Map<Long, BookdropFileEntity> fileMap,
+                                               Set<Long> failedFileIds) {
+        if (!result.isSuccess() || result.getExtractedMetadata() == null) {
+            return;
+        }
+
+        BookdropFileEntity file = fileMap.get(result.getFileId());
+        if (file == null) {
+            return;
+        }
+
+        try {
+            BookMetadata currentMetadata = metadataHelper.getCurrentMetadata(file);
+            BookMetadata extractedMetadata = result.getExtractedMetadata();
+            metadataHelper.mergeMetadata(currentMetadata, extractedMetadata);
+            metadataHelper.updateFetchedMetadata(file, currentMetadata);
+
+        } catch (RuntimeException e) {
+            log.error("Error persisting extracted metadata for file {} ({}): {}",
+                     file.getId(), file.getFileName(), e.getMessage(), e);
+            failedFileIds.add(file.getId());
+            result.setSuccess(false);
+            result.setErrorMessage("Failed to save metadata: " + e.getMessage());
+        }
+    }
+
     private boolean isYearMonthFormat(String format) {
         return format != null && 
                (format.contains("y") || format.contains("Y")) &&

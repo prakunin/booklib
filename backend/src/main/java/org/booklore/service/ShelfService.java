@@ -30,6 +30,8 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class ShelfService {
 
+    private static final String AUDIT_ENTITY_SHELF = "Shelf";
+
     private final ShelfRepository shelfRepository;
     private final BookRepository bookRepository;
     private final ShelfMapper shelfMapper;
@@ -55,7 +57,7 @@ public class ShelfService {
                 .user(fetchUserEntityById(userId))
                 .build();
         Shelf result = shelfMapper.toShelf(shelfRepository.save(shelfEntity));
-        auditService.log(AuditAction.SHELF_CREATED, "Shelf", shelfEntity.getId(), "Created shelf: " + request.getName());
+        auditService.log(AuditAction.SHELF_CREATED, AUDIT_ENTITY_SHELF, shelfEntity.getId(), "Created shelf: " + request.getName());
         return result;
     }
 
@@ -70,7 +72,7 @@ public class ShelfService {
         shelfEntity.setIconType(request.getIconType());
         shelfEntity.setPublic(request.isPublicShelf());
         Shelf result = shelfMapper.toShelf(shelfRepository.save(shelfEntity));
-        auditService.log(AuditAction.SHELF_UPDATED, "Shelf", id, "Updated shelf: " + request.getName());
+        auditService.log(AuditAction.SHELF_UPDATED, AUDIT_ENTITY_SHELF, id, "Updated shelf: " + request.getName());
         return result;
     }
 
@@ -88,7 +90,7 @@ public class ShelfService {
     @Transactional
     public void deleteShelf(Long shelfId) {
         shelfRepository.deleteById(shelfId);
-        auditService.log(AuditAction.SHELF_DELETED, "Shelf", shelfId, "Deleted shelf: " + shelfId);
+        auditService.log(AuditAction.SHELF_DELETED, AUDIT_ENTITY_SHELF, shelfId, "Deleted shelf: " + shelfId);
     }
 
     public Shelf getUserKoboShelf() {

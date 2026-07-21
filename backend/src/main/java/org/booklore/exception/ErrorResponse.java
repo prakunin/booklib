@@ -6,6 +6,7 @@ import lombok.Setter;
 import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Getter
@@ -22,13 +23,13 @@ public class ErrorResponse {
     public ErrorResponse(int status, String message) {
         this.status = status;
         this.message = message;
-        this.timestamp = LocalDateTime.now();
+        this.timestamp = LocalDateTime.now(ZoneId.systemDefault());
     }
 
     public ErrorResponse(int status, String message, List<String> details) {
         this.status = status;
         this.message = message;
-        this.timestamp = LocalDateTime.now();
+        this.timestamp = LocalDateTime.now(ZoneId.systemDefault());
         this.details = details;
     }
 }

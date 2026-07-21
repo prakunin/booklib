@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 public class VersionService {
     private static final Pattern VERSION_PATTERN = Pattern.compile("^\\d+\\.\\d+\\.\\d+$");
     private static final String DEVELOPMENT_VERSION = "development";
+    private static final String UNKNOWN_VERSION = "unknown";
     private static final String GITHUB_REPO = "prakunin/booklib";
     private static final String BASE_URI = "https://api.github.com/repos/" + GITHUB_REPO;
     private static final int MAX_RELEASES = 15;
@@ -46,7 +47,7 @@ public class VersionService {
     }
 
     public VersionInfo getVersionInfo() {
-        String latest = "unknown";
+        String latest = UNKNOWN_VERSION;
         try {
             latest = fetchLatestGitHubReleaseVersion();
         } catch (Exception _) {
@@ -69,11 +70,11 @@ public class VersionService {
                     .body(String.class);
 
             JsonNode root = objectMapper.readTree(response);
-            return root.path("tag_name").asText("unknown");
+            return root.path("tag_name").asString(UNKNOWN_VERSION);
 
         } catch (Exception _) {
             log.warn("Failed to fetch latest release version");
-            return "unknown";
+            return UNKNOWN_VERSION;
         }
     }
 
@@ -98,13 +99,13 @@ public class VersionService {
             }
 
             for (JsonNode release : releases) {
-                String tag = release.path("tag_name").asText(null);
+                String tag = release.path("tag_name").asString(null);
                 if (tag == null || !isVersionGreater(tag, currentVersion)) {
                     continue;
                 }
                 String url = "https://github.com/" + GITHUB_REPO + "/releases/tag/" + tag;
-                LocalDateTime published = LocalDateTime.parse(release.path("published_at").asText(), DateTimeFormatter.ISO_DATE_TIME);
-                updates.add(new ReleaseNote(tag, release.path("name").asText(tag), release.path("body").asText(""), url, published));
+                LocalDateTime published = LocalDateTime.parse(release.path("published_at").asString(), DateTimeFormatter.ISO_DATE_TIME);
+                updates.add(new ReleaseNote(tag, release.path("name").asString(tag), release.path("body").asString(""), url, published));
             }
 
             log.info("Returning {} newer releases", updates.size());

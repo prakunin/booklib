@@ -50,6 +50,7 @@ import org.mockito.quality.Strictness;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
@@ -439,8 +440,8 @@ class KoboEntitlementServiceTest {
         BookEntity book1 = createEpubBookEntity(1L);
         ShelfEntity koboShelf = ShelfEntity.builder().id(100L).name(ShelfType.KOBO.getName()).bookEntities(Set.of(book1)).build();
 
-        LocalDateTime createdAt = LocalDateTime.of(2024, 1, 15, 10, 30, 0);
-        LocalDateTime updatedAt = LocalDateTime.of(2024, 6, 20, 14, 45, 0);
+        LocalDateTime createdAt = LocalDateTime.of(2024, Month.JANUARY, 15, 10, 30, 0);
+        LocalDateTime updatedAt = LocalDateTime.of(2024, Month.JUNE, 20, 14, 45, 0);
         MagicShelfEntity magicShelf = MagicShelfEntity.builder()
                 .id(201L)
                 .userId(user.getId())
@@ -478,7 +479,8 @@ class KoboEntitlementServiceTest {
         when(shelfRepository.findByUserIdAndName(user.getId(), ShelfType.KOBO.getName()))
                 .thenReturn(Optional.of(koboShelf));
         when(koboCompatibilityService.isBookSupportedForKobo(any(BookEntity.class))).thenReturn(true);
-        when(shelfRepository.findByUserId(user.getId())).thenReturn(List.of(koboShelf));
+        // No user shelves at all (not even the Kobo shelf) and no magic shelves.
+        when(shelfRepository.findByUserId(user.getId())).thenReturn(List.of());
         when(magicShelfRepository.findAllByUserId(user.getId())).thenReturn(List.of());
 
         List<KoboTagWrapper> tags = koboEntitlementService.generateTags();
@@ -588,6 +590,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should prefer href-only web reader bookmark over existing state when two-way sync is on")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateNewEntitlements_prefersHrefOnlyWebReaderBookmark() {
             BookEntity book = createEpubBookEntity(1L);
             book.setAddedOn(Instant.parse("2025-01-01T00:00:00Z"));
@@ -642,6 +646,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should keep stored Kobo bookmark when mirrored EPUB progress is not newer")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateNewEntitlements_preservesStoredKoboBookmarkWhenKoboIsFreshest() {
             BookEntity book = createEpubBookEntity(1L);
             book.setAddedOn(Instant.parse("2025-01-01T00:00:00Z"));
@@ -809,6 +815,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should use synced EPUB file progress when book has multiple files")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateChangedReadingStates_usesSyncedEpubFileProgress() {
             BookEntity book = new BookEntity();
             book.setId(1L);
@@ -893,6 +901,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should include epub progress in bookmark when two-way sync ON")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateChangedReadingStates_twoWaySync() {
             BookEntity book = new BookEntity();
             book.setId(1L);
@@ -926,6 +936,8 @@ class KoboEntitlementServiceTest {
 
         @Test
         @DisplayName("Should NOT include epub progress in bookmark when two-way sync OFF")
+        // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+        @SuppressWarnings("java:S1874")
         void generateChangedReadingStates_twoWaySyncOff() {
             BookEntity book = new BookEntity();
             book.setId(1L);

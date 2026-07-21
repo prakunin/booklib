@@ -54,6 +54,8 @@ import java.util.stream.Stream;
 @Transactional(readOnly = true)
 public class AuthorMetadataService {
 
+    private static final String AUDIT_ENTITY_AUTHOR = "Author";
+
     private final AuthorRepository authorRepository;
     private final Map<AuthorMetadataSource, AuthorParser> authorParserMap;
     private final AuditService auditService;
@@ -130,7 +132,7 @@ public class AuthorMetadataService {
             authorPhotoIndex.invalidate();
         }
 
-        auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
+        auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, AUDIT_ENTITY_AUTHOR, authorId,
                 "Matched author '" + author.getName() + "' via " + result.getSource() + " (ASIN: " + result.getAsin() + ")");
 
         return toAuthorDetails(author);
@@ -152,7 +154,7 @@ public class AuthorMetadataService {
                     authorPhotoIndex.invalidate();
                 }
 
-                auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
+                auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, AUDIT_ENTITY_AUTHOR, authorId,
                         "Quick-matched author '" + author.getName() + "' via " + result.getSource() + " (ASIN: " + result.getAsin() + ")");
 
                 return toAuthorDetails(author);
@@ -162,6 +164,11 @@ public class AuthorMetadataService {
         throw ApiError.GENERIC_BAD_REQUEST.createException("No metadata found for author: " + author.getName());
     }
 
+    // quickMatchAuthor() is @Transactional, but this self-invocation bypasses the proxy so it
+    // runs without that transaction here; each repository call still commits independently.
+    // Not fixed: routing through a self-injected proxy would newly apply transactional semantics
+    // to a hot async path and risks changing behavior under load. Known debt (sonar java:S6809).
+    @SuppressWarnings("java:S6809")
     public Flux<AuthorSummary> autoMatchAuthors(List<Long> authorIds) {
         return Flux.fromIterable(authorIds)
                 .concatMap(authorId ->
@@ -200,7 +207,7 @@ public class AuthorMetadataService {
             fileService.deleteAuthorImages(authorId);
             authorPhotoIndex.invalidate();
 
-            auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
+            auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, AUDIT_ENTITY_AUTHOR, authorId,
                     "Unmatched author '" + author.getName() + "'");
         }
     }
@@ -223,7 +230,7 @@ public class AuthorMetadataService {
             authorPhotoIndex.invalidate();
             authorRepository.delete(author);
 
-            auditService.log(AuditAction.AUTHOR_DELETED, "Author", authorId,
+            auditService.log(AuditAction.AUTHOR_DELETED, AUDIT_ENTITY_AUTHOR, authorId,
                     "Deleted author '" + authorName + "'");
         }
     }
@@ -301,7 +308,7 @@ public class AuthorMetadataService {
 
         authorRepository.save(author);
 
-        auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, "Author", authorId,
+        auditService.log(AuditAction.AUTHOR_METADATA_UPDATED, AUDIT_ENTITY_AUTHOR, authorId,
                 "Updated author '" + author.getName() + "'");
 
         return toAuthorDetails(author);

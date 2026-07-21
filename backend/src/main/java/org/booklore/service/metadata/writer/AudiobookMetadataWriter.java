@@ -26,6 +26,9 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -44,12 +47,7 @@ public class AudiobookMetadataWriter implements MetadataWriter {
     @Override
     public void saveMetadataToFile(File audioFile, BookMetadataEntity metadata, String thumbnailUrl, MetadataClearFlags clear) {
         if (audioFile.isDirectory()) {
-            if (StringUtils.isNotBlank(thumbnailUrl)) {
-                byte[] coverData = loadImage(thumbnailUrl);
-                if (coverData != null) {
-                    saveCoverToFolder(audioFile.toPath(), coverData);
-                }
-            }
+            saveFolderCover(audioFile, thumbnailUrl);
             return;
         }
 
@@ -69,79 +67,7 @@ public class AudiobookMetadataWriter implements MetadataWriter {
             AudioFile f = AudioFileIO.read(audioFile);
             Tag tag = f.getTagOrCreateAndSetDefault();
 
-            boolean[] hasChanges = {false};
-            MetadataCopyHelper helper = new MetadataCopyHelper(metadata);
-
-            helper.copyTitle(clear != null && clear.isTitle(), val -> {
-                setTagField(tag, FieldKey.ALBUM, val, hasChanges);
-                setTagField(tag, FieldKey.TITLE, val, hasChanges);
-            });
-
-            helper.copyAuthors(clear != null && clear.isAuthors(), authors -> {
-                String authorStr = authors != null ? String.join("; ", authors) : null;
-                setTagField(tag, FieldKey.ALBUM_ARTIST, authorStr, hasChanges);
-                setTagField(tag, FieldKey.ARTIST, authorStr, hasChanges);
-            });
-
-            if (StringUtils.isNotBlank(metadata.getNarrator())) {
-                setTagField(tag, FieldKey.COMPOSER, metadata.getNarrator(), hasChanges);
-            }
-
-            helper.copyDescription(clear != null && clear.isDescription(), val -> {
-                setTagField(tag, FieldKey.COMMENT, val, hasChanges);
-            });
-
-            helper.copyPublisher(clear != null && clear.isPublisher(), val -> {
-                setTagField(tag, FieldKey.RECORD_LABEL, val, hasChanges);
-            });
-
-            helper.copyPublishedDate(clear != null && clear.isPublishedDate(), val -> {
-                String year = val != null ? String.valueOf(val.getYear()) : null;
-                setTagField(tag, FieldKey.YEAR, year, hasChanges);
-            });
-
-            helper.copyCategories(clear != null && clear.isCategories(), categories -> {
-                String genre = categories != null && !categories.isEmpty()
-                        ? String.join("; ", categories)
-                        : null;
-                setTagField(tag, FieldKey.GENRE, genre, hasChanges);
-            });
-
-            helper.copyLanguage(clear != null && clear.isLanguage(), val -> {
-                setTagField(tag, FieldKey.LANGUAGE, val, hasChanges);
-            });
-
-            helper.copySeriesName(clear != null && clear.isSeriesName(), val -> {
-                setTagField(tag, FieldKey.GROUPING, val, hasChanges);
-            });
-
-            helper.copySeriesNumber(clear != null && clear.isSeriesNumber(), val -> {
-                String trackNo = val != null ? String.format("%.0f", val) : null;
-                setTagField(tag, FieldKey.TRACK, trackNo, hasChanges);
-            });
-
-            helper.copySeriesTotal(clear != null && clear.isSeriesTotal(), val -> {
-                String trackTotal = val != null ? String.valueOf(val) : null;
-                setTagField(tag, FieldKey.TRACK_TOTAL, trackTotal, hasChanges);
-            });
-
-            if (StringUtils.isNotBlank(thumbnailUrl)) {
-                byte[] coverData = loadImage(thumbnailUrl);
-                if (coverData != null) {
-                    try {
-                        tag.deleteArtworkField();
-                        Artwork artwork = ArtworkFactory.getNew();
-                        artwork.setBinaryData(coverData);
-                        artwork.setMimeType(detectMimeType(coverData));
-                        tag.setField(artwork);
-                        hasChanges[0] = true;
-                    } catch (Exception e) {
-                        log.warn("Failed to set cover art for {}: {}", audioFile.getName(), e.getMessage());
-                    }
-                }
-            }
-
-            if (hasChanges[0]) {
+            if (applyAudiobookTags(tag, metadata, thumbnailUrl, clear, audioFile.getName())) {
                 f.commit();
                 log.info("Metadata updated in audiobook: {}", audioFile.getName());
             } else {
@@ -150,22 +76,133 @@ public class AudiobookMetadataWriter implements MetadataWriter {
 
         } catch (Exception e) {
             log.warn("Failed to write metadata to audiobook file {}: {}", audioFile.getName(), e.getMessage(), e);
-            if (backupFile.exists()) {
-                try {
-                    Files.copy(backupFile.toPath(), audioFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                    log.info("Restored audiobook from backup: {}", audioFile.getName());
-                } catch (IOException io) {
-                    log.error("Failed to restore audiobook from backup for {}: {}", audioFile.getName(), io.getMessage(), io);
-                }
-            }
+            restoreAudiobookFromBackup(backupFile, audioFile);
         } finally {
-            if (backupFile.exists()) {
-                try {
-                    Files.delete(backupFile.toPath());
-                } catch (IOException ex) {
-                    log.warn("Failed to delete backup for {}: {}", audioFile.getName(), ex.getMessage());
-                }
+            deleteAudiobookBackup(backupFile, audioFile.getName());
+        }
+    }
+
+    private void saveFolderCover(File audioFile, String thumbnailUrl) {
+        if (StringUtils.isNotBlank(thumbnailUrl)) {
+            byte[] coverData = loadImage(thumbnailUrl);
+            if (coverData != null) {
+                saveCoverToFolder(audioFile.toPath(), coverData);
             }
+        }
+    }
+
+    private boolean applyAudiobookTags(Tag tag, BookMetadataEntity metadata, String thumbnailUrl, MetadataClearFlags clear, String fileName) {
+        boolean[] hasChanges = {false};
+        MetadataCopyHelper helper = new MetadataCopyHelper(metadata);
+
+        helper.copyTitle(isClear(clear, MetadataClearFlags::isTitle), val -> {
+            setTagField(tag, FieldKey.ALBUM, val, hasChanges);
+            setTagField(tag, FieldKey.TITLE, val, hasChanges);
+        });
+
+        helper.copyAuthors(isClear(clear, MetadataClearFlags::isAuthors), authors -> {
+            String authorStr = authorsOf(authors);
+            setTagField(tag, FieldKey.ALBUM_ARTIST, authorStr, hasChanges);
+            setTagField(tag, FieldKey.ARTIST, authorStr, hasChanges);
+        });
+
+        if (StringUtils.isNotBlank(metadata.getNarrator())) {
+            setTagField(tag, FieldKey.COMPOSER, metadata.getNarrator(), hasChanges);
+        }
+
+        helper.copyDescription(isClear(clear, MetadataClearFlags::isDescription), val ->
+                setTagField(tag, FieldKey.COMMENT, val, hasChanges));
+
+        helper.copyPublisher(isClear(clear, MetadataClearFlags::isPublisher), val ->
+                setTagField(tag, FieldKey.RECORD_LABEL, val, hasChanges));
+
+        helper.copyPublishedDate(isClear(clear, MetadataClearFlags::isPublishedDate), val ->
+                setTagField(tag, FieldKey.YEAR, yearOf(val), hasChanges));
+
+        helper.copyCategories(isClear(clear, MetadataClearFlags::isCategories), categories ->
+                setTagField(tag, FieldKey.GENRE, genreOf(categories), hasChanges));
+
+        helper.copyLanguage(isClear(clear, MetadataClearFlags::isLanguage), val ->
+                setTagField(tag, FieldKey.LANGUAGE, val, hasChanges));
+
+        helper.copySeriesName(isClear(clear, MetadataClearFlags::isSeriesName), val ->
+                setTagField(tag, FieldKey.GROUPING, val, hasChanges));
+
+        helper.copySeriesNumber(isClear(clear, MetadataClearFlags::isSeriesNumber), val ->
+                setTagField(tag, FieldKey.TRACK, trackNumberOf(val), hasChanges));
+
+        helper.copySeriesTotal(isClear(clear, MetadataClearFlags::isSeriesTotal), val ->
+                setTagField(tag, FieldKey.TRACK_TOTAL, trackTotalOf(val), hasChanges));
+
+        applyCoverArtIfProvided(tag, thumbnailUrl, fileName, hasChanges);
+
+        return hasChanges[0];
+    }
+
+    private static boolean isClear(MetadataClearFlags clear, Predicate<MetadataClearFlags> flag) {
+        return clear != null && flag.test(clear);
+    }
+
+    private static String yearOf(LocalDate publishedDate) {
+        return publishedDate != null ? String.valueOf(publishedDate.getYear()) : null;
+    }
+
+    private static String authorsOf(Set<String> authors) {
+        return authors != null ? String.join("; ", authors) : null;
+    }
+
+    private static String genreOf(Set<String> categories) {
+        return categories != null && !categories.isEmpty() ? String.join("; ", categories) : null;
+    }
+
+    private static String trackNumberOf(Float seriesNumber) {
+        return seriesNumber != null ? String.format("%.0f", seriesNumber) : null;
+    }
+
+    private static String trackTotalOf(Integer seriesTotal) {
+        return seriesTotal != null ? String.valueOf(seriesTotal) : null;
+    }
+
+    private void applyCoverArtIfProvided(Tag tag, String thumbnailUrl, String fileName, boolean[] hasChanges) {
+        if (StringUtils.isNotBlank(thumbnailUrl)) {
+            byte[] coverData = loadImage(thumbnailUrl);
+            if (coverData != null) {
+                setCoverArtwork(tag, coverData, fileName, hasChanges);
+            }
+        }
+    }
+
+    private void restoreAudiobookFromBackup(File backupFile, File audioFile) {
+        if (backupFile.exists()) {
+            try {
+                Files.copy(backupFile.toPath(), audioFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                log.info("Restored audiobook from backup: {}", audioFile.getName());
+            } catch (IOException io) {
+                log.error("Failed to restore audiobook from backup for {}: {}", audioFile.getName(), io.getMessage(), io);
+            }
+        }
+    }
+
+    private void deleteAudiobookBackup(File backupFile, String fileName) {
+        if (backupFile.exists()) {
+            try {
+                Files.delete(backupFile.toPath());
+            } catch (IOException ex) {
+                log.warn("Failed to delete backup for {}: {}", fileName, ex.getMessage());
+            }
+        }
+    }
+
+    private void setCoverArtwork(Tag tag, byte[] coverData, String fileName, boolean[] hasChanges) {
+        try {
+            tag.deleteArtworkField();
+            Artwork artwork = ArtworkFactory.getNew();
+            artwork.setBinaryData(coverData);
+            artwork.setMimeType(detectMimeType(coverData));
+            tag.setField(artwork);
+            hasChanges[0] = true;
+        } catch (Exception e) {
+            log.warn("Failed to set cover art for {}: {}", fileName, e.getMessage());
         }
     }
 
@@ -329,6 +366,10 @@ public class AudiobookMetadataWriter implements MetadataWriter {
         return true;
     }
 
+    // S1168: null here is a load-failure sentinel that callers check via `!= null`/`== null` before
+    // writing artwork/cover bytes; an empty array would be silently treated as a successful load and
+    // written out as bogus zero-length artwork/cover data.
+    @SuppressWarnings("java:S1168")
     private byte[] loadImage(String imageUrl) {
         try {
             return encodeImage(fileService.downloadImageFromUrl(imageUrl));

@@ -46,6 +46,7 @@ public class ArchivedBookContentService {
         return resolve(bookFile, true);
     }
 
+    @SuppressWarnings("java:S1181") // Error is rethrown unchanged after completing the CompletableFuture and freeing the dedup slot - not swallowed
     private Path resolve(BookFileEntity bookFile, boolean revalidate) {
         if (!bookFile.isArchivedSource()) {
             return bookFile.getFullFilePath();
@@ -70,7 +71,9 @@ public class ArchivedBookContentService {
             Path resolved = resolveLocked(bookFile, false);
             flight.complete(resolved);
             return resolved;
-        } catch (RuntimeException | Error e) {
+        } catch (Exception | Error e) {
+            // A JVM Error must still complete the flight and free the dedup slot below in `finally` -
+            // otherwise concurrent callers awaiting `existing` would hang forever. Rethrown unchanged.
             flight.completeExceptionally(e);
             throw e;
         } finally {

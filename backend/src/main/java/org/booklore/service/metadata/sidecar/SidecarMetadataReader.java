@@ -1,6 +1,7 @@
 package org.booklore.service.metadata.sidecar;
 
 import lombok.extern.slf4j.Slf4j;
+import org.booklore.model.dto.sidecar.SidecarBookMetadata;
 import org.booklore.model.dto.sidecar.SidecarMetadata;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
@@ -17,11 +18,9 @@ import java.util.Optional;
 @Service
 public class SidecarMetadataReader {
 
-    private final SidecarMetadataMapper mapper;
     private final ObjectMapper objectMapper;
 
-    public SidecarMetadataReader(SidecarMetadataMapper mapper, ObjectMapper objectMapper) {
-        this.mapper = mapper;
+    public SidecarMetadataReader(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -49,20 +48,20 @@ public class SidecarMetadataReader {
 
     public byte[] readSidecarCover(Path bookPath) {
         if (bookPath == null) {
-            return null;
+            return new byte[0];
         }
 
         Path coverPath = getCoverPath(bookPath);
         if (!Files.exists(coverPath)) {
             log.debug("No sidecar cover file found at: {}", coverPath);
-            return null;
+            return new byte[0];
         }
 
         try {
             return Files.readAllBytes(coverPath);
         } catch (IOException e) {
             log.warn("Failed to read sidecar cover from {}: {}", coverPath, e.getMessage());
-            return null;
+            return new byte[0];
         }
     }
 
@@ -144,15 +143,16 @@ public class SidecarMetadataReader {
         if (!nullSafeEquals(sm.getLanguage(), db.getLanguage())) return true;
         if (!nullSafeEquals(sm.getPageCount(), db.getPageCount())) return true;
 
+        return isSeriesDifferent(sm, db);
+    }
+
+    private boolean isSeriesDifferent(SidecarBookMetadata sm, BookMetadataEntity db) {
         if (sm.getSeries() != null) {
             if (!nullSafeEquals(sm.getSeries().getName(), db.getSeriesName())) return true;
             if (!nullSafeEquals(sm.getSeries().getNumber(), db.getSeriesNumber())) return true;
-            if (!nullSafeEquals(sm.getSeries().getTotal(), db.getSeriesTotal())) return true;
-        } else if (db.getSeriesName() != null || db.getSeriesNumber() != null || db.getSeriesTotal() != null) {
-            return true;
+            return !nullSafeEquals(sm.getSeries().getTotal(), db.getSeriesTotal());
         }
-
-        return false;
+        return db.getSeriesName() != null || db.getSeriesNumber() != null || db.getSeriesTotal() != null;
     }
 
     private boolean nullSafeEquals(Object a, Object b) {

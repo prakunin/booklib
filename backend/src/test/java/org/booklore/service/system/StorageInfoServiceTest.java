@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -101,7 +102,7 @@ class StorageInfoServiceTest {
         @Test
         void degradesToEmptyRatherThanPropagatingWhenTheRepositoryFails() {
             // Spring Data reports SQL failures as unchecked exceptions — exactly the case
-            // this diagnostics tab exists for (DB unreachable).
+            // this diagnostics tab exists for, e.g. an unreachable database.
             when(libraryPathRepository.findAllPaths())
                     .thenThrow(new DataAccessResourceFailureException("connection refused"));
 
@@ -308,7 +309,7 @@ class StorageInfoServiceTest {
             service.libraryPaths(configuredPaths);
             service.filesystems(configuredPaths);
 
-            verify(libraryPathRepository, org.mockito.Mockito.times(1)).findAllPaths();
+            verify(libraryPathRepository, times(1)).findAllPaths();
         }
     }
 

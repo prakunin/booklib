@@ -56,8 +56,7 @@ class MetadataMatchServiceTest {
     }
 
     private BookEntity bookWith(BookMetadataEntity metadata) {
-        BookEntity book = BookEntity.builder().metadata(metadata).build();
-        return book;
+        return BookEntity.builder().metadata(metadata).build();
     }
 
     @Nested

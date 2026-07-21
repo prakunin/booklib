@@ -1,0 +1,53 @@
+{
+  "book": {
+    "id": 12345,
+    "lang": "ja",
+    "olang": "ja",
+    "title": "Re:Zero Original",
+    "c_release_date": 20180115,
+    "description": "A story about starting over in another world.",
+    "image": { "id": 1, "filename": "cover-123.jpg" },
+    "rating": { "score": 8.4, "count": 120 },
+    "titles": [
+      { "lang": "ja", "title": "Re:Zero Original", "official": true, "book_id": 12345 },
+      { "lang": "en", "title": "Re:Zero: Starting Life in a Different World", "official": true, "book_id": 12345 }
+    ],
+    "editions": [
+      {
+        "book_id": 12345,
+        "lang": "en",
+        "title": "Re:Zero",
+        "eid": 1,
+        "staff": [
+          { "name": "Nagatsuki Tappei", "romaji": "Tappei Nagatsuki", "role_type": "author" },
+          { "name": "John Doe", "role_type": "author" },
+          { "name": "Otsuka Shinichirou", "role_type": "artist" }
+        ]
+      }
+    ],
+    "releases": [
+      { "lang": "en", "id": 1, "release_date": 20200310, "title": "Re:Zero Vol 1", "format": "digital" },
+      { "lang": "ja", "id": 2, "release_date": 20180115, "title": "Original", "format": "print" }
+    ],
+    "publishers": [
+      { "lang": "en", "id": 1, "name": "Yen Press", "publisher_type": "publisher" },
+      { "lang": "en", "id": 2, "name": "Some Imprint", "publisher_type": "imprint" },
+      { "lang": "ja", "id": 3, "name": "MF Bunko J", "publisher_type": "publisher" }
+    ],
+    "series": {
+      "id": 500,
+      "lang": "en",
+      "title": "Re:Zero",
+      "books": [
+        { "id": 11111, "title": "Vol 0" },
+        { "id": 12345, "title": "Vol 1" },
+        { "id": 22222, "title": "Vol 2" }
+      ],
+      "tags": [
+        { "id": 1, "name": "isekai", "ttype": "genre" },
+        { "id": 2, "name": "SPACE OPERA", "ttype": "genre" },
+        { "id": 3, "name": "ignored-tag", "ttype": "tag" }
+      ]
+    }
+  }
+}

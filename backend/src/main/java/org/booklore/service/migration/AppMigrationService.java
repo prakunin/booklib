@@ -9,6 +9,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Slf4j
 @AllArgsConstructor
@@ -57,7 +58,7 @@ public class AppMigrationService {
     }
 
     private void saveMigrationRecord(Migration migration) {
-        AppMigrationEntity entity = new AppMigrationEntity(migration.getKey(), LocalDateTime.now(), migration.getDescription());
+        AppMigrationEntity entity = new AppMigrationEntity(migration.getKey(), LocalDateTime.now(ZoneId.systemDefault()), migration.getDescription());
         migrationRepository.save(entity);
     }
 

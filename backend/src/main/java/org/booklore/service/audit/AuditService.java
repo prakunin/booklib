@@ -42,12 +42,7 @@ public class AuditService {
                 username = user.getUsername();
             }
 
-            String ipAddress = null;
-            try {
-                ipAddress = RequestUtils.getCurrentRequest().getRemoteAddr();
-            } catch (Exception _) {
-                // Non-HTTP context (scheduled tasks, etc.)
-            }
+            String ipAddress = resolveRemoteAddress();
 
             String countryCode = geoIpService.resolveCountryCode(ipAddress);
 
@@ -70,6 +65,15 @@ public class AuditService {
             auditLogRepository.save(entity);
         } catch (Exception e) {
             log.warn("Failed to write audit log: action={}, description={}", action, description, e);
+        }
+    }
+
+    private String resolveRemoteAddress() {
+        try {
+            return RequestUtils.getCurrentRequest().getRemoteAddr();
+        } catch (Exception _) {
+            // Non-HTTP context (scheduled tasks, etc.)
+            return null;
         }
     }
 

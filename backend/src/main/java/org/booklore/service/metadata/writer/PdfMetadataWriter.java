@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -69,28 +71,36 @@ public class PdfMetadataWriter implements MetadataWriter {
             log.info("Successfully embedded metadata into PDF: {}", file.getName());
         } catch (Exception e) {
             log.warn("Failed to write metadata to PDF {}: {}", file.getName(), e.getMessage(), e);
-            if (backupCreated) {
-                try {
-                    Files.copy(backupPath, filePath, StandardCopyOption.REPLACE_EXISTING);
-                    log.info("Restored PDF {} from temp backup after failure", file.getName());
-                } catch (IOException ex) {
-                    log.error("Failed to restore PDF temp backup for {}: {}", file.getName(), ex.getMessage(), ex);
-                }
-            }
+            restorePdfFromBackup(backupCreated, backupPath, filePath, file.getName());
         } finally {
-            if (tempPath != null) {
-                try {
-                    Files.deleteIfExists(tempPath);
-                } catch (IOException e) {
-                    log.warn("Could not delete PDF temp file: {}", e.getMessage());
-                }
+            cleanupPdfTempFiles(tempPath, backupCreated, backupPath, file.getName());
+        }
+    }
+
+    private void restorePdfFromBackup(boolean backupCreated, Path backupPath, Path filePath, String fileName) {
+        if (backupCreated) {
+            try {
+                Files.copy(backupPath, filePath, StandardCopyOption.REPLACE_EXISTING);
+                log.info("Restored PDF {} from temp backup after failure", fileName);
+            } catch (IOException ex) {
+                log.error("Failed to restore PDF temp backup for {}: {}", fileName, ex.getMessage(), ex);
             }
-            if (backupCreated) {
-                try {
-                    Files.deleteIfExists(backupPath);
-                } catch (IOException e) {
-                    log.warn("Could not delete PDF temp backup for {}: {}", file.getName(), e.getMessage());
-                }
+        }
+    }
+
+    private void cleanupPdfTempFiles(Path tempPath, boolean backupCreated, Path backupPath, String fileName) {
+        if (tempPath != null) {
+            try {
+                Files.deleteIfExists(tempPath);
+            } catch (IOException e) {
+                log.warn("Could not delete PDF temp file: {}", e.getMessage());
+            }
+        }
+        if (backupCreated) {
+            try {
+                Files.deleteIfExists(backupPath);
+            } catch (IOException e) {
+                log.warn("Could not delete PDF temp backup for {}: {}", fileName, e.getMessage());
             }
         }
     }
@@ -125,6 +135,13 @@ public class PdfMetadataWriter implements MetadataWriter {
         MetadataCopyHelper helper = new MetadataCopyHelper(entity);
 
         // --- PDF Info Dictionary (legacy) via PDFium4j ---
+        applyInfoDictionary(doc, helper, clear);
+
+        // --- XMP metadata via PDFium4j XmpMetadataWriter (StringBuilder-based, no DOM) ---
+        applyXmpMetadata(doc, helper, clear, entity);
+    }
+
+    private void applyInfoDictionary(PdfDocument doc, MetadataCopyHelper helper, MetadataClearFlags clear) {
         StringBuilder keywordsBuilder = new StringBuilder();
         helper.copyCategories(clear != null && clear.isCategories(), cats -> {
             if (cats != null && !cats.isEmpty()) {
@@ -132,28 +149,35 @@ public class PdfMetadataWriter implements MetadataWriter {
             }
         });
 
-        helper.copyTitle(clear != null && clear.isTitle(), title -> doc.setMetadata(MetadataTag.TITLE, title != null ? title : ""));
-        helper.copyPublisher(clear != null && clear.isPublisher(), pub -> doc.setMetadata(MetadataTag.PRODUCER, pub != null ? pub : ""));
-        helper.copyAuthors(clear != null && clear.isAuthors(), authors -> doc.setMetadata(MetadataTag.AUTHOR, authors != null ? String.join(", ", authors) : ""));
-        helper.copyPublishedDate(clear != null && clear.isPublishedDate(), date -> {
-            if (date != null) {
-                // PDF date format: D:YYYYMMDDHHmmSS
-                String pdfDate = String.format("D:%04d%02d%02d000000", date.getYear(), date.getMonthValue(), date.getDayOfMonth());
-                doc.setMetadata(MetadataTag.CREATION_DATE, pdfDate);
-            } else {
-                doc.setMetadata(MetadataTag.CREATION_DATE, "");
-            }
-        });
+        applyInfoDocumentFields(doc, helper, clear);
 
         String keywords = keywordsBuilder.toString();
         if (keywords.length() > MAX_INFO_KEYWORDS_LENGTH) {
             keywords = keywords.substring(0, MAX_INFO_KEYWORDS_LENGTH - 3) + "...";
-            log.debug("PDF keywords truncated from {} to {} characters for legacy compatibility", 
+            log.debug("PDF keywords truncated from {} to {} characters for legacy compatibility",
                 keywordsBuilder.length(), keywords.length());
         }
         doc.setMetadata(MetadataTag.KEYWORDS, keywords);
+    }
 
-        // --- XMP metadata via PDFium4j XmpMetadataWriter (StringBuilder-based, no DOM) ---
+    private void applyInfoDocumentFields(PdfDocument doc, MetadataCopyHelper helper, MetadataClearFlags clear) {
+        helper.copyTitle(clear != null && clear.isTitle(), title -> doc.setMetadata(MetadataTag.TITLE, title != null ? title : ""));
+        helper.copyPublisher(clear != null && clear.isPublisher(), pub -> doc.setMetadata(MetadataTag.PRODUCER, pub != null ? pub : ""));
+        helper.copyAuthors(clear != null && clear.isAuthors(), authors -> doc.setMetadata(MetadataTag.AUTHOR, authors != null ? String.join(", ", authors) : ""));
+        helper.copyPublishedDate(clear != null && clear.isPublishedDate(), date -> applyPdfCreationDate(doc, date));
+    }
+
+    private void applyPdfCreationDate(PdfDocument doc, LocalDate date) {
+        if (date != null) {
+            // PDF date format: D:YYYYMMDDHHmmSS
+            String pdfDate = String.format("D:%04d%02d%02d000000", date.getYear(), date.getMonthValue(), date.getDayOfMonth());
+            doc.setMetadata(MetadataTag.CREATION_DATE, pdfDate);
+        } else {
+            doc.setMetadata(MetadataTag.CREATION_DATE, "");
+        }
+    }
+
+    private void applyXmpMetadata(PdfDocument doc, MetadataCopyHelper helper, MetadataClearFlags clear, BookMetadataEntity entity) {
         try {
             String newXmp = buildXmpPacket(helper, clear, entity);
             String existingXmp = doc.xmpMetadataString();
@@ -174,12 +198,54 @@ public class PdfMetadataWriter implements MetadataWriter {
      * Builds the complete XMP packet using PDFium4j's StringBuilder-based XmpMetadataWriter.
      * Eliminates all DOM and TransformerFactory overhead from the old approach.
      */
-    @SuppressWarnings("unchecked")
     private String buildXmpPacket(MetadataCopyHelper helper, MetadataClearFlags clear, BookMetadataEntity metadata) {
         // Capture DC field values from helper
-        String[] title = {null}, description = {null}, publisher = {null}, language = {null}, date = {null};
-        List<String>[] authors = new List[]{null};
-        List<String>[] subjects = new List[]{null};
+        DcScalars scalars = captureDcScalars(helper, clear);
+        DcLists lists = captureDcLists(helper, clear);
+
+        // Build custom fields map
+        Map<String, String> customFields = new LinkedHashMap<>();
+
+        // XMP Basic (unprefixed → written as xmp: by XmpMetadataWriter)
+        customFields.put("CreatorTool", "Booklore");
+        String nowIso = ZonedDateTime.now(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_INSTANT);
+        customFields.put("MetadataDate", nowIso);
+        customFields.put("ModifyDate", nowIso);
+        if (scalars.date() != null) {
+            customFields.put("CreateDate", scalars.date());
+        }
+
+        // Booklore namespace simple fields
+        addBookloreSimpleFields(customFields, helper, clear, metadata);
+
+        XmpMetadata xmpMeta = XmpMetadata.builder()
+                .title(scalars.title())
+                .creators(lists.authors() != null ? lists.authors() : List.of())
+                .description(scalars.description())
+                .subjects(lists.subjects() != null ? lists.subjects() : List.of())
+                .publisher(scalars.publisher())
+                .language(scalars.language())
+                .date(scalars.date())
+                .customFields(customFields)
+                .build();
+
+        XmpMetadataWriter xmpWriter = new XmpMetadataWriter();
+        String xmpPacket = xmpWriter.write(xmpMeta);
+
+        // Inject RDF Bag elements for tags/moods (not supported as simple custom fields)
+        return injectBagElements(xmpPacket, helper, clear);
+    }
+
+    private record DcScalars(String title, String description, String publisher, String language, String date) {}
+
+    private record DcLists(List<String> authors, List<String> subjects) {}
+
+    private DcScalars captureDcScalars(MetadataCopyHelper helper, MetadataClearFlags clear) {
+        String[] title = {null};
+        String[] description = {null};
+        String[] publisher = {null};
+        String[] language = {null};
+        String[] date = {null};
 
         helper.copyTitle(clear != null && clear.isTitle(), t -> title[0] = t);
         helper.copyDescription(clear != null && clear.isDescription(), d -> description[0] = d);
@@ -190,6 +256,15 @@ public class PdfMetadataWriter implements MetadataWriter {
         helper.copyPublishedDate(clear != null && clear.isPublishedDate(), d -> {
             if (d != null) date[0] = d.toString();
         });
+
+        return new DcScalars(title[0], description[0], publisher[0], language[0], date[0]);
+    }
+
+    @SuppressWarnings("unchecked")
+    private DcLists captureDcLists(MetadataCopyHelper helper, MetadataClearFlags clear) {
+        List<String>[] authors = new List[]{null};
+        List<String>[] subjects = new List[]{null};
+
         helper.copyAuthors(clear != null && clear.isAuthors(), a -> {
             if (a != null && !a.isEmpty()) {
                 authors[0] = a.stream()
@@ -202,93 +277,61 @@ public class PdfMetadataWriter implements MetadataWriter {
             if (c != null && !c.isEmpty()) subjects[0] = new ArrayList<>(c);
         });
 
-        // Build custom fields map
-        Map<String, String> customFields = new LinkedHashMap<>();
-
-        // XMP Basic (unprefixed → written as xmp: by XmpMetadataWriter)
-        customFields.put("CreatorTool", "Booklore");
-        String nowIso = ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT);
-        customFields.put("MetadataDate", nowIso);
-        customFields.put("ModifyDate", nowIso);
-        if (date[0] != null) {
-            customFields.put("CreateDate", date[0]);
-        }
-
-        // Booklore namespace simple fields
-        addBookloreSimpleFields(customFields, helper, clear, metadata);
-
-        XmpMetadata xmpMeta = XmpMetadata.builder()
-                .title(title[0])
-                .creators(authors[0] != null ? authors[0] : List.of())
-                .description(description[0])
-                .subjects(subjects[0] != null ? subjects[0] : List.of())
-                .publisher(publisher[0])
-                .language(language[0])
-                .date(date[0])
-                .customFields(customFields)
-                .build();
-
-        XmpMetadataWriter xmpWriter = new XmpMetadataWriter();
-        String xmpPacket = xmpWriter.write(xmpMeta);
-
-        // Inject RDF Bag elements for tags/moods (not supported as simple custom fields)
-        return injectBagElements(xmpPacket, helper, clear);
+        return new DcLists(authors[0], subjects[0]);
     }
 
     private void addBookloreSimpleFields(Map<String, String> customFields, MetadataCopyHelper helper,
                                          MetadataClearFlags clear, BookMetadataEntity metadata) {
         String prefix = BookLoreMetadata.NS_PREFIX + ":";
 
+        addSeriesAndSubtitleFields(customFields, helper, clear, metadata, prefix);
+        addIdentifierFields(customFields, helper, clear, prefix);
+        addRatingFields(customFields, helper, clear, prefix);
+        addPageCountField(customFields, helper, prefix);
+    }
+
+    private void addSeriesAndSubtitleFields(Map<String, String> customFields, MetadataCopyHelper helper,
+                                            MetadataClearFlags clear, BookMetadataEntity metadata, String prefix) {
         if (hasValidSeries(metadata, clear)) {
             customFields.put(prefix + "seriesName", metadata.getSeriesName());
             customFields.put(prefix + "seriesNumber", formatSeriesNumber(metadata.getSeriesNumber()));
 
             if (metadata.getSeriesTotal() != null && metadata.getSeriesTotal() > 0) {
-                helper.copySeriesTotal(clear != null && clear.isSeriesTotal(), total -> {
-                    if (total != null && total > 0) {
-                        customFields.put(prefix + "seriesTotal", total.toString());
-                    }
-                });
+                helper.copySeriesTotal(clear != null && clear.isSeriesTotal(),
+                        total -> putSeriesTotal(customFields, prefix, total));
             }
         }
 
-        helper.copySubtitle(clear != null && clear.isSubtitle(), subtitle -> {
-            if (subtitle != null && !subtitle.isBlank()) customFields.put(prefix + "subtitle", subtitle);
-        });
+        helper.copySubtitle(clear != null && clear.isSubtitle(),
+                subtitle -> putIfPresent(customFields, prefix + "subtitle", subtitle));
+    }
 
-        helper.copyIsbn13(clear != null && clear.isIsbn13(), isbn -> {
-            if (isbn != null && !isbn.isBlank()) customFields.put(prefix + "isbn13", isbn);
-        });
-        helper.copyIsbn10(clear != null && clear.isIsbn10(), isbn -> {
-            if (isbn != null && !isbn.isBlank()) customFields.put(prefix + "isbn10", isbn);
-        });
+    private void addIdentifierFields(Map<String, String> customFields, MetadataCopyHelper helper,
+                                     MetadataClearFlags clear, String prefix) {
+        helper.copyIsbn13(clear != null && clear.isIsbn13(),
+                isbn -> putIfPresent(customFields, prefix + "isbn13", isbn));
+        helper.copyIsbn10(clear != null && clear.isIsbn10(),
+                isbn -> putIfPresent(customFields, prefix + "isbn10", isbn));
+        helper.copyGoogleId(clear != null && clear.isGoogleId(),
+                id -> putIfPresent(customFields, prefix + "googleId", id));
+        helper.copyGoodreadsId(clear != null && clear.isGoodreadsId(),
+                id -> putIfPresent(customFields, prefix + "goodreadsId", normalizeGoodreadsId(id)));
+        helper.copyHardcoverId(clear != null && clear.isHardcoverId(),
+                id -> putIfPresent(customFields, prefix + "hardcoverId", id));
+        helper.copyHardcoverBookId(clear != null && clear.isHardcoverBookId(),
+                id -> putIfPresent(customFields, prefix + "hardcoverBookId", id));
+        helper.copyAsin(clear != null && clear.isAsin(),
+                id -> putIfPresent(customFields, prefix + "asin", id));
+        helper.copyComicvineId(clear != null && clear.isComicvineId(),
+                id -> putIfPresent(customFields, prefix + "comicvineId", id));
+        helper.copyLubimyczytacId(clear != null && clear.isLubimyczytacId(),
+                id -> putIfPresent(customFields, prefix + "lubimyczytacId", id));
+        helper.copyRanobedbId(clear != null && clear.isRanobedbId(),
+                id -> putIfPresent(customFields, prefix + "ranobedbId", id));
+    }
 
-        helper.copyGoogleId(clear != null && clear.isGoogleId(), id -> {
-            if (id != null && !id.isBlank()) customFields.put(prefix + "googleId", id);
-        });
-        helper.copyGoodreadsId(clear != null && clear.isGoodreadsId(), id -> {
-            String normalized = normalizeGoodreadsId(id);
-            if (normalized != null && !normalized.isBlank()) customFields.put(prefix + "goodreadsId", normalized);
-        });
-        helper.copyHardcoverId(clear != null && clear.isHardcoverId(), id -> {
-            if (id != null && !id.isBlank()) customFields.put(prefix + "hardcoverId", id);
-        });
-        helper.copyHardcoverBookId(clear != null && clear.isHardcoverBookId(), id -> {
-            if (id != null && !id.isBlank()) customFields.put(prefix + "hardcoverBookId", id);
-        });
-        helper.copyAsin(clear != null && clear.isAsin(), id -> {
-            if (id != null && !id.isBlank()) customFields.put(prefix + "asin", id);
-        });
-        helper.copyComicvineId(clear != null && clear.isComicvineId(), id -> {
-            if (id != null && !id.isBlank()) customFields.put(prefix + "comicvineId", id);
-        });
-        helper.copyLubimyczytacId(clear != null && clear.isLubimyczytacId(), id -> {
-            if (id != null && !id.isBlank()) customFields.put(prefix + "lubimyczytacId", id);
-        });
-        helper.copyRanobedbId(clear != null && clear.isRanobedbId(), id -> {
-            if (id != null && !id.isBlank()) customFields.put(prefix + "ranobedbId", id);
-        });
-
+    private void addRatingFields(Map<String, String> customFields, MetadataCopyHelper helper,
+                                 MetadataClearFlags clear, String prefix) {
         helper.copyRating(false, rating -> addBookloreRating(customFields, prefix, "rating", rating));
         helper.copyHardcoverRating(clear != null && clear.isHardcoverRating(),
                 rating -> addBookloreRating(customFields, prefix, "hardcoverRating", rating));
@@ -300,12 +343,26 @@ public class PdfMetadataWriter implements MetadataWriter {
                 rating -> addBookloreRating(customFields, prefix, "lubimyczytacRating", rating));
         helper.copyRanobedbRating(clear != null && clear.isRanobedbRating(),
                 rating -> addBookloreRating(customFields, prefix, "ranobedbRating", rating));
+    }
 
+    private void addPageCountField(Map<String, String> customFields, MetadataCopyHelper helper, String prefix) {
         helper.copyPageCount(false, pageCount -> {
             if (pageCount != null && pageCount > 0) {
                 customFields.put(prefix + "pageCount", pageCount.toString());
             }
         });
+    }
+
+    private void putSeriesTotal(Map<String, String> customFields, String prefix, Integer total) {
+        if (total != null && total > 0) {
+            customFields.put(prefix + "seriesTotal", total.toString());
+        }
+    }
+
+    private void putIfPresent(Map<String, String> customFields, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            customFields.put(key, value);
+        }
     }
 
     private void addBookloreRating(Map<String, String> customFields, String prefix, String name, Double rating) {

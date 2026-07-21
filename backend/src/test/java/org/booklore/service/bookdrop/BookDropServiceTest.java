@@ -228,7 +228,7 @@ class BookDropServiceTest {
     }
 
     @Test
-    @Disabled
+    @Disabled("stubs findAllExcludingIdsFlat(), but with an empty excludedIds list finalizeImport's selectAll path calls findAllIds() instead, so this fails on a stub mismatch rather than a product defect")
     void finalizeImport_WhenSelectAllTrue_ShouldProcessAllFiles() throws Exception {
         BookdropFinalizeRequest request = new BookdropFinalizeRequest();
         request.setSelectAll(true);
@@ -264,7 +264,7 @@ class BookDropServiceTest {
         bookEntity.setId(1L);
         when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(bookEntity));
 
-        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().lenient())) {
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().strictness(Strictness.LENIENT))) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(true);
             filesMock.when(() -> Files.copy(any(Path.class), any(Path.class), any())).thenReturn(1024L);
             filesMock.when(() -> Files.createDirectories(any(Path.class))).thenReturn(tempDir);
@@ -293,7 +293,7 @@ class BookDropServiceTest {
         BookMetadata metadata = new BookMetadata();
         when(objectMapper.readValue(anyString(), eq(BookMetadata.class))).thenReturn(metadata);
 
-        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().lenient())) {
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().strictness(Strictness.LENIENT))) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(true);
 
             BookdropFinalizeResult result = bookDropService.finalizeImport(request);
@@ -318,7 +318,7 @@ class BookDropServiceTest {
         when(appProperties.getBookdropFolder()).thenReturn(tempDir.toString());
         when(appProperties.getPathConfig()).thenReturn(tempDir.toString());
 
-        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().lenient())) {
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().strictness(Strictness.LENIENT))) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(true);
             filesMock.when(() -> Files.walk(any(Path.class))).thenReturn(Stream.of(tempDir));
             filesMock.when(() -> Files.isDirectory(any(Path.class))).thenReturn(false);
@@ -343,7 +343,7 @@ class BookDropServiceTest {
         when(appProperties.getBookdropFolder()).thenReturn(tempDir.toString());
         when(appProperties.getPathConfig()).thenReturn(tempDir.toString());
 
-        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().lenient())) {
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().strictness(Strictness.LENIENT))) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(true);
             filesMock.when(() -> Files.walk(any(Path.class))).thenReturn(Stream.of(tempDir));
             filesMock.when(() -> Files.isDirectory(any(Path.class))).thenReturn(false);
@@ -363,7 +363,7 @@ class BookDropServiceTest {
     void discardSelectedFiles_WhenBookdropFolderDoesNotExist_ShouldHandleGracefully() {
         when(appProperties.getBookdropFolder()).thenReturn("/non-existent-path");
 
-        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().lenient())) {
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().strictness(Strictness.LENIENT))) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(false);
 
             bookDropService.discardSelectedFiles(true, null, null);
@@ -398,7 +398,7 @@ class BookDropServiceTest {
         when(fileMovingHelper.generateNewFilePath(anyString(), any(), anyString(), anyString()))
                 .thenReturn(tempDir.resolve("target-file.pdf"));
 
-        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().lenient())) {
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().strictness(Strictness.LENIENT))) {
             filesMock.when(() -> Files.exists(Path.of("/non-existent/missing-file.pdf"))).thenReturn(false);
 
             BookdropFinalizeResult result = bookDropService.finalizeImport(request);
@@ -429,7 +429,7 @@ class BookDropServiceTest {
         when(fileMovingHelper.generateNewFilePath(anyString(), any(), anyString(), anyString()))
                 .thenReturn(tempDir.resolve("target-file.pdf"));
 
-        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().lenient())) {
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().strictness(Strictness.LENIENT))) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(true);
             filesMock.when(() -> Files.copy(any(Path.class), any(Path.class), any()))
                     .thenThrow(new IOException("Disk full"));
@@ -625,7 +625,7 @@ class BookDropServiceTest {
         when(fileMovingHelper.generateNewFilePath(anyString(), any(), anyString(), anyString()))
                 .thenReturn(tempDir.resolve("target-file.pdf"));
 
-        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().lenient())) {
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().strictness(Strictness.LENIENT))) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(false);
 
             bookDropService.finalizeImport(request);
@@ -651,7 +651,7 @@ class BookDropServiceTest {
         when(fileMovingHelper.generateNewFilePath(anyString(), any(), anyString(), anyString()))
                 .thenReturn(tempDir.resolve("target-file.pdf"));
 
-        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().lenient())) {
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class, withSettings().strictness(Strictness.LENIENT))) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(false);
 
             bookDropService.finalizeImport(request);

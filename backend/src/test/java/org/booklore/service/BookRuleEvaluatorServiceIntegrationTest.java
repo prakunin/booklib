@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -1381,11 +1382,11 @@ class BookRuleEvaluatorServiceIntegrationTest {
         @Test
         void greaterThan_matchesPublishedDateAfterThreshold() {
             BookEntity recentBook = createBook("Recent Book");
-            recentBook.getMetadata().setPublishedDate(LocalDate.of(2024, 6, 15));
+            recentBook.getMetadata().setPublishedDate(LocalDate.of(2024, Month.JUNE, 15));
             em.merge(recentBook.getMetadata());
 
             BookEntity oldBook = createBook("Old Book");
-            oldBook.getMetadata().setPublishedDate(LocalDate.of(2020, 1, 1));
+            oldBook.getMetadata().setPublishedDate(LocalDate.of(2020, Month.JANUARY, 1));
             em.merge(oldBook.getMetadata());
             em.flush();
             em.clear();
@@ -1399,11 +1400,11 @@ class BookRuleEvaluatorServiceIntegrationTest {
         @Test
         void lessThan_matchesPublishedDateBeforeThreshold() {
             BookEntity recentBook = createBook("Recent Book");
-            recentBook.getMetadata().setPublishedDate(LocalDate.of(2024, 6, 15));
+            recentBook.getMetadata().setPublishedDate(LocalDate.of(2024, Month.JUNE, 15));
             em.merge(recentBook.getMetadata());
 
             BookEntity oldBook = createBook("Old Book");
-            oldBook.getMetadata().setPublishedDate(LocalDate.of(2020, 1, 1));
+            oldBook.getMetadata().setPublishedDate(LocalDate.of(2020, Month.JANUARY, 1));
             em.merge(oldBook.getMetadata());
             em.flush();
             em.clear();
@@ -1417,11 +1418,11 @@ class BookRuleEvaluatorServiceIntegrationTest {
         @Test
         void inBetween_matchesPublishedDateInRange() {
             BookEntity inRange = createBook("In Range Book");
-            inRange.getMetadata().setPublishedDate(LocalDate.of(2023, 6, 15));
+            inRange.getMetadata().setPublishedDate(LocalDate.of(2023, Month.JUNE, 15));
             em.merge(inRange.getMetadata());
 
             BookEntity outOfRange = createBook("Out of Range Book");
-            outOfRange.getMetadata().setPublishedDate(LocalDate.of(2020, 1, 1));
+            outOfRange.getMetadata().setPublishedDate(LocalDate.of(2020, Month.JANUARY, 1));
             em.merge(outOfRange.getMetadata());
             em.flush();
             em.clear();
@@ -1769,7 +1770,7 @@ class BookRuleEvaluatorServiceIntegrationTest {
         @Test
         void has_publishedDate_matchesWhenPresent() {
             BookEntity withDate = createBook("With Published Date");
-            withDate.getMetadata().setPublishedDate(LocalDate.of(2023, 1, 1));
+            withDate.getMetadata().setPublishedDate(LocalDate.of(2023, Month.JANUARY, 1));
             em.merge(withDate.getMetadata());
 
             BookEntity noDate = createBook("No Published Date");

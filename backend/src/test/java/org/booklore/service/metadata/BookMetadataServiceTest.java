@@ -67,7 +67,7 @@ class BookMetadataServiceTest {
 
     @BeforeEach
     void setUp() {
-        parserMap = new HashMap<>();
+        parserMap = new EnumMap<>(MetadataProvider.class);
         service = new BookMetadataService(
                 bookRepository, bookMapper, bookMetadataMapper, bookMetadataUpdater,
                 notificationService, bookMetadataRepository, bookQueryService,

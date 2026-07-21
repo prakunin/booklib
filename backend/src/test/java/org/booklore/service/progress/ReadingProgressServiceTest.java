@@ -125,6 +125,8 @@ class ReadingProgressServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void enrichBookWithProgress_shouldSetProgressFields() {
         Book book = Book.builder().id(1L).build();
         UserBookProgressEntity progress = new UserBookProgressEntity();
@@ -142,6 +144,8 @@ class ReadingProgressServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void enrichBookWithProgress_withFileProgress_shouldOverlayFileProgress() {
         Book book = Book.builder().id(1L).build();
 
@@ -171,6 +175,8 @@ class ReadingProgressServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void updateReadProgress_epub_shouldSaveProgress() {
         long bookId = 1L;
         BookEntity book = new BookEntity();
@@ -252,6 +258,8 @@ class ReadingProgressServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void updateReadProgress_pdf_shouldSaveProgress() {
         long bookId = 1L;
         BookEntity book = new BookEntity();
@@ -290,6 +298,8 @@ class ReadingProgressServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void updateReadProgress_shouldDelegateKoreaderSync() {
         long bookId = 1L;
         BookEntity book = new BookEntity();
@@ -325,6 +335,8 @@ class ReadingProgressServiceTest {
     }
 
     @Test
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     void updateReadProgress_shouldDelegateKoreaderSyncWithCorrectPercentage() {
         long bookId = 1L;
         BookEntity book = new BookEntity();

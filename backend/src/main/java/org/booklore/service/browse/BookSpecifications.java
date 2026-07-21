@@ -18,6 +18,14 @@ import java.util.Objects;
 
 public class BookSpecifications {
 
+    private static final String ATTR_LIBRARY = "library";
+    private static final String ATTR_SHELVES = "shelves";
+    private static final String ATTR_READ_STATUS = "readStatus";
+    private static final String ATTR_METADATA = "metadata";
+    private static final String ATTR_BOOK_FILES = "bookFiles";
+    private static final String ATTR_BOOK_TYPE = "bookType";
+    private static final String ATTR_PERSONAL_RATING = "personalRating";
+
     private BookSpecifications() {
     }
 
@@ -61,6 +69,27 @@ public class BookSpecifications {
         return result;
     }
 
+    private static List<ReadStatus> parseReadStatuses(List<String> statuses) {
+        List<String> unknown = new ArrayList<>();
+        List<ReadStatus> parsed = statuses.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(s -> {
+                    String trimmed = s.trim().toUpperCase();
+                    try {
+                        return ReadStatus.valueOf(trimmed);
+                    } catch (IllegalArgumentException _) {
+                        unknown.add(s.trim());
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
+        if (!unknown.isEmpty()) {
+            throw new APIException("Invalid status values: " + unknown + ". Valid values: " + List.of(ReadStatus.values()), HttpStatus.BAD_REQUEST);
+        }
+        return parsed;
+    }
+
     @SuppressWarnings("unchecked")
     private static <X, Y> Join<X, Y> getOrCreateJoin(From<?, X> from, String attribute, JoinType joinType) {
         for (Join<X, ?> join : from.getJoins()) {
@@ -79,7 +108,7 @@ public class BookSpecifications {
             if (libraryIds.isEmpty()) {
                 return cb.disjunction();
             }
-            return root.get("library").get("id").in(libraryIds);
+            return root.get(ATTR_LIBRARY).get("id").in(libraryIds);
         };
     }
 
@@ -88,7 +117,7 @@ public class BookSpecifications {
             if (libraryId == null) {
                 return cb.conjunction();
             }
-            return cb.equal(root.get("library").get("id"), libraryId);
+            return cb.equal(root.get(ATTR_LIBRARY).get("id"), libraryId);
         };
     }
 
@@ -97,7 +126,7 @@ public class BookSpecifications {
             if (shelfId == null) {
                 return cb.conjunction();
             }
-            Join<BookEntity, ShelfEntity> shelvesJoin = root.join("shelves", JoinType.INNER);
+            Join<BookEntity, ShelfEntity> shelvesJoin = root.join(ATTR_SHELVES, JoinType.INNER);
             return cb.equal(shelvesJoin.get("id"), shelfId);
         };
     }
@@ -112,7 +141,7 @@ public class BookSpecifications {
             subquery.select(progressRoot.get("book").get("id"))
                     .where(
                             cb.equal(progressRoot.get("user").get("id"), userId),
-                            cb.equal(progressRoot.get("readStatus"), status)
+                            cb.equal(progressRoot.get(ATTR_READ_STATUS), status)
                     );
             return root.get("id").in(subquery);
         };
@@ -128,7 +157,7 @@ public class BookSpecifications {
             subquery.select(progressRoot.get("book").get("id"))
                     .where(
                             cb.equal(progressRoot.get("user").get("id"), userId),
-                            progressRoot.get("readStatus").in(ReadStatus.READING, ReadStatus.RE_READING)
+                            progressRoot.get(ATTR_READ_STATUS).in(ReadStatus.READING, ReadStatus.RE_READING)
                     );
             return root.get("id").in(subquery);
         };
@@ -170,7 +199,7 @@ public class BookSpecifications {
             }
             String pattern = "%" + searchQuery.toLowerCase().trim() + "%";
 
-            Join<BookEntity, BookMetadataEntity> metadataJoin = root.join("metadata", JoinType.LEFT);
+            Join<BookEntity, BookMetadataEntity> metadataJoin = root.join(ATTR_METADATA, JoinType.LEFT);
 
             // Use EXISTS subquery for author search to avoid DISTINCT and cartesian products
             Subquery<Long> authorSubquery = query.subquery(Long.class);
@@ -217,7 +246,7 @@ public class BookSpecifications {
             Subquery<Long> subquery = query.subquery(Long.class);
             Root<BookFileEntity> bookFileRoot = subquery.from(BookFileEntity.class);
             subquery.select(bookFileRoot.get("book").get("id"))
-                    .where(cb.equal(bookFileRoot.get("bookType"), BookFileType.AUDIOBOOK));
+                    .where(cb.equal(bookFileRoot.get(ATTR_BOOK_TYPE), BookFileType.AUDIOBOOK));
             return root.get("id").in(subquery);
         };
     }
@@ -227,7 +256,7 @@ public class BookSpecifications {
             Subquery<Long> subquery = query.subquery(Long.class);
             Root<BookFileEntity> bookFileRoot = subquery.from(BookFileEntity.class);
             subquery.select(bookFileRoot.get("book").get("id"))
-                    .where(cb.notEqual(bookFileRoot.get("bookType"), BookFileType.AUDIOBOOK));
+                    .where(cb.notEqual(bookFileRoot.get(ATTR_BOOK_TYPE), BookFileType.AUDIOBOOK));
             return root.get("id").in(subquery);
         };
     }
@@ -243,7 +272,7 @@ public class BookSpecifications {
             Subquery<Long> subquery = query.subquery(Long.class);
             Root<BookFileEntity> bookFileRoot = subquery.from(BookFileEntity.class);
             subquery.select(bookFileRoot.get("book").get("id"))
-                    .where(cb.equal(bookFileRoot.get("bookType"), fileType));
+                    .where(cb.equal(bookFileRoot.get(ATTR_BOOK_TYPE), fileType));
             return root.get("id").in(subquery);
         };
     }
@@ -281,7 +310,7 @@ public class BookSpecifications {
                     Subquery<Long> sub = query.subquery(Long.class);
                     Root<BookFileEntity> bfRoot = sub.from(BookFileEntity.class);
                     sub.select(bfRoot.get("book").get("id"))
-                            .where(cb.equal(bfRoot.get("bookType"), ft));
+                            .where(cb.equal(bfRoot.get(ATTR_BOOK_TYPE), ft));
                     predicates.add(root.get("id").in(sub));
                 }
                 return cb.and(predicates.toArray(Predicate[]::new));
@@ -290,7 +319,7 @@ public class BookSpecifications {
             Subquery<Long> sub = query.subquery(Long.class);
             Root<BookFileEntity> bfRoot = sub.from(BookFileEntity.class);
             sub.select(bfRoot.get("book").get("id"))
-                    .where(bfRoot.get("bookType").in(parsed));
+                    .where(bfRoot.get(ATTR_BOOK_TYPE).in(parsed));
 
             if ("not".equals(mode)) {
                 return cb.not(root.get("id").in(sub));
@@ -308,23 +337,7 @@ public class BookSpecifications {
     public static Specification<BookEntity> withReadStatuses(List<String> statuses, Long userId, String mode) {
         return (root, query, cb) -> {
             if (userId == null) return cb.conjunction();
-            List<String> unknown = new ArrayList<>();
-            List<ReadStatus> parsed = statuses.stream()
-                    .filter(s -> s != null && !s.isBlank())
-                    .map(s -> {
-                        String trimmed = s.trim().toUpperCase();
-                        try {
-                            return ReadStatus.valueOf(trimmed);
-                        } catch (IllegalArgumentException _) {
-                            unknown.add(s.trim());
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull)
-                    .toList();
-            if (!unknown.isEmpty()) {
-                throw new APIException("Invalid status values: " + unknown + ". Valid values: " + List.of(ReadStatus.values()), HttpStatus.BAD_REQUEST);
-            }
+            List<ReadStatus> parsed = parseReadStatuses(statuses);
             if (parsed.isEmpty()) return cb.conjunction();
 
             boolean hasUnset = parsed.contains(ReadStatus.UNSET);
@@ -335,7 +348,7 @@ public class BookSpecifications {
             sub.select(progressRoot.get("book").get("id"))
                     .where(
                             cb.equal(progressRoot.get("user").get("id"), userId),
-                            realStatuses.isEmpty() ? cb.disjunction() : progressRoot.get("readStatus").in(realStatuses)
+                            realStatuses.isEmpty() ? cb.disjunction() : progressRoot.get(ATTR_READ_STATUS).in(realStatuses)
                     );
 
             Predicate isReal = root.get("id").in(sub);
@@ -353,7 +366,7 @@ public class BookSpecifications {
             unsetEntrySub.select(unsetEntryRoot.get("book").get("id"))
                     .where(
                             cb.equal(unsetEntryRoot.get("user").get("id"), userId),
-                            cb.equal(unsetEntryRoot.get("readStatus"), ReadStatus.UNSET)
+                            cb.equal(unsetEntryRoot.get(ATTR_READ_STATUS), ReadStatus.UNSET)
                     );
             Predicate hasUnsetEntry = root.get("id").in(unsetEntrySub);
             
@@ -382,7 +395,7 @@ public class BookSpecifications {
             subquery.select(progressRoot.get("book").get("id"))
                     .where(
                             cb.equal(progressRoot.get("user").get("id"), userId),
-                            cb.greaterThanOrEqualTo(progressRoot.get("personalRating"), minRating)
+                            cb.greaterThanOrEqualTo(progressRoot.get(ATTR_PERSONAL_RATING), minRating)
                     );
             return root.get("id").in(subquery);
         };
@@ -404,7 +417,7 @@ public class BookSpecifications {
                 ratedSubquery.select(ratedRoot.get("book").get("id"))
                         .where(
                                 cb.equal(ratedRoot.get("user").get("id"), userId),
-                                cb.isNotNull(ratedRoot.get("personalRating"))
+                                cb.isNotNull(ratedRoot.get(ATTR_PERSONAL_RATING))
                         );
                 return cb.not(root.get("id").in(ratedSubquery));
             }
@@ -412,7 +425,7 @@ public class BookSpecifications {
             subquery.select(progressRoot.get("book").get("id"))
                     .where(
                             cb.equal(progressRoot.get("user").get("id"), userId),
-                            cb.lessThanOrEqualTo(progressRoot.get("personalRating"), maxRating)
+                            cb.lessThanOrEqualTo(progressRoot.get(ATTR_PERSONAL_RATING), maxRating)
                     );
             return root.get("id").in(subquery);
         };
@@ -437,7 +450,7 @@ public class BookSpecifications {
             if (cleaned.isEmpty()) return cb.conjunction();
 
             return buildManyToManySpec(root, query, cb, cleaned, mode,
-                    "metadata", "authors", "name");
+                    "authors", "name");
         };
     }
 
@@ -456,7 +469,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(languages);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "language");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "language");
         };
     }
 
@@ -472,7 +485,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(seriesNames);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "seriesName");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "seriesName");
         };
     }
 
@@ -489,7 +502,7 @@ public class BookSpecifications {
             if (cleaned.isEmpty()) return cb.conjunction();
 
             return buildManyToManySpec(root, query, cb, cleaned, mode,
-                    "metadata", "categories", "name");
+                    "categories", "name");
         };
     }
 
@@ -505,7 +518,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(publishers);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "publisher");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "publisher");
         };
     }
 
@@ -522,7 +535,7 @@ public class BookSpecifications {
             if (cleaned.isEmpty()) return cb.conjunction();
 
             return buildManyToManySpec(root, query, cb, cleaned, mode,
-                    "metadata", "tags", "name");
+                    "tags", "name");
         };
     }
 
@@ -539,7 +552,7 @@ public class BookSpecifications {
             if (cleaned.isEmpty()) return cb.conjunction();
 
             return buildManyToManySpec(root, query, cb, cleaned, mode,
-                    "metadata", "moods", "name");
+                    "moods", "name");
         };
     }
 
@@ -555,7 +568,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(narrators);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "narrator");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "narrator");
         };
     }
 
@@ -563,7 +576,7 @@ public class BookSpecifications {
         return (root, query, cb) -> {
             Subquery<Long> subquery = query.subquery(Long.class);
             Root<BookEntity> subRoot = subquery.correlate(root);
-            subRoot.join("shelves", JoinType.INNER);
+            subRoot.join(ATTR_SHELVES, JoinType.INNER);
             subquery.select(cb.literal(1L));
             return cb.not(cb.exists(subquery));
         };
@@ -573,7 +586,7 @@ public class BookSpecifications {
         return (root, query, cb) -> {
             List<Integer> ids = parseIntList(rangeIds, "ageRating");
             if (ids.isEmpty()) return cb.conjunction();
-            Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, "metadata", JoinType.INNER);
+            Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, ATTR_METADATA, JoinType.INNER);
             Expression<Integer> ageRating = metadataJoin.get("ageRating");
             
             // Age rating ranges from frontend config (mirrored here for performance)
@@ -600,7 +613,7 @@ public class BookSpecifications {
         return (root, query, cb) -> {
             List<String> cleaned = cleanLowerCase(values);
             if (cleaned.isEmpty()) return cb.conjunction();
-            return buildMetadataFieldSpec(root, query, cb, cleaned, mode, "contentRating");
+            return buildMetadataFieldSpec(root, cb, cleaned, mode, "contentRating");
         };
     }
 
@@ -633,7 +646,7 @@ public class BookSpecifications {
             if (years.isEmpty()) return cb.conjunction();
             List<Integer> parsedYears = parseIntList(years, "publishedDate");
             if (parsedYears.isEmpty()) return cb.conjunction();
-            Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, "metadata", JoinType.INNER);
+            Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, ATTR_METADATA, JoinType.INNER);
             Expression<Integer> yearExpr = cb.function("YEAR", Integer.class, metadataJoin.get("publishedDate"));
             Predicate combined = yearExpr.in(parsedYears);
             return "not".equals(mode) ? cb.not(combined) : combined;
@@ -647,11 +660,11 @@ public class BookSpecifications {
             
             Subquery<Long> sub = query.subquery(Long.class);
             Root<BookEntity> subRoot = sub.correlate(root);
-            Join<BookEntity, BookFileEntity> bfJoin = subRoot.join("bookFiles", JoinType.INNER);
+            Join<BookEntity, BookFileEntity> bfJoin = subRoot.join(ATTR_BOOK_FILES, JoinType.INNER);
             
             Subquery<Long> minIdSub = query.subquery(Long.class);
             Root<BookEntity> minIdRoot = minIdSub.correlate(root);
-            Join<BookEntity, BookFileEntity> minIdJoin = minIdRoot.join("bookFiles", JoinType.INNER);
+            Join<BookEntity, BookFileEntity> minIdJoin = minIdRoot.join(ATTR_BOOK_FILES, JoinType.INNER);
             minIdSub.select(cb.min(minIdJoin.get("id")))
                     .where(cb.equal(minIdJoin.get("isBookFormat"), true));
 
@@ -682,14 +695,14 @@ public class BookSpecifications {
     public static Specification<BookEntity> withPersonalRatings(List<String> values, Long userId, String mode) {
         return (root, query, cb) -> {
             if (userId == null || values.isEmpty()) return cb.conjunction();
-            List<Integer> parsed = parseIntList(values, "personalRating");
+            List<Integer> parsed = parseIntList(values, ATTR_PERSONAL_RATING);
             if (parsed.isEmpty()) return cb.conjunction();
             Subquery<Long> sub = query.subquery(Long.class);
             Root<UserBookProgressEntity> progressRoot = sub.from(UserBookProgressEntity.class);
             sub.select(progressRoot.get("book").get("id"))
                     .where(
                             cb.equal(progressRoot.get("user").get("id"), userId),
-                            progressRoot.get("personalRating").in(parsed)
+                            progressRoot.get(ATTR_PERSONAL_RATING).in(parsed)
                     );
             return "not".equals(mode) ? cb.not(root.get("id").in(sub)) : root.get("id").in(sub);
         };
@@ -724,7 +737,7 @@ public class BookSpecifications {
         return (root, query, cb) -> {
             List<Integer> ids = parseIntList(rangeIds, fieldName);
             if (ids.isEmpty()) return cb.conjunction();
-            Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, "metadata", JoinType.INNER);
+            Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, ATTR_METADATA, JoinType.INNER);
             Expression<Double> rating = metadataJoin.get(fieldName);
             List<Predicate> predicates = new ArrayList<>();
             for (Integer id : ids) {
@@ -747,7 +760,7 @@ public class BookSpecifications {
         return (root, query, cb) -> {
             List<Integer> ids = parseIntList(rangeIds, "pageCount");
             if (ids.isEmpty()) return cb.conjunction();
-            Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, "metadata", JoinType.INNER);
+            Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, ATTR_METADATA, JoinType.INNER);
             Expression<Integer> count = metadataJoin.get("pageCount");
             List<Predicate> predicates = new ArrayList<>();
             for (Integer id : ids) {
@@ -781,7 +794,7 @@ public class BookSpecifications {
             boolean wantShelved = cleaned.contains("shelved");
             boolean wantUnshelved = cleaned.contains("unshelved");
             if (wantShelved && wantUnshelved) return cb.conjunction();
-            Predicate hasShelves = cb.isNotEmpty(root.get("shelves"));
+            Predicate hasShelves = cb.isNotEmpty(root.get(ATTR_SHELVES));
             Predicate combined = wantShelved ? hasShelves : cb.not(hasShelves);
             return "not".equals(mode) ? cb.not(combined) : combined;
         };
@@ -829,7 +842,7 @@ public class BookSpecifications {
                 for (Long id : ids) {
                     Subquery<Long> sub = query.subquery(Long.class);
                     Root<BookEntity> subRoot = sub.correlate(root);
-                    Join<BookEntity, ShelfEntity> subShelves = subRoot.join("shelves", JoinType.INNER);
+                    Join<BookEntity, ShelfEntity> subShelves = subRoot.join(ATTR_SHELVES, JoinType.INNER);
                     sub.select(cb.literal(1L)).where(cb.equal(subShelves.get("id"), id));
                     predicates.add(cb.exists(sub));
                 }
@@ -838,7 +851,7 @@ public class BookSpecifications {
 
             Subquery<Long> sub = query.subquery(Long.class);
             Root<BookEntity> subRoot = sub.correlate(root);
-            Join<BookEntity, ShelfEntity> subShelves = subRoot.join("shelves", JoinType.INNER);
+            Join<BookEntity, ShelfEntity> subShelves = subRoot.join(ATTR_SHELVES, JoinType.INNER);
             sub.select(cb.literal(1L)).where(subShelves.get("id").in(ids));
             return "not".equals(mode) ? cb.not(cb.exists(sub)) : cb.exists(sub);
         };
@@ -847,15 +860,15 @@ public class BookSpecifications {
     public static Specification<BookEntity> inLibraries(List<String> libraryIds, String mode) {
         return (root, query, cb) -> {
             if (libraryIds.isEmpty()) return cb.conjunction();
-            List<Long> ids = parseLongList(libraryIds, "library");
+            List<Long> ids = parseLongList(libraryIds, ATTR_LIBRARY);
             if (ids.isEmpty()) return cb.conjunction();
             
             if ("and".equals(mode)) {
                 if (ids.size() > 1) return cb.disjunction(); // A book can't be in multiple libraries
-                return cb.equal(root.get("library").get("id"), ids.getFirst());
+                return cb.equal(root.get(ATTR_LIBRARY).get("id"), ids.getFirst());
             }
 
-            Predicate combined = root.get("library").get("id").in(ids);
+            Predicate combined = root.get(ATTR_LIBRARY).get("id").in(ids);
             return "not".equals(mode) ? cb.not(combined) : combined;
         };
     }
@@ -923,10 +936,10 @@ public class BookSpecifications {
      * NOT = metadata field NOT IN (values)
      */
     private static Predicate buildMetadataFieldSpec(
-            Root<BookEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb,
+            Root<BookEntity> root, CriteriaBuilder cb,
             List<String> values, String mode, String fieldName) {
 
-        Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, "metadata", JoinType.INNER);
+        Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, ATTR_METADATA, JoinType.INNER);
         Expression<String> fieldExpr = cb.lower(metadataJoin.get(fieldName));
 
         if ("not".equals(mode)) {
@@ -947,7 +960,7 @@ public class BookSpecifications {
     private static Predicate buildManyToManySpec(
             Root<BookEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb,
             List<String> values, String mode,
-            String metadataAttr, String collectionAttr, String nameAttr) {
+            String collectionAttr, String nameAttr) {
 
         if ("and".equals(mode)) {
             // AND: book must have ALL values one EXISTS subquery per value

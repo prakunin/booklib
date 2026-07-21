@@ -8,9 +8,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -199,6 +203,106 @@ class PdfMetadataExtractorTest {
             BookMetadata meta = extractor.extractMetadata(pdf);
             assertThat(meta.getLanguage()).isEqualTo("English");
         }
+
+        @Test
+        void blankAuthor_noAuthorsSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.AUTHOR, "   ");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getAuthors()).isNullOrEmpty();
+        }
+
+        @Test
+        void authorWithOnlyDelimiters_noAuthorsSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.AUTHOR, " , & ");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getAuthors()).isNullOrEmpty();
+        }
+
+        @Test
+        void blankKeywords_noCategoriesSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.KEYWORDS, "   ");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getCategories()).isNullOrEmpty();
+        }
+
+        @Test
+        void keywordsWithOnlyDelimiters_noCategoriesSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.KEYWORDS, ";;;");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getCategories()).isNullOrEmpty();
+        }
+
+        @Test
+        void blankOptionalDocumentInfoFields_noneAreSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.SUBJECT, "   ");
+                doc.setMetadata("EBX_PUBLISHER", "   ");
+                doc.setMetadata(MetadataTag.CREATION_DATE, "   ");
+                doc.setMetadata("Language", "   ");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getDescription()).isNull();
+            assertThat(meta.getPublisher()).isNull();
+            assertThat(meta.getPublishedDate()).isNull();
+            assertThat(meta.getLanguage()).isNull();
+        }
+    }
+
+    // --- parsePdfDate format variants, driven through the CreationDate document-info field ---
+
+    @Nested
+    class ParsePdfDateTests {
+
+        private java.time.LocalDate publishedDateFor(String creationDate) throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.CREATION_DATE, creationDate);
+            });
+            return extractor.extractMetadata(pdf).getPublishedDate();
+        }
+
+        @Test
+        void plainIsoDate_withoutDPrefix_isParsed() throws Exception {
+            assertThat(publishedDateFor("2021-02-17")).isEqualTo(java.time.LocalDate.of(2021, java.time.Month.FEBRUARY, 17));
+        }
+
+        @Test
+        void plusTimezoneOffset_isStrippedBeforeParsing() throws Exception {
+            assertThat(publishedDateFor("D:20230615120000+05'00'")).isEqualTo(java.time.LocalDate.of(2023, java.time.Month.JUNE, 15));
+        }
+
+        @Test
+        void dashTimezoneOffset_isStrippedBeforeParsing() throws Exception {
+            assertThat(publishedDateFor("D:20230615120000-05'00'")).isEqualTo(java.time.LocalDate.of(2023, java.time.Month.JUNE, 15));
+        }
+
+        @Test
+        void yearAndMonthOnly_defaultsToFirstOfMonth() throws Exception {
+            assertThat(publishedDateFor("D:202306")).isEqualTo(java.time.LocalDate.of(2023, java.time.Month.JUNE, 1));
+        }
+
+        @Test
+        void yearOnly_defaultsToJanuaryFirst() throws Exception {
+            assertThat(publishedDateFor("D:2023")).isEqualTo(java.time.LocalDate.of(2023, java.time.Month.JANUARY, 1));
+        }
+
+        @Test
+        void unparseableDate_isIgnoredRatherThanThrowing() throws Exception {
+            assertThat(publishedDateFor("D:notadate")).isNull();
+        }
     }
 
     // --- Dublin Core XMP ---
@@ -386,32 +490,23 @@ class PdfMetadataExtractorTest {
             assertThat(meta.getSeriesName()).isEqualTo("Booklore Series");
         }
 
-        @Test
-        void extractsSubtitle_camelCase() throws Exception {
-            File pdf = createPdfWithXmp("""
-                <booklore:subtitle>A New Beginning</booklore:subtitle>
-                """);
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("subtitleCases")
+        void extractsSubtitle(String scenario, String xmpFragment, String expectedSubtitle) throws Exception {
+            File pdf = createPdfWithXmp(xmpFragment);
             BookMetadata meta = extractor.extractMetadata(pdf);
-            assertThat(meta.getSubtitle()).isEqualTo("A New Beginning");
+            assertThat(meta.getSubtitle()).isEqualTo(expectedSubtitle);
         }
 
-        @Test
-        void extractsSubtitle_pascalCaseFallback() throws Exception {
-            File pdf = createPdfWithXmp("""
-                <booklore:Subtitle>Custom Subtitle</booklore:Subtitle>
-                """);
-            BookMetadata meta = extractor.extractMetadata(pdf);
-            assertThat(meta.getSubtitle()).isEqualTo("Custom Subtitle");
-        }
-
-        @Test
-        void subtitle_camelCaseTakesPrecedenceOverPascalCase() throws Exception {
-            File pdf = createPdfWithXmp("""
-                <booklore:subtitle>New</booklore:subtitle>
-                <booklore:Subtitle>Custom</booklore:Subtitle>
-                """);
-            BookMetadata meta = extractor.extractMetadata(pdf);
-            assertThat(meta.getSubtitle()).isEqualTo("New");
+        private static Stream<Arguments> subtitleCases() {
+            return Stream.of(
+                    Arguments.of("camelCase", "<booklore:subtitle>A New Beginning</booklore:subtitle>", "A New Beginning"),
+                    Arguments.of("pascalCaseFallback", "<booklore:Subtitle>Custom Subtitle</booklore:Subtitle>", "Custom Subtitle"),
+                    Arguments.of("camelCaseTakesPrecedenceOverPascalCase", """
+                            <booklore:subtitle>New</booklore:subtitle>
+                            <booklore:Subtitle>Custom</booklore:Subtitle>
+                            """, "New")
+            );
         }
 
         @Test
@@ -593,76 +688,60 @@ class PdfMetadataExtractorTest {
     @Nested
     class IdentifierTests {
 
-        @Test
-        void extractsIsbn13_fromGenericIsbnScheme() throws Exception {
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("genericIsbnSchemeCases")
+        void parsesIsbnFromIdentifierScheme(String scenario, String identifierBagXml, String field, String expectedValue) throws Exception {
             File pdf = createPdfWithXmp("""
                 <xmp:Identifier>
                   <rdf:Bag>
-                    <rdf:li>
-                      <xmpidq:Scheme>ISBN</xmpidq:Scheme>
-                      <rdf:value>978-0-13-468599-1</rdf:value>
-                    </rdf:li>
+                %s
                   </rdf:Bag>
                 </xmp:Identifier>
-                """);
+                """.formatted(identifierBagXml));
             BookMetadata meta = extractor.extractMetadata(pdf);
-            assertThat(meta.getIsbn13()).isEqualTo("9780134685991");
+
+            switch (field) {
+                case "isbn13" -> assertThat(meta.getIsbn13()).isEqualTo(expectedValue);
+                case "isbn10" -> assertThat(meta.getIsbn10()).isEqualTo(expectedValue);
+                default -> throw new IllegalArgumentException("Unexpected field: " + field);
+            }
         }
 
-        @Test
-        void extractsIsbn10_fromGenericIsbnScheme_10digits() throws Exception {
-            File pdf = createPdfWithXmp("""
-                <xmp:Identifier>
-                  <rdf:Bag>
-                    <rdf:li>
-                      <xmpidq:Scheme>ISBN</xmpidq:Scheme>
-                      <rdf:value>0-13-468599-X</rdf:value>
-                    </rdf:li>
-                  </rdf:Bag>
-                </xmp:Identifier>
-                """);
-            BookMetadata meta = extractor.extractMetadata(pdf);
-            assertThat(meta.getIsbn10()).isEqualTo("013468599X");
-        }
-
-        @Test
-        void specificIsbn13_overridesGenericIsbn() throws Exception {
-            File pdf = createPdfWithXmp("""
-                <xmp:Identifier>
-                  <rdf:Bag>
-                    <rdf:li>
-                      <xmpidq:Scheme>ISBN</xmpidq:Scheme>
-                      <rdf:value>9780000000000</rdf:value>
-                    </rdf:li>
-                    <rdf:li>
-                      <xmpidq:Scheme>ISBN13</xmpidq:Scheme>
-                      <rdf:value>9781234567890</rdf:value>
-                    </rdf:li>
-                  </rdf:Bag>
-                </xmp:Identifier>
-                """);
-            BookMetadata meta = extractor.extractMetadata(pdf);
-            assertThat(meta.getIsbn13()).isEqualTo("9781234567890");
-        }
-
-        @Test
-        void specificIsbn10_overridesGenericIsbn() throws Exception {
-            File pdf = createPdfWithXmp("""
-                <xmp:Identifier>
-                  <rdf:Bag>
-                    <rdf:li>
-                      <xmpidq:Scheme>ISBN</xmpidq:Scheme>
-                      <rdf:value>9780000000000</rdf:value>
-                    </rdf:li>
-                    <rdf:li>
-                      <xmpidq:Scheme>ISBN10</xmpidq:Scheme>
-                      <rdf:value>0-123-45678-9</rdf:value>
-                    </rdf:li>
-                  </rdf:Bag>
-                </xmp:Identifier>
-                """);
-            BookMetadata meta = extractor.extractMetadata(pdf);
-            assertThat(meta.getIsbn10()).isEqualTo("0123456789");
+        private static Stream<Arguments> genericIsbnSchemeCases() {
+            return Stream.of(
+                    Arguments.of("genericIsbnScheme13Digits", """
+                            <rdf:li>
+                              <xmpidq:Scheme>ISBN</xmpidq:Scheme>
+                              <rdf:value>978-0-13-468599-1</rdf:value>
+                            </rdf:li>
+                            """, "isbn13", "9780134685991"),
+                    Arguments.of("genericIsbnScheme10Digits", """
+                            <rdf:li>
+                              <xmpidq:Scheme>ISBN</xmpidq:Scheme>
+                              <rdf:value>0-13-468599-X</rdf:value>
+                            </rdf:li>
+                            """, "isbn10", "013468599X"),
+                    Arguments.of("specificIsbn13OverridesGeneric", """
+                            <rdf:li>
+                              <xmpidq:Scheme>ISBN</xmpidq:Scheme>
+                              <rdf:value>9780000000000</rdf:value>
+                            </rdf:li>
+                            <rdf:li>
+                              <xmpidq:Scheme>ISBN13</xmpidq:Scheme>
+                              <rdf:value>9781234567890</rdf:value>
+                            </rdf:li>
+                            """, "isbn13", "9781234567890"),
+                    Arguments.of("specificIsbn10OverridesGeneric", """
+                            <rdf:li>
+                              <xmpidq:Scheme>ISBN</xmpidq:Scheme>
+                              <rdf:value>9780000000000</rdf:value>
+                            </rdf:li>
+                            <rdf:li>
+                              <xmpidq:Scheme>ISBN10</xmpidq:Scheme>
+                              <rdf:value>0-123-45678-9</rdf:value>
+                            </rdf:li>
+                            """, "isbn10", "0123456789")
+            );
         }
 
         @Test
@@ -1103,7 +1182,7 @@ class PdfMetadataExtractorTest {
         );
         assertThat(meta.getPublisher()).isEqualTo("Orbit");
         assertThat(meta.getLanguage()).isEqualTo("en");
-        assertThat(meta.getPublishedDate()).isEqualTo(java.time.LocalDate.of(2013, 11, 6));
+        assertThat(meta.getPublishedDate()).isEqualTo(java.time.LocalDate.of(2013, java.time.Month.NOVEMBER, 6));
         assertThat(meta.getSeriesName()).isEqualTo("The Witcher");
         assertThat(meta.getSeriesNumber()).isEqualTo(0.6f);
         assertThat(meta.getSeriesTotal()).isEqualTo(5);

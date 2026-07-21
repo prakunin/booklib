@@ -92,6 +92,8 @@ public class FileService {
     private static final int    SQUARE_THUMBNAIL_SIZE         = 250;
     private static final int    MAX_SQUARE_SIZE               = 1000;
     private static final String IMAGE_FORMAT                  = "JPEG";
+    private static final String FAILED_TO_SAVE_COVER_IMAGES_MESSAGE           = "Failed to save cover images";
+    private static final String FAILED_TO_SAVE_AUDIOBOOK_COVER_IMAGES_MESSAGE = "Failed to save audiobook cover images";
     // @formatter:on
 
     // ========================================
@@ -375,22 +377,9 @@ public class FileService {
 
         while (redirectCount <= MAX_REDIRECTS) {
             URI uri = URI.create(currentUrl);
-            if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
-                throw new IOException("Only HTTP and HTTPS protocols are allowed");
-            }
+            String host = validateImageRequestUri(uri, currentUrl);
 
-            String host = uri.getHost();
-            if (host == null) {
-                throw new IOException("Invalid URL: no host found in " + currentUrl);
-            }
-
-            NetworkAddressValidator.validateExternalHttpUrl(currentUrl);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.set(HttpHeaders.USER_AGENT, "BookLore/1.0 (Book and Comic Metadata Fetcher; +https://github.com/booklore-app/booklore)");
-            headers.set(HttpHeaders.ACCEPT, "image/*");
-
-            HttpEntity<String> entity = new HttpEntity<>(headers);
+            HttpEntity<String> entity = buildImageRequestEntity();
 
             log.debug("Downloading image from: {}", currentUrl);
 
@@ -404,34 +393,7 @@ public class FileService {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return readImage(response.getBody());
             } else if (response.getStatusCode().is3xxRedirection()) {
-                String location = response.getHeaders().getFirst(HttpHeaders.LOCATION);
-                if (location == null) {
-                    throw new IOException("Redirection response without Location header");
-                }
-                URI redirectUri = uri.resolve(location);
-                NetworkAddressValidator.validateExternalHttpUrl(redirectUri.toString());
-
-                // When a CDN redirects to a raw IP (e.g. CloudFront -> 3.168.64.124),
-                // the Host header would become the bare IP, which the CDN rejects with
-                // 400. Rewrite the URL to keep the previous hostname so the JDK
-                // HttpClient sets the correct Host header automatically.
-                if (isRawIpAddress(redirectUri.getHost())) {
-                    try {
-                        redirectUri = new URI(
-                                redirectUri.getScheme(),
-                                redirectUri.getUserInfo(),
-                                host,
-                                redirectUri.getPort(),
-                                redirectUri.getPath(),
-                                redirectUri.getQuery(),
-                                redirectUri.getFragment()
-                        );
-                    } catch (URISyntaxException e) {
-                        throw new IOException("Invalid redirect URI: " + e.getMessage(), e);
-                    }
-                }
-
-                currentUrl = redirectUri.toString();
+                currentUrl = resolveRedirectUrl(uri, response, host);
                 redirectCount++;
             } else {
                 throw new IOException("Failed to download image. HTTP Status: " + response.getStatusCode());
@@ -439,6 +401,58 @@ public class FileService {
         }
 
         throw new IOException("Too many redirects (max " + MAX_REDIRECTS + ")");
+    }
+
+    private String validateImageRequestUri(URI uri, String currentUrl) throws IOException {
+        if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IOException("Only HTTP and HTTPS protocols are allowed");
+        }
+
+        String host = uri.getHost();
+        if (host == null) {
+            throw new IOException("Invalid URL: no host found in " + currentUrl);
+        }
+
+        NetworkAddressValidator.validateExternalHttpUrl(currentUrl);
+        return host;
+    }
+
+    private HttpEntity<String> buildImageRequestEntity() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.USER_AGENT, "BookLore/1.0 (Book and Comic Metadata Fetcher; +https://github.com/booklore-app/booklore)");
+        headers.set(HttpHeaders.ACCEPT, "image/*");
+        return new HttpEntity<>(headers);
+    }
+
+    private String resolveRedirectUrl(URI uri, ResponseEntity<byte[]> response, String host) throws IOException {
+        String location = response.getHeaders().getFirst(HttpHeaders.LOCATION);
+        if (location == null) {
+            throw new IOException("Redirection response without Location header");
+        }
+        URI redirectUri = uri.resolve(location);
+        NetworkAddressValidator.validateExternalHttpUrl(redirectUri.toString());
+
+        // When a CDN redirects to a raw IP (e.g. CloudFront -> 3.168.64.124),
+        // the Host header would become the bare IP, which the CDN rejects with
+        // 400. Rewrite the URL to keep the previous hostname so the JDK
+        // HttpClient sets the correct Host header automatically.
+        if (isRawIpAddress(redirectUri.getHost())) {
+            try {
+                redirectUri = new URI(
+                        redirectUri.getScheme(),
+                        redirectUri.getUserInfo(),
+                        host,
+                        redirectUri.getPort(),
+                        redirectUri.getPath(),
+                        redirectUri.getQuery(),
+                        redirectUri.getFragment()
+                );
+            } catch (URISyntaxException e) {
+                throw new IOException("Invalid redirect URI: " + e.getMessage(), e);
+            }
+        }
+
+        return redirectUri.toString();
     }
 
     private boolean isRawIpAddress(String host) {
@@ -479,7 +493,7 @@ public class FileService {
             }
             boolean success = saveCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush(); // Release resources after processing
             log.info("Cover images created and saved for book ID: {}", bookId);
@@ -498,7 +512,7 @@ public class FileService {
             }
             boolean success = saveCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Cover images created and saved from bytes for book ID: {}", bookId);
@@ -596,7 +610,7 @@ public class FileService {
             }
             boolean success = saveCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Cover images created and saved from URL for book ID: {}", bookId);
@@ -663,7 +677,10 @@ public class FileService {
 
             double targetRatio = (double) THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT;
             double sourceRatio = (double) rgbImage.getWidth() / rgbImage.getHeight();
-            int cropWidth, cropHeight, cropX, cropY;
+            int cropWidth;
+            int cropHeight;
+            int cropX;
+            int cropY;
             if (sourceRatio > targetRatio) {
                 cropHeight = rgbImage.getHeight();
                 cropWidth = (int) (cropHeight * targetRatio);
@@ -733,7 +750,7 @@ public class FileService {
             }
             boolean success = saveAudiobookCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save audiobook cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_AUDIOBOOK_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Audiobook cover images created and saved for book ID: {}", bookId);
@@ -752,7 +769,7 @@ public class FileService {
             }
             boolean success = saveAudiobookCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save audiobook cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_AUDIOBOOK_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Audiobook cover images created and saved from bytes for book ID: {}", bookId);
@@ -771,7 +788,7 @@ public class FileService {
             }
             boolean success = saveAudiobookCoverImages(originalImage, bookId);
             if (!success) {
-                throw ApiError.FILE_READ_ERROR.createException("Failed to save audiobook cover images");
+                throw ApiError.FILE_READ_ERROR.createException(FAILED_TO_SAVE_AUDIOBOOK_COVER_IMAGES_MESSAGE);
             }
             originalImage.flush();
             log.info("Audiobook cover images created and saved from URL for book ID: {}", bookId);
@@ -897,7 +914,8 @@ public class FileService {
         }
 
         // Determine thumbnail dimensions based on source aspect ratio
-        int thumbWidth, thumbHeight;
+        int thumbWidth;
+        int thumbHeight;
         double aspectRatio = (double) rgbImage.getWidth() / rgbImage.getHeight();
         if (aspectRatio >= 0.85 && aspectRatio <= 1.15) {
             // Square-ish image (e.g., audiobook covers) - keep square
@@ -966,7 +984,7 @@ public class FileService {
      * then asks to crop it to a height greater than it has.
      */
     private static int clamp(int target, int available) {
-        return Math.max(1, Math.min(target, available));
+        return Math.clamp(target, 1, available);
     }
 
     private BufferedImage cropFromTop(BufferedImage image, int targetWidth, int targetHeight, boolean smartCrop) {
@@ -1034,8 +1052,12 @@ public class FileService {
     }
 
     private boolean colorsAreSimilar(int rgb1, int rgb2) {
-        int r1 = (rgb1 >> 16) & 0xFF, g1 = (rgb1 >> 8) & 0xFF, b1 = rgb1 & 0xFF;
-        int r2 = (rgb2 >> 16) & 0xFF, g2 = (rgb2 >> 8) & 0xFF, b2 = rgb2 & 0xFF;
+        int r1 = (rgb1 >> 16) & 0xFF;
+        int g1 = (rgb1 >> 8) & 0xFF;
+        int b1 = rgb1 & 0xFF;
+        int r2 = (rgb2 >> 16) & 0xFF;
+        int g2 = (rgb2 >> 8) & 0xFF;
+        int b2 = rgb2 & 0xFF;
         return Math.abs(r1 - r2) <= SMART_CROP_COLOR_TOLERANCE
                 && Math.abs(g1 - g2) <= SMART_CROP_COLOR_TOLERANCE
                 && Math.abs(b1 - b2) <= SMART_CROP_COLOR_TOLERANCE;

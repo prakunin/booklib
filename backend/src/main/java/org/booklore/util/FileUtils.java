@@ -381,7 +381,7 @@ public class FileUtils {
         return "";
     }
 
-    final private List<String> systemDirs = Arrays.asList(
+    private final List<String> systemDirs = Arrays.asList(
       // synology
       "#recycle",
       "@eaDir",

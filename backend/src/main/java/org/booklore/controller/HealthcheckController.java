@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -30,7 +31,7 @@ public class HealthcheckController {
             .status("UP")
             .message("Application is running smoothly.")
             .version(versionService.getAppVersion()) // ex) 'development' Insert
-            .timestamp(LocalDateTime.now())
+            .timestamp(LocalDateTime.now(ZoneId.systemDefault()))
             .build();
 
     return ResponseEntity.ok(new SuccessResponse<>(200, "Pong", healthData));

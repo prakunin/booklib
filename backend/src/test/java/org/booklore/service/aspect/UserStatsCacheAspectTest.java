@@ -119,6 +119,7 @@ class UserStatsCacheAspectTest {
     @SuppressWarnings("unused")
     private static final class Sample {
         void opA() {
+            // no-op: stub target method used only for its Method reference via reflection
         }
     }
 

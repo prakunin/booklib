@@ -5,6 +5,7 @@ import lombok.*;
 import org.booklore.model.enums.AuditAction;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "audit_log")
@@ -50,7 +51,7 @@ public class AuditLogEntity {
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+            createdAt = LocalDateTime.now(ZoneId.systemDefault());
         }
     }
 }

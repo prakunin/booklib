@@ -22,8 +22,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -48,6 +50,7 @@ public class DoubanBookParser implements BookParser {
     private static final Pattern SUBJECT_ID_PATTERN = Pattern.compile("/subject/(\\d+)/");
     // Pattern to extract rating number from class names like 'rating40' -> 40
     private static final Pattern RATING_NUMBER_PATTERN = Pattern.compile("rating(\\d+)");
+    private static final String INFO_SELECTOR = "#info";
     // Pattern for yyyy-MM-dd (or yyyy/M/d) date formats
     private static final Pattern DATE_YMD_PATTERN = Pattern.compile("(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})");
     private final AppSettingService appSettingService;
@@ -65,22 +68,7 @@ public class DoubanBookParser implements BookParser {
         if (topResult.getDoubanId() != null && areDoubanReviewsEnabled()) {
             BookMetadata detailedMetadata = getBookMetadata(topResult.getDoubanId());
             if (detailedMetadata != null) {
-                // Merge detailed metadata with search result, preserving search result data where detailed is missing
-                if (detailedMetadata.getThumbnailUrl() == null && topResult.getThumbnailUrl() != null) {
-                    detailedMetadata.setThumbnailUrl(topResult.getThumbnailUrl());
-                }
-                if (detailedMetadata.getAuthors() == null || detailedMetadata.getAuthors().isEmpty()) {
-                    detailedMetadata.setAuthors(topResult.getAuthors());
-                }
-                if (detailedMetadata.getPublisher() == null && topResult.getPublisher() != null) {
-                    detailedMetadata.setPublisher(topResult.getPublisher());
-                }
-                if (detailedMetadata.getPublishedDate() == null && topResult.getPublishedDate() != null) {
-                    detailedMetadata.setPublishedDate(topResult.getPublishedDate());
-                }
-                if (detailedMetadata.getDoubanRating() == null && topResult.getDoubanRating() != null) {
-                    detailedMetadata.setDoubanRating(topResult.getDoubanRating());
-                }
+                mergeSearchResultDefaults(detailedMetadata, topResult);
                 return detailedMetadata;
             }
         }
@@ -88,11 +76,30 @@ public class DoubanBookParser implements BookParser {
         return topResult;
     }
 
+    // Merge detailed metadata with search result, preserving search result data where detailed is missing
+    private void mergeSearchResultDefaults(BookMetadata detailedMetadata, BookMetadata topResult) {
+        if (detailedMetadata.getThumbnailUrl() == null && topResult.getThumbnailUrl() != null) {
+            detailedMetadata.setThumbnailUrl(topResult.getThumbnailUrl());
+        }
+        if (detailedMetadata.getAuthors() == null || detailedMetadata.getAuthors().isEmpty()) {
+            detailedMetadata.setAuthors(topResult.getAuthors());
+        }
+        if (detailedMetadata.getPublisher() == null && topResult.getPublisher() != null) {
+            detailedMetadata.setPublisher(topResult.getPublisher());
+        }
+        if (detailedMetadata.getPublishedDate() == null && topResult.getPublishedDate() != null) {
+            detailedMetadata.setPublishedDate(topResult.getPublishedDate());
+        }
+        if (detailedMetadata.getDoubanRating() == null && topResult.getDoubanRating() != null) {
+            detailedMetadata.setDoubanRating(topResult.getDoubanRating());
+        }
+    }
+
     @Override
     public List<BookMetadata> fetchMetadata(Book book, FetchMetadataRequest fetchMetadataRequest) {
         List<BookMetadata> searchResults = getDoubanSearchResults(book, fetchMetadataRequest);
         if (searchResults == null || searchResults.isEmpty()) {
-            return null;
+            return List.of();
         }
 
         // For detailed metadata, fetch full book information for top results
@@ -122,121 +129,36 @@ public class DoubanBookParser implements BookParser {
         String queryUrl = buildQueryUrl(request, book);
         if (queryUrl == null) {
             log.error("Query URL is null, cannot proceed.");
-            return null;
+            return List.of();
         }
         List<BookMetadata> searchResults = new ArrayList<>();
         try {
             Document doc = fetchDocument(queryUrl);
 
             // Extract JSON data from window.__DATA__
-            String htmlContent = doc.html();
-            String jsonData = null;
-
-            // Use regex to find the JSON object in window.__DATA__
-            Matcher matcher = WINDOW_DATA_JSON_PATTERN.matcher(htmlContent);
-             if (matcher.find()) {
-                 jsonData = matcher.group(1);
-                 log.debug("Successfully extracted JSON data, length: {}", jsonData.length());
-             }
-
+            String jsonData = extractWindowDataJson(doc);
             if (jsonData == null) {
                 log.warn("No JSON data found in Douban search response");
-                return null;
+                return List.of();
             }
 
             log.debug("Extracted JSON data: {}", jsonData);
 
             // Parse JSON data
-            JsonNode rootNode;
-            try {
-                rootNode = objectMapper.readTree(jsonData);
-                log.debug("Successfully parsed JSON");
-            } catch (Exception e) {
-                log.warn("Failed to parse JSON: {}", e.getMessage());
-                return null;
-            }
-            JsonNode itemsNode = rootNode.get("items");
-
-            log.debug("Items node: {}", itemsNode != null ? itemsNode.toString() : "null");
-
-            if (itemsNode == null || !itemsNode.isArray()) {
-                log.warn("No items found in Douban search response or items is not an array");
-                return null;
+            JsonNode rootNode = parseSearchJson(jsonData);
+            if (rootNode == null) {
+                return List.of();
             }
 
-            if (itemsNode.isEmpty()) {
-                log.info("No books found for the search query");
-                return null;
+            JsonNode itemsNode = extractSearchItems(rootNode);
+            if (itemsNode == null) {
+                return List.of();
             }
 
             for (JsonNode item : itemsNode) {
-                try {
-                    String title = item.get("title").asText();
-                    String url = item.get("url").asText();
-                    String coverUrl = item.get("cover_url").asText();
-                    String doubanId = extractDoubanIdFromUrl(url);
-
-                    // Extract abstract information
-                    String abstractText = item.get("abstract").asText();
-                    List<String> authors = List.of();
-                    String publisher = null;
-                    String pubDate = null;
-
-                    if (abstractText != null && !abstractText.isEmpty()) {
-                        // Parse abstract: "author0 / author1 / author 2 / ... / publisher / date (YYYY-MM or YYYY-MM-DD) / price"
-                        String[] parts = SLASH_SEPARATOR_PATTERN.split(abstractText);
-                        if (parts.length >= 4) {
-                            // Authors are all parts except the last three (publisher, date, price)
-                            authors = Arrays.stream(parts, 0, parts.length - 3)
-                                    .map(String::trim)
-                                    .filter(s -> !s.isEmpty())
-                                    .toList();
-                            publisher = parts[parts.length - 3].trim();
-                            pubDate = parts[parts.length - 2].trim();
-                        } else if (parts.length >= 2) {
-                            // Fallback for shorter abstracts
-                            authors = List.of(parts[1].trim());
-                            if (parts.length >= 3) {
-                                publisher = parts[2].trim();
-                            }
-                            if (parts.length >= 4) {
-                                pubDate = parts[3].trim();
-                            }
-                        }
-                    }
-
-                    // Extract rating information
-                    JsonNode ratingNode = item.get("rating");
-                    Double rating = null;
-                    if (ratingNode != null && ratingNode.has("value")) {
-                        rating = ratingNode.get("value").asDouble();
-                    }
-
-                    if (doubanId != null && !title.isEmpty()) {
-                        BookMetadata metadata = BookMetadata.builder()
-                                .provider(MetadataProvider.Douban)
-                                .title(title)
-                                .doubanId(doubanId)
-                                .thumbnailUrl(coverUrl)
-                                .publisher(publisher)
-                                .doubanRating(rating)
-                                .authors(authors)
-                                .build();
-
-                        // Try to parse publication date
-                        if (pubDate != null) {
-                            try {
-                                metadata.setPublishedDate(parseDoubanDate(pubDate));
-                            } catch (Exception _) {
-                                log.debug("Could not parse publication date: {}", pubDate);
-                            }
-                        }
-
-                        searchResults.add(metadata);
-                        log.debug("Found book: {} with ID: {} and cover: {}", title, doubanId, coverUrl);
-                    }
-                } catch (Exception e) {
-                    log.warn("Error parsing search result item: {}", e.getMessage());
+                BookMetadata metadata = parseSearchResultItem(item);
+                if (metadata != null) {
+                    searchResults.add(metadata);
                 }
             }
 
@@ -245,6 +167,140 @@ public class DoubanBookParser implements BookParser {
         }
         log.info("Douban: Found {} search results", searchResults.size());
         return searchResults;
+    }
+
+    // Use regex to find the JSON object assigned to window.__DATA__
+    private String extractWindowDataJson(Document doc) {
+        Matcher matcher = WINDOW_DATA_JSON_PATTERN.matcher(doc.html());
+        if (matcher.find()) {
+            String jsonData = matcher.group(1);
+            log.debug("Successfully extracted JSON data, length: {}", jsonData.length());
+            return jsonData;
+        }
+        return null;
+    }
+
+    private JsonNode extractSearchItems(JsonNode rootNode) {
+        JsonNode itemsNode = rootNode.get("items");
+
+        log.debug("Items node: {}", itemsNode != null ? itemsNode.toString() : "null");
+
+        if (itemsNode == null || !itemsNode.isArray()) {
+            log.warn("No items found in Douban search response or items is not an array");
+            return null;
+        }
+
+        if (itemsNode.isEmpty()) {
+            log.info("No books found for the search query");
+            return null;
+        }
+
+        return itemsNode;
+    }
+
+    private JsonNode parseSearchJson(String jsonData) {
+        try {
+            JsonNode rootNode = objectMapper.readTree(jsonData);
+            log.debug("Successfully parsed JSON");
+            return rootNode;
+        } catch (Exception e) {
+            log.warn("Failed to parse JSON: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private BookMetadata parseSearchResultItem(JsonNode item) {
+        try {
+            String title = item.get("title").asString();
+            String url = item.get("url").asString();
+            String coverUrl = item.get("cover_url").asString();
+            String doubanId = extractDoubanIdFromUrl(url);
+
+            // Extract abstract information
+            String abstractText = item.get("abstract").asString();
+            AbstractParts abstractParts = parseAbstract(abstractText);
+            List<String> authors = abstractParts.authors();
+            String publisher = abstractParts.publisher();
+            String pubDate = abstractParts.pubDate();
+
+            // Extract rating information
+            JsonNode ratingNode = item.get("rating");
+            Double rating = null;
+            if (ratingNode != null && ratingNode.has("value")) {
+                rating = ratingNode.get("value").asDouble();
+            }
+
+            if (doubanId == null || title.isEmpty()) {
+                return null;
+            }
+
+            BookMetadata metadata = BookMetadata.builder()
+                    .provider(MetadataProvider.Douban)
+                    .title(title)
+                    .doubanId(doubanId)
+                    .thumbnailUrl(coverUrl)
+                    .publisher(publisher)
+                    .doubanRating(rating)
+                    .authors(authors)
+                    .build();
+
+            // Try to parse publication date
+            if (pubDate != null) {
+                metadata.setPublishedDate(parsePublicationDateQuietly(pubDate));
+            }
+
+            log.debug("Found book: {} with ID: {} and cover: {}", title, doubanId, coverUrl);
+            return metadata;
+        } catch (Exception e) {
+            log.warn("Error parsing search result item: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private record AbstractParts(List<String> authors, String publisher, String pubDate) {
+        static final AbstractParts EMPTY = new AbstractParts(List.of(), null, null);
+    }
+
+    // Parses "author0 / author1 / author2 / ... / publisher / date (YYYY-MM or YYYY-MM-DD) / price".
+    private AbstractParts parseAbstract(String abstractText) {
+        if (abstractText == null || abstractText.isEmpty()) {
+            return AbstractParts.EMPTY;
+        }
+
+        String[] parts = SLASH_SEPARATOR_PATTERN.split(abstractText);
+        List<String> authors = List.of();
+        String publisher = null;
+        String pubDate = null;
+
+        if (parts.length >= 4) {
+            // Authors are all parts except the last three (publisher, date, price)
+            authors = Arrays.stream(parts, 0, parts.length - 3)
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+            publisher = parts[parts.length - 3].trim();
+            pubDate = parts[parts.length - 2].trim();
+        } else if (parts.length >= 2) {
+            // Fallback for shorter abstracts
+            authors = List.of(parts[1].trim());
+            if (parts.length >= 3) {
+                publisher = parts[2].trim();
+            }
+            if (parts.length >= 4) {
+                pubDate = parts[3].trim();
+            }
+        }
+
+        return new AbstractParts(authors, publisher, pubDate);
+    }
+
+    private LocalDate parsePublicationDateQuietly(String pubDate) {
+        try {
+            return parseDoubanDate(pubDate);
+        } catch (Exception _) {
+            log.debug("Could not parse publication date: {}", pubDate);
+            return null;
+        }
     }
 
     private String extractDoubanIdFromUrl(String url) {
@@ -279,19 +335,19 @@ public class DoubanBookParser implements BookParser {
         return BookMetadata.builder()
                 .provider(MetadataProvider.Douban)
                 .title(getTitle(doc))
-                .subtitle(getSubtitle(doc))
+                .subtitle(getSubtitle())
                 .authors(new ArrayList<>(getAuthors(doc)))
-                .categories(new HashSet<>(getCategories(doc)))
+                .categories(new HashSet<>(getCategories()))
                 .description(cleanDescriptionHtml(getDescription(doc)))
                 .seriesName(getSeriesName(doc))
-                .seriesNumber(getSeriesNumber(doc))
-                .seriesTotal(getSeriesTotal(doc))
+                .seriesNumber(getSeriesNumber())
+                .seriesTotal(getSeriesTotal())
                 .isbn13(getIsbn13(doc))
                 .isbn10(getIsbn10(doc))
                 .doubanId(doubanBookId)
                 .publisher(getPublisher(doc))
                 .publishedDate(getPublicationDate(doc))
-                .language(LanguageNormalizer.normalize(getLanguage(doc)))
+                .language(LanguageNormalizer.normalize(getLanguage()))
                 .pageCount(getPageCount(doc))
                 .thumbnailUrl(getThumbnail(doc))
                 .doubanRating(getRating(doc))
@@ -355,7 +411,7 @@ public class DoubanBookParser implements BookParser {
         return null;
     }
 
-    private String getSubtitle(Document doc) {
+    private String getSubtitle() {
         // Douban doesn't typically have subtitles separate from title
         return null;
     }
@@ -363,7 +419,7 @@ public class DoubanBookParser implements BookParser {
     private List<String> getAuthors(Document doc) {
         List<String> authors = new ArrayList<>();
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 // Collect authors from "作者" span
                 Element authorSpan = infoElement.selectFirst("span:contains(作者)");
@@ -410,7 +466,7 @@ public class DoubanBookParser implements BookParser {
 
     private String getIsbn10(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Element span = infoElement.selectFirst("span:contains(ISBN)");
                 if (span != null) {
@@ -433,7 +489,7 @@ public class DoubanBookParser implements BookParser {
 
     private String getIsbn13(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Element span = infoElement.selectFirst("span:contains(ISBN)");
                 if (span != null) {
@@ -456,7 +512,7 @@ public class DoubanBookParser implements BookParser {
 
     private String getPublisher(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Elements spans = infoElement.select("span");
                 for (Element span : spans) {
@@ -477,7 +533,7 @@ public class DoubanBookParser implements BookParser {
 
     private LocalDate getPublicationDate(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Element span = infoElement.selectFirst("span:contains(出版年)");
                 if (span != null) {
@@ -497,7 +553,7 @@ public class DoubanBookParser implements BookParser {
 
     private String getSeriesName(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
+            Element infoElement = doc.selectFirst(INFO_SELECTOR);
             if (infoElement != null) {
                 Element seriesSpan = infoElement.selectFirst("span:contains(丛书)");
                 if (seriesSpan != null) {
@@ -518,22 +574,22 @@ public class DoubanBookParser implements BookParser {
         return null;
     }
 
-    private Float getSeriesNumber(Document doc) {
+    private Float getSeriesNumber() {
         // Douban doesn't typically have series information
         return null;
     }
 
-    private Integer getSeriesTotal(Document doc) {
+    private Integer getSeriesTotal() {
         // Douban doesn't typically have series information
         return null;
     }
 
-    private String getLanguage(Document doc) {
+    private String getLanguage() {
         // Douban doesn't typically specify language
         return null;
     }
 
-    private Set<String> getCategories(Document doc) {
+    private Set<String> getCategories() {
         // Douban doesn't typically have category information
         return Set.of();
     }
@@ -558,73 +614,89 @@ public class DoubanBookParser implements BookParser {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
 
         try {
-            Elements reviewElements = doc.select("#comments .comment-item");
-            log.debug("Douban: Found {} review elements with selector '#comments .comment-item'", reviewElements.size());
-
-            if (reviewElements.isEmpty()) {
-                // Try alternative selectors that Douban might be using
-                reviewElements = doc.select(".comment-item");
-                log.debug("Douban: Trying alternative selector '.comment-item', found {} elements", reviewElements.size());
-
-                if (reviewElements.isEmpty()) {
-                    reviewElements = doc.select("[class*=comment]");
-                    log.debug("Douban: Trying broad selector '[class*=comment]', found {} elements", reviewElements.size());
-                }
-            }
+            Elements reviewElements = selectReviewElements(doc);
 
             int count = 0;
+            int index = 0;
 
-            for (Element reviewElement : reviewElements) {
-                if (count >= maxReviews) {
-                    break;
+            while (count < maxReviews && index < reviewElements.size()) {
+                Element reviewElement = reviewElements.get(index);
+                index++;
+
+                BookReview review = parseReviewElement(reviewElement, formatter);
+                if (review != null) {
+                    reviews.add(review);
+                    count++;
                 }
-
-                Elements reviewerElements = reviewElement.select(".comment-info a");
-                String reviewerName = !reviewerElements.isEmpty() ? reviewerElements.first().text() : null;
-
-                Elements ratingElements = reviewElement.select(".comment-info .rating");
-                Float ratingValue = null;
-                if (!ratingElements.isEmpty()) {
-                    String ratingClass = ratingElements.first().className();
-                    Matcher matcher = RATING_NUMBER_PATTERN.matcher(ratingClass);
-                     if (matcher.find()) {
-                         ratingValue = Float.parseFloat(matcher.group(1)) / 2.0f; // Convert 5-star scale to 10-star scale
-                     }
-                }
-
-                Elements dateElements = reviewElement.select(".comment-info .comment-time");
-                Instant dateInstant = null;
-                if (!dateElements.isEmpty()) {
-                    try {
-                        String dateText = dateElements.first().text().trim();
-                        LocalDate localDate = LocalDate.parse(dateText, formatter);
-                        dateInstant = localDate.atStartOfDay(ZoneOffset.UTC).toInstant();
-                    } catch (DateTimeParseException e) {
-                        log.warn("Failed to parse date '{}' in review: {}", dateElements.first().text(), e.getMessage());
-                    }
-                }
-
-                Elements bodyElements = reviewElement.select(".comment-content");
-                String body = !bodyElements.isEmpty() ? bodyElements.first().text() : null;
-                if (body == null || body.isEmpty()) {
-                    continue;
-                }
-
-                reviews.add(BookReview.builder()
-                        .metadataProvider(MetadataProvider.Douban)
-                        .reviewerName(reviewerName != null ? reviewerName.trim() : null)
-                        .rating(ratingValue)
-                        .date(dateInstant)
-                        .body(body.trim())
-                        .build());
-
-                count++;
             }
         } catch (Exception e) {
             log.warn("Failed to parse reviews: {}", e.getMessage());
         }
         log.info("Douban: Extracted {} reviews from page", reviews.size());
         return reviews;
+    }
+
+    private Elements selectReviewElements(Document doc) {
+        Elements reviewElements = doc.select("#comments .comment-item");
+        log.debug("Douban: Found {} review elements with selector '#comments .comment-item'", reviewElements.size());
+
+        if (reviewElements.isEmpty()) {
+            // Try alternative selectors that Douban might be using
+            reviewElements = doc.select(".comment-item");
+            log.debug("Douban: Trying alternative selector '.comment-item', found {} elements", reviewElements.size());
+
+            if (reviewElements.isEmpty()) {
+                reviewElements = doc.select("[class*=comment]");
+                log.debug("Douban: Trying broad selector '[class*=comment]', found {} elements", reviewElements.size());
+            }
+        }
+        return reviewElements;
+    }
+
+    private BookReview parseReviewElement(Element reviewElement, DateTimeFormatter formatter) {
+        Elements reviewerElements = reviewElement.select(".comment-info a");
+        String reviewerName = !reviewerElements.isEmpty() ? Objects.requireNonNull(reviewerElements.first()).text() : null;
+
+        Elements ratingElements = reviewElement.select(".comment-info .rating");
+        Float ratingValue = null;
+        if (!ratingElements.isEmpty()) {
+            String ratingClass = Objects.requireNonNull(ratingElements.first()).className();
+            Matcher matcher = RATING_NUMBER_PATTERN.matcher(ratingClass);
+             if (matcher.find()) {
+                 ratingValue = Float.parseFloat(matcher.group(1)) / 2.0f; // Convert 5-star scale to 10-star scale
+             }
+        }
+
+        Elements dateElements = reviewElement.select(".comment-info .comment-time");
+        Instant dateInstant = parseReviewDate(dateElements, formatter);
+
+        Elements bodyElements = reviewElement.select(".comment-content");
+        String body = !bodyElements.isEmpty() ? Objects.requireNonNull(bodyElements.first()).text() : null;
+        if (body == null || body.isEmpty()) {
+            return null;
+        }
+
+        return BookReview.builder()
+                .metadataProvider(MetadataProvider.Douban)
+                .reviewerName(reviewerName != null ? reviewerName.trim() : null)
+                .rating(ratingValue)
+                .date(dateInstant)
+                .body(body.trim())
+                .build();
+    }
+
+    private Instant parseReviewDate(Elements dateElements, DateTimeFormatter formatter) {
+        if (dateElements.isEmpty()) {
+            return null;
+        }
+        try {
+            String dateText = dateElements.first().text().trim();
+            LocalDate localDate = LocalDate.parse(dateText, formatter);
+            return localDate.atStartOfDay(ZoneOffset.UTC).toInstant();
+        } catch (DateTimeParseException e) {
+            log.warn("Failed to parse date '{}' in review: {}", dateElements.first().text(), e.getMessage());
+            return null;
+        }
     }
 
     private Integer getReviewCount(Document doc) {
@@ -660,21 +732,11 @@ public class DoubanBookParser implements BookParser {
 
     private Integer getPageCount(Document doc) {
         try {
-            Element infoElement = doc.selectFirst("#info");
-            if (infoElement != null) {
-                Element span = infoElement.selectFirst("span:contains(页数)");
-                if (span != null) {
-                    Node next = span.nextSibling();
-                    if (next instanceof TextNode textNode) {
-                        String pageText = textNode.text().trim();
-                        if (!pageText.isEmpty()) {
-                            try {
-                                return Integer.parseInt(NON_DIGIT_PATTERN.matcher(pageText).replaceAll(""));
-                            } catch (NumberFormatException _) {
-                                log.warn("Error parsing page count: {}", pageText);
-                            }
-                        }
-                    }
+            String pageText = extractInfoFieldText(doc, "页数");
+            if (pageText != null && !pageText.isEmpty()) {
+                Integer parsed = parsePageCount(pageText);
+                if (parsed != null) {
+                    return parsed;
                 }
             }
             log.debug("Failed to parse page count: Element not found.");
@@ -682,6 +744,32 @@ public class DoubanBookParser implements BookParser {
             log.warn("Failed to parse page count: {}", e.getMessage());
         }
         return null;
+    }
+
+    // Returns the trimmed text node immediately following the #info span whose text contains the label.
+    private String extractInfoFieldText(Document doc, String label) {
+        Element infoElement = doc.selectFirst(INFO_SELECTOR);
+        if (infoElement == null) {
+            return null;
+        }
+        Element span = infoElement.selectFirst("span:contains(" + label + ")");
+        if (span == null) {
+            return null;
+        }
+        Node next = span.nextSibling();
+        if (next instanceof TextNode textNode) {
+            return textNode.text().trim();
+        }
+        return null;
+    }
+
+    private Integer parsePageCount(String pageText) {
+        try {
+            return Integer.parseInt(NON_DIGIT_PATTERN.matcher(pageText).replaceAll(""));
+        } catch (NumberFormatException _) {
+            log.warn("Error parsing page count: {}", pageText);
+            return null;
+        }
     }
 
     private Document fetchDocument(String url) {
@@ -714,7 +802,7 @@ public class DoubanBookParser implements BookParser {
             return Jsoup.parse(html, response.url().toString());
         } catch (IOException e) {
             log.error("Error parsing url: {}", url, e);
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -749,7 +837,7 @@ public class DoubanBookParser implements BookParser {
             matcher = pattern.matcher(trim);
             if (matcher.matches()) {
                 int year = Integer.parseInt(matcher.group(1));
-                return LocalDate.of(year, 1, 1);
+                return LocalDate.of(year, Month.JANUARY, 1);
             }
 
             // Chinese patterns
@@ -777,7 +865,7 @@ public class DoubanBookParser implements BookParser {
             matcher = pattern.matcher(trim);
             if (matcher.matches()) {
                 int year = Integer.parseInt(matcher.group(1));
-                return LocalDate.of(year, 1, 1);
+                return LocalDate.of(year, Month.JANUARY, 1);
             }
 
         } catch (Exception e) {

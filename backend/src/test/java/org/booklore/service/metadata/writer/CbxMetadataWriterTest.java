@@ -12,7 +12,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.mockito.Mockito;
 import org.w3c.dom.Document;
 
 import javax.xml.XMLConstants;
@@ -25,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -35,6 +35,8 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @EnabledIf("org.booklore.service.ArchiveService#isAvailable")
 class CbxMetadataWriterTest {
@@ -44,7 +46,7 @@ class CbxMetadataWriterTest {
 
     @BeforeEach
     void setup() throws Exception {
-        AppSettingService appSettingService = Mockito.mock(AppSettingService.class);
+        AppSettingService appSettingService = mock(AppSettingService.class);
         AppSettings settings = new AppSettings();
         MetadataPersistenceSettings persistence = new MetadataPersistenceSettings();
         MetadataPersistenceSettings.SaveToOriginalFile save = new MetadataPersistenceSettings.SaveToOriginalFile();
@@ -54,7 +56,7 @@ class CbxMetadataWriterTest {
         save.setCbx(cbx);
         persistence.setSaveToOriginalFile(save);
         settings.setMetadataPersistenceSettings(persistence);
-        Mockito.when(appSettingService.getAppSettings()).thenReturn(settings);
+        when(appSettingService.getAppSettings()).thenReturn(settings);
 
         writer = new CbxMetadataWriter(appSettingService, new ArchiveService());
         tempDir = Files.createTempDirectory("cbx_writer_test_");
@@ -95,7 +97,7 @@ class CbxMetadataWriterTest {
         meta.setSeriesName("Series X");
         meta.setSeriesNumber(2.5f);
         meta.setSeriesTotal(12);
-        meta.setPublishedDate(LocalDate.of(2020, 7, 14));
+        meta.setPublishedDate(LocalDate.of(2020, Month.JULY, 14));
         meta.setPageCount(42);
         meta.setLanguage("en");
 
@@ -379,27 +381,27 @@ class CbxMetadataWriterTest {
             assertEquals("Teen", text(doc, "AgeRating"));
 
             // Characters, Teams, Locations
-            String characters_str = text(doc, "Characters");
-            assertNotNull(characters_str);
-            assertTrue(characters_str.contains("Peter Parker"));
-            assertTrue(characters_str.contains("Mary Jane"));
+            String charactersStr = text(doc, "Characters");
+            assertNotNull(charactersStr);
+            assertTrue(charactersStr.contains("Peter Parker"));
+            assertTrue(charactersStr.contains("Mary Jane"));
 
-            String teams_str = text(doc, "Teams");
-            assertNotNull(teams_str);
-            assertTrue(teams_str.contains("Avengers"));
+            String teamsStr = text(doc, "Teams");
+            assertNotNull(teamsStr);
+            assertTrue(teamsStr.contains("Avengers"));
 
-            String locations_str = text(doc, "Locations");
-            assertNotNull(locations_str);
-            assertTrue(locations_str.contains("New York City"));
+            String locationsStr = text(doc, "Locations");
+            assertNotNull(locationsStr);
+            assertTrue(locationsStr.contains("New York City"));
 
             // Creators
-            String penciller_str = text(doc, "Penciller");
-            assertNotNull(penciller_str);
-            assertTrue(penciller_str.contains("John Romita Jr."));
+            String pencillerStr = text(doc, "Penciller");
+            assertNotNull(pencillerStr);
+            assertTrue(pencillerStr.contains("John Romita Jr."));
 
-            String inker_str = text(doc, "Inker");
-            assertNotNull(inker_str);
-            assertTrue(inker_str.contains("Klaus Janson"));
+            String inkerStr = text(doc, "Inker");
+            assertNotNull(inkerStr);
+            assertTrue(inkerStr.contains("Klaus Janson"));
         }
     }
 

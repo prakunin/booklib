@@ -51,7 +51,7 @@ public class KoboRatingService {
     }
 
     @Transactional
-    public ResponseEntity<?> updatePersonalRating(BookLoreUser user, long bookId, int rating) {
+    public ResponseEntity<Void> updatePersonalRating(BookLoreUser user, long bookId, int rating) {
         if (user == null) {
             // If the user is not allowed to access the book, it doesn't exist to them.
             log.debug("User is not authenticated to rate book {}", bookId);

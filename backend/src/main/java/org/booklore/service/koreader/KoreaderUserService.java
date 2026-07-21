@@ -20,6 +20,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class KoreaderUserService {
 
+    private static final String KOREADER_USER_NOT_FOUND_MESSAGE = "Koreader user not found for BookLore user ID: ";
+
     private final AuthenticationService authService;
     private final UserRepository userRepository;
     private final KoreaderUserRepository koreaderUserRepository;
@@ -56,7 +58,7 @@ public class KoreaderUserService {
     public KoreaderUser getUser() {
         Long id = authService.getAuthenticatedUser().getId();
         KoreaderUserEntity user = koreaderUserRepository.findByBookLoreUserId(id)
-                .orElseThrow(() -> ApiError.GENERIC_NOT_FOUND.createException("Koreader user not found for BookLore user ID: " + id));
+                .orElseThrow(() -> ApiError.GENERIC_NOT_FOUND.createException(KOREADER_USER_NOT_FOUND_MESSAGE + id));
         return koreaderUserMapper.toDto(user);
     }
 
@@ -64,7 +66,7 @@ public class KoreaderUserService {
     public void toggleSync(boolean enabled) {
         Long id = authService.getAuthenticatedUser().getId();
         KoreaderUserEntity user = koreaderUserRepository.findByBookLoreUserId(id)
-                .orElseThrow(() -> ApiError.GENERIC_NOT_FOUND.createException("Koreader user not found for BookLore user ID: " + id));
+                .orElseThrow(() -> ApiError.GENERIC_NOT_FOUND.createException(KOREADER_USER_NOT_FOUND_MESSAGE + id));
         user.setSyncEnabled(enabled);
         koreaderUserRepository.save(user);
     }
@@ -73,7 +75,7 @@ public class KoreaderUserService {
     public void toggleSyncProgressWithWebReader(boolean enabled) {
         Long id = authService.getAuthenticatedUser().getId();
         KoreaderUserEntity user = koreaderUserRepository.findByBookLoreUserId(id)
-                .orElseThrow(() -> ApiError.GENERIC_NOT_FOUND.createException("Koreader user not found for BookLore user ID: " + id));
+                .orElseThrow(() -> ApiError.GENERIC_NOT_FOUND.createException(KOREADER_USER_NOT_FOUND_MESSAGE + id));
         user.setSyncWithWebReader(enabled);
         koreaderUserRepository.save(user);
     }

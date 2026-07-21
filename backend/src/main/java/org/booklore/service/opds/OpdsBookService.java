@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -36,6 +37,8 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 public class OpdsBookService {
+
+    private static final String AUTHENTICATION_REQUIRED_MESSAGE = "Authentication required";
 
     private final BookOpdsRepository bookOpdsRepository;
     private final BookRepository bookRepository;
@@ -69,7 +72,7 @@ public class OpdsBookService {
 
     public Page<Book> getBooksPage(Long userId, String query, Long libraryId, Set<Long> shelfIds, int page, int size) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findByIdWithDetails(userId)
@@ -86,35 +89,39 @@ public class OpdsBookService {
 
         if (shelfIds != null && !shelfIds.isEmpty()) {
             validateShelfAccess(shelfIds, user.getId(), isAdmin);
-            Page<Book> books = query != null && !query.isBlank()
-                    ? searchByMetadataInShelvesPageInternal(BookUtils.normalizeForSearch(query), userLibraryIds, shelfIds, page, size, userId)
-                    : getBooksByShelfIdsPageInternal(userLibraryIds, shelfIds, page, size, userId);
+            Page<Book> books = selectBooks(query,
+                    () -> searchByMetadataInShelvesPageInternal(BookUtils.normalizeForSearch(query), userLibraryIds, shelfIds, page, size, userId),
+                    () -> getBooksByShelfIdsPageInternal(userLibraryIds, shelfIds, page, size, userId));
             return applyBookFilters(books, userId);
         }
 
         if (libraryId != null) {
             validateLibraryAccess(libraryId, userLibraryIds, isAdmin);
-            Page<Book> books = query != null && !query.isBlank()
-                    ? searchByMetadataInLibrariesPageInternal(BookUtils.normalizeForSearch(query), Set.of(libraryId), page, size, userId)
-                    : getBooksByLibraryIdsPageInternal(Set.of(libraryId), page, size, userId);
+            Page<Book> books = selectBooks(query,
+                    () -> searchByMetadataInLibrariesPageInternal(BookUtils.normalizeForSearch(query), Set.of(libraryId), page, size, userId),
+                    () -> getBooksByLibraryIdsPageInternal(Set.of(libraryId), page, size, userId));
             return applyBookFilters(books, userId);
         }
 
         if (isAdmin) {
-            return query != null && !query.isBlank()
-                    ? searchByMetadataPageInternal(BookUtils.normalizeForSearch(query), page, size, null)
-                    : getAllBooksPageInternal(page, size, null);
+            return selectBooks(query,
+                    () -> searchByMetadataPageInternal(BookUtils.normalizeForSearch(query), page, size, null),
+                    () -> getAllBooksPageInternal(page, size, null));
         }
 
-        Page<Book> books = query != null && !query.isBlank()
-                ? searchByMetadataInLibrariesPageInternal(BookUtils.normalizeForSearch(query), userLibraryIds, page, size, userId)
-                : getBooksByLibraryIdsPageInternal(userLibraryIds, page, size, userId);
+        Page<Book> books = selectBooks(query,
+                () -> searchByMetadataInLibrariesPageInternal(BookUtils.normalizeForSearch(query), userLibraryIds, page, size, userId),
+                () -> getBooksByLibraryIdsPageInternal(userLibraryIds, page, size, userId));
         return applyBookFilters(books, userId);
+    }
+
+    private Page<Book> selectBooks(String query, Supplier<Page<Book>> searchResult, Supplier<Page<Book>> listResult) {
+        return query != null && !query.isBlank() ? searchResult.get() : listResult.get();
     }
 
     public Page<Book> getRecentBooksPage(Long userId, int page, int size) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findByIdWithDetails(userId)
@@ -211,7 +218,7 @@ public class OpdsBookService {
 
     public Page<Book> getBooksByAuthorName(Long userId, String authorName, int page, int size) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findByIdWithDetails(userId)
@@ -265,7 +272,7 @@ public class OpdsBookService {
 
     public Page<Book> getBooksBySeriesName(Long userId, String seriesName, int page, int size) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findByIdWithDetails(userId)
@@ -345,18 +352,6 @@ public class OpdsBookService {
         return createPageFromEntities(books, idPage, pageable, userId);
     }
 
-    private Page<Book> getBooksByShelfIdPageInternal(Long shelfId, int page, int size, Long userId) {
-        Pageable pageable = PageRequest.of(Math.max(page, 0), size);
-
-        Page<Long> idPage = bookOpdsRepository.findBookIdsByShelfId(shelfId, pageable);
-        if (idPage.isEmpty()) {
-            return new PageImpl<>(List.of(), pageable, 0);
-        }
-
-        List<BookEntity> books = bookOpdsRepository.findAllWithMetadataByIdsAndShelfId(idPage.getContent(), shelfId);
-        return createPageFromEntities(books, idPage, pageable, userId);
-    }
-
     private Page<Book> getBooksByShelfIdsPageInternal(Set<Long> libraryIds, Set<Long> shelfIds, int page, int size, Long userId) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), size);
 
@@ -427,7 +422,7 @@ public class OpdsBookService {
 
     public void validateBookContentAccess(Long bookId, Long userId) {
         if (userId == null) {
-            throw ApiError.FORBIDDEN.createException("Authentication required");
+            throw ApiError.FORBIDDEN.createException(AUTHENTICATION_REQUIRED_MESSAGE);
         }
 
         BookLoreUserEntity entity = userRepository.findById(userId)
@@ -496,103 +491,115 @@ public class OpdsBookService {
         }
 
         List<Book> sortedBooks = new ArrayList<>(booksPage.getContent());
-        
+
         switch (sortOrder) {
-            case TITLE_ASC -> sortedBooks.sort((b1, b2) -> {
-                String title1 = b1.getMetadata() != null && b1.getMetadata().getTitle() != null 
-                    ? b1.getMetadata().getTitle() : "";
-                String title2 = b2.getMetadata() != null && b2.getMetadata().getTitle() != null 
-                    ? b2.getMetadata().getTitle() : "";
-                return title1.compareToIgnoreCase(title2);
-            });
-            case TITLE_DESC -> sortedBooks.sort((b1, b2) -> {
-                String title1 = b1.getMetadata() != null && b1.getMetadata().getTitle() != null 
-                    ? b1.getMetadata().getTitle() : "";
-                String title2 = b2.getMetadata() != null && b2.getMetadata().getTitle() != null 
-                    ? b2.getMetadata().getTitle() : "";
-                return title2.compareToIgnoreCase(title1);
-            });
-            case AUTHOR_ASC -> sortedBooks.sort((b1, b2) -> {
-                String author1 = getFirstAuthor(b1);
-                String author2 = getFirstAuthor(b2);
-                return author1.compareToIgnoreCase(author2);
-            });
-            case AUTHOR_DESC -> sortedBooks.sort((b1, b2) -> {
-                String author1 = getFirstAuthor(b1);
-                String author2 = getFirstAuthor(b2);
-                return author2.compareToIgnoreCase(author1);
-            });
-            case SERIES_ASC -> sortedBooks.sort((b1, b2) -> {
-                String series1 = getSeriesName(b1);
-                String series2 = getSeriesName(b2);
-                boolean hasSeries1 = !series1.isEmpty();
-                boolean hasSeries2 = !series2.isEmpty();
-                
-                // Books without series come after books with series
-                if (!hasSeries1 && !hasSeries2) {
-                    // Both have no series, sort by addedOn descending
-                    return compareByAddedOn(b2, b1);
-                }
-                if (!hasSeries1) return 1;
-                if (!hasSeries2) return -1;
-                
-                // Both have series, sort by series name then number
-                int seriesComp = series1.compareToIgnoreCase(series2);
-                if (seriesComp != 0) return seriesComp;
-                return Float.compare(getSeriesNumber(b1), getSeriesNumber(b2));
-            });
-            case SERIES_DESC -> sortedBooks.sort((b1, b2) -> {
-                String series1 = getSeriesName(b1);
-                String series2 = getSeriesName(b2);
-                boolean hasSeries1 = !series1.isEmpty();
-                boolean hasSeries2 = !series2.isEmpty();
-                
-                // Books without series come after books with series
-                if (!hasSeries1 && !hasSeries2) {
-                    // Both have no series, sort by addedOn descending
-                    return compareByAddedOn(b2, b1);
-                }
-                if (!hasSeries1) return 1;
-                if (!hasSeries2) return -1;
-                
-                // Both have series, sort by series name then number
-                int seriesComp = series2.compareToIgnoreCase(series1);
-                if (seriesComp != 0) return seriesComp;
-                return Float.compare(getSeriesNumber(b2), getSeriesNumber(b1));
-            });
-            case RATING_ASC -> sortedBooks.sort((b1, b2) -> {
-                Float rating1 = calculateRating(b1);
-                Float rating2 = calculateRating(b2);
-                // Books with no rating go to the end
-                if (rating1 == null && rating2 == null) {
-                    // Both have no rating, fall back to addedOn descending
-                    return compareByAddedOn(b2, b1);
-                }
-                if (rating1 == null) return 1;
-                if (rating2 == null) return -1;
-                int ratingComp = Float.compare(rating1, rating2); // Ascending order (lowest first)
-                if (ratingComp != 0) return ratingComp;
-                // Same rating, fall back to addedOn descending
-                return compareByAddedOn(b2, b1);
-            });
-            case RATING_DESC -> sortedBooks.sort((b1, b2) -> {
-                Float rating1 = calculateRating(b1);
-                Float rating2 = calculateRating(b2);
-                // Books with no rating go to the end
-                if (rating1 == null && rating2 == null) {
-                    // Both have no rating, fall back to addedOn descending
-                    return compareByAddedOn(b2, b1);
-                }
-                if (rating1 == null) return 1;
-                if (rating2 == null) return -1;
-                int ratingComp = Float.compare(rating2, rating1); // Descending order (highest first)
-                if (ratingComp != 0) return ratingComp;
-                // Same rating, fall back to addedOn descending
-                return compareByAddedOn(b2, b1);
-            });
+            case TITLE_ASC -> sortedBooks.sort(this::compareTitleAsc);
+            case TITLE_DESC -> sortedBooks.sort(this::compareTitleDesc);
+            case AUTHOR_ASC -> sortedBooks.sort(this::compareAuthorAsc);
+            case AUTHOR_DESC -> sortedBooks.sort(this::compareAuthorDesc);
+            case SERIES_ASC -> sortedBooks.sort(this::compareSeriesAsc);
+            case SERIES_DESC -> sortedBooks.sort(this::compareSeriesDesc);
+            case RATING_ASC -> sortedBooks.sort(this::compareRatingAsc);
+            case RATING_DESC -> sortedBooks.sort(this::compareRatingDesc);
+            default -> {
+                // RECENT is already handled by the early return above; no other values exist
+            }
         }
 
         return new PageImpl<>(sortedBooks, booksPage.getPageable(), booksPage.getTotalElements());
+    }
+
+    private String titleOf(Book book) {
+        return book.getMetadata() != null && book.getMetadata().getTitle() != null
+                ? book.getMetadata().getTitle() : "";
+    }
+
+    private int compareTitleAsc(Book b1, Book b2) {
+        return titleOf(b1).compareToIgnoreCase(titleOf(b2));
+    }
+
+    private int compareTitleDesc(Book b1, Book b2) {
+        return titleOf(b2).compareToIgnoreCase(titleOf(b1));
+    }
+
+    private int compareAuthorAsc(Book b1, Book b2) {
+        return getFirstAuthor(b1).compareToIgnoreCase(getFirstAuthor(b2));
+    }
+
+    private int compareAuthorDesc(Book b1, Book b2) {
+        return getFirstAuthor(b2).compareToIgnoreCase(getFirstAuthor(b1));
+    }
+
+    private int compareSeriesAsc(Book b1, Book b2) {
+        String series1 = getSeriesName(b1);
+        String series2 = getSeriesName(b2);
+        boolean hasSeries1 = !series1.isEmpty();
+        boolean hasSeries2 = !series2.isEmpty();
+
+        // Books without series come after books with series
+        if (!hasSeries1 && !hasSeries2) {
+            // Both have no series, sort by addedOn descending
+            return compareByAddedOnDescending(b1, b2);
+        }
+        if (!hasSeries1) return 1;
+        if (!hasSeries2) return -1;
+
+        // Both have series, sort by series name then number
+        int seriesComp = series1.compareToIgnoreCase(series2);
+        if (seriesComp != 0) return seriesComp;
+        return Float.compare(getSeriesNumber(b1), getSeriesNumber(b2));
+    }
+
+    private int compareSeriesDesc(Book b1, Book b2) {
+        String series1 = getSeriesName(b1);
+        String series2 = getSeriesName(b2);
+        boolean hasSeries1 = !series1.isEmpty();
+        boolean hasSeries2 = !series2.isEmpty();
+
+        // Books without series come after books with series
+        if (!hasSeries1 && !hasSeries2) {
+            // Both have no series, sort by addedOn descending
+            return compareByAddedOnDescending(b1, b2);
+        }
+        if (!hasSeries1) return 1;
+        if (!hasSeries2) return -1;
+
+        // Both have series, sort by series name then number
+        int seriesComp = series2.compareToIgnoreCase(series1);
+        if (seriesComp != 0) return seriesComp;
+        return Float.compare(getSeriesNumber(b2), getSeriesNumber(b1));
+    }
+
+    private int compareRatingAsc(Book b1, Book b2) {
+        Float rating1 = calculateRating(b1);
+        Float rating2 = calculateRating(b2);
+        // Books with no rating go to the end
+        if (rating1 == null && rating2 == null) {
+            // Both have no rating, fall back to addedOn descending
+            return compareByAddedOnDescending(b1, b2);
+        }
+        if (rating1 == null) return 1;
+        if (rating2 == null) return -1;
+        int ratingComp = Float.compare(rating1, rating2); // Ascending order (lowest first)
+        if (ratingComp != 0) return ratingComp;
+        // Same rating, fall back to addedOn descending
+        return compareByAddedOnDescending(b1, b2);
+    }
+
+    private int compareRatingDesc(Book b1, Book b2) {
+        Float rating1 = calculateRating(b1);
+        Float rating2 = calculateRating(b2);
+        // Books with no rating go to the end
+        if (rating1 == null && rating2 == null) {
+            // Both have no rating, fall back to addedOn descending
+            return compareByAddedOnDescending(b1, b2);
+        }
+        if (rating1 == null) return 1;
+        if (rating2 == null) return -1;
+        int ratingComp = Float.compare(rating2, rating1); // Descending order (highest first)
+        if (ratingComp != 0) return ratingComp;
+        // Same rating, fall back to addedOn descending
+        return compareByAddedOnDescending(b1, b2);
     }
 
     private String getFirstAuthor(Book book) {
@@ -622,6 +629,17 @@ public class OpdsBookService {
         if (b1.getAddedOn() == null) return 1;
         if (b2.getAddedOn() == null) return -1;
         return b1.getAddedOn().compareTo(b2.getAddedOn());
+    }
+
+    // Reverses compareByAddedOn() to sort newest-first, matching the RECENT default (see
+    // applySortOrder above). Named wrapper instead of calling compareByAddedOn(b2, b1) inline at
+    // each tie-break site, since that swapped-argument pattern reads as a bug (sonar java:S2234)
+    // even though it is the intentional way to reverse a two-argument comparator.
+    // The swapped argument order is the point of this method (see comment above) - not a
+    // misordered call, so java:S2234 does not apply here.
+    @SuppressWarnings("java:S2234")
+    private int compareByAddedOnDescending(Book b1, Book b2) {
+        return compareByAddedOn(b2, b1);
     }
 
     private Float calculateRating(Book book) {

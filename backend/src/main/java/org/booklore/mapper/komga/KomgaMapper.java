@@ -210,24 +210,20 @@ public class KomgaMapper {
         String summary = null;
         
         BookEntity firstBook = books.getFirst();
-            for (BookEntity book : books) {
+        for (BookEntity book : books) {
             BookMetadataEntity metadata = book.getMetadata();
-            if (metadata != null) {
-                if (metadata.getAuthors() != null) {
-                    metadata.getAuthors().forEach(author -> authorNames.add(author.getName()));
-                }
-                
-                if (metadata.getTags() != null) {
-                    metadata.getTags().forEach(tag -> allTags.add(tag.getName()));
-                }
-                
-                if (releaseDate == null && metadata.getPublishedDate() != null) {
-                    releaseDate = metadata.getPublishedDate().format(DATE_FORMATTER);
-                }
-                
-                if (summary == null && metadata.getDescription() != null) {
-                    summary = metadata.getDescription();
-                }
+            if (metadata == null) {
+                continue;
+            }
+
+            collectAuthorsAndTags(metadata, authorNames, allTags);
+
+            if (releaseDate == null && metadata.getPublishedDate() != null) {
+                releaseDate = metadata.getPublishedDate().format(DATE_FORMATTER);
+            }
+
+            if (summary == null && metadata.getDescription() != null) {
+                summary = metadata.getDescription();
             }
         }
         
@@ -246,6 +242,16 @@ public class KomgaMapper {
                 .summaryNumber(nullIfEmptyInCleanMode(null, ""))
                 .summaryLock(false)
                 .build();
+    }
+
+    private void collectAuthorsAndTags(BookMetadataEntity metadata, Set<String> authorNames, Set<String> allTags) {
+        if (metadata.getAuthors() != null) {
+            metadata.getAuthors().forEach(author -> authorNames.add(author.getName()));
+        }
+
+        if (metadata.getTags() != null) {
+            metadata.getTags().forEach(tag -> allTags.add(tag.getName()));
+        }
     }
 
     public String getBookSeriesName(BookEntity book) {
@@ -335,17 +341,6 @@ public class KomgaMapper {
         }
         return value != null ? value : defaultValue;
     }
-    /**
-     * Helper method to return null for empty integer in clean mode.
-     * In clean mode, we want to allow null values so they can be filtered out.
-     */
-    private Integer nullIfEmptyInCleanMode(Integer value, Integer defaultValue) {
-        if (KomgaCleanContext.isCleanMode()) {
-            return (value != null) ? value : null;
-        }
-        return value != null ? value : defaultValue;
-    }
-
     /**
      * Helper method to return null for empty float in clean mode.
      * In clean mode, we want to allow null values so they can be filtered out.

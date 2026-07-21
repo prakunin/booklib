@@ -69,7 +69,7 @@ public class InstallationService {
             setting.setVal(json);
             appSettingsRepository.save(setting);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to save installation ID", e);
+            throw new IllegalStateException("Failed to save installation ID", e);
         }
     }
 
@@ -85,7 +85,7 @@ public class InstallationService {
             }
             return hexString.toString();
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not found", e);
+            throw new IllegalStateException("SHA-256 algorithm not found", e);
         }
     }
 }

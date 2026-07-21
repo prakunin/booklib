@@ -70,7 +70,7 @@ public class KoboEntitlementService {
                 .toList();
     }
 
-    public List<? extends Entitlement> generateChangedEntitlements(Set<Long> bookIds, String token, boolean removed) {
+    public List<Entitlement> generateChangedEntitlements(Set<Long> bookIds, String token, boolean removed) {
 
         List<BookEntity> books = bookQueryService.findAllWithMetadataByIds(bookIds);
 
@@ -78,7 +78,7 @@ public class KoboEntitlementService {
         if (removed) {
             return books.stream()
                     .filter(koboCompatibilityService::isBookSupportedForKobo)
-                    .map(book -> {
+                    .<Entitlement>map(book -> {
                         KoboBookMetadata metadata = KoboBookMetadata.builder()
                                 .coverImageId(book.getBookCoverHash())
                                 .crossRevisionId(String.valueOf(book.getId()))
@@ -99,7 +99,7 @@ public class KoboEntitlementService {
         }
         return books.stream()
                 .filter(bookEntity -> bookEntity.getPrimaryBookFile() != null && bookEntity.getPrimaryBookFile().getBookType() == BookFileType.EPUB)
-                .map(book -> ChangedProductMetadata.builder()
+                .<Entitlement>map(book -> ChangedProductMetadata.builder()
                         .changedProductMetadata(BookEntitlementContainer.builder()
                                 .bookEntitlement(buildBookEntitlement(book, false))
                                 .bookMetadata(mapToKoboMetadata(book, token))
@@ -214,6 +214,8 @@ public class KoboEntitlementService {
                 .build();
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private ChangedReadingState buildChangedReadingState(UserBookProgressEntity progress,
                                                          UserBookFileProgressEntity fileProgress,
                                                          String timestamp,
@@ -243,6 +245,8 @@ public class KoboEntitlementService {
                 .build();
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private KoboReadingState getReadingStateForBook(BookEntity book) {
         OffsetDateTime now = getCurrentUtc();
         String entitlementId = String.valueOf(book.getId());
@@ -268,14 +272,17 @@ public class KoboEntitlementService {
                     .orElse(null)
                 : null;
 
-        KoboReadingState.CurrentBookmark bookmark = webReaderBookmark != null
-                ? webReaderBookmark
-                : existingState != null && existingState.getCurrentBookmark() != null
-                ? existingState.getCurrentBookmark()
-                : userProgress
-                .filter(progress -> progress.getKoboProgressPercent() != null || (twoWaySync && progress.getEpubProgressPercent() != null))
-                .map(progress -> readingStateBuilder.buildBookmarkFromProgress(progress, fileProgress, now))
-                .orElseGet(() -> readingStateBuilder.buildEmptyBookmark(now));
+        KoboReadingState.CurrentBookmark bookmark;
+        if (webReaderBookmark != null) {
+            bookmark = webReaderBookmark;
+        } else if (existingState != null && existingState.getCurrentBookmark() != null) {
+            bookmark = existingState.getCurrentBookmark();
+        } else {
+            bookmark = userProgress
+                    .filter(progress -> progress.getKoboProgressPercent() != null || (twoWaySync && progress.getEpubProgressPercent() != null))
+                    .map(progress -> readingStateBuilder.buildBookmarkFromProgress(progress, fileProgress, now))
+                    .orElseGet(() -> readingStateBuilder.buildEmptyBookmark(now));
+        }
 
         KoboReadingState.StatusInfo statusInfo = userProgress
                 .map(progress -> readingStateBuilder.buildStatusInfoFromProgress(progress, now.toString()))
@@ -349,44 +356,17 @@ public class KoboEntitlementService {
                 .map(list -> list.stream().map(CategoryEntity::getName).toList())
                 .orElse(Collections.emptyList());
 
-        KoboBookMetadata.Series series = null;
-        if (metadata.getSeriesName() != null && !metadata.getSeriesName().isBlank()) {
-            series = KoboBookMetadata.Series.builder()
-                    .id("series_" + metadata.getSeriesName().hashCode())
-                    .name(metadata.getSeriesName())
-                    .number(metadata.getSeriesNumber() != null 
-                        ? BigDecimal.valueOf(metadata.getSeriesNumber()).stripTrailingZeros().toPlainString() 
-                        : "1")
-                    .numberFloat(metadata.getSeriesNumber() != null ? metadata.getSeriesNumber().doubleValue() : 1.0)
-                    .build();
-        } else {
-            series = KoboBookMetadata.Series.builder()
-                    .id("")
-                    .name("")
-                    .number("")
-                    .numberFloat(0.0)
-                    .build();
-        }
+        KoboBookMetadata.Series series = buildSeries(metadata);
 
         String downloadUrl = koboUrlBuilder.downloadUrl(token, book.getId());
 
-        KoboBookFormat bookFormat = KoboBookFormat.EPUB3;
         KoboSettings koboSettings = appSettingService.getAppSettings().getKoboSettings();
 
         var primaryFile = book.getPrimaryBookFile();
         if (primaryFile == null) {
             return null;
         }
-        boolean isEpubFile = primaryFile.getBookType() == BookFileType.EPUB;
-        boolean isCbxFile = primaryFile.getBookType() == BookFileType.CBX;
-
-        if (isEpubFile && primaryFile.isFixedLayout()) {
-            bookFormat = KoboBookFormat.EPUB3FL;
-        } else if (isEpubFile && koboSettings != null && koboSettings.isConvertToKepub()) {
-            bookFormat = KoboBookFormat.KEPUB;
-        } else if (koboSettings != null && isCbxFile && koboSettings.isConvertCbxToEpub()) {
-            bookFormat = KoboBookFormat.EPUB3;
-        }
+        KoboBookFormat bookFormat = determineBookFormat(primaryFile, koboSettings);
 
         return KoboBookMetadata.builder()
                 .crossRevisionId(String.valueOf(book.getId()))
@@ -419,6 +399,39 @@ public class KoboEntitlementService {
                                 .build()
                 ))
                 .build();
+    }
+
+    private KoboBookMetadata.Series buildSeries(BookMetadataEntity metadata) {
+        if (metadata.getSeriesName() != null && !metadata.getSeriesName().isBlank()) {
+            return KoboBookMetadata.Series.builder()
+                    .id("series_" + metadata.getSeriesName().hashCode())
+                    .name(metadata.getSeriesName())
+                    .number(metadata.getSeriesNumber() != null
+                        ? BigDecimal.valueOf(metadata.getSeriesNumber()).stripTrailingZeros().toPlainString()
+                        : "1")
+                    .numberFloat(metadata.getSeriesNumber() != null ? metadata.getSeriesNumber().doubleValue() : 1.0)
+                    .build();
+        }
+        return KoboBookMetadata.Series.builder()
+                .id("")
+                .name("")
+                .number("")
+                .numberFloat(0.0)
+                .build();
+    }
+
+    private KoboBookFormat determineBookFormat(BookFileEntity primaryFile, KoboSettings koboSettings) {
+        boolean isEpubFile = primaryFile.getBookType() == BookFileType.EPUB;
+        boolean isCbxFile = primaryFile.getBookType() == BookFileType.CBX;
+
+        if (isEpubFile && primaryFile.isFixedLayout()) {
+            return KoboBookFormat.EPUB3FL;
+        } else if (isEpubFile && koboSettings != null && koboSettings.isConvertToKepub()) {
+            return KoboBookFormat.KEPUB;
+        } else if (koboSettings != null && isCbxFile && koboSettings.isConvertCbxToEpub()) {
+            return KoboBookFormat.EPUB3;
+        }
+        return KoboBookFormat.EPUB3;
     }
 
     private OffsetDateTime getCurrentUtc() {

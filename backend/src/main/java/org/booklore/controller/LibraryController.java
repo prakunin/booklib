@@ -78,7 +78,7 @@ public class LibraryController {
     @DeleteMapping("/{libraryId}")
     @CheckLibraryAccess(libraryIdParam = "libraryId")
     @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
-    public ResponseEntity<?> deleteLibrary(@Parameter(description = "ID of the library") @PathVariable long libraryId) {
+    public ResponseEntity<Void> deleteLibrary(@Parameter(description = "ID of the library") @PathVariable long libraryId) {
         libraryService.deleteLibrary(libraryId);
         return ResponseEntity.noContent().build();
     }
@@ -113,7 +113,7 @@ public class LibraryController {
     @PutMapping("/{libraryId}/refresh")
     @CheckLibraryAccess(libraryIdParam = "libraryId")
     @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
-    public ResponseEntity<?> rescanLibrary(@Parameter(description = "ID of the library") @PathVariable long libraryId) {
+    public ResponseEntity<Void> rescanLibrary(@Parameter(description = "ID of the library") @PathVariable long libraryId) {
         libraryService.rescanLibrary(libraryId);
         return ResponseEntity.noContent().build();
     }

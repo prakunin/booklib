@@ -296,10 +296,7 @@ public class MetadataChangeDetector {
                 return true;
             }
         }
-        if (hasComicMetadataChanges(newMeta, existingMeta)) {
-            return true;
-        }
-        return false;
+        return hasComicMetadataChanges(newMeta, existingMeta);
     }
 
     public static boolean hasValueChangesForFileWrite(BookMetadata newMeta, BookMetadataEntity existingMeta, MetadataClearFlags clear) {
@@ -523,15 +520,23 @@ public class MetadataChangeDetector {
                 || !isEffectivelyEmpty(dto.getReadingDirection())
                 || !isEffectivelyEmpty(dto.getWebLink())
                 || !isEffectivelyEmpty(dto.getNotes())
-                || (dto.getCharacters() != null && !dto.getCharacters().isEmpty())
-                || (dto.getTeams() != null && !dto.getTeams().isEmpty())
-                || (dto.getLocations() != null && !dto.getLocations().isEmpty())
-                || (dto.getPencillers() != null && !dto.getPencillers().isEmpty())
-                || (dto.getInkers() != null && !dto.getInkers().isEmpty())
-                || (dto.getColorists() != null && !dto.getColorists().isEmpty())
-                || (dto.getLetterers() != null && !dto.getLetterers().isEmpty())
-                || (dto.getCoverArtists() != null && !dto.getCoverArtists().isEmpty())
-                || (dto.getEditors() != null && !dto.getEditors().isEmpty());
+                || hasNonEmptyComicCollection(dto);
+    }
+
+    private static boolean hasNonEmptyComicCollection(ComicMetadata dto) {
+        return isNotEmpty(dto.getCharacters())
+                || isNotEmpty(dto.getTeams())
+                || isNotEmpty(dto.getLocations())
+                || isNotEmpty(dto.getPencillers())
+                || isNotEmpty(dto.getInkers())
+                || isNotEmpty(dto.getColorists())
+                || isNotEmpty(dto.getLetterers())
+                || isNotEmpty(dto.getCoverArtists())
+                || isNotEmpty(dto.getEditors());
+    }
+
+    private static boolean isNotEmpty(Collection<?> collection) {
+        return collection != null && !collection.isEmpty();
     }
 
     private static boolean stringSetsEqual(Set<String> set1, Set<String> set2) {

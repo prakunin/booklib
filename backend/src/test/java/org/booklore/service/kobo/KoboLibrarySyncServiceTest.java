@@ -1,12 +1,21 @@
 package org.booklore.service.kobo;
 
+import org.booklore.model.dto.BookLoreUser;
+import org.booklore.model.dto.BookloreSyncToken;
 import org.booklore.model.dto.KoboSyncSettings;
+import org.booklore.model.dto.kobo.*;
+import org.booklore.model.dto.settings.AppSettings;
+import org.booklore.model.dto.settings.KoboSettings;
+import org.booklore.model.entity.KoboLibrarySnapshotEntity;
+import org.booklore.model.entity.KoboSnapshotBookEntity;
 import org.booklore.model.entity.UserBookProgressEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.enums.ReadStatus;
 import org.booklore.repository.KoboDeletedBookProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
+import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.util.kobo.BookloreSyncTokenGenerator;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,16 +26,31 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("KoboLibrarySyncService Tests")
+// Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+@SuppressWarnings("java:S1874")
 class KoboLibrarySyncServiceTest {
 
     @Mock
@@ -45,6 +69,8 @@ class KoboLibrarySyncServiceTest {
     private ObjectMapper objectMapper;
     @Mock
     private KoboSettingsService koboSettingsService;
+    @Mock
+    private AppSettingService appSettingService;
 
     @InjectMocks
     private KoboLibrarySyncService service;
@@ -319,5 +345,150 @@ class KoboLibrarySyncServiceTest {
         if (lastReadTime == null) return false;
         if (sentTime != null && !lastReadTime.isAfter(sentTime)) return false;
         return receivedTime == null || lastReadTime.isAfter(receivedTime);
+    }
+
+    @Nested
+    @DisplayName("syncLibrary Orchestration")
+    class SyncLibraryOrchestration {
+
+        private final BookLoreUser user = new BookLoreUser();
+
+        @BeforeEach
+        void setUp() {
+            user.setId(42L);
+
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+            when(tokenGenerator.toBase64(any())).thenReturn("final-token");
+            when(koboLibrarySnapshotService.getChangedBooks(any(), any(), any())).thenReturn(Page.empty());
+            when(koboLibrarySnapshotService.getRemovedBooks(any(), any(), any(), any())).thenReturn(Page.empty());
+            when(userBookProgressRepository.findAllBooksNeedingKoboSync(any(), any())).thenReturn(List.of());
+            when(entitlementService.generateNewEntitlements(any(), any())).thenReturn(List.of());
+            when(entitlementService.generateTags()).thenReturn(List.of());
+
+            AppSettings noForwardSettings = AppSettings.builder()
+                    .koboSettings(KoboSettings.builder().forwardToKoboStore(false).build())
+                    .build();
+            when(appSettingService.getAppSettings()).thenReturn(noForwardSettings);
+        }
+
+        @AfterEach
+        void tearDown() {
+            RequestContextHolder.resetRequestAttributes();
+        }
+
+        @Test
+        @DisplayName("Initial sync with no previous snapshot completes and cleans up deleted progress")
+        void initialSync_noPreviousSnapshot_completesAndCleansUp() {
+            when(tokenGenerator.fromRequestHeaders(any())).thenReturn(null);
+
+            KoboLibrarySnapshotEntity currSnapshot = KoboLibrarySnapshotEntity.builder().id("curr-1").userId(42L).build();
+            when(koboLibrarySnapshotService.findByIdAndUserId(null, 42L)).thenReturn(Optional.empty());
+            when(koboLibrarySnapshotService.create(42L)).thenReturn(currSnapshot);
+            when(koboLibrarySnapshotService.getUnsyncedBooks(eq("curr-1"), any())).thenReturn(Page.empty());
+
+            ResponseEntity<List<Entitlement>> response = service.syncLibrary(user, "req-token");
+
+            assertThat(response.getHeaders().getFirst(KoboHeaders.X_KOBO_SYNC)).isEmpty();
+            assertThat(response.getHeaders().getFirst(KoboHeaders.X_KOBO_SYNCTOKEN)).isEqualTo("final-token");
+            verify(koboLibrarySnapshotService, never()).deleteById(any());
+            verify(koboDeletedBookProgressRepository).deleteBySnapshotIdAndUserId(null, 42L);
+        }
+
+        @Test
+        @DisplayName("Incremental sync with more added books than fit in a page continues and keeps the ongoing snapshot")
+        void incrementalSync_moreAddedBooksThanPageSize_continuesSync() {
+            BookloreSyncToken incomingToken = BookloreSyncToken.builder()
+                    .ongoingSyncPointId("curr-1")
+                    .lastSuccessfulSyncPointId("prev-1")
+                    .build();
+            when(tokenGenerator.fromRequestHeaders(any())).thenReturn(incomingToken);
+
+            KoboLibrarySnapshotEntity currSnapshot = KoboLibrarySnapshotEntity.builder().id("curr-1").userId(42L).build();
+            KoboLibrarySnapshotEntity prevSnapshot = KoboLibrarySnapshotEntity.builder().id("prev-1").userId(42L).build();
+            when(koboLibrarySnapshotService.findByIdAndUserId("curr-1", 42L)).thenReturn(Optional.of(currSnapshot));
+            when(koboLibrarySnapshotService.findByIdAndUserId("prev-1", 42L)).thenReturn(Optional.of(prevSnapshot));
+
+            KoboSnapshotBookEntity addedBook = KoboSnapshotBookEntity.builder().id(1L).bookId(100L).build();
+            Page<KoboSnapshotBookEntity> addedPage = new PageImpl<>(List.of(addedBook), PageRequest.of(0, 100), 101);
+            when(koboLibrarySnapshotService.getNewlyAddedBooks(eq("prev-1"), eq("curr-1"), any(), eq(42L))).thenReturn(addedPage);
+
+            ResponseEntity<List<Entitlement>> response = service.syncLibrary(user, "req-token");
+
+            assertThat(response.getHeaders().getFirst(KoboHeaders.X_KOBO_SYNC)).isEqualTo("continue");
+            verify(koboLibrarySnapshotService, never()).deleteById(any());
+            verify(userBookProgressRepository, never()).findAllBooksNeedingKoboSync(any(), any());
+        }
+
+        @Test
+        @DisplayName("Forwarding enabled and Kobo store reachable maps upstream entitlements and adopts upstream token")
+        void forwardingEnabled_storeReachable_mapsUpstreamEntitlementsAndToken() {
+            when(tokenGenerator.fromRequestHeaders(any())).thenReturn(null);
+
+            KoboLibrarySnapshotEntity currSnapshot = KoboLibrarySnapshotEntity.builder().id("curr-2").userId(42L).build();
+            when(koboLibrarySnapshotService.findByIdAndUserId(null, 42L)).thenReturn(Optional.empty());
+            when(koboLibrarySnapshotService.create(42L)).thenReturn(currSnapshot);
+            when(koboLibrarySnapshotService.getUnsyncedBooks(eq("curr-2"), any())).thenReturn(Page.empty());
+
+            AppSettings forwardSettings = AppSettings.builder()
+                    .koboSettings(KoboSettings.builder().forwardToKoboStore(true).build())
+                    .build();
+            when(appSettingService.getAppSettings()).thenReturn(forwardSettings);
+
+            JsonNode newNode = mock(JsonNode.class);
+            when(newNode.has("NewEntitlement")).thenReturn(true);
+            JsonNode changedNode = mock(JsonNode.class);
+            when(changedNode.has("NewEntitlement")).thenReturn(false);
+            when(changedNode.has("ChangedEntitlement")).thenReturn(true);
+            JsonNode unknownNode = mock(JsonNode.class);
+            when(unknownNode.has("NewEntitlement")).thenReturn(false);
+            when(unknownNode.has("ChangedEntitlement")).thenReturn(false);
+
+            JsonNode arrayBody = mock(JsonNode.class);
+            when(arrayBody.isArray()).thenReturn(true);
+            when(arrayBody.iterator()).thenReturn(List.of(newNode, changedNode, unknownNode).iterator());
+
+            NewEntitlement mappedNew = new NewEntitlement();
+            ChangedEntitlement mappedChanged = new ChangedEntitlement();
+            when(objectMapper.treeToValue(newNode, NewEntitlement.class)).thenReturn(mappedNew);
+            when(objectMapper.treeToValue(changedNode, ChangedEntitlement.class)).thenReturn(mappedChanged);
+
+            ResponseEntity<JsonNode> koboResponse = ResponseEntity.ok()
+                    .header(KoboHeaders.X_KOBO_SYNC, "")
+                    .header(KoboHeaders.X_KOBO_SYNCTOKEN, "upstream-b64")
+                    .body(arrayBody);
+            when(koboServerProxy.proxyCurrentRequest(null, true)).thenReturn(koboResponse);
+
+            BookloreSyncToken upstreamToken = BookloreSyncToken.builder().lastSuccessfulSyncPointId("up-1").build();
+            when(tokenGenerator.fromBase64("upstream-b64")).thenReturn(upstreamToken);
+
+            ResponseEntity<List<Entitlement>> response = service.syncLibrary(user, "req-token");
+
+            assertThat(response.getBody()).contains(mappedNew, mappedChanged);
+            assertThat(response.getHeaders().getFirst(KoboHeaders.X_KOBO_SYNC)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Forwarding enabled but proxy call throws falls back to non-continuing sync without upstream entitlements")
+        void forwardingEnabled_proxyThrows_fallsBackGracefully() {
+            when(tokenGenerator.fromRequestHeaders(any())).thenReturn(null);
+
+            KoboLibrarySnapshotEntity currSnapshot = KoboLibrarySnapshotEntity.builder().id("curr-3").userId(42L).build();
+            when(koboLibrarySnapshotService.findByIdAndUserId(null, 42L)).thenReturn(Optional.empty());
+            when(koboLibrarySnapshotService.create(42L)).thenReturn(currSnapshot);
+            when(koboLibrarySnapshotService.getUnsyncedBooks(eq("curr-3"), any())).thenReturn(Page.empty());
+
+            AppSettings forwardSettings = AppSettings.builder()
+                    .koboSettings(KoboSettings.builder().forwardToKoboStore(true).build())
+                    .build();
+            when(appSettingService.getAppSettings()).thenReturn(forwardSettings);
+            when(koboServerProxy.proxyCurrentRequest(null, true)).thenThrow(new RuntimeException("upstream down"));
+
+            ResponseEntity<List<Entitlement>> response = service.syncLibrary(user, "req-token");
+
+            assertThat(response.getHeaders().getFirst(KoboHeaders.X_KOBO_SYNC)).isEmpty();
+            assertThat(response.getBody()).doesNotContain((Entitlement) null);
+        }
     }
 }

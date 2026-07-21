@@ -59,10 +59,6 @@ public record BookListRequest(
         };
     }
 
-    private static boolean hasValues(List<String> list) {
-        return list != null && !list.isEmpty() && list.stream().anyMatch(s -> s != null && !s.isBlank());
-    }
-
     /**
      * Returns non-blank trimmed values from the given list, or an empty list.
      */

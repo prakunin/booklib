@@ -263,12 +263,10 @@ class BookFileAttachmentServiceTest {
             BookEntity target = createBook(1L);
             createBookFileNoPhysicalFile(10L, target, "target.epub", "sub", true);
             // Create the target file physically so target validation passes
-            try {
+            assertDoesNotThrow(() -> {
                 Files.createDirectories(tempDir.resolve("sub"));
                 Files.createFile(tempDir.resolve("sub/target.epub"));
-            } catch (IOException _) {
-                fail("Setup failed");
-            }
+            });
 
             BookEntity source = createBook(2L);
             createBookFileNoPhysicalFile(20L, source, "missing.epub", "sub2", true);

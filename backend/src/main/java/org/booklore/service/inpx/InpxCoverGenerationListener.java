@@ -48,23 +48,27 @@ public class InpxCoverGenerationListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void handle(InpxCoverGenerationRequestedEvent event) {
         for (Long bookId : event.bookIds()) {
-            if (bookId == null) {
-                continue;
-            }
-            Boolean previousAttemptGeneratedCover = attemptedBooks.getIfPresent(bookId);
-            if (previousAttemptGeneratedCover != null) {
-                if (previousAttemptGeneratedCover) {
-                    notifyUsers(bookId, Set.of(event.username()));
-                }
-                continue;
-            }
-            waitingUsers.computeIfAbsent(bookId, ignored -> ConcurrentHashMap.newKeySet())
-                    .add(event.username());
-            if (!processingBookIds.add(bookId)) {
-                continue;
-            }
-            generateCover(bookId);
+            processBookId(bookId, event);
         }
+    }
+
+    private void processBookId(Long bookId, InpxCoverGenerationRequestedEvent event) {
+        if (bookId == null) {
+            return;
+        }
+        Boolean previousAttemptGeneratedCover = attemptedBooks.getIfPresent(bookId);
+        if (previousAttemptGeneratedCover != null) {
+            if (previousAttemptGeneratedCover) {
+                notifyUsers(bookId, Set.of(event.username()));
+            }
+            return;
+        }
+        waitingUsers.computeIfAbsent(bookId, ignored -> ConcurrentHashMap.newKeySet())
+                .add(event.username());
+        if (!processingBookIds.add(bookId)) {
+            return;
+        }
+        generateCover(bookId);
     }
 
     private void generateCover(long bookId) {

@@ -24,7 +24,7 @@ public class SetupController {
     @Operation(summary = "Get setup status", description = "Check if initial setup has been completed.")
     @ApiResponse(responseCode = "200", description = "Setup status returned successfully")
     @GetMapping("/status")
-    public ResponseEntity<?> getSetupStatus() {
+    public ResponseEntity<SuccessResponse<Boolean>> getSetupStatus() {
         boolean isCompleted = userProvisioningService.isInitialUserAlreadyProvisioned();
         String message = isCompleted
                 ? "Initial setup has already been completed."
@@ -35,7 +35,7 @@ public class SetupController {
     @Operation(summary = "Setup first user", description = "Provision the initial admin user during setup.")
     @ApiResponse(responseCode = "200", description = "Admin user created successfully")
     @PostMapping
-    public ResponseEntity<?> setupFirstUser(
+    public ResponseEntity<Object> setupFirstUser(
             @Parameter(description = "Initial user request") @RequestBody @Valid InitialUserRequest request) {
         if (userProvisioningService.isInitialUserAlreadyProvisioned()) {
             return ResponseEntity.status(403).body(new ErrorResponse(403, "Setup is disabled after the first user is created."));

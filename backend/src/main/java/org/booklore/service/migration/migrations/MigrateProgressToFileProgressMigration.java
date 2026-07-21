@@ -43,40 +43,9 @@ public class MigrateProgressToFileProgressMigration implements Migration {
         int skippedCount = 0;
 
         for (UserBookProgressEntity progress : allProgress) {
-            if (!hasAnyProgress(progress)) {
-                skippedCount++;
-                continue;
-            }
-
-            try {
-                Optional<BookFileEntity> bookFileOpt = findBookFileForProgress(progress);
-                if (bookFileOpt.isEmpty()) {
-                    log.debug("No matching book file found for progress id={}, bookId={}",
-                            progress.getId(), progress.getBook().getId());
-                    skippedCount++;
-                    continue;
-                }
-
-                BookFileEntity bookFile = bookFileOpt.get();
-
-                // Check if file progress already exists
-                Optional<UserBookFileProgressEntity> existingFileProgress =
-                        userBookFileProgressRepository.findByUserIdAndBookFileId(
-                                progress.getUser().getId(), bookFile.getId());
-
-                if (existingFileProgress.isPresent()) {
-                    log.debug("File progress already exists for userId={}, bookFileId={}",
-                            progress.getUser().getId(), bookFile.getId());
-                    skippedCount++;
-                    continue;
-                }
-
-                UserBookFileProgressEntity fileProgress = createFileProgress(progress, bookFile);
-                userBookFileProgressRepository.save(fileProgress);
+            if (migrateSingleProgress(progress) == ProgressMigrationOutcome.MIGRATED) {
                 migratedCount++;
-            } catch (Exception e) {
-                log.warn("Failed to migrate progress for progressId={}: {}",
-                        progress.getId(), e.getMessage());
+            } else {
                 skippedCount++;
             }
         }
@@ -85,12 +54,56 @@ public class MigrateProgressToFileProgressMigration implements Migration {
                 getKey(), migratedCount, skippedCount);
     }
 
+    private enum ProgressMigrationOutcome {
+        MIGRATED, SKIPPED
+    }
+
+    private ProgressMigrationOutcome migrateSingleProgress(UserBookProgressEntity progress) {
+        if (!hasAnyProgress(progress)) {
+            return ProgressMigrationOutcome.SKIPPED;
+        }
+
+        try {
+            Optional<BookFileEntity> bookFileOpt = findBookFileForProgress(progress);
+            if (bookFileOpt.isEmpty()) {
+                log.debug("No matching book file found for progress id={}, bookId={}",
+                        progress.getId(), progress.getBook().getId());
+                return ProgressMigrationOutcome.SKIPPED;
+            }
+
+            BookFileEntity bookFile = bookFileOpt.get();
+
+            // Check if file progress already exists
+            Optional<UserBookFileProgressEntity> existingFileProgress =
+                    userBookFileProgressRepository.findByUserIdAndBookFileId(
+                            progress.getUser().getId(), bookFile.getId());
+
+            if (existingFileProgress.isPresent()) {
+                log.debug("File progress already exists for userId={}, bookFileId={}",
+                        progress.getUser().getId(), bookFile.getId());
+                return ProgressMigrationOutcome.SKIPPED;
+            }
+
+            UserBookFileProgressEntity fileProgress = createFileProgress(progress, bookFile);
+            userBookFileProgressRepository.save(fileProgress);
+            return ProgressMigrationOutcome.MIGRATED;
+        } catch (Exception e) {
+            log.warn("Failed to migrate progress for progressId={}: {}",
+                    progress.getId(), e.getMessage());
+            return ProgressMigrationOutcome.SKIPPED;
+        }
+    }
+
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private boolean hasAnyProgress(UserBookProgressEntity progress) {
         return progress.getPdfProgress() != null ||
                 progress.getEpubProgress() != null ||
                 progress.getCbxProgress() != null;
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private Optional<BookFileEntity> findBookFileForProgress(UserBookProgressEntity progress) {
         if (progress.getBook() == null || progress.getBook().getBookFiles() == null) {
             return Optional.empty();
@@ -131,6 +144,8 @@ public class MigrateProgressToFileProgressMigration implements Migration {
         return Optional.empty();
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private UserBookFileProgressEntity createFileProgress(UserBookProgressEntity progress, BookFileEntity bookFile) {
         UserBookFileProgressEntity fileProgress = new UserBookFileProgressEntity();
         fileProgress.setUser(progress.getUser());
@@ -153,6 +168,10 @@ public class MigrateProgressToFileProgressMigration implements Migration {
                 fileProgress.setPositionData(progress.getCbxProgress() != null ?
                         String.valueOf(progress.getCbxProgress()) : null);
                 fileProgress.setProgressPercent(progress.getCbxProgressPercent());
+            }
+            default -> {
+                // No-op: legacy per-format progress fields never covered AUDIOBOOK; historical
+                // behavior left positionData/progressPercent unset for this type.
             }
         }
 

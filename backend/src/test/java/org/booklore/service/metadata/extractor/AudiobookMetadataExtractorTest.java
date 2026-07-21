@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +37,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AudiobookMetadataExtractorTest {
+
+    private static final String TEST_MP3 = "test.mp3";
+    private static final String FULL_AUDIOBOOK_TITLE = "Full Audiobook";
 
     @Mock
     private FfprobeService ffprobeService;
@@ -161,7 +165,7 @@ class AudiobookMetadataExtractorTest {
 
                 BookMetadata metadata = extractor.extractMetadata(file);
 
-                assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 1, 1));
+                assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.JANUARY, 1));
             }
         }
 
@@ -174,7 +178,7 @@ class AudiobookMetadataExtractorTest {
 
                 BookMetadata metadata = extractor.extractMetadata(file);
 
-                assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 1, 1));
+                assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.JANUARY, 1));
             }
         }
 
@@ -698,6 +702,235 @@ class AudiobookMetadataExtractorTest {
 
             assertThatThrownBy(() -> extractor.extractCover(missing))
                     .isInstanceOf(CoverExtractionException.class);
+        }
+    }
+
+    /**
+     * Drives {@code extractChaptersWithFfprobe} through a real {@code ProcessBuilder} invocation
+     * (as production code does) rather than mocking the private method: the fake "ffprobe" is a
+     * tiny shell script that prints canned JSON to stdout, so the real process-execution and
+     * JSON-parsing code paths both run.
+     */
+    @Nested
+    class FfprobeChapterExtractionTests {
+
+        private Path fakeFfprobe(String stdout, int exitCode) throws IOException {
+            Path script = tempDir.resolve("fake-ffprobe.sh");
+            String content = "#!/bin/sh\ncat <<'JSON_EOF'\n" + stdout + "\nJSON_EOF\nexit " + exitCode + "\n";
+            Files.writeString(script, content);
+            assertThat(script.toFile().setExecutable(true)).isTrue();
+            return script;
+        }
+
+        private AudioFile audioFileWithNoId3v2Chapters(double trackLengthSeconds) {
+            Tag tag = mock(Tag.class);
+            when(tag.getFirst(any(FieldKey.class))).thenReturn("");
+
+            AudioHeader header = mock(AudioHeader.class);
+            when(header.getPreciseTrackLength()).thenReturn(trackLengthSeconds);
+            when(header.getBitRateAsNumber()).thenReturn(128L);
+            when(header.getSampleRateAsNumber()).thenReturn(44100);
+            when(header.getChannels()).thenReturn("Stereo");
+            when(header.getEncodingType()).thenReturn("mp3");
+
+            AudioFile audioFile = mock(AudioFile.class);
+            when(audioFile.getTag()).thenReturn(tag);
+            when(audioFile.getAudioHeader()).thenReturn(header);
+            return audioFile;
+        }
+
+        @Test
+        void directSecondsFields_titleFromTagsWithDefaultFallback() throws IOException {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                when(ffprobeService.getFfprobeBinary()).thenReturn(fakeFfprobe("""
+                        {"chapters": [
+                          {"start_time": 0.0, "end_time": 125.5, "tags": {"title": "Prologue"}},
+                          {"start_time": 125.5, "end_time": 300.0}
+                        ]}""", 0));
+
+                AudioFile audioFile = audioFileWithNoId3v2Chapters(300.0);
+                File file = new File(tempDir.toFile(), TEST_MP3);
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                BookMetadata metadata = extractor.extractMetadata(file);
+                List<AudiobookMetadata.ChapterInfo> chapters = metadata.getAudiobookMetadata().getChapters();
+
+                assertThat(chapters).hasSize(2);
+                assertThat(chapters.get(0).getTitle()).isEqualTo("Prologue");
+                assertThat(chapters.get(0).getEndTimeMs()).isEqualTo(125500L);
+                assertThat(chapters.get(1).getTitle()).isEqualTo("Chapter 2");
+                assertThat(chapters.get(1).getStartTimeMs()).isEqualTo(125500L);
+                assertThat(chapters.get(1).getEndTimeMs()).isEqualTo(300000L);
+            }
+        }
+
+        @Test
+        void rawFields_convertedUsingExplicitTimeBase() throws IOException {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                when(ffprobeService.getFfprobeBinary()).thenReturn(fakeFfprobe(
+                        "{\"chapters\": [{\"start\": 0, \"end\": 48000, \"time_base\": \"1/48000\"}]}", 0));
+
+                AudioFile audioFile = audioFileWithNoId3v2Chapters(1.0);
+                File file = new File(tempDir.toFile(), TEST_MP3);
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                BookMetadata metadata = extractor.extractMetadata(file);
+                List<AudiobookMetadata.ChapterInfo> chapters = metadata.getAudiobookMetadata().getChapters();
+
+                assertThat(chapters).hasSize(1);
+                assertThat(chapters.getFirst().getStartTimeMs()).isZero();
+                assertThat(chapters.getFirst().getEndTimeMs()).isEqualTo(1000L);
+            }
+        }
+
+        @Test
+        void rawFields_defaultToMillisecondTimeBaseWhenAbsent() throws IOException {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                when(ffprobeService.getFfprobeBinary()).thenReturn(fakeFfprobe(
+                        "{\"chapters\": [{\"start\": 2500, \"end\": 5000}]}", 0));
+
+                AudioFile audioFile = audioFileWithNoId3v2Chapters(5.0);
+                File file = new File(tempDir.toFile(), TEST_MP3);
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                BookMetadata metadata = extractor.extractMetadata(file);
+                List<AudiobookMetadata.ChapterInfo> chapters = metadata.getAudiobookMetadata().getChapters();
+
+                assertThat(chapters).hasSize(1);
+                assertThat(chapters.getFirst().getStartTimeMs()).isEqualTo(2500L);
+                assertThat(chapters.getFirst().getEndTimeMs()).isEqualTo(5000L);
+            }
+        }
+
+        @Test
+        void malformedTimeBase_fallsBackToDividingByOneThousand() throws IOException {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                when(ffprobeService.getFfprobeBinary()).thenReturn(fakeFfprobe(
+                        "{\"chapters\": [{\"start\": 5000, \"end\": 10000, \"time_base\": \"bogus\"}]}", 0));
+
+                AudioFile audioFile = audioFileWithNoId3v2Chapters(10.0);
+                File file = new File(tempDir.toFile(), TEST_MP3);
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                BookMetadata metadata = extractor.extractMetadata(file);
+                List<AudiobookMetadata.ChapterInfo> chapters = metadata.getAudiobookMetadata().getChapters();
+
+                assertThat(chapters).hasSize(1);
+                assertThat(chapters.getFirst().getStartTimeMs()).isEqualTo(5000L);
+                assertThat(chapters.getFirst().getEndTimeMs()).isEqualTo(10000L);
+            }
+        }
+
+        @Test
+        void emptyChaptersArray_fallsBackToDefaultChapter() throws IOException {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                when(ffprobeService.getFfprobeBinary()).thenReturn(fakeFfprobe("{\"chapters\": []}", 0));
+
+                AudioFile audioFile = audioFileWithNoId3v2Chapters(90.0);
+                File file = new File(tempDir.toFile(), TEST_MP3);
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                BookMetadata metadata = extractor.extractMetadata(file);
+                List<AudiobookMetadata.ChapterInfo> chapters = metadata.getAudiobookMetadata().getChapters();
+
+                assertThat(chapters).hasSize(1);
+                assertThat(chapters.getFirst().getTitle()).isEqualTo(FULL_AUDIOBOOK_TITLE);
+            }
+        }
+
+        @Test
+        void malformedJsonOutput_fallsBackToDefaultChapter() throws IOException {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                when(ffprobeService.getFfprobeBinary()).thenReturn(fakeFfprobe("not valid json at all", 0));
+
+                AudioFile audioFile = audioFileWithNoId3v2Chapters(90.0);
+                File file = new File(tempDir.toFile(), TEST_MP3);
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                BookMetadata metadata = extractor.extractMetadata(file);
+                List<AudiobookMetadata.ChapterInfo> chapters = metadata.getAudiobookMetadata().getChapters();
+
+                assertThat(chapters).hasSize(1);
+                assertThat(chapters.getFirst().getTitle()).isEqualTo(FULL_AUDIOBOOK_TITLE);
+            }
+        }
+
+        @Test
+        void nonZeroExitCode_fallsBackToDefaultChapter() throws IOException {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                when(ffprobeService.getFfprobeBinary()).thenReturn(fakeFfprobe("{\"chapters\": []}", 1));
+
+                AudioFile audioFile = audioFileWithNoId3v2Chapters(90.0);
+                File file = new File(tempDir.toFile(), TEST_MP3);
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                BookMetadata metadata = extractor.extractMetadata(file);
+                List<AudiobookMetadata.ChapterInfo> chapters = metadata.getAudiobookMetadata().getChapters();
+
+                assertThat(chapters).hasSize(1);
+                assertThat(chapters.getFirst().getTitle()).isEqualTo(FULL_AUDIOBOOK_TITLE);
+            }
+        }
+
+        @Test
+        void literalEmptyJsonObject_fallsBackToDefaultChapter() throws IOException {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                when(ffprobeService.getFfprobeBinary()).thenReturn(fakeFfprobe("{}", 0));
+
+                AudioFile audioFile = audioFileWithNoId3v2Chapters(90.0);
+                File file = new File(tempDir.toFile(), TEST_MP3);
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                BookMetadata metadata = extractor.extractMetadata(file);
+                List<AudiobookMetadata.ChapterInfo> chapters = metadata.getAudiobookMetadata().getChapters();
+
+                assertThat(chapters).hasSize(1);
+                assertThat(chapters.getFirst().getTitle()).isEqualTo(FULL_AUDIOBOOK_TITLE);
+            }
+        }
+    }
+
+    @Nested
+    class ExtractChaptersFromFileTests {
+
+        @Test
+        void delegatesToTheSameChapterExtractionAsExtractMetadata() {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                FrameBodyCHAP chapBody = mock(FrameBodyCHAP.class);
+                when(chapBody.getObjectValue("StartTime")).thenReturn(0L);
+                when(chapBody.getObjectValue("EndTime")).thenReturn(60000L);
+                when(chapBody.getObjectValue("ElementID")).thenReturn("Intro");
+
+                AbstractID3v2Frame frame = mock(AbstractID3v2Frame.class);
+                when(frame.getBody()).thenReturn(chapBody);
+
+                AbstractID3v2Tag id3v2Tag = mock(AbstractID3v2Tag.class);
+                when(id3v2Tag.getFrame(ID3v2ChapterFrames.FRAME_ID_CHAPTER)).thenReturn(List.of(frame));
+
+                AudioFile audioFile = mock(AudioFile.class);
+                when(audioFile.getTag()).thenReturn(id3v2Tag);
+                when(audioFile.getAudioHeader()).thenReturn(mock(AudioHeader.class));
+
+                File file = new File(tempDir.toFile(), TEST_MP3);
+                mocked.when(() -> AudioFileIO.read(file)).thenReturn(audioFile);
+
+                List<AudiobookMetadata.ChapterInfo> chapters = extractor.extractChaptersFromFile(file);
+
+                assertThat(chapters).hasSize(1);
+                assertThat(chapters.getFirst().getTitle()).isEqualTo("Intro");
+            }
+        }
+
+        @Test
+        void returnsEmptyListRatherThanThrowingWhenTheFileCannotBeRead() {
+            try (MockedStatic<AudioFileIO> mocked = mockStatic(AudioFileIO.class)) {
+                File file = new File(tempDir.toFile(), "broken.mp3");
+                mocked.when(() -> AudioFileIO.read(file)).thenThrow(new RuntimeException("corrupt"));
+
+                List<AudiobookMetadata.ChapterInfo> chapters = extractor.extractChaptersFromFile(file);
+
+                assertThat(chapters).isEmpty();
+            }
         }
     }
 

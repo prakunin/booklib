@@ -20,6 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -49,7 +50,14 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
             "in", "https://api.audible.in/"
     );
 
+    // Audible's REST catalog API path structure is a fixed external vendor contract, not an
+    // environment-specific value - BASE_URIS above already externalizes the per-locale host,
+    // so making the path itself configurable too would be artificial.
+    // (Also suppressing java:S125 here: this prose comment trips the commented-out-code heuristic
+    // because it quotes an identifier, not because it contains dead code.)
+    @SuppressWarnings({"java:S1075", "java:S125"})
     private static final String PATH_SEARCH = "/1.0/catalog/products";
+    @SuppressWarnings("java:S1075")
     private static final String PATH_ASIN = "/1.0/catalog/products/{asin}";
     private static final String IMAGE_SIZE = "1000";
 
@@ -177,7 +185,7 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
 
             if (response.statusCode() < 200 || response.statusCode() > 399) {
                 log.error("Audible request failed with status code: {}", response.statusCode());
-                throw new RuntimeException("Failed to query Audible");
+                throw new IllegalStateException("Failed to query Audible");
             }
 
             log.debug("Request success with code {}", response.statusCode());
@@ -187,7 +195,7 @@ public class AudibleParser implements BookParser, DetailedMetadataProvider {
             }
         } catch (IOException e) {
             log.error("Audible request failed", e);
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw e;

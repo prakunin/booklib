@@ -84,7 +84,7 @@ public class UserController {
     @Operation(summary = "Change password", description = "Change the password for the current user.")
     @ApiResponse(responseCode = "200", description = "Password changed successfully")
     @PutMapping("/change-password")
-    public ResponseEntity<?> changePassword(@Parameter(description = "Change password request") @RequestBody @Valid ChangePasswordRequest request) {
+    public ResponseEntity<Void> changePassword(@Parameter(description = "Change password request") @RequestBody @Valid ChangePasswordRequest request) {
         userService.changePassword(request);
         return ResponseEntity.ok().build();
     }
@@ -93,7 +93,7 @@ public class UserController {
     @ApiResponse(responseCode = "200", description = "Password changed successfully")
     @PutMapping("/change-user-password")
     @PreAuthorize("@securityUtil.isAdmin()")
-    public ResponseEntity<?> changeUserPassword(@Parameter(description = "Change user password request") @RequestBody @Valid ChangeUserPasswordRequest request) {
+    public ResponseEntity<Void> changeUserPassword(@Parameter(description = "Change user password request") @RequestBody @Valid ChangeUserPasswordRequest request) {
         userService.changeUserPassword(request);
         return ResponseEntity.ok().build();
     }

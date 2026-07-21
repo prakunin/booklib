@@ -11,6 +11,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
 import javax.imageio.ImageIO;
+import javax.xml.parsers.ParserConfigurationException;
+import org.xml.sax.SAXException;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Path;
@@ -21,7 +23,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.function.DoubleConsumer;
-import java.util.function.IntConsumer;
 import java.util.regex.Matcher;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -73,7 +74,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         return BookMetadata.builder().title(baseName).build();
     }
 
-    private Document buildSecureDocument(InputStream is) throws Exception {
+    private Document buildSecureDocument(InputStream is) throws ParserConfigurationException, SAXException, IOException {
         return SecureXmlUtils.createSecureDocumentBuilder(true).parse(is);
     }
 
@@ -91,6 +92,19 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
     ) {
         BookMetadata.BookMetadataBuilder builder = BookMetadata.builder();
 
+        applyCoreFields(document, builder, fallbackTitle);
+        applyGtin(document, builder);
+        applyBookCollections(document, builder);
+
+        // Extract comic-specific metadata
+        ComicMetadata.ComicMetadataBuilder comicBuilder = ComicMetadata.builder();
+        if (applyComicMetadata(document, builder, comicBuilder)) {
+            builder.comicMetadata(comicBuilder.build());
+        }
+        return builder.build();
+    }
+
+    private void applyCoreFields(Document document, BookMetadata.BookMetadataBuilder builder, String fallbackTitle) {
         String title = getTextContent(document, "Title");
         builder.title(title == null || title.isBlank() ? fallbackTitle : title);
 
@@ -121,19 +135,24 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
                 )
         );
         builder.language(getTextContent(document, "LanguageISO"));
+    }
 
+    private void applyGtin(Document document, BookMetadata.BookMetadataBuilder builder) {
         // GTIN is the standard ComicInfo field for ISBN (EAN/UPC)
         // Validate it's a 13-digit number (ISBN-13/EAN-13)
         String gtin = getTextContent(document, "GTIN");
-        if (gtin != null && !gtin.isBlank()) {
-            String normalized = ISBN_CLEANER_PATTERN.matcher(gtin).replaceAll("");
-            if (ISBN13_PATTERN.matcher(normalized).matches()) {
-                builder.isbn13(normalized);
-            } else {
-                log.debug("Invalid GTIN format (expected 13 digits): {}", gtin);
-            }
+        if (gtin == null || gtin.isBlank()) {
+            return;
         }
+        String normalized = ISBN_CLEANER_PATTERN.matcher(gtin).replaceAll("");
+        if (ISBN13_PATTERN.matcher(normalized).matches()) {
+            builder.isbn13(normalized);
+        } else {
+            log.debug("Invalid GTIN format (expected 13 digits): {}", gtin);
+        }
+    }
 
+    private void applyBookCollections(Document document, BookMetadata.BookMetadataBuilder builder) {
         List<String> authors = new ArrayList<>(splitValues(getTextContent(document, "Writer")));
         if (!authors.isEmpty()) {
             builder.authors(authors);
@@ -148,9 +167,22 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         if (!tags.isEmpty()) {
             builder.tags(tags);
         }
+    }
 
-        // Extract comic-specific metadata
-        ComicMetadata.ComicMetadataBuilder comicBuilder = ComicMetadata.builder();
+    private boolean applyComicMetadata(
+            Document document,
+            BookMetadata.BookMetadataBuilder builder,
+            ComicMetadata.ComicMetadataBuilder comicBuilder
+    ) {
+        boolean hasComicFields = applyComicIssueFields(document, comicBuilder);
+        hasComicFields |= applyComicCreators(document, comicBuilder);
+        hasComicFields |= applyComicPublicationFields(document, comicBuilder);
+        hasComicFields |= applyComicEntities(document, comicBuilder);
+        hasComicFields |= applyComicWebAndNotes(document, builder, comicBuilder);
+        return hasComicFields;
+    }
+
+    private boolean applyComicIssueFields(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
         boolean hasComicFields = false;
 
         String issueNumber = getTextContent(document, "Number");
@@ -179,6 +211,12 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             comicBuilder.alternateIssue(getTextContent(document, "AlternateNumber"));
             hasComicFields = true;
         }
+
+        return hasComicFields;
+    }
+
+    private boolean applyComicCreators(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
+        boolean hasComicFields = false;
 
         Set<String> pencillers = splitValues(getTextContent(document, "Penciller"));
         if (!pencillers.isEmpty()) {
@@ -216,6 +254,12 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             hasComicFields = true;
         }
 
+        return hasComicFields;
+    }
+
+    private boolean applyComicPublicationFields(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
+        boolean hasComicFields = false;
+
         String imprint = getTextContent(document, "Imprint");
         if (imprint != null && !imprint.isBlank()) {
             comicBuilder.imprint(imprint);
@@ -234,17 +278,30 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             hasComicFields = true;
         }
 
-        String manga = getTextContent(document, "Manga");
-        if (manga != null && !manga.isBlank()) {
-            boolean isManga = "yes".equalsIgnoreCase(manga) || "true".equalsIgnoreCase(manga) || "yesandrighttoleft".equalsIgnoreCase(manga);
-            comicBuilder.manga(isManga);
-            if ("yesandrighttoleft".equalsIgnoreCase(manga)) {
-                comicBuilder.readingDirection("rtl");
-            } else {
-                comicBuilder.readingDirection("ltr");
-            }
+        if (applyMangaField(document, comicBuilder)) {
             hasComicFields = true;
         }
+
+        return hasComicFields;
+    }
+
+    private boolean applyMangaField(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
+        String manga = getTextContent(document, "Manga");
+        if (manga == null || manga.isBlank()) {
+            return false;
+        }
+        boolean isManga = "yes".equalsIgnoreCase(manga) || "true".equalsIgnoreCase(manga) || "yesandrighttoleft".equalsIgnoreCase(manga);
+        comicBuilder.manga(isManga);
+        if ("yesandrighttoleft".equalsIgnoreCase(manga)) {
+            comicBuilder.readingDirection("rtl");
+        } else {
+            comicBuilder.readingDirection("ltr");
+        }
+        return true;
+    }
+
+    private boolean applyComicEntities(Document document, ComicMetadata.ComicMetadataBuilder comicBuilder) {
+        boolean hasComicFields = false;
 
         Set<String> characters = splitValues(getTextContent(document, "Characters"));
         if (!characters.isEmpty()) {
@@ -264,6 +321,16 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             hasComicFields = true;
         }
 
+        return hasComicFields;
+    }
+
+    private boolean applyComicWebAndNotes(
+            Document document,
+            BookMetadata.BookMetadataBuilder builder,
+            ComicMetadata.ComicMetadataBuilder comicBuilder
+    ) {
+        boolean hasComicFields = false;
+
         String web = getTextContent(document, "Web");
         if (web != null && !web.isBlank()) {
             comicBuilder.webLink(web);
@@ -277,67 +344,74 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
             comicBuilder.notes(notes);
             hasComicFields = true;
             parseNotes(notes, builder);
+            applyNotesDescriptionFallback(document, builder, notes);
+        }
 
-            // Store whether we already have a description from Summary/Description XML elements
-            String existingDescription = coalesce(
-                    getTextContent(document, "Summary"),
-                    getTextContent(document, "Description")
-            );
-            boolean hasDescription = existingDescription != null && !existingDescription.isBlank();
+        return hasComicFields;
+    }
 
-            // If description is missing, use cleaned notes (removing BookLore tags)
-            if (!hasDescription) {
-                String cleanedNotes = BOOKLORE_TAG_PATTERN.matcher(notes).replaceAll("").trim();
-                if (!cleanedNotes.isEmpty()) {
-                    builder.description(cleanedNotes);
-                }
+    private void applyNotesDescriptionFallback(Document document, BookMetadata.BookMetadataBuilder builder, String notes) {
+        // Store whether we already have a description from Summary/Description XML elements
+        String existingDescription = coalesce(
+                getTextContent(document, "Summary"),
+                getTextContent(document, "Description")
+        );
+        boolean hasDescription = existingDescription != null && !existingDescription.isBlank();
+
+        // If description is missing, use cleaned notes (removing BookLore tags)
+        if (!hasDescription) {
+            String cleanedNotes = BOOKLORE_TAG_PATTERN.matcher(notes).replaceAll("").trim();
+            if (!cleanedNotes.isEmpty()) {
+                builder.description(cleanedNotes);
             }
         }
-
-        if (hasComicFields) {
-            builder.comicMetadata(comicBuilder.build());
-        }
-        return builder.build();
     }
 
     private void parseWebField(String web, BookMetadata.BookMetadataBuilder builder) {
         String[] urls = WEB_SPLIT_PATTERN.split(web);
         for (String url : urls) {
-            if (url.isBlank()) continue;
-            url = url.trim();
-
-            Matcher grMatcher = GOODREADS_URL_PATTERN.matcher(url);
-            if (grMatcher.find()) {
-                builder.goodreadsId(grMatcher.group(1));
+            if (url.isBlank()) {
                 continue;
             }
-
-            Matcher azMatcher = AMAZON_URL_PATTERN.matcher(url);
-            if (azMatcher.find()) {
-                builder.asin(azMatcher.group(1));
-                continue;
-            }
-
-            Matcher cvMatcher = COMICVINE_URL_PATTERN.matcher(url);
-            if (cvMatcher.find()) {
-                builder.comicvineId(cvMatcher.group(1));
-                continue;
-            }
-
-            Matcher cvSiteMatcher = COMICVINE_SITE_URL_PATTERN.matcher(url);
-            if (cvSiteMatcher.find()) {
-                builder.comicvineId(cvSiteMatcher.group(1));
-                continue;
-            }
-
-            Matcher hcMatcher = HARDCOVER_URL_PATTERN.matcher(url);
-            if (hcMatcher.find()) {
-                builder.hardcoverId(hcMatcher.group(1));
-                continue;
-            }
+            applyWebUrlToBuilder(url.trim(), builder);
         }
     }
 
+    private void applyWebUrlToBuilder(String url, BookMetadata.BookMetadataBuilder builder) {
+        Matcher grMatcher = GOODREADS_URL_PATTERN.matcher(url);
+        if (grMatcher.find()) {
+            builder.goodreadsId(grMatcher.group(1));
+            return;
+        }
+
+        Matcher azMatcher = AMAZON_URL_PATTERN.matcher(url);
+        if (azMatcher.find()) {
+            builder.asin(azMatcher.group(1));
+            return;
+        }
+
+        Matcher cvMatcher = COMICVINE_URL_PATTERN.matcher(url);
+        if (cvMatcher.find()) {
+            builder.comicvineId(cvMatcher.group(1));
+            return;
+        }
+
+        Matcher cvSiteMatcher = COMICVINE_SITE_URL_PATTERN.matcher(url);
+        if (cvSiteMatcher.find()) {
+            builder.comicvineId(cvSiteMatcher.group(1));
+            return;
+        }
+
+        Matcher hcMatcher = HARDCOVER_URL_PATTERN.matcher(url);
+        if (hcMatcher.find()) {
+            builder.hardcoverId(hcMatcher.group(1));
+        }
+    }
+
+    // S6916: the "when" guard clause syntax cannot attach to constant case labels (only to type
+    // patterns), so the single-if bodies below cannot be rewritten as guarded case labels - Sonar
+    // flags this for string switches too (known false positive, see java:S6916 discussions).
+    @SuppressWarnings("java:S6916")
     private void parseNotes(String notes, BookMetadata.BookMetadataBuilder builder) {
         Matcher matcher = BOOKLORE_NOTE_PATTERN.matcher(notes);
         while (matcher.find()) {
@@ -372,6 +446,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
                 case "GoodreadsId" -> builder.goodreadsId(value);
                 case "ASIN" -> builder.asin(value);
                 case "ComicvineId" -> builder.comicvineId(value);
+                default -> log.debug("Unrecognized BookLore note key: {}", key);
             }
         }
     }
@@ -384,13 +459,6 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         }
     }
 
-    private void safeParseInt(String value, IntConsumer consumer) {
-        try {
-            consumer.accept(Integer.parseInt(value));
-        } catch (NumberFormatException _) {
-            log.debug("Failed to parse int from value: {}", value);
-        }
-    }
     /**
      * Extracts and trims text content from the first element with the given tag name.
      *
@@ -407,9 +475,10 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
     }
 
     private String coalesce(String a, String b) {
-        return (a != null && !a.isBlank())
-                ? a
-                : (b != null && !b.isBlank() ? b : null);
+        if (a != null && !a.isBlank()) {
+            return a;
+        }
+        return (b != null && !b.isBlank()) ? b : null;
     }
 
     /**
@@ -499,6 +568,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
      * {@link CoverExtractionException}: a comic whose pages we cannot decode plainly has pages, and
      * telling the user it has no cover would be a lie.
      */
+    @SuppressWarnings("java:S1168") // null (not empty array) means "proven no cover"; BookCoverGenerator/BookdropMetadataService branch on == null
     public byte[] extractCover(Path path) {
         List<String> imageEntries = listComicImageEntries(path);
 
@@ -558,36 +628,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
 
             NodeList pages = document.getElementsByTagName("Page");
             for (int i = 0; i < pages.getLength(); i++) {
-                try {
-                    Node node = pages.item(i);
-                    if (!(node instanceof Element page)) {
-                        continue;
-                    }
-
-                    if (!"FrontCover".equalsIgnoreCase(page.getAttribute("Type"))) {
-                        continue;
-                    }
-
-                    // The `ImageFile` is an entry name to read.
-                    String imageFile = page.getAttribute("ImageFile");
-                    if (imageFile != null && !imageFile.isBlank()) {
-                        possibleCoverImages.add(imageFile.trim());
-                    }
-
-                    // The `Image` attribute is an index of the pages in the CBZ to read.
-                    String image = page.getAttribute("Image");
-                    if (image != null && !image.isBlank()) {
-                        int index = Integer.parseInt(image.trim());
-                        if (entryNames.size() > index) {
-                            possibleCoverImages.add(entryNames.get(index));
-                        } else if (index > 0 && entryNames.size() > index - 1) {
-                            // It's possible there's an off-by-one error in some cases.
-                            possibleCoverImages.add(entryNames.get(index - 1));
-                        }
-                    }
-                } catch (Exception _) {
-                    // Do nothing
-                }
+                collectCoverImageFromPage(pages.item(i), entryNames, possibleCoverImages);
             }
 
         } catch (Exception e) {
@@ -595,6 +636,38 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         }
 
         return possibleCoverImages.stream();
+    }
+
+    private void collectCoverImageFromPage(Node node, List<String> entryNames, Set<String> possibleCoverImages) {
+        try {
+            if (!(node instanceof Element page)) {
+                return;
+            }
+
+            if (!"FrontCover".equalsIgnoreCase(page.getAttribute("Type"))) {
+                return;
+            }
+
+            // The `ImageFile` is an entry name to read.
+            String imageFile = page.getAttribute("ImageFile");
+            if (imageFile != null && !imageFile.isBlank()) {
+                possibleCoverImages.add(imageFile.trim());
+            }
+
+            // The `Image` attribute is an index of the pages in the CBZ to read.
+            String image = page.getAttribute("Image");
+            if (image != null && !image.isBlank()) {
+                int index = Integer.parseInt(image.trim());
+                if (entryNames.size() > index) {
+                    possibleCoverImages.add(entryNames.get(index));
+                } else if (index > 0 && entryNames.size() > index - 1) {
+                    // It's possible there's an off-by-one error in some cases.
+                    possibleCoverImages.add(entryNames.get(index - 1));
+                }
+            }
+        } catch (Exception _) {
+            // Do nothing
+        }
     }
 
     /**
@@ -635,8 +708,7 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         if (norm.startsWith("__MACOSX/") || norm.contains("/__MACOSX/")) return false;
         String base = baseName(norm);
         if (base.startsWith(".")) return false;
-        if (".ds_store".equalsIgnoreCase(base)) return false;
-        return true;
+        return !".ds_store".equalsIgnoreCase(base);
     }
 
     private String findComicInfoEntry(Path cbxPath) {
@@ -668,6 +740,10 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
         return new ByteArrayInputStream(xmlBytes);
     }
 
+    // S1168: null (not empty array) distinguishes "could not read this entry" from a zero-byte
+    // entry; callers here (extractCover's unreadable/undecodable bookkeeping, findComicInfoEntryInputStream)
+    // branch on == null.
+    @SuppressWarnings("java:S1168")
     private byte[] readArchiveEntryBytes(Path cbxPath, String entryName) {
         try {
             return archiveService.getEntryBytes(cbxPath, entryName);
@@ -693,30 +769,44 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
     private int naturalCompare(String a, String b) {
         if (a == null) return b == null ? 0 : -1;
         if (b == null) return 1;
-        String s1 = a.toLowerCase();
-        String s2 = b.toLowerCase();
-        int i = 0, j = 0, n1 = s1.length(), n2 = s2.length();
+        return compareNaturally(a.toLowerCase(), b.toLowerCase());
+    }
+
+    private int compareNaturally(String s1, String s2) {
+        int i = 0;
+        int j = 0;
+        int n1 = s1.length();
+        int n2 = s2.length();
         while (i < n1 && j < n2) {
             char c1 = s1.charAt(i);
             char c2 = s2.charAt(j);
             if (Character.isDigit(c1) && Character.isDigit(c2)) {
-                int i1 = i;
-                while (i1 < n1 && Character.isDigit(s1.charAt(i1))) i1++;
-                int j1 = j;
-                while (j1 < n2 && Character.isDigit(s2.charAt(j1))) j1++;
-                String num1 = LEADING_ZEROS_PATTERN.matcher(s1.substring(i, i1)).replaceFirst("");
-                String num2 = LEADING_ZEROS_PATTERN.matcher(s2.substring(j, j1)).replaceFirst("");
-                int cmp = Integer.compare(num1.isEmpty() ? 0 : Integer.parseInt(num1), num2.isEmpty() ? 0 : Integer.parseInt(num2));
-                if (cmp != 0) return cmp;
-                i = i1;
-                j = j1;
+                DigitRun run = compareDigitRuns(s1, s2, i, j, n1, n2);
+                if (run.comparison() != 0) return run.comparison();
+                i = run.nextI();
+                j = run.nextJ();
+            } else if (c1 != c2) {
+                return Character.compare(c1, c2);
             } else {
-                if (c1 != c2) return Character.compare(c1, c2);
                 i++;
                 j++;
             }
         }
         return Integer.compare(n1 - i, n2 - j);
+    }
+
+    private DigitRun compareDigitRuns(String s1, String s2, int i, int j, int n1, int n2) {
+        int i1 = i;
+        while (i1 < n1 && Character.isDigit(s1.charAt(i1))) i1++;
+        int j1 = j;
+        while (j1 < n2 && Character.isDigit(s2.charAt(j1))) j1++;
+        String num1 = LEADING_ZEROS_PATTERN.matcher(s1.substring(i, i1)).replaceFirst("");
+        String num2 = LEADING_ZEROS_PATTERN.matcher(s2.substring(j, j1)).replaceFirst("");
+        int cmp = Integer.compare(num1.isEmpty() ? 0 : Integer.parseInt(num1), num2.isEmpty() ? 0 : Integer.parseInt(num2));
+        return new DigitRun(cmp, i1, j1);
+    }
+
+    private record DigitRun(int comparison, int nextI, int nextJ) {
     }
 
     private static boolean isComicInfoName(String name) {

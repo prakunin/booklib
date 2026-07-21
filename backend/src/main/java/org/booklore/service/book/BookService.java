@@ -213,10 +213,8 @@ public class BookService {
                 .findFirst()
                 .orElseThrow(() -> ApiError.FILE_NOT_FOUND.createException("Book file not found: " + bookFileId));
         BookFileType bookType = bookFile.getBookType();
-        if (bookType == BookFileType.EPUB || bookType == BookFileType.FB2
-                || bookType == BookFileType.MOBI
-                || bookType == BookFileType.AZW3) {
-            ebookViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
+        switch (bookType) {
+            case EPUB, FB2, MOBI, AZW3 -> ebookViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
                     .ifPresent(epubPref -> settingsBuilder.ebookSettings(EbookViewerPreferences.builder()
                             .bookId(bookId)
                             .userId(user.getId())
@@ -236,25 +234,25 @@ public class BookService {
                             .backgroundSaturation(epubPref.getBackgroundSaturation())
                             .backgroundTransparency(epubPref.getBackgroundTransparency())
                             .build()));
-        } else if (bookType == BookFileType.PDF) {
-            pdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
-                    .ifPresent(pdfPref -> settingsBuilder.pdfSettings(PdfViewerPreferences.builder()
-                            .bookId(bookId)
-                            .zoom(pdfPref.getZoom())
-                            .spread(pdfPref.getSpread())
-                            .isDarkTheme(pdfPref.getIsDarkTheme())
-                            .build()));
-            newPdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
-                    .ifPresent(pdfPref -> settingsBuilder.newPdfSettings(NewPdfViewerPreferences.builder()
-                            .bookId(bookId)
-                            .pageViewMode(pdfPref.getPageViewMode())
-                            .pageSpread(pdfPref.getPageSpread())
-                            .fitMode(pdfPref.getFitMode())
-                            .scrollMode(pdfPref.getScrollMode())
-                            .backgroundColor(pdfPref.getBackgroundColor())
-                            .build()));
-        } else if (bookType == BookFileType.CBX) {
-            cbxViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
+            case PDF -> {
+                pdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
+                        .ifPresent(pdfPref -> settingsBuilder.pdfSettings(PdfViewerPreferences.builder()
+                                .bookId(bookId)
+                                .zoom(pdfPref.getZoom())
+                                .spread(pdfPref.getSpread())
+                                .isDarkTheme(pdfPref.getIsDarkTheme())
+                                .build()));
+                newPdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
+                        .ifPresent(pdfPref -> settingsBuilder.newPdfSettings(NewPdfViewerPreferences.builder()
+                                .bookId(bookId)
+                                .pageViewMode(pdfPref.getPageViewMode())
+                                .pageSpread(pdfPref.getPageSpread())
+                                .fitMode(pdfPref.getFitMode())
+                                .scrollMode(pdfPref.getScrollMode())
+                                .backgroundColor(pdfPref.getBackgroundColor())
+                                .build()));
+            }
+            case CBX -> cbxViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
                     .ifPresent(cbxPref -> settingsBuilder.cbxSettings(CbxViewerPreferences.builder()
                             .bookId(bookId)
                             .pageViewMode(cbxPref.getPageViewMode())
@@ -263,8 +261,7 @@ public class BookService {
                             .scrollMode(cbxPref.getScrollMode())
                             .backgroundColor(cbxPref.getBackgroundColor())
                             .build()));
-        } else {
-            throw ApiError.UNSUPPORTED_BOOK_TYPE.createException();
+            case null, default -> throw ApiError.UNSUPPORTED_BOOK_TYPE.createException();
         }
         return settingsBuilder.build();
     }
@@ -434,44 +431,7 @@ public class BookService {
         List<Long> failedFileDeletions = new ArrayList<>();
         for (BookEntity book : books) {
             for (BookFileEntity bookFile : book.getBookFiles()) {
-                Path fullFilePath = bookFile.getFullFilePath();
-                try {
-                    if (Files.exists(fullFilePath)) {
-                        try {
-                            monitoringRegistrationService.unregisterSpecificPath(fullFilePath.getParent());
-                        } catch (Exception ex) {
-                            log.warn("Failed to unregister monitoring for path: {}", fullFilePath.getParent(), ex);
-                        }
-
-                        // Handle folder-based audiobooks (delete directory recursively)
-                        if (bookFile.isFolderBased() && Files.isDirectory(fullFilePath)) {
-                            deleteDirectoryRecursively(fullFilePath);
-                            log.info("Deleted folder-based audiobook: {}", fullFilePath);
-                        } else {
-                            Files.delete(fullFilePath);
-                            log.info("Deleted book file: {}", fullFilePath);
-                        }
-
-                        Set<Path> libraryRoots = book.getLibrary().getLibraryPaths().stream()
-                                .map(LibraryPathEntity::getPath)
-                                .map(Paths::get)
-                                .map(Path::normalize)
-                                .collect(Collectors.toSet());
-
-                        deleteEmptyParentDirsUpToLibraryFolders(fullFilePath.getParent(), libraryRoots);
-
-                        try {
-                            sidecarMetadataWriter.deleteSidecarFiles(fullFilePath);
-                        } catch (Exception e) {
-                            log.warn("Failed to delete sidecar files for: {}", fullFilePath, e);
-                        }
-                    }
-                } catch (IOException e) {
-                    log.warn("Failed to delete book file: {}", fullFilePath, e);
-                    failedFileDeletions.add(book.getId());
-                } finally {
-                    monitoringRegistrationService.registerSpecificPath(fullFilePath.getParent(), book.getLibrary().getId());
-                }
+                deleteBookFileFromDisk(book, bookFile, failedFileDeletions);
             }
         }
 
@@ -487,6 +447,55 @@ public class BookService {
         return failedFileDeletions.isEmpty()
                 ? ResponseEntity.ok(response)
                 : ResponseEntity.status(HttpStatus.MULTI_STATUS).body(response);
+    }
+
+    private void deleteBookFileFromDisk(BookEntity book, BookFileEntity bookFile, List<Long> failedFileDeletions) {
+        Path fullFilePath = bookFile.getFullFilePath();
+        try {
+            if (Files.exists(fullFilePath)) {
+                unregisterMonitoringQuietly(fullFilePath.getParent());
+
+                // Handle folder-based audiobooks (delete directory recursively)
+                if (bookFile.isFolderBased() && Files.isDirectory(fullFilePath)) {
+                    deleteDirectoryRecursively(fullFilePath);
+                    log.info("Deleted folder-based audiobook: {}", fullFilePath);
+                } else {
+                    Files.delete(fullFilePath);
+                    log.info("Deleted book file: {}", fullFilePath);
+                }
+
+                Set<Path> libraryRoots = book.getLibrary().getLibraryPaths().stream()
+                        .map(LibraryPathEntity::getPath)
+                        .map(Paths::get)
+                        .map(Path::normalize)
+                        .collect(Collectors.toSet());
+
+                deleteEmptyParentDirsUpToLibraryFolders(fullFilePath.getParent(), libraryRoots);
+
+                deleteSidecarFilesQuietly(fullFilePath);
+            }
+        } catch (IOException e) {
+            log.warn("Failed to delete book file: {}", fullFilePath, e);
+            failedFileDeletions.add(book.getId());
+        } finally {
+            monitoringRegistrationService.registerSpecificPath(fullFilePath.getParent(), book.getLibrary().getId());
+        }
+    }
+
+    private void unregisterMonitoringQuietly(Path path) {
+        try {
+            monitoringRegistrationService.unregisterSpecificPath(path);
+        } catch (Exception ex) {
+            log.warn("Failed to unregister monitoring for path: {}", path, ex);
+        }
+    }
+
+    private void deleteSidecarFilesQuietly(Path fullFilePath) {
+        try {
+            sidecarMetadataWriter.deleteSidecarFiles(fullFilePath);
+        } catch (Exception e) {
+            log.warn("Failed to delete sidecar files for: {}", fullFilePath, e);
+        }
     }
 
     private void deleteDirectoryRecursively(Path path) throws IOException {
@@ -510,57 +519,68 @@ public class BookService {
         }
 
         while (dir != null) {
-            boolean isLibraryRoot = false;
-            for (Path root : normalizedRoots) {
-                try {
-                    if (Files.isSameFile(root, dir)) {
-                        isLibraryRoot = true;
-                        break;
-                    }
-                } catch (IOException _) {
-                    log.warn("Failed to compare paths: {} and {}", root, dir);
-                }
-            }
+            dir = advanceCleanup(dir, normalizedRoots, ignoredFilenames);
+        }
+    }
 
-            if (isLibraryRoot) {
-                log.debug("Reached library root: {}. Stopping cleanup.", dir);
-                break;
-            }
+    private Path advanceCleanup(Path dir, Set<Path> normalizedRoots, Set<String> ignoredFilenames) {
+        if (isLibraryRootDir(dir, normalizedRoots)) {
+            log.debug("Reached library root: {}. Stopping cleanup.", dir);
+            return null;
+        }
 
-            File[] files = dir.toFile().listFiles();
-            if (files == null) {
-                log.warn("Cannot read directory: {}. Stopping cleanup.", dir);
-                break;
-            }
+        File[] files = dir.toFile().listFiles();
+        if (files == null) {
+            log.warn("Cannot read directory: {}. Stopping cleanup.", dir);
+            return null;
+        }
 
-            boolean hasImportantFiles = false;
-            for (File file : files) {
-                if (!ignoredFilenames.contains(file.getName())) {
-                    hasImportantFiles = true;
-                    break;
-                }
-            }
+        if (hasImportantFiles(files, ignoredFilenames)) {
+            log.debug("Directory {} contains important files. Stopping cleanup.", dir);
+            return null;
+        }
 
-            if (!hasImportantFiles) {
-                for (File file : files) {
-                    try {
-                        Files.delete(file.toPath());
-                        log.info("Deleted ignored file: {}", file.getAbsolutePath());
-                    } catch (IOException _) {
-                        log.warn("Failed to delete ignored file: {}", file.getAbsolutePath());
-                    }
+        deleteIgnoredFiles(files);
+
+        try {
+            Files.delete(dir);
+            log.info("Deleted empty directory: {}", dir);
+        } catch (IOException e) {
+            log.warn("Failed to delete directory: {}", dir, e);
+            return null;
+        }
+        return dir.getParent();
+    }
+
+    private boolean isLibraryRootDir(Path dir, Set<Path> normalizedRoots) {
+        for (Path root : normalizedRoots) {
+            try {
+                if (Files.isSameFile(root, dir)) {
+                    return true;
                 }
-                try {
-                    Files.delete(dir);
-                    log.info("Deleted empty directory: {}", dir);
-                } catch (IOException e) {
-                    log.warn("Failed to delete directory: {}", dir, e);
-                    break;
-                }
-                dir = dir.getParent();
-            } else {
-                log.debug("Directory {} contains important files. Stopping cleanup.", dir);
-                break;
+            } catch (IOException _) {
+                log.warn("Failed to compare paths: {} and {}", root, dir);
+            }
+        }
+        return false;
+    }
+
+    private boolean hasImportantFiles(File[] files, Set<String> ignoredFilenames) {
+        for (File file : files) {
+            if (!ignoredFilenames.contains(file.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void deleteIgnoredFiles(File[] files) {
+        for (File file : files) {
+            try {
+                Files.delete(file.toPath());
+                log.info("Deleted ignored file: {}", file.getAbsolutePath());
+            } catch (IOException _) {
+                log.warn("Failed to delete ignored file: {}", file.getAbsolutePath());
             }
         }
     }

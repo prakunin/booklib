@@ -8,6 +8,6 @@ public record InpxCoverGenerationRequestedEvent(Set<Long> bookIds, String userna
 
     public InpxCoverGenerationRequestedEvent {
         bookIds = Set.copyOf(requireNonNull(bookIds));
-        username = requireNonNull(username);
+        requireNonNull(username);
     }
 }

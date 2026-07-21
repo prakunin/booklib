@@ -36,31 +36,32 @@ public class PopulateAuthorSortNameMigration implements Migration {
         var processedCount = 0;
         var page = 0;
 
-        while (true) {
+        boolean morePages = true;
+        while (morePages) {
             // Stable id ordering keeps offset paging consistent as rows are updated each batch.
             var authors = authorRepository.findAll(PageRequest.of(page, batchSize, Sort.by("id"))).getContent();
             if (authors.isEmpty()) {
-                break;
-            }
+                morePages = false;
+            } else {
+                for (var author : authors) {
+                    if (!author.isSortNameLocked()) {
+                        author.setSortName(AuthorSortName.compute(author.getName()));
+                    }
+                }
 
-            for (var author : authors) {
-                if (!author.isSortNameLocked()) {
-                    author.setSortName(AuthorSortName.compute(author.getName()));
+                authorRepository.saveAll(authors);
+                processedCount += authors.size();
+                log.info("Migration progress: {} authors processed", processedCount);
+
+                // Flush and detach the batch so the persistence context does not grow across the scan.
+                entityManager.flush();
+                entityManager.clear();
+
+                morePages = authors.size() >= batchSize;
+                if (morePages) {
+                    page++;
                 }
             }
-
-            authorRepository.saveAll(authors);
-            processedCount += authors.size();
-            log.info("Migration progress: {} authors processed", processedCount);
-
-            // Flush and detach the batch so the persistence context does not grow across the scan.
-            entityManager.flush();
-            entityManager.clear();
-
-            if (authors.size() < batchSize) {
-                break;
-            }
-            page++;
         }
 
         log.info("Completed migration '{}'. Total authors processed: {}", getKey(), processedCount);

@@ -128,6 +128,7 @@ public class CbxReaderService {
         List<CbxPageDimension> dimensions = new ArrayList<>();
         for (int i = 1; i <= pageCount; i++) {
             Path cachedPage = chapterCacheService.getCachedPage(cacheKey, i);
+            CbxPageDimension dimension = null;
             try (ImageInputStream iis = ImageIO.createImageInputStream(cachedPage.toFile())) {
                 Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
                 if (readers.hasNext()) {
@@ -136,8 +137,7 @@ public class CbxReaderService {
                         reader.setInput(iis, true, true);
                         int width = reader.getWidth(0);
                         int height = reader.getHeight(0);
-                        dimensions.add(CbxPageDimension.builder().pageNumber(i).width(width).height(height).wide(width > height).build());
-                        continue;
+                        dimension = CbxPageDimension.builder().pageNumber(i).width(width).height(height).wide(width > height).build();
                     } finally {
                         reader.dispose();
                     }
@@ -145,7 +145,7 @@ public class CbxReaderService {
             } catch (Exception e) {
                 log.warn("Failed to read dimensions for cached page {}: {}", i, e.getMessage());
             }
-            dimensions.add(CbxPageDimension.builder().pageNumber(i).width(0).height(0).wide(false).build());
+            dimensions.add(dimension != null ? dimension : CbxPageDimension.builder().pageNumber(i).width(0).height(0).wide(false).build());
         }
         return dimensions;
     }

@@ -113,7 +113,9 @@ public class BookSimilarityService {
         keys.addAll(vecA.keySet());
         keys.addAll(vecB.keySet());
 
-        double dotProduct = 0, normA = 0, normB = 0;
+        double dotProduct = 0;
+        double normA = 0;
+        double normB = 0;
 
         for (String key : keys) {
             int a = vecA.getOrDefault(key, 0);

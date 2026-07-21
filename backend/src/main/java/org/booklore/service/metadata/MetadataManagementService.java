@@ -57,40 +57,54 @@ public class MetadataManagementService {
 
     private void writeMetadataToFile(List<BookMetadataEntity> metadataList, boolean moveFile) {
         for (BookMetadataEntity metadata : metadataList) {
-            if (metadata.getBook() != null) {
-                BookEntity book = metadata.getBook();
-                BookFileEntity primaryFile = book.getPrimaryBookFile();
-                if (Boolean.TRUE.equals(book.getIsPhysical()) || primaryFile == null) {
-                    continue;
-                }
-                boolean bookModified = false;
-
-                BookFileType bookType = primaryFile.getBookType();
-                if (appProperties.isLocalStorage()) {
-                    Optional<MetadataWriter> writerOpt = metadataWriterFactory.getWriter(bookType);
-                    if (writerOpt.isPresent()) {
-                        File file = book.getFullFilePath().toFile();
-                        writerOpt.get().saveMetadataToFile(file, metadata, null, null);
-                        String newHash = FileFingerprint.generateHash(book.getFullFilePath());
-                        primaryFile.setCurrentHash(newHash);
-                        bookModified = true;
-                    }
-                }
-
-                if (moveFile) {
-                    FileMoveResult result = fileMoveService.moveSingleFile(book);
-                    if (result.isMoved()) {
-                        primaryFile.setFileName(result.getNewFileName());
-                        primaryFile.setFileSubPath(result.getNewFileSubPath());
-                        bookModified = true;
-                    }
-                }
-
-                if (bookModified) {
-                    bookRepository.saveAndFlush(book);
-                }
-            }
+            writeMetadataForBook(metadata, moveFile);
         }
+    }
+
+    private void writeMetadataForBook(BookMetadataEntity metadata, boolean moveFile) {
+        BookEntity book = metadata.getBook();
+        if (book == null) {
+            return;
+        }
+        BookFileEntity primaryFile = book.getPrimaryBookFile();
+        if (Boolean.TRUE.equals(book.getIsPhysical()) || primaryFile == null) {
+            return;
+        }
+
+        boolean bookModified = writeMetadataToLocalFile(book, primaryFile, metadata);
+        if (moveFile && moveBookFile(book, primaryFile)) {
+            bookModified = true;
+        }
+
+        if (bookModified) {
+            bookRepository.saveAndFlush(book);
+        }
+    }
+
+    private boolean writeMetadataToLocalFile(BookEntity book, BookFileEntity primaryFile, BookMetadataEntity metadata) {
+        if (!appProperties.isLocalStorage()) {
+            return false;
+        }
+        BookFileType bookType = primaryFile.getBookType();
+        Optional<MetadataWriter> writerOpt = metadataWriterFactory.getWriter(bookType);
+        if (writerOpt.isEmpty()) {
+            return false;
+        }
+        File file = book.getFullFilePath().toFile();
+        writerOpt.get().saveMetadataToFile(file, metadata, null, null);
+        String newHash = FileFingerprint.generateHash(book.getFullFilePath());
+        primaryFile.setCurrentHash(newHash);
+        return true;
+    }
+
+    private boolean moveBookFile(BookEntity book, BookFileEntity primaryFile) {
+        FileMoveResult result = fileMoveService.moveSingleFile(book);
+        if (!result.isMoved()) {
+            return false;
+        }
+        primaryFile.setFileName(result.getNewFileName());
+        primaryFile.setFileSubPath(result.getNewFileSubPath());
+        return true;
     }
 
     private void consolidateAuthors(List<String> targetValues, List<String> valuesToMerge, boolean moveFile) {

@@ -2,6 +2,7 @@ package org.booklore.service.kobo;
 
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
+import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.CategoryEntity;
 import org.booklore.model.entity.TagEntity;
 import org.booklore.service.ArchiveService;
@@ -32,7 +33,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
 import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
 
 /**
  * Service for converting comic book archive files (CBX) to EPUB format.
@@ -69,6 +72,7 @@ public class CbxConversionService {
     private static final String MIMETYPE_CONTENT = "application/epub+zip";
     private static final long MAX_IMAGE_SIZE_BYTES = 50L * 1024 * 1024;
     private static final String EXTRACTED_IMAGES_SUBDIR = "cbx_extracted_images";
+    private static final String TEMPLATE_MODEL_KEY_CONTENT_FILE_GROUPS = "contentFileGroups";
 
     private final Configuration freemarkerConfig;
     private final ArchiveService archiveService;
@@ -261,7 +265,7 @@ public class CbxConversionService {
     private void addMimetypeEntry(ZipArchiveOutputStream zipOut) throws IOException {
         byte[] mimetypeBytes = MIMETYPE_CONTENT.getBytes(StandardCharsets.UTF_8);
         ZipArchiveEntry mimetypeEntry = new ZipArchiveEntry("mimetype");
-        mimetypeEntry.setMethod(ZipArchiveEntry.STORED);
+        mimetypeEntry.setMethod(ZipEntry.STORED);
         mimetypeEntry.setSize(mimetypeBytes.length);
         mimetypeEntry.setCrc(calculateCrc32(mimetypeBytes));
 
@@ -412,7 +416,7 @@ public class CbxConversionService {
                         makeRelativeToOebps(group.htmlPath())))
                 .toList();
 
-        model.put("contentFileGroups", relativeContentGroups);
+        model.put(TEMPLATE_MODEL_KEY_CONTENT_FILE_GROUPS, relativeContentGroups);
         model.put("coverImagePath", makeRelativeToOebps(COVER_IMAGE_PATH));
         model.put("tocNcxPath", makeRelativeToOebps(TOC_NCX_PATH));
         model.put("navXhtmlPath", makeRelativeToOebps(NAV_XHTML_PATH));
@@ -431,7 +435,7 @@ public class CbxConversionService {
             List<EpubContentFileGroup> contentGroups) throws IOException, TemplateException {
 
         Map<String, Object> model = createBookMetadataModel(bookEntity);
-        model.put("contentFileGroups", contentGroups);
+        model.put(TEMPLATE_MODEL_KEY_CONTENT_FILE_GROUPS, contentGroups);
 
         String tocNcx = processTemplate("xml/toc.xml.ftl", model);
 
@@ -445,7 +449,7 @@ public class CbxConversionService {
             List<EpubContentFileGroup> contentGroups) throws IOException, TemplateException {
 
         Map<String, Object> model = createBookMetadataModel(bookEntity);
-        model.put("contentFileGroups", contentGroups);
+        model.put(TEMPLATE_MODEL_KEY_CONTENT_FILE_GROUPS, contentGroups);
 
         String navXhtml = processTemplate("xml/nav.xhtml.ftl", model);
 
@@ -458,71 +462,9 @@ public class CbxConversionService {
     private Map<String, Object> createBookMetadataModel(BookEntity bookEntity) {
         Map<String, Object> model = new HashMap<>();
 
-        if (bookEntity != null && bookEntity.getMetadata() != null) {
-            var metadata = bookEntity.getMetadata();
-
-            model.put("title", metadata.getTitle() != null ? metadata.getTitle() : "Unknown Comic");
-            model.put("language", metadata.getLanguage() != null ? metadata.getLanguage() : "en");
-
-            if (metadata.getSubtitle() != null && !metadata.getSubtitle().trim().isEmpty()) {
-                model.put("subtitle", metadata.getSubtitle());
-            }
-            if (metadata.getDescription() != null && !metadata.getDescription().trim().isEmpty()) {
-                model.put("description", metadata.getDescription());
-            }
-
-            if (metadata.getSeriesName() != null && !metadata.getSeriesName().trim().isEmpty()) {
-                model.put("seriesName", metadata.getSeriesName());
-            }
-            if (metadata.getSeriesNumber() != null) {
-                model.put("seriesNumber", metadata.getSeriesNumber());
-            }
-            if (metadata.getSeriesTotal() != null) {
-                model.put("seriesTotal", metadata.getSeriesTotal());
-            }
-
-            if (metadata.getPublisher() != null && !metadata.getPublisher().trim().isEmpty()) {
-                model.put("publisher", metadata.getPublisher());
-            }
-            if (metadata.getPublishedDate() != null) {
-                model.put("publishedDate", metadata.getPublishedDate().toString());
-            }
-            if (metadata.getPageCount() != null && metadata.getPageCount() > 0) {
-                model.put("pageCount", metadata.getPageCount());
-            }
-
-            if (metadata.getIsbn13() != null && !metadata.getIsbn13().trim().isEmpty()) {
-                model.put("isbn13", metadata.getIsbn13());
-            }
-            if (metadata.getIsbn10() != null && !metadata.getIsbn10().trim().isEmpty()) {
-                model.put("isbn10", metadata.getIsbn10());
-            }
-            if (metadata.getAsin() != null && !metadata.getAsin().trim().isEmpty()) {
-                model.put("asin", metadata.getAsin());
-            }
-            if (metadata.getGoodreadsId() != null && !metadata.getGoodreadsId().trim().isEmpty()) {
-                model.put("goodreadsId", metadata.getGoodreadsId());
-            }
-
-            if (metadata.getAuthors() != null && !metadata.getAuthors().isEmpty()) {
-                model.put("authors", metadata.getAuthors().stream()
-                        .map(AuthorEntity::getName)
-                        .toList());
-            }
-
-            if (metadata.getCategories() != null && !metadata.getCategories().isEmpty()) {
-                model.put("categories", metadata.getCategories().stream()
-                        .map(CategoryEntity::getName)
-                        .toList());
-            }
-
-            if (metadata.getTags() != null && !metadata.getTags().isEmpty()) {
-                model.put("tags", metadata.getTags().stream()
-                        .map(TagEntity::getName)
-                        .toList());
-            }
-
-            model.put("identifier", "urn:uuid:" + UUID.randomUUID());
+        var metadata = bookEntity != null ? bookEntity.getMetadata() : null;
+        if (metadata != null) {
+            populateMetadataModel(model, metadata);
         } else {
             model.put("title", "Unknown Comic");
             model.put("language", "en");
@@ -532,6 +474,55 @@ public class CbxConversionService {
         model.put("modified", Instant.now().toString());
 
         return model;
+    }
+
+    private void populateMetadataModel(Map<String, Object> model, BookMetadataEntity metadata) {
+        model.put("title", metadata.getTitle() != null ? metadata.getTitle() : "Unknown Comic");
+        model.put("language", metadata.getLanguage() != null ? metadata.getLanguage() : "en");
+
+        putIfText(model, "subtitle", metadata.getSubtitle());
+        putIfText(model, "description", metadata.getDescription());
+        putIfText(model, "seriesName", metadata.getSeriesName());
+        putIfNotNull(model, "seriesNumber", metadata.getSeriesNumber());
+        putIfNotNull(model, "seriesTotal", metadata.getSeriesTotal());
+        putIfText(model, "publisher", metadata.getPublisher());
+
+        if (metadata.getPublishedDate() != null) {
+            model.put("publishedDate", metadata.getPublishedDate().toString());
+        }
+        if (metadata.getPageCount() != null && metadata.getPageCount() > 0) {
+            model.put("pageCount", metadata.getPageCount());
+        }
+
+        putIfText(model, "isbn13", metadata.getIsbn13());
+        putIfText(model, "isbn10", metadata.getIsbn10());
+        putIfText(model, "asin", metadata.getAsin());
+        putIfText(model, "goodreadsId", metadata.getGoodreadsId());
+
+        putNames(model, "authors", metadata.getAuthors(), AuthorEntity::getName);
+        putNames(model, "categories", metadata.getCategories(), CategoryEntity::getName);
+        putNames(model, "tags", metadata.getTags(), TagEntity::getName);
+
+        model.put("identifier", "urn:uuid:" + UUID.randomUUID());
+    }
+
+    private void putIfText(Map<String, Object> model, String key, String value) {
+        if (value != null && !value.trim().isEmpty()) {
+            model.put(key, value);
+        }
+    }
+
+    private void putIfNotNull(Map<String, Object> model, String key, Object value) {
+        if (value != null) {
+            model.put(key, value);
+        }
+    }
+
+    private <T> void putNames(Map<String, Object> model, String key, Collection<T> items,
+            Function<T, String> nameExtractor) {
+        if (items != null && !items.isEmpty()) {
+            model.put(key, items.stream().map(nameExtractor).toList());
+        }
     }
 
     private String processTemplate(String templateName, Map<String, Object> model)

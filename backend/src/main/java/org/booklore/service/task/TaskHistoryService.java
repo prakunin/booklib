@@ -33,7 +33,7 @@ public class TaskHistoryService {
                 .type(type)
                 .status(TaskStatus.ACCEPTED)
                 .userId(userId)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneId.systemDefault()))
                 .progressPercentage(0)
                 .taskOptions(options)
                 .build();
@@ -52,30 +52,34 @@ public class TaskHistoryService {
         Object bookIds = options.get("bookIds");
         Object libraryId = options.get("libraryId");
         if (bookIds instanceof Collection<?> ids && !ids.isEmpty()) {
-            sb.append(" (").append(ids.size()).append(" books, IDs: ");
-            String truncationSuffix = "...)";
-            Iterator<?> it = ids.iterator();
-            boolean truncated = false;
-            while (it.hasNext()) {
-                String id = it.next().toString();
-                boolean isLast = !it.hasNext();
-                String separator = sb.charAt(sb.length() - 1) == ' ' ? "" : ", ";
-                if (isLast && sb.length() + separator.length() + id.length() + 1 <= MAX_DESCRIPTION_LENGTH) {
-                    sb.append(separator).append(id).append(")");
-                } else if (!isLast && sb.length() + separator.length() + id.length() + truncationSuffix.length() <= MAX_DESCRIPTION_LENGTH) {
-                    sb.append(separator).append(id);
-                } else {
-                    truncated = true;
-                    break;
-                }
-            }
-            if (truncated) {
-                sb.append(truncationSuffix);
-            }
+            appendBookIds(sb, ids);
         } else if (libraryId != null) {
             sb.append(" (Library ID: ").append(libraryId).append(")");
         }
         return sb.toString();
+    }
+
+    private void appendBookIds(StringBuilder sb, Collection<?> ids) {
+        sb.append(" (").append(ids.size()).append(" books, IDs: ");
+        String truncationSuffix = "...)";
+        Iterator<?> it = ids.iterator();
+        boolean truncated = false;
+        while (it.hasNext()) {
+            String id = it.next().toString();
+            boolean isLast = !it.hasNext();
+            String separator = sb.charAt(sb.length() - 1) == ' ' ? "" : ", ";
+            if (isLast && sb.length() + separator.length() + id.length() + 1 <= MAX_DESCRIPTION_LENGTH) {
+                sb.append(separator).append(id).append(")");
+            } else if (!isLast && sb.length() + separator.length() + id.length() + truncationSuffix.length() <= MAX_DESCRIPTION_LENGTH) {
+                sb.append(separator).append(id);
+            } else {
+                truncated = true;
+                break;
+            }
+        }
+        if (truncated) {
+            sb.append(truncationSuffix);
+        }
     }
 
     @Transactional
@@ -83,10 +87,10 @@ public class TaskHistoryService {
         taskHistoryRepository.findById(taskId).ifPresent(task -> {
             task.setStatus(status);
             task.setMessage(message);
-            task.setUpdatedAt(LocalDateTime.now());
+            task.setUpdatedAt(LocalDateTime.now(ZoneId.systemDefault()));
 
             if (status == TaskStatus.COMPLETED || status == TaskStatus.FAILED) {
-                task.setCompletedAt(LocalDateTime.now());
+                task.setCompletedAt(LocalDateTime.now(ZoneId.systemDefault()));
                 task.setProgressPercentage(100);
             }
 
@@ -99,8 +103,8 @@ public class TaskHistoryService {
         taskHistoryRepository.findById(taskId).ifPresent(task -> {
             task.setStatus(TaskStatus.FAILED);
             task.setErrorDetails(errorDetails);
-            task.setCompletedAt(LocalDateTime.now());
-            task.setUpdatedAt(LocalDateTime.now());
+            task.setCompletedAt(LocalDateTime.now(ZoneId.systemDefault()));
+            task.setUpdatedAt(LocalDateTime.now(ZoneId.systemDefault()));
             taskHistoryRepository.save(task);
             log.error("Task failed: id={}", taskId);
         });

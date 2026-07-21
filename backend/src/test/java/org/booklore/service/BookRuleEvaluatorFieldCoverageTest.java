@@ -27,6 +27,7 @@ import org.springframework.data.domain.PageRequest;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -386,12 +387,10 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.persist(shelf1);
             em.persist(shelf2);
 
-            List<BookEntity> books = new ArrayList<>();
             for (int i = 0; i < 10; i++) {
                 BookEntity book = createBook("Multi-shelf Book " + i);
                 book.setShelves(new HashSet<>(Set.of(shelf1, shelf2)));
                 em.merge(book);
-                books.add(book);
             }
             em.flush();
             em.clear();
@@ -588,12 +587,10 @@ class BookRuleEvaluatorFieldCoverageTest {
             em.persist(shelf3);
             em.persist(shelf4);
 
-            List<BookEntity> books = new ArrayList<>();
             for (int i = 0; i < 5; i++) {
                 BookEntity book = createBook("Many Shelf Book " + i);
                 book.setShelves(new HashSet<>(Set.of(shelf1, shelf2, shelf3, shelf4)));
                 em.merge(book);
-                books.add(book);
             }
             em.flush();
             em.clear();
@@ -1184,11 +1181,11 @@ class BookRuleEvaluatorFieldCoverageTest {
         @Test
         void equals_matchesExactDate() {
             BookEntity book = createBook("Exact Date Book");
-            book.getMetadata().setPublishedDate(LocalDate.of(2023, 6, 15));
+            book.getMetadata().setPublishedDate(LocalDate.of(2023, Month.JUNE, 15));
             em.merge(book.getMetadata());
 
             BookEntity other = createBook("Other Date Book");
-            other.getMetadata().setPublishedDate(LocalDate.of(2020, 1, 1));
+            other.getMetadata().setPublishedDate(LocalDate.of(2020, Month.JANUARY, 1));
             em.merge(other.getMetadata());
             em.flush();
             em.clear();
@@ -1204,7 +1201,7 @@ class BookRuleEvaluatorFieldCoverageTest {
             BookEntity noDate = createBook("No Date");
 
             BookEntity withDate = createBook("With Date");
-            withDate.getMetadata().setPublishedDate(LocalDate.of(2023, 1, 1));
+            withDate.getMetadata().setPublishedDate(LocalDate.of(2023, Month.JANUARY, 1));
             em.merge(withDate.getMetadata());
             em.flush();
             em.clear();

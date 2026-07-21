@@ -74,35 +74,42 @@ public class KoboAutoShelfService {
         boolean modified = false;
 
         for (KoboUserSettingsEntity setting : eligibleUsers) {
-            ShelfEntity shelf = shelfByUser.get(setting.getUserId());
-
-            if (shelf == null) {
-                log.debug("User {} has auto-add enabled but no Kobo shelf exists", setting.getUserId());
-                continue;
+            if (addBookToUserKoboShelf(book, setting, users, shelfByUser)) {
+                modified = true;
             }
-
-            if (!hasBookLibraryAccess(users.get(setting.getUserId()), book)) {
-                log.debug("Book {} is not available for user {}", book.getId(), setting.getUserId());
-                continue;
-            }
-
-            if (book.getShelves() == null) {
-                book.setShelves(new HashSet<>());
-            }
-
-            if (book.getShelves().contains(shelf)) {
-                log.debug("Book {} already on Kobo shelf for user {}", book.getId(), setting.getUserId());
-                continue;
-            }
-
-            book.getShelves().add(shelf);
-            modified = true;
-            log.info("Auto-added book {} to Kobo shelf for user {}", book.getId(), setting.getUserId());
         }
 
         if (modified) {
             bookRepository.save(book);
         }
+    }
+
+    private boolean addBookToUserKoboShelf(BookEntity book, KoboUserSettingsEntity setting,
+                                            Map<Long, BookLoreUserEntity> users, Map<Long, ShelfEntity> shelfByUser) {
+        ShelfEntity shelf = shelfByUser.get(setting.getUserId());
+
+        if (shelf == null) {
+            log.debug("User {} has auto-add enabled but no Kobo shelf exists", setting.getUserId());
+            return false;
+        }
+
+        if (!hasBookLibraryAccess(users.get(setting.getUserId()), book)) {
+            log.debug("Book {} is not available for user {}", book.getId(), setting.getUserId());
+            return false;
+        }
+
+        if (book.getShelves() == null) {
+            book.setShelves(new HashSet<>());
+        }
+
+        if (book.getShelves().contains(shelf)) {
+            log.debug("Book {} already on Kobo shelf for user {}", book.getId(), setting.getUserId());
+            return false;
+        }
+
+        book.getShelves().add(shelf);
+        log.info("Auto-added book {} to Kobo shelf for user {}", book.getId(), setting.getUserId());
+        return true;
     }
 
     private boolean hasBookLibraryAccess(BookLoreUserEntity user, BookEntity bookEntity) {

@@ -111,32 +111,35 @@ public class SidecarMetadataMapper {
         }
 
         if (m.getRatings() != null) {
-            SidecarRatings r = m.getRatings();
-            if (r.getAmazon() != null) {
-                builder.amazonRating(r.getAmazon().getAverage())
-                        .amazonReviewCount(r.getAmazon().getCount());
-            }
-            if (r.getGoodreads() != null) {
-                builder.goodreadsRating(r.getGoodreads().getAverage())
-                        .goodreadsReviewCount(r.getGoodreads().getCount());
-            }
-            if (r.getHardcover() != null) {
-                builder.hardcoverRating(r.getHardcover().getAverage())
-                        .hardcoverReviewCount(r.getHardcover().getCount());
-            }
-            if (r.getLubimyczytac() != null) {
-                builder.lubimyczytacRating(r.getLubimyczytac().getAverage());
-            }
-            if (r.getRanobedb() != null) {
-                builder.ranobedbRating(r.getRanobedb().getAverage());
-            }
-            if (r.getAudible() != null) {
-                builder.audibleRating(r.getAudible().getAverage())
-                        .audibleReviewCount(r.getAudible().getCount());
-            }
+            applyRatings(builder, m.getRatings());
         }
 
         return builder.build();
+    }
+
+    private void applyRatings(BookMetadata.BookMetadataBuilder builder, SidecarRatings r) {
+        if (r.getAmazon() != null) {
+            builder.amazonRating(r.getAmazon().getAverage())
+                    .amazonReviewCount(r.getAmazon().getCount());
+        }
+        if (r.getGoodreads() != null) {
+            builder.goodreadsRating(r.getGoodreads().getAverage())
+                    .goodreadsReviewCount(r.getGoodreads().getCount());
+        }
+        if (r.getHardcover() != null) {
+            builder.hardcoverRating(r.getHardcover().getAverage())
+                    .hardcoverReviewCount(r.getHardcover().getCount());
+        }
+        if (r.getLubimyczytac() != null) {
+            builder.lubimyczytacRating(r.getLubimyczytac().getAverage());
+        }
+        if (r.getRanobedb() != null) {
+            builder.ranobedbRating(r.getRanobedb().getAverage());
+        }
+        if (r.getAudible() != null) {
+            builder.audibleRating(r.getAudible().getAverage())
+                    .audibleReviewCount(r.getAudible().getCount());
+        }
     }
 
     public String getCoverFileName(Path bookPath) {
@@ -146,6 +149,7 @@ public class SidecarMetadataMapper {
         return baseName + ".cover.jpg";
     }
 
+    @SuppressWarnings("java:S1168") // null keeps @JsonInclude(NON_NULL) omitting the key in exported sidecar JSON (wire format)
     private List<String> extractNames(List<AuthorEntity> entities) {
         if (entities == null) return null;
         return entities.stream()
@@ -153,6 +157,7 @@ public class SidecarMetadataMapper {
                 .toList();
     }
 
+    @SuppressWarnings("java:S1168") // null keeps @JsonInclude(NON_NULL) omitting the key in exported sidecar JSON (wire format)
     private Set<String> extractCategoryNames(Set<CategoryEntity> entities) {
         if (entities == null) return null;
         return entities.stream()
@@ -160,6 +165,7 @@ public class SidecarMetadataMapper {
                 .collect(Collectors.toSet());
     }
 
+    @SuppressWarnings("java:S1168") // null keeps @JsonInclude(NON_NULL) omitting the key in exported sidecar JSON (wire format)
     private Set<String> extractMoodNames(Set<MoodEntity> entities) {
         if (entities == null) return null;
         return entities.stream()
@@ -167,6 +173,7 @@ public class SidecarMetadataMapper {
                 .collect(Collectors.toSet());
     }
 
+    @SuppressWarnings("java:S1168") // null keeps @JsonInclude(NON_NULL) omitting the key in exported sidecar JSON (wire format)
     private Set<String> extractTagNames(Set<TagEntity> entities) {
         if (entities == null) return null;
         return entities.stream()

@@ -17,9 +17,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import tools.jackson.core.type.TypeReference;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -85,7 +87,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
             """;
     private static final String BASE_AUTOCOMPLETE_URL = "https://www.goodreads.com/book/auto_complete?format=json&q=";
     private static final String BASE_ISBN_URL = "https://www.goodreads.com/book/isbn/";
-    private static final Pattern PATTERN_PATH_GOODREADS_ID = Pattern.compile("^/book/show/([0-9]+)[^/]+$");
+    private static final Pattern PATTERN_PATH_GOODREADS_ID = Pattern.compile("^/book/show/(\\d++)[^/]++$");
     private static final int COUNT_DETAILED_METADATA_TO_GET = 3;
 
     private final HttpClient httpClient;
@@ -143,44 +145,7 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
     public Flux<BookMetadata> fetchMetadataStream(Book book, FetchMetadataRequest fetchMetadataRequest) {
         return Flux.create(sink -> {
             try {
-                String isbn = ParserUtils.cleanIsbn(fetchMetadataRequest.getIsbn());
-                if (isbn != null && !isbn.isBlank()) {
-                    try {
-                        String legacyId = resolveIsbn(isbn);
-                        BookMetadata metadata = fetchAndParseBook(legacyId);
-                        if (metadata != null) {
-                            sink.next(metadata);
-                        }
-                    } catch (Exception e) {
-                        if (e instanceof InterruptedException) {
-                            Thread.currentThread().interrupt();
-                        }
-                        log.warn("GoodReads: ISBN lookup failed: {}, falling back to title search", e.getMessage());
-                    }
-                }
-
-                List<String> searchResultIds = fetchSearchResults(book, fetchMetadataRequest).stream()
-                        .limit(COUNT_DETAILED_METADATA_TO_GET)
-                        .toList();
-
-                for (String goodreadsId : searchResultIds) {
-                    if (sink.isCancelled()) {
-                        return;
-                    }
-                    log.info("GoodReads: Fetching metadata for: Goodreads ID {}", goodreadsId);
-                    try {
-                        BookMetadata metadata = fetchAndParseBook(goodreadsId);
-                        if (metadata != null) {
-                            sink.next(metadata);
-                        }
-                        Thread.sleep(ThreadLocalRandom.current().nextLong(500, 1501));
-                    } catch (InterruptedException e) {
-                        throw e;
-                    } catch (Exception e) {
-                        log.error("Error fetching metadata for book: {}", goodreadsId, e);
-                    }
-                }
-
+                emitMetadataResults(sink, book, fetchMetadataRequest);
                 sink.complete();
             } catch (Exception e) {
                 if (e instanceof InterruptedException) {
@@ -189,6 +154,54 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
                 sink.error(e);
             }
         });
+    }
+
+    private void emitMetadataResults(FluxSink<BookMetadata> sink, Book book, FetchMetadataRequest fetchMetadataRequest) throws InterruptedException {
+        String isbn = ParserUtils.cleanIsbn(fetchMetadataRequest.getIsbn());
+        if (isbn != null && !isbn.isBlank()) {
+            tryFetchByIsbn(sink, isbn);
+        }
+
+        List<String> searchResultIds = fetchSearchResults(book, fetchMetadataRequest).stream()
+                .limit(COUNT_DETAILED_METADATA_TO_GET)
+                .toList();
+
+        for (String goodreadsId : searchResultIds) {
+            if (sink.isCancelled()) {
+                return;
+            }
+            log.info("GoodReads: Fetching metadata for: Goodreads ID {}", goodreadsId);
+            fetchAndEmitSearchResult(sink, goodreadsId);
+        }
+    }
+
+    private void tryFetchByIsbn(FluxSink<BookMetadata> sink, String isbn) {
+        try {
+            String legacyId = resolveIsbn(isbn);
+            BookMetadata metadata = fetchAndParseBook(legacyId);
+            if (metadata != null) {
+                sink.next(metadata);
+            }
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            log.warn("GoodReads: ISBN lookup failed: {}, falling back to title search", e.getMessage());
+        }
+    }
+
+    private void fetchAndEmitSearchResult(FluxSink<BookMetadata> sink, String goodreadsId) throws InterruptedException {
+        try {
+            BookMetadata metadata = fetchAndParseBook(goodreadsId);
+            if (metadata != null) {
+                sink.next(metadata);
+            }
+            Thread.sleep(ThreadLocalRandom.current().nextLong(500, 1501));
+        } catch (InterruptedException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error fetching metadata for book: {}", goodreadsId, e);
+        }
     }
 
     private BookMetadata fetchAndParseBook(String goodreadsId) {
@@ -300,30 +313,35 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
     private void extractContributorDetails(JsonNode bookNode, BookMetadata.BookMetadataBuilder builder) {
         List<String> authors = new ArrayList<>();
 
-        JsonNode primaryEdge = bookNode.get("primaryContributorEdge");
-        if (primaryEdge != null && primaryEdge.isObject()) {
-            JsonNode node = primaryEdge.get("node");
-            if (node != null) {
-                String name = node.path("name").asText(null);
-                if (name != null) {
-                    authors.add(name);
-                }
-            }
-        }
-
-        JsonNode secondaryEdges = bookNode.get("secondaryContributorEdges");
-        if (secondaryEdges != null && secondaryEdges.isArray()) {
-            for (int i = 0; i < secondaryEdges.size(); i++) {
-                JsonNode node = secondaryEdges.get(i).path("node");
-                String name = node.path("name").asText(null);
-                if (name != null) {
-                    authors.add(name);
-                }
-            }
-        }
+        addPrimaryContributor(bookNode.get("primaryContributorEdge"), authors);
+        addSecondaryContributors(bookNode.get("secondaryContributorEdges"), authors);
 
         if (!authors.isEmpty()) {
             builder.authors(authors);
+        }
+    }
+
+    private void addPrimaryContributor(JsonNode primaryEdge, List<String> authors) {
+        if (primaryEdge != null && primaryEdge.isObject()) {
+            JsonNode node = primaryEdge.get("node");
+            if (node != null) {
+                String name = node.path("name").asString(null);
+                if (name != null) {
+                    authors.add(name);
+                }
+            }
+        }
+    }
+
+    private void addSecondaryContributors(JsonNode secondaryEdges, List<String> authors) {
+        if (secondaryEdges != null && secondaryEdges.isArray()) {
+            for (int i = 0; i < secondaryEdges.size(); i++) {
+                JsonNode node = secondaryEdges.get(i).path("node");
+                String name = node.path("name").asString(null);
+                if (name != null) {
+                    authors.add(name);
+                }
+            }
         }
     }
 
@@ -350,52 +368,59 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
 
         int count = 0;
         for (int i = 0; i < edges.size() && count < maxReviews; i++) {
-            JsonNode reviewNode = edges.get(i).path("node");
-            if (reviewNode == null || reviewNode.isMissingNode()) {
-                continue;
-            }
-
-            try {
-                String rawBody = reviewNode.path("text").asText(null);
-                String plainBody = rawBody != null ? Jsoup.parse(rawBody).text() : null;
-                if (plainBody == null || plainBody.trim().isEmpty()) {
-                    continue;
-                }
-
-                JsonNode creator = reviewNode.get("creator");
-                String reviewerName = creator != null ? creator.path("name").asText(null) : null;
-                Integer followersCount = null;
-                Integer textReviewsCount = null;
-                if (creator != null) {
-                    JsonNode fn = creator.path("followersCount");
-                    if (fn.canConvertToInt()) {
-                        followersCount = fn.asInt();
-                    }
-                    JsonNode trn = creator.path("textReviewsCount");
-                    if (trn.canConvertToInt()) {
-                        textReviewsCount = trn.asInt();
-                    }
-                }
-
-                JsonNode updatedAtNode = reviewNode.path("updatedAt");
-                BookReview review = BookReview.builder()
-                        .metadataProvider(MetadataProvider.GoodReads)
-                        .date(updatedAtNode.isIntegralNumber() ? Instant.ofEpochMilli(updatedAtNode.asLong()) : null)
-                        .body(plainBody.trim())
-                        .rating(Float.valueOf(reviewNode.path("rating").asText("0")))
-                        .spoiler(reviewNode.path("spoilerStatus").asBoolean(false))
-                        .reviewerName(reviewerName != null ? reviewerName.trim() : null)
-                        .followersCount(followersCount)
-                        .textReviewsCount(textReviewsCount)
-                        .build();
+            BookReview review = parseReviewAtIndex(edges, i);
+            if (review != null) {
                 reviews.add(review);
                 count++;
-            } catch (Exception e) {
-                log.error("Error parsing review at index {}: {}", i, e.getMessage());
             }
         }
 
         builder.bookReviews(reviews);
+    }
+
+    private BookReview parseReviewAtIndex(JsonNode edges, int i) {
+        JsonNode reviewNode = edges.get(i).path("node");
+        if (reviewNode == null || reviewNode.isMissingNode()) {
+            return null;
+        }
+
+        try {
+            String rawBody = reviewNode.path("text").asString(null);
+            String plainBody = rawBody != null ? Jsoup.parse(rawBody).text() : null;
+            if (plainBody == null || plainBody.trim().isEmpty()) {
+                return null;
+            }
+
+            JsonNode creator = reviewNode.get("creator");
+            String reviewerName = creator != null ? creator.path("name").asString(null) : null;
+            Integer followersCount = null;
+            Integer textReviewsCount = null;
+            if (creator != null) {
+                JsonNode fn = creator.path("followersCount");
+                if (fn.canConvertToInt()) {
+                    followersCount = fn.asInt();
+                }
+                JsonNode trn = creator.path("textReviewsCount");
+                if (trn.canConvertToInt()) {
+                    textReviewsCount = trn.asInt();
+                }
+            }
+
+            JsonNode updatedAtNode = reviewNode.path("updatedAt");
+            return BookReview.builder()
+                    .metadataProvider(MetadataProvider.GoodReads)
+                    .date(updatedAtNode.isIntegralNumber() ? Instant.ofEpochMilli(updatedAtNode.asLong()) : null)
+                    .body(plainBody.trim())
+                    .rating(Float.valueOf(reviewNode.path("rating").asString("0")))
+                    .spoiler(reviewNode.path("spoilerStatus").asBoolean(false))
+                    .reviewerName(reviewerName != null ? reviewerName.trim() : null)
+                    .followersCount(followersCount)
+                    .textReviewsCount(textReviewsCount)
+                    .build();
+        } catch (Exception e) {
+            log.error("Error parsing review at index {}: {}", i, e.getMessage());
+            return null;
+        }
     }
 
     private void extractSeriesDetails(JsonNode bookNode, BookMetadata.BookMetadataBuilder builder) {
@@ -403,33 +428,33 @@ public class GoodReadsParser implements BookParser, DetailedMetadataProvider {
         if (bookSeries != null && bookSeries.isArray() && bookSeries.size() > 0) {
             JsonNode first = bookSeries.get(0);
             JsonNode series = first.path("series");
-            String seriesName = series.path("title").asText(null);
+            String seriesName = series.path("title").asString(null);
             if (seriesName != null) {
                 builder.seriesName(seriesName);
             }
-            builder.seriesNumber(parseNumber(first.path("userPosition").asText(null), Float::parseFloat));
+            builder.seriesNumber(parseNumber(first.path("userPosition").asString(null), Float::parseFloat));
         }
     }
 
     private void extractBookDetails(JsonNode bookNode, BookMetadata.BookMetadataBuilder builder) {
-        TitleInfo titleInfo = parseTitleInfo(bookNode.path("title").asText(null));
+        TitleInfo titleInfo = parseTitleInfo(bookNode.path("title").asString(null));
         builder.title(titleInfo.title())
                 .subtitle(titleInfo.subtitle())
-                .description(normalizeNull(bookNode.path("description").asText(null)))
-                .thumbnailUrl(normalizeNull(bookNode.path("imageUrl").asText(null)))
+                .description(normalizeNull(bookNode.path("description").asString(null)))
+                .thumbnailUrl(normalizeNull(bookNode.path("imageUrl").asString(null)))
                 .categories(extractGenres(bookNode));
 
         JsonNode detailsJson = bookNode.get("details");
         if (detailsJson != null && detailsJson.isObject()) {
-            builder.pageCount(parseNumber(detailsJson.path("numPages").asText(null), Integer::parseInt))
+            builder.pageCount(parseNumber(detailsJson.path("numPages").asString(null), Integer::parseInt))
                     .publishedDate(convertToLocalDate(detailsJson.path("publicationTime")))
-                    .publisher(normalizeNull(detailsJson.path("publisher").asText(null)))
-                    .isbn10(normalizeNull(detailsJson.path("isbn").asText(null)))
-                    .isbn13(normalizeNull(detailsJson.path("isbn13").asText(null)));
+                    .publisher(normalizeNull(detailsJson.path("publisher").asString(null)))
+                    .isbn10(normalizeNull(detailsJson.path("isbn").asString(null)))
+                    .isbn13(normalizeNull(detailsJson.path("isbn13").asString(null)));
 
             JsonNode languageJson = detailsJson.get("language");
             if (languageJson != null && languageJson.isObject()) {
-                builder.language(LanguageNormalizer.normalize(normalizeNull(languageJson.path("name").asText(null))));
+                builder.language(LanguageNormalizer.normalize(normalizeNull(languageJson.path("name").asString(null))));
             }
         }
     }
@@ -442,8 +467,8 @@ return;
 
         JsonNode statsJson = work.get("stats");
         if (statsJson != null && statsJson.isObject()) {
-            builder.goodreadsRating(parseNumber(statsJson.path("averageRating").asText(null), Double::parseDouble))
-                    .goodreadsReviewCount(parseNumber(statsJson.path("ratingsCount").asText(null), Integer::parseInt));
+            builder.goodreadsRating(parseNumber(statsJson.path("averageRating").asString(null), Double::parseDouble))
+                    .goodreadsReviewCount(parseNumber(statsJson.path("ratingsCount").asString(null), Integer::parseInt));
         }
     }
 
@@ -454,13 +479,13 @@ return;
             if (bookGenresArray != null && bookGenresArray.isArray()) {
                 for (int i = 0; i < bookGenresArray.size(); i++) {
                     JsonNode genreJson = bookGenresArray.get(i).path("genre");
-                    genres.add(genreJson.path("name").asText());
+                    genres.add(genreJson.path("name").asString());
                 }
             }
             return genres;
         } catch (Exception e) {
             log.error("Error extracting genres", e);
-            return null;
+            return Set.of();
         }
     }
 
@@ -499,7 +524,7 @@ return;
             if (publicationTimeNode.isNumber()) {
                 millis = publicationTimeNode.asLong();
             } else {
-                String text = publicationTimeNode.asText(null);
+                String text = publicationTimeNode.asString(null);
                 if (text == null || text.isBlank() || "null".equals(text)) {
                     return null;
                 }
@@ -586,7 +611,7 @@ return;
 
             if (response.statusCode() < 200 || response.statusCode() > 399) {
                 log.error("GoodReads request failed with status code: {}", response.statusCode());
-                throw new RuntimeException("Failed to query GoodReads");
+                throw new IllegalStateException("Failed to query GoodReads");
             }
 
             return objectMapper.readValue(response.body(), typeReference);
@@ -594,7 +619,7 @@ return;
             throw e;
         } catch (IOException e) {
             log.error("GoodReads request failed", e);
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
     }
 }

@@ -8,7 +8,6 @@ import org.grimmory.epub4j.archive.EpubContainers;
 import org.grimmory.epub4j.domain.Book;
 import org.grimmory.epub4j.domain.MediaType;
 import org.grimmory.epub4j.domain.MediaTypes;
-import org.grimmory.epub4j.domain.Resource;
 import org.grimmory.epub4j.epub.CoverDetector;
 import org.grimmory.epub4j.epub.CoverDetector.CoverDetectionResult;
 import org.grimmory.epub4j.epub.EpubReader;
@@ -21,6 +20,7 @@ import org.booklore.util.SecureXmlUtils;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -53,6 +54,8 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
     private static final Pattern ISBN_SEPARATOR_PATTERN = Pattern.compile("[- ]");
 
     private static final Set<Integer> VALID_AGE_RATINGS = Set.of(0, 6, 10, 13, 16, 18, 21);
+    private static final String COVER_KEYWORD = "cover";
+    private static final String CONTENT_ATTR = "content";
 
     private final ObjectMapper objectMapper;
 
@@ -113,8 +116,19 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
      * regenerating the cover of a corrupt EPUB told the user it had "no embedded cover image".
      */
     @Override
+    @SuppressWarnings("java:S1168") // null (not empty array) means "proven no cover"; BookCoverGenerator/BookdropMetadataService/EpubProcessor branch on == null
     public byte[] extractCover(File epubFile) {
         // Primary: use epub4j's CoverDetector with native lazy loading
+        byte[] fastPathCover = extractCoverViaEpub4j(epubFile);
+        if (fastPathCover.length > 0) {
+            return fastPathCover;
+        }
+
+        // Last resort: scan container for cover-like images
+        return scanContainerForCover(epubFile);
+    }
+
+    private byte[] extractCoverViaEpub4j(File epubFile) {
         try {
             Book book = new EpubReader().readEpubLazy(epubFile.toPath(), "UTF-8");
             Optional<CoverDetectionResult> detection = CoverDetector.detectCoverImageWithMethod(book);
@@ -134,58 +148,35 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
             // that exists for exactly the files it chokes on. Only that scan gets to conclude.
             log.debug("epub4j cover detection failed for {}: {}", epubFile.getName(), e.getMessage());
         }
+        // Purely an internal "fast path found nothing usable, try the fallback" signal - unlike
+        // extractCover's null, this carries no external "proven absence" contract, so an empty
+        // array is a safe, equivalent sentinel.
+        return new byte[0];
+    }
 
-        // Last resort: scan container for cover-like images
+    @SuppressWarnings("java:S1168") // null (not empty array) means "proven no cover"; BookCoverGenerator/BookdropMetadataService/EpubProcessor branch on == null
+    private byte[] scanContainerForCover(File epubFile) {
         try (EpubContainer container = EpubContainers.open(epubFile.toPath())) {
             // NOTE: this will moved to org.grimmory.epub4j in the near future
             // most of the parsing done here, can be safely replaced with methods already existing in epub4j
             String opfName = findOpfPath(container);
             Document opf = parseXmlFromContainer(container, opfName);
 
-            // Try OPF manifest for cover-image property
             NodeList items = opf.getElementsByTagName("item");
-            for (int i = 0; i < items.getLength(); i++) {
-                Element item = (Element) items.item(i);
-                String properties = item.getAttribute("properties");
-                if (properties != null && properties.contains("cover-image")) {
-                    String href = URLDecoder.decode(item.getAttribute("href"), StandardCharsets.UTF_8);
-                    String fullPath = resolvePath(opfName, href);
-                    if (container.exists(fullPath)) {
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
-                        container.streamTo(fullPath, baos);
-                        return baos.toByteArray();
-                    }
-                }
+
+            byte[] byProperty = findCoverByManifestProperty(container, opfName, items);
+            if (byProperty != null) {
+                return byProperty;
             }
 
-            // Search manifest for cover-looking items by id/href
-            for (int i = 0; i < items.getLength(); i++) {
-                Element item = (Element) items.item(i);
-                String id = item.getAttribute("id");
-                String href = item.getAttribute("href");
-                String mediaType = item.getAttribute("media-type");
-                if (mediaType != null && mediaType.startsWith("image/")
-                        && ((id != null && id.toLowerCase().contains("cover")) ||
-                            (href != null && href.toLowerCase().contains("cover")))) {
-                    String decodedHref = URLDecoder.decode(href, StandardCharsets.UTF_8);
-                    String fullPath = resolvePath(opfName, decodedHref);
-                    if (container.exists(fullPath)) {
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
-                        container.streamTo(fullPath, baos);
-                        return baos.toByteArray();
-                    }
-                }
+            byte[] byName = findCoverByManifestName(container, opfName, items);
+            if (byName != null) {
+                return byName;
             }
 
-            // Scan all files for cover-named images
-            for (String name : container.listAllFiles()) {
-                String lower = name.toLowerCase();
-                if (lower.contains("cover") && (lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
-                        lower.endsWith(".png") || lower.endsWith(".webp"))) {
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
-                    container.streamTo(name, baos);
-                    return baos.toByteArray();
-                }
+            byte[] byFileScan = findCoverByFileScan(container);
+            if (byFileScan != null) {
+                return byFileScan;
             }
         } catch (Exception e) {
             throw new CoverExtractionException("Failed to extract cover from EPUB: " + epubFile.getName(), e);
@@ -195,7 +186,68 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
         return null;
     }
 
+    // Try OPF manifest for cover-image property
+    @SuppressWarnings("java:S1168") // null distinguishes "not found here" from a zero-length cover resource
+    private byte[] findCoverByManifestProperty(EpubContainer container, String opfName, NodeList items) throws IOException {
+        for (int i = 0; i < items.getLength(); i++) {
+            Element item = (Element) items.item(i);
+            String properties = item.getAttribute("properties");
+            if (properties != null && properties.contains("cover-image")) {
+                String href = URLDecoder.decode(item.getAttribute("href"), StandardCharsets.UTF_8);
+                String fullPath = resolvePath(opfName, href);
+                if (container.exists(fullPath)) {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
+                    container.streamTo(fullPath, baos);
+                    return baos.toByteArray();
+                }
+            }
+        }
+        return null;
+    }
+
+    // Search manifest for cover-looking items by id/href
+    @SuppressWarnings("java:S1168") // null distinguishes "not found here" from a zero-length cover resource
+    private byte[] findCoverByManifestName(EpubContainer container, String opfName, NodeList items) throws IOException {
+        for (int i = 0; i < items.getLength(); i++) {
+            Element item = (Element) items.item(i);
+            String id = item.getAttribute("id");
+            String href = item.getAttribute("href");
+            String mediaType = item.getAttribute("media-type");
+            if (mediaType != null && mediaType.startsWith("image/")
+                    && ((id != null && id.toLowerCase().contains(COVER_KEYWORD)) ||
+                        (href != null && href.toLowerCase().contains(COVER_KEYWORD)))) {
+                String decodedHref = URLDecoder.decode(href, StandardCharsets.UTF_8);
+                String fullPath = resolvePath(opfName, decodedHref);
+                if (container.exists(fullPath)) {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
+                    container.streamTo(fullPath, baos);
+                    return baos.toByteArray();
+                }
+            }
+        }
+        return null;
+    }
+
+    // Scan all files for cover-named images
+    @SuppressWarnings("java:S1168") // null distinguishes "not found here" from a zero-length cover resource
+    private byte[] findCoverByFileScan(EpubContainer container) throws IOException {
+        for (String name : container.listAllFiles()) {
+            String lower = name.toLowerCase();
+            if (lower.contains(COVER_KEYWORD) && (lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+                    lower.endsWith(".png") || lower.endsWith(".webp"))) {
+                ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
+                container.streamTo(name, baos);
+                return baos.toByteArray();
+            }
+        }
+        return null;
+    }
+
     @Override
+    // S6916: the "when" guard clause syntax cannot attach to constant case labels (only to type
+    // patterns), so the single-if bodies in the switches below cannot be rewritten as guarded case
+    // labels - Sonar flags this for string switches too (known false positive, see java:S6916 discussions).
+    @SuppressWarnings("java:S6916")
     public BookMetadata extractMetadata(File epubFile) {
         try (EpubContainer container = EpubContainers.open(epubFile.toPath())) {
             String opfPath = findOpfPath(container);
@@ -222,6 +274,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
             Map<String, String> titlesById = new HashMap<>();
             Map<String, String> titleTypeById = new HashMap<>();
             boolean hasTitle = false;
+            MetaParseState metaParseState = new MetaParseState(builderMeta, moods, tags, titleTypeById, creatorRolesById);
 
             for (int i = 0; i < children.getLength(); i++) {
                 if (!(children.item(i) instanceof Element el)) continue;
@@ -231,253 +284,361 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
 
                 switch (tag) {
                     case "title" -> {
-                        String id = el.getAttribute("id");
-                        if (StringUtils.isNotBlank(id)) {
-                            titlesById.put(id, text);
-                        }
-
-                        if (!hasTitle) {
-                            hasTitle = true;
-                            builderMeta.title(text);
-                        }
+                        handleTitle(el, text, builderMeta, titlesById, hasTitle);
+                        hasTitle = true;
                     }
                     case "meta" -> {
-                        String prop = el.getAttribute("property").trim();
-                        String name = el.getAttribute("name").trim();
-                        String refines = el.getAttribute("refines").trim();
-                        String content = el.hasAttribute("content") ? el.getAttribute("content").trim() : text;
-
-                        if ("title-type".equals(prop) && StringUtils.isNotBlank(refines)) {
-                            titleTypeById.put(refines.substring(1), content.toLowerCase());
-                        }
-
-                        if ("role".equals(prop) && StringUtils.isNotBlank(refines)) {
-                            creatorRolesById.computeIfAbsent(refines.substring(1), k -> new ArrayList<>()).add(content.toLowerCase());
-                        }
-
-                        if ("rendition:layout".equals(prop) && "pre-paginated".equals(content)) {
-                            builderMeta.isFixedLayout(true);
-                        }
-
-                        if (!seriesFound && ((BookLoreMetadata.NS_PREFIX + ":series").equals(prop) || "calibre:series".equals(name) || "belongs-to-collection".equals(prop))) {
-                            builderMeta.seriesName(content);
-                            seriesFound = true;
-                        }
-                        if (!seriesIndexFound && ((BookLoreMetadata.NS_PREFIX + ":series_index").equals(prop) || "calibre:series_index".equals(name) || "group-position".equals(prop))) {
-                            try {
-                                builderMeta.seriesNumber(Float.parseFloat(content));
-                                seriesIndexFound = true;
-                            } catch (NumberFormatException _) {
-                                // ignore unparseable series index
-                            }
-                        }
-
-                        if ("calibre:pages".equals(name) || "pagecount".equals(name) || "schema:pagecount".equals(prop) || "media:pagecount".equals(prop) || (BookLoreMetadata.NS_PREFIX + ":page_count").equals(prop)) {
-                            safeParseInt(content, builderMeta::pageCount);
-                        } else if ("calibre:user_metadata:#pagecount".equals(name)) {
-                            try {
-                                JsonNode jsonRoot = objectMapper.readTree(content);
-                                JsonNode valueNode = jsonRoot.get("#value#");
-                                if (valueNode != null && !valueNode.isNull()) {
-                                    safeParseInt(valueNode.asText(), builderMeta::pageCount);
-                                }
-                            } catch (Exception e) {
-                                log.debug("Failed to parse calibre:user_metadata:#pagecount: {}", e.getMessage());
-                            }
-                        } else if ("calibre:user_metadata".equals(prop)) {
-                            try {
-                                extractCalibreUserMetadata(objectMapper.readTree(content), builderMeta, moods, tags);
-                            } catch (Exception e) {
-                                log.debug("Failed to parse calibre:user_metadata: {}", e.getMessage());
-                            }
-                        }
-
-
-
-                        String key = StringUtils.isNotBlank(prop) ? prop : name;
-
-                        switch (key) {
-                            case BookLoreMetadata.NS_PREFIX + ":asin" -> builderMeta.asin(content);
-                            case BookLoreMetadata.NS_PREFIX + ":goodreads_id" -> builderMeta.goodreadsId(content);
-                            case BookLoreMetadata.NS_PREFIX + ":comicvine_id" -> builderMeta.comicvineId(content);
-                            case BookLoreMetadata.NS_PREFIX + ":ranobedb_id" -> builderMeta.ranobedbId(content);
-                            case BookLoreMetadata.NS_PREFIX + ":hardcover_id" -> builderMeta.hardcoverId(content);
-                            case BookLoreMetadata.NS_PREFIX + ":google_books_id" -> builderMeta.googleId(content);
-                            case BookLoreMetadata.NS_PREFIX + ":lubimyczytac_id" -> builderMeta.lubimyczytacId(content);
-                            case BookLoreMetadata.NS_PREFIX + ":page_count" ->
-                                    safeParseInt(content, builderMeta::pageCount);
-                            case BookLoreMetadata.NS_PREFIX + ":subtitle" -> builderMeta.subtitle(content);
-                            case BookLoreMetadata.NS_PREFIX + ":series_total" ->
-                                    safeParseInt(content, builderMeta::seriesTotal);
-                            case BookLoreMetadata.NS_PREFIX + ":rating" -> {
-                                // rating handled elsewhere; ignore here
-                            }
-                            case BookLoreMetadata.NS_PREFIX + ":amazon_rating" ->
-                                    safeParseDouble(content, builderMeta::amazonRating);
-                            case BookLoreMetadata.NS_PREFIX + ":amazon_review_count" ->
-                                    safeParseInt(content, builderMeta::amazonReviewCount);
-                            case BookLoreMetadata.NS_PREFIX + ":goodreads_rating" ->
-                                    safeParseDouble(content, builderMeta::goodreadsRating);
-                            case BookLoreMetadata.NS_PREFIX + ":goodreads_review_count" ->
-                                    safeParseInt(content, builderMeta::goodreadsReviewCount);
-                            case BookLoreMetadata.NS_PREFIX + ":hardcover_rating" ->
-                                    safeParseDouble(content, builderMeta::hardcoverRating);
-                            case BookLoreMetadata.NS_PREFIX + ":hardcover_review_count" ->
-                                    safeParseInt(content, builderMeta::hardcoverReviewCount);
-                            case BookLoreMetadata.NS_PREFIX + ":lubimyczytac_rating" ->
-                                    safeParseDouble(content, builderMeta::lubimyczytacRating);
-                            case BookLoreMetadata.NS_PREFIX + ":ranobedb_rating" ->
-                                    safeParseDouble(content, builderMeta::ranobedbRating);
-                            case BookLoreMetadata.NS_PREFIX + ":age_rating" -> safeParseInt(content, v -> {
-                                if (VALID_AGE_RATINGS.contains(v)) builderMeta.ageRating(v);
-                            });
-                            case BookLoreMetadata.NS_PREFIX + ":content_rating" -> builderMeta.contentRating(content);
-                            case BookLoreMetadata.NS_PREFIX + ":moods" -> {
-                                if (StringUtils.isNotBlank(content)) {
-                                    extractSetField(content, moods);
-                                }
-                            }
-                            case BookLoreMetadata.NS_PREFIX + ":tags" -> {
-                                if (StringUtils.isNotBlank(content)) {
-                                    extractSetField(content, tags);
-                                }
-                            }
-                        }
+                        SeriesFlags flags = handleMeta(el, text, metaParseState,
+                                new SeriesFlags(seriesFound, seriesIndexFound));
+                        seriesFound = flags.seriesFound();
+                        seriesIndexFound = flags.seriesIndexFound();
                     }
-                    case "creator" -> {
-                        String role = el.getAttributeNS(OPF_NS, "role");
-                        if (StringUtils.isNotBlank(role)) {
-                            creatorsByRole.computeIfAbsent(role, k -> new ArrayList<>()).add(text);
-                        } else {
-                            String id = el.getAttribute("id");
-                            if (StringUtils.isNotBlank(id)) {
-                                creatorsById.put(id, text);
-                            } else {
-                                creatorsByRole.get("aut").add(text);
-                            }
-                        }
-                    }
+                    case "creator" -> handleCreator(el, text, creatorsById, creatorsByRole);
                     case "subject" -> categories.add(text);
                     case "description" -> builderMeta.description(text);
                     case "publisher" -> builderMeta.publisher(text);
                     case "language" -> builderMeta.language(text);
-                    case "identifier" -> {
-                        String scheme = el.getAttributeNS(OPF_NS, "scheme").toUpperCase();
-                        String textLower = text.toLowerCase();
-
-                        // Parse URN format: urn:scheme:value
-                        String value = text;
-                        String urnScheme = null;
-                        if (textLower.startsWith("urn:")) {
-                            String[] parts = text.split(":", 3);
-                            if (parts.length >= 3) {
-                                urnScheme = parts[1].toUpperCase();
-                                value = parts[2];
-                            }
-                        } else if (textLower.startsWith("isbn:")) {
-                            value = text.substring(5);
-                            urnScheme = "ISBN";
-                        }
-
-                        // Use URN scheme if opf:scheme is not present
-                        if (scheme.isEmpty() && urnScheme != null) {
-                            scheme = urnScheme;
-                        }
-
-                        if (!scheme.isEmpty()) {
-                            switch (scheme) {
-                                case "ISBN", "ISBN10", "ISBN13" -> {
-                                    String cleanValue = ISBN_SEPARATOR_PATTERN.matcher(value).replaceAll("");
-                                    if (cleanValue.length() == 13) builderMeta.isbn13(value);
-                                    else if (cleanValue.length() == 10) builderMeta.isbn10(value);
-                                }
-                                case "GOODREADS" -> builderMeta.goodreadsId(value);
-                                case "COMICVINE" -> builderMeta.comicvineId(value);
-                                case "RANOBEDB" -> builderMeta.ranobedbId(value);
-                                case "GOOGLE" -> builderMeta.googleId(value);
-                                case "AMAZON" -> builderMeta.asin(value);
-                                case "HARDCOVER" -> builderMeta.hardcoverId(value);
-                                case "HARDCOVERBOOK", "HARDCOVER_BOOK_ID" -> builderMeta.hardcoverBookId(value);
-                                case "LUBIMYCZYTAC" -> builderMeta.lubimyczytacId(value);
-                            }
-                        } else {
-                            // Handle Calibre's prefix:value format (e.g., amazon:B09XXX, goodreads:123)
-                            int colonIdx = text.indexOf(':');
-                            if (colonIdx > 0) {
-                                String prefix = text.substring(0, colonIdx).toLowerCase();
-                                String val = text.substring(colonIdx + 1).trim();
-                                if (!"calibre".equals(prefix) && !"uuid".equals(prefix)) {
-                                    BiConsumer<BookMetadata.BookMetadataBuilder, String> setter = CALIBRE_IDENTIFIER_PREFIXES.get(prefix);
-                                    if (setter != null) {
-                                        setter.accept(builderMeta, val);
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    case "identifier" -> handleIdentifier(el, text, builderMeta);
                     case "date" -> {
                         LocalDate parsed = parseDate(text);
                         if (parsed != null) builderMeta.publishedDate(parsed);
                     }
+                    default -> log.debug("Unhandled OPF metadata tag: {}", tag);
                 }
             }
 
-            for (Map.Entry<String, String> entry : titlesById.entrySet()) {
-                String id = entry.getKey();
-                String value = entry.getValue();
-                String type = titleTypeById.get(id);
-                if ("main".equals(type)) builderMeta.title(value);
-                else if ("subtitle".equals(type)) builderMeta.subtitle(value);
-            }
+            applyTitleTypes(titlesById, titleTypeById, builderMeta);
+            applyModifiedDateFallback(builderMeta, children);
+            applyCreators(creatorsById, creatorRolesById, creatorsByRole, builderMeta);
+            applyCollections(builderMeta, categories, moods, tags);
 
-            if (builderMeta.build().getPublishedDate() == null) {
-                for (int i = 0; i < children.getLength(); i++) {
-                    if (!(children.item(i) instanceof Element el)) continue;
-                    if (!"meta".equals(el.getLocalName())) continue;
-                    String prop = el.getAttribute("property").trim().toLowerCase();
-                    String content = el.hasAttribute("content") ? el.getAttribute("content").trim() : el.getTextContent().trim();
-                    if ("dcterms:modified".equals(prop)) {
-                        LocalDate parsed = parseDate(content);
-                        if (parsed != null) {
-                            builderMeta.publishedDate(parsed);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            for (Map.Entry<String, String> entry : creatorsById.entrySet()) {
-                String id = entry.getKey();
-                String value = entry.getValue();
-                List<String> roles = creatorRolesById.getOrDefault(id, List.of("aut"));
-                for (String role : roles) {
-                    creatorsByRole.computeIfAbsent(role, k -> new ArrayList<>()).add(value);
-                }
-            }
-
-            builderMeta.authors(creatorsByRole.get("aut"));
-
-            if (!moods.isEmpty()) builderMeta.moods(moods);
-            if (!tags.isEmpty()) builderMeta.tags(tags);
-
-            // Remove moods and tags from categories to ensure strict separation
-            categories.removeAll(moods);
-            categories.removeAll(tags);
-
-            builderMeta.categories(categories);
-
-            BookMetadata extractedMetadata = builderMeta.build();
-
-            if (StringUtils.isBlank(extractedMetadata.getTitle())) {
-                builderMeta.title(FilenameUtils.getBaseName(epubFile.getName()));
-                extractedMetadata = builderMeta.build();
-            }
-
-            return extractedMetadata;
+            return finalizeTitle(builderMeta, epubFile);
         } catch (Exception e) {
             log.error("Failed to read metadata from EPUB file {}: {}", epubFile.getName(), e.getMessage(), e);
             return null;
         }
+    }
+
+    private record SeriesFlags(boolean seriesFound, boolean seriesIndexFound) {
+    }
+
+    // Groups the parser state that is threaded through every "meta" element for the whole
+    // document (as opposed to seriesFound/seriesIndexFound, which are per-iteration flags -
+    // see SeriesFlags), so handleMeta doesn't need one param per accumulator.
+    private record MetaParseState(BookMetadata.BookMetadataBuilder builderMeta, Set<String> moods, Set<String> tags,
+                                  Map<String, String> titleTypeById, Map<String, List<String>> creatorRolesById) {
+    }
+
+    private void handleTitle(Element el, String text, BookMetadata.BookMetadataBuilder builderMeta,
+                             Map<String, String> titlesById, boolean hasTitle) {
+        String id = el.getAttribute("id");
+        if (StringUtils.isNotBlank(id)) {
+            titlesById.put(id, text);
+        }
+
+        if (!hasTitle) {
+            builderMeta.title(text);
+        }
+    }
+
+    private SeriesFlags handleMeta(Element el, String text, MetaParseState state, SeriesFlags flags) {
+        String prop = el.getAttribute("property").trim();
+        String name = el.getAttribute("name").trim();
+        String refines = el.getAttribute("refines").trim();
+        String content = el.hasAttribute(CONTENT_ATTR) ? el.getAttribute(CONTENT_ATTR).trim() : text;
+
+        BookMetadata.BookMetadataBuilder builderMeta = state.builderMeta();
+        handleRefinesAndLayout(prop, refines, content, builderMeta, state.titleTypeById(), state.creatorRolesById());
+        SeriesFlags updatedFlags = updateSeries(prop, name, content, builderMeta, flags.seriesFound(), flags.seriesIndexFound());
+        handlePageCountMeta(prop, name, content, builderMeta, state.moods(), state.tags());
+        applyMetaKey(StringUtils.isNotBlank(prop) ? prop : name, content, builderMeta, state.moods(), state.tags());
+
+        return updatedFlags;
+    }
+
+    private void handleRefinesAndLayout(String prop, String refines, String content,
+                                        BookMetadata.BookMetadataBuilder builderMeta,
+                                        Map<String, String> titleTypeById,
+                                        Map<String, List<String>> creatorRolesById) {
+        if ("title-type".equals(prop) && StringUtils.isNotBlank(refines)) {
+            titleTypeById.put(refines.substring(1), content.toLowerCase());
+        }
+
+        if ("role".equals(prop) && StringUtils.isNotBlank(refines)) {
+            creatorRolesById.computeIfAbsent(refines.substring(1), k -> new ArrayList<>()).add(content.toLowerCase());
+        }
+
+        if ("rendition:layout".equals(prop) && "pre-paginated".equals(content)) {
+            builderMeta.isFixedLayout(true);
+        }
+    }
+
+    private SeriesFlags updateSeries(String prop, String name, String content,
+                                     BookMetadata.BookMetadataBuilder builderMeta,
+                                     boolean seriesFound, boolean seriesIndexFound) {
+        if (!seriesFound && ((BookLoreMetadata.NS_PREFIX + ":series").equals(prop) || "calibre:series".equals(name) || "belongs-to-collection".equals(prop))) {
+            builderMeta.seriesName(content);
+            seriesFound = true;
+        }
+        if (!seriesIndexFound && ((BookLoreMetadata.NS_PREFIX + ":series_index").equals(prop) || "calibre:series_index".equals(name) || "group-position".equals(prop))
+                && trySetSeriesNumber(builderMeta, content)) {
+            seriesIndexFound = true;
+        }
+        return new SeriesFlags(seriesFound, seriesIndexFound);
+    }
+
+    private void handlePageCountMeta(String prop, String name, String content,
+                                     BookMetadata.BookMetadataBuilder builderMeta,
+                                     Set<String> moods, Set<String> tags) {
+        if ("calibre:pages".equals(name) || "pagecount".equals(name) || "schema:pagecount".equals(prop) || "media:pagecount".equals(prop) || (BookLoreMetadata.NS_PREFIX + ":page_count").equals(prop)) {
+            safeParseInt(content, builderMeta::pageCount);
+        } else if ("calibre:user_metadata:#pagecount".equals(name)) {
+            parseUserMetadataPageCount(content, builderMeta);
+        } else if ("calibre:user_metadata".equals(prop)) {
+            parseUserMetadata(content, builderMeta, moods, tags);
+        }
+    }
+
+    // S6916: the "when" guard clause syntax cannot attach to constant case labels (only to type
+    // patterns), so the single-if bodies in the switch below cannot be rewritten as guarded case
+    // labels - same known false positive as extractMetadata's switch above.
+    @SuppressWarnings("java:S6916")
+    private void applyMetaKey(String key, String content, BookMetadata.BookMetadataBuilder builderMeta,
+                              Set<String> moods, Set<String> tags) {
+        switch (key) {
+            case BookLoreMetadata.NS_PREFIX + ":asin" -> builderMeta.asin(content);
+            case BookLoreMetadata.NS_PREFIX + ":goodreads_id" -> builderMeta.goodreadsId(content);
+            case BookLoreMetadata.NS_PREFIX + ":comicvine_id" -> builderMeta.comicvineId(content);
+            case BookLoreMetadata.NS_PREFIX + ":ranobedb_id" -> builderMeta.ranobedbId(content);
+            case BookLoreMetadata.NS_PREFIX + ":hardcover_id" -> builderMeta.hardcoverId(content);
+            case BookLoreMetadata.NS_PREFIX + ":google_books_id" -> builderMeta.googleId(content);
+            case BookLoreMetadata.NS_PREFIX + ":lubimyczytac_id" -> builderMeta.lubimyczytacId(content);
+            case BookLoreMetadata.NS_PREFIX + ":page_count" ->
+                    safeParseInt(content, builderMeta::pageCount);
+            case BookLoreMetadata.NS_PREFIX + ":subtitle" -> builderMeta.subtitle(content);
+            case BookLoreMetadata.NS_PREFIX + ":series_total" ->
+                    safeParseInt(content, builderMeta::seriesTotal);
+            case BookLoreMetadata.NS_PREFIX + ":rating" -> {
+                // rating handled elsewhere; ignore here
+            }
+            case BookLoreMetadata.NS_PREFIX + ":amazon_rating" ->
+                    safeParseDouble(content, builderMeta::amazonRating);
+            case BookLoreMetadata.NS_PREFIX + ":amazon_review_count" ->
+                    safeParseInt(content, builderMeta::amazonReviewCount);
+            case BookLoreMetadata.NS_PREFIX + ":goodreads_rating" ->
+                    safeParseDouble(content, builderMeta::goodreadsRating);
+            case BookLoreMetadata.NS_PREFIX + ":goodreads_review_count" ->
+                    safeParseInt(content, builderMeta::goodreadsReviewCount);
+            case BookLoreMetadata.NS_PREFIX + ":hardcover_rating" ->
+                    safeParseDouble(content, builderMeta::hardcoverRating);
+            case BookLoreMetadata.NS_PREFIX + ":hardcover_review_count" ->
+                    safeParseInt(content, builderMeta::hardcoverReviewCount);
+            case BookLoreMetadata.NS_PREFIX + ":lubimyczytac_rating" ->
+                    safeParseDouble(content, builderMeta::lubimyczytacRating);
+            case BookLoreMetadata.NS_PREFIX + ":ranobedb_rating" ->
+                    safeParseDouble(content, builderMeta::ranobedbRating);
+            case BookLoreMetadata.NS_PREFIX + ":age_rating" -> safeParseInt(content, v -> {
+                if (VALID_AGE_RATINGS.contains(v)) builderMeta.ageRating(v);
+            });
+            case BookLoreMetadata.NS_PREFIX + ":content_rating" -> builderMeta.contentRating(content);
+            case BookLoreMetadata.NS_PREFIX + ":moods" -> {
+                if (StringUtils.isNotBlank(content)) {
+                    extractSetField(content, moods);
+                }
+            }
+            case BookLoreMetadata.NS_PREFIX + ":tags" -> {
+                if (StringUtils.isNotBlank(content)) {
+                    extractSetField(content, tags);
+                }
+            }
+            default -> log.debug("Unhandled meta key: {}", key);
+        }
+    }
+
+    private void handleCreator(Element el, String text, Map<String, String> creatorsById,
+                               Map<String, List<String>> creatorsByRole) {
+        String role = el.getAttributeNS(OPF_NS, "role");
+        if (StringUtils.isNotBlank(role)) {
+            creatorsByRole.computeIfAbsent(role, k -> new ArrayList<>()).add(text);
+        } else {
+            String id = el.getAttribute("id");
+            if (StringUtils.isNotBlank(id)) {
+                creatorsById.put(id, text);
+            } else {
+                creatorsByRole.get("aut").add(text);
+            }
+        }
+    }
+
+    private void handleIdentifier(Element el, String text, BookMetadata.BookMetadataBuilder builderMeta) {
+        String scheme = el.getAttributeNS(OPF_NS, "scheme").toUpperCase();
+        String textLower = text.toLowerCase();
+
+        // Parse URN format: urn:scheme:value
+        String value = text;
+        String urnScheme = null;
+        if (textLower.startsWith("urn:")) {
+            String[] parts = text.split(":", 3);
+            if (parts.length >= 3) {
+                urnScheme = parts[1].toUpperCase();
+                value = parts[2];
+            }
+        } else if (textLower.startsWith("isbn:")) {
+            value = text.substring(5);
+            urnScheme = "ISBN";
+        }
+
+        // Use URN scheme if opf:scheme is not present
+        if (scheme.isEmpty() && urnScheme != null) {
+            scheme = urnScheme;
+        }
+
+        if (!scheme.isEmpty()) {
+            applyIdentifierScheme(scheme, value, builderMeta);
+        } else {
+            applyCalibrePrefixIdentifier(text, builderMeta);
+        }
+    }
+
+    private void applyIdentifierScheme(String scheme, String value, BookMetadata.BookMetadataBuilder builderMeta) {
+        switch (scheme) {
+            case "ISBN", "ISBN10", "ISBN13" -> {
+                String cleanValue = ISBN_SEPARATOR_PATTERN.matcher(value).replaceAll("");
+                if (cleanValue.length() == 13) builderMeta.isbn13(value);
+                else if (cleanValue.length() == 10) builderMeta.isbn10(value);
+            }
+            case "GOODREADS" -> builderMeta.goodreadsId(value);
+            case "COMICVINE" -> builderMeta.comicvineId(value);
+            case "RANOBEDB" -> builderMeta.ranobedbId(value);
+            case "GOOGLE" -> builderMeta.googleId(value);
+            case "AMAZON" -> builderMeta.asin(value);
+            case "HARDCOVER" -> builderMeta.hardcoverId(value);
+            case "HARDCOVERBOOK", "HARDCOVER_BOOK_ID" -> builderMeta.hardcoverBookId(value);
+            case "LUBIMYCZYTAC" -> builderMeta.lubimyczytacId(value);
+            default -> log.debug("Unhandled identifier scheme: {}", scheme);
+        }
+    }
+
+    private void applyCalibrePrefixIdentifier(String text, BookMetadata.BookMetadataBuilder builderMeta) {
+        // Handle Calibre's prefix:value format (e.g., amazon:B09XXX, goodreads:123)
+        int colonIdx = text.indexOf(':');
+        if (colonIdx > 0) {
+            String prefix = text.substring(0, colonIdx).toLowerCase();
+            String val = text.substring(colonIdx + 1).trim();
+            if (!"calibre".equals(prefix) && !"uuid".equals(prefix)) {
+                BiConsumer<BookMetadata.BookMetadataBuilder, String> setter = CALIBRE_IDENTIFIER_PREFIXES.get(prefix);
+                if (setter != null) {
+                    setter.accept(builderMeta, val);
+                }
+            }
+        }
+    }
+
+    private void applyTitleTypes(Map<String, String> titlesById, Map<String, String> titleTypeById,
+                                 BookMetadata.BookMetadataBuilder builderMeta) {
+        for (Map.Entry<String, String> entry : titlesById.entrySet()) {
+            String type = titleTypeById.get(entry.getKey());
+            if ("main".equals(type)) builderMeta.title(entry.getValue());
+            else if ("subtitle".equals(type)) builderMeta.subtitle(entry.getValue());
+        }
+    }
+
+    private void applyModifiedDateFallback(BookMetadata.BookMetadataBuilder builderMeta, NodeList children) {
+        if (builderMeta.build().getPublishedDate() == null) {
+            LocalDate modifiedDate = findDctermsModifiedDate(children);
+            if (modifiedDate != null) {
+                builderMeta.publishedDate(modifiedDate);
+            }
+        }
+    }
+
+    private void applyCreators(Map<String, String> creatorsById, Map<String, List<String>> creatorRolesById,
+                               Map<String, List<String>> creatorsByRole, BookMetadata.BookMetadataBuilder builderMeta) {
+        for (Map.Entry<String, String> entry : creatorsById.entrySet()) {
+            List<String> roles = creatorRolesById.getOrDefault(entry.getKey(), List.of("aut"));
+            for (String role : roles) {
+                creatorsByRole.computeIfAbsent(role, k -> new ArrayList<>()).add(entry.getValue());
+            }
+        }
+
+        builderMeta.authors(creatorsByRole.get("aut"));
+    }
+
+    private void applyCollections(BookMetadata.BookMetadataBuilder builderMeta, Set<String> categories,
+                                  Set<String> moods, Set<String> tags) {
+        if (!moods.isEmpty()) builderMeta.moods(moods);
+        if (!tags.isEmpty()) builderMeta.tags(tags);
+
+        // Remove moods and tags from categories to ensure strict separation
+        categories.removeAll(moods);
+        categories.removeAll(tags);
+
+        builderMeta.categories(categories);
+    }
+
+    private BookMetadata finalizeTitle(BookMetadata.BookMetadataBuilder builderMeta, File epubFile) {
+        BookMetadata extractedMetadata = builderMeta.build();
+
+        if (StringUtils.isBlank(extractedMetadata.getTitle())) {
+            builderMeta.title(FilenameUtils.getBaseName(epubFile.getName()));
+            extractedMetadata = builderMeta.build();
+        }
+
+        return extractedMetadata;
+    }
+
+    private boolean trySetSeriesNumber(BookMetadata.BookMetadataBuilder builderMeta, String content) {
+        try {
+            builderMeta.seriesNumber(Float.parseFloat(content));
+            return true;
+        } catch (NumberFormatException _) {
+            // ignore unparseable series index
+            return false;
+        }
+    }
+
+    private void parseUserMetadataPageCount(String content, BookMetadata.BookMetadataBuilder builderMeta) {
+        try {
+            JsonNode jsonRoot = objectMapper.readTree(content);
+            JsonNode valueNode = jsonRoot.get("#value#");
+            if (valueNode != null && !valueNode.isNull()) {
+                safeParseInt(valueNode.asString(), builderMeta::pageCount);
+            }
+        } catch (Exception e) {
+            log.debug("Failed to parse calibre:user_metadata:#pagecount: {}", e.getMessage());
+        }
+    }
+
+    private void parseUserMetadata(String content, BookMetadata.BookMetadataBuilder builderMeta, Set<String> moods, Set<String> tags) {
+        try {
+            extractCalibreUserMetadata(objectMapper.readTree(content), builderMeta, moods, tags);
+        } catch (Exception e) {
+            log.debug("Failed to parse calibre:user_metadata: {}", e.getMessage());
+        }
+    }
+
+    private LocalDate findDctermsModifiedDate(NodeList children) {
+        for (int i = 0; i < children.getLength(); i++) {
+            Element el = asMetaElement(children.item(i));
+            if (el != null) {
+                String prop = el.getAttribute("property").trim().toLowerCase();
+                if ("dcterms:modified".equals(prop)) {
+                    String content = el.hasAttribute(CONTENT_ATTR) ? el.getAttribute(CONTENT_ATTR).trim() : el.getTextContent().trim();
+                    LocalDate parsed = parseDate(content);
+                    if (parsed != null) {
+                        return parsed;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private Element asMetaElement(Node node) {
+        if (!(node instanceof Element el) || !"meta".equals(el.getLocalName())) {
+            return null;
+        }
+        return el;
     }
 
     private static void safeParseInt(String value, IntConsumer setter) {
@@ -508,30 +669,50 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
             return;
         }
         for (Map.Entry<String, JsonNode> field : objectNode.properties()) {
-            String fieldName = field.getKey();
-            try {
-                JsonNode fieldObj = field.getValue();
-                if (fieldObj == null || !fieldObj.isObject()) continue;
+            applyCalibreUserMetadataField(field, builder, moodsSet, tagsSet);
+        }
+    }
 
-                JsonNode valueNode = fieldObj.get("#value#");
-                if (valueNode == null || valueNode.isNull()) continue;
-
-
-                if ("#moods".equals(fieldName) || "#extra_tags".equals(fieldName)) {
-                    String value = valueNode.isArray() ? valueNode.toString() : valueNode.asText().trim();
-                    if (value.isEmpty() || "null".equals(value)) continue;
-                    extractSetField(value, "#moods".equals(fieldName) ? moodsSet : tagsSet);
-                } else {
-                    String value = valueNode.asText().trim();
-                    if (value.isEmpty() || "null".equals(value)) continue;
-                    BiConsumer<BookMetadata.BookMetadataBuilder, String> mapper = CALIBRE_FIELD_MAPPINGS.get(fieldName);
-                    if (mapper != null) {
-                        mapper.accept(builder, value);
-                    }
-                }
-            } catch (Exception e) {
-                log.debug("Failed to extract Calibre field '{}': {}", fieldName, e.getMessage());
+    private void applyCalibreUserMetadataField(Map.Entry<String, JsonNode> field, BookMetadata.BookMetadataBuilder builder,
+                                                Set<String> moodsSet, Set<String> tagsSet) {
+        String fieldName = field.getKey();
+        try {
+            JsonNode fieldObj = field.getValue();
+            if (fieldObj == null || !fieldObj.isObject()) {
+                return;
             }
+
+            JsonNode valueNode = fieldObj.get("#value#");
+            if (valueNode == null || valueNode.isNull()) {
+                return;
+            }
+
+            if ("#moods".equals(fieldName) || "#extra_tags".equals(fieldName)) {
+                applyMoodsOrTagsField(fieldName, valueNode, moodsSet, tagsSet);
+            } else {
+                applyMappedCalibreField(fieldName, valueNode, builder);
+            }
+        } catch (Exception e) {
+            log.debug("Failed to extract Calibre field '{}': {}", fieldName, e.getMessage());
+        }
+    }
+
+    private void applyMoodsOrTagsField(String fieldName, JsonNode valueNode, Set<String> moodsSet, Set<String> tagsSet) {
+        String value = valueNode.isArray() ? valueNode.toString() : valueNode.asString().trim();
+        if (value.isEmpty() || "null".equals(value)) {
+            return;
+        }
+        extractSetField(value, "#moods".equals(fieldName) ? moodsSet : tagsSet);
+    }
+
+    private void applyMappedCalibreField(String fieldName, JsonNode valueNode, BookMetadata.BookMetadataBuilder builder) {
+        String value = valueNode.asString().trim();
+        if (value.isEmpty() || "null".equals(value)) {
+            return;
+        }
+        BiConsumer<BookMetadata.BookMetadataBuilder, String> mapper = CALIBRE_FIELD_MAPPINGS.get(fieldName);
+        if (mapper != null) {
+            mapper.accept(builder, value);
         }
     }
 
@@ -584,7 +765,7 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
         if (YEAR_ONLY_PATTERN.matcher(value).matches()) {
             int year = Integer.parseInt(value);
             if (year >= 1 && year <= 9999) {
-                return LocalDate.of(year, 1, 1);
+                return LocalDate.of(year, Month.JANUARY, 1);
             }
         }
 
@@ -611,26 +792,6 @@ public class EpubMetadataExtractor implements FileMetadataExtractor {
 
         log.warn("Failed to parse date from string: {}", value);
         return null;
-    }
-
-    private byte[] getImageFromEpubResource(Resource res) {
-        if (res == null) {
-            return null;
-        }
-
-        MediaType mt = res.getMediaType();
-        if (mt == null || mt.name() == null || !mt.name().startsWith("image")) {
-            return null;
-        }
-
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            res.writeTo(baos);
-            return baos.toByteArray();
-        } catch (IOException e) {
-            log.warn("Failed to read data for resource", e);
-            return null;
-        }
     }
 
     private String findOpfPath(EpubContainer container) throws IOException, ParserConfigurationException, SAXException {

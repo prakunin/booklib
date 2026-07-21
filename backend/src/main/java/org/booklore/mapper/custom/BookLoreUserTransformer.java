@@ -43,45 +43,7 @@ public class BookLoreUserTransformer {
         BookLoreUser.UserSettings userSettings = new BookLoreUser.UserSettings();
 
         for (UserSettingEntity settingEntity : userEntity.getSettings()) {
-            String key = settingEntity.getSettingKey();
-            String value = settingEntity.getSettingValue();
-
-            try {
-                UserSettingKey settingKey = UserSettingKey.fromDbKey(key);
-                if (settingKey.isJson()) {
-                    switch (settingKey) {
-                        case PER_BOOK_SETTING -> userSettings.setPerBookSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.PerBookSetting.class));
-                        case PDF_READER_SETTING -> userSettings.setPdfReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.PdfReaderSetting.class));
-                        case EPUB_READER_SETTING -> userSettings.setEpubReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.EpubReaderSetting.class));
-                        case EBOOK_READER_SETTING -> userSettings.setEbookReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.EbookReaderSetting.class));
-                        case CBX_READER_SETTING -> userSettings.setCbxReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.CbxReaderSetting.class));
-                        case NEW_PDF_READER_SETTING -> userSettings.setNewPdfReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.NewPdfReaderSetting.class));
-                        case SIDEBAR_LIBRARY_SORTING -> userSettings.setSidebarLibrarySorting(objectMapper.readValue(value, SidebarSortOption.class));
-                        case SIDEBAR_SHELF_SORTING -> userSettings.setSidebarShelfSorting(objectMapper.readValue(value, SidebarSortOption.class));
-                        case SIDEBAR_MAGIC_SHELF_SORTING -> userSettings.setSidebarMagicShelfSorting(objectMapper.readValue(value, SidebarSortOption.class));
-                        case ENTITY_VIEW_PREFERENCES -> userSettings.setEntityViewPreferences(objectMapper.readValue(value, BookLoreUser.UserSettings.EntityViewPreferences.class));
-                        case TABLE_COLUMN_PREFERENCE -> userSettings.setTableColumnPreference(objectMapper.readValue(value, new TypeReference<>() {
-                        }));
-                        case DASHBOARD_CONFIG -> userSettings.setDashboardConfig(objectMapper.readValue(value, BookLoreUser.UserSettings.DashboardConfig.class));
-                        case VISIBLE_FILTERS -> userSettings.setVisibleFilters(objectMapper.readValue(value, new TypeReference<>() {
-                        }));
-                        case VISIBLE_SORT_FIELDS -> userSettings.setVisibleSortFields(objectMapper.readValue(value, new TypeReference<>() {
-                        }));
-                    }
-                } else {
-                    switch (settingKey) {
-                        case FILTER_MODE -> userSettings.setFilterMode(value);
-                        case FILTER_SORTING_MODE -> userSettings.setFilterSortingMode(value);
-                        case METADATA_CENTER_VIEW_MODE -> userSettings.setMetadataCenterViewMode(value);
-                        case ENABLE_SERIES_VIEW -> userSettings.setEnableSeriesView(Boolean.parseBoolean(value));
-                        case AUTO_SAVE_METADATA -> userSettings.setAutoSaveMetadata(Boolean.parseBoolean(value));
-                    }
-                }
-            } catch (IllegalArgumentException _) {
-                log.debug("Unknown setting key encountered: {}", key);
-            } catch (Exception e) {
-                log.error("Failed to deserialize setting '{}': {}", key, e.getMessage(), e);
-            }
+            applyUserSetting(userSettings, settingEntity);
         }
 
         bookLoreUser.setUserSettings(userSettings);
@@ -96,5 +58,57 @@ public class BookLoreUserTransformer {
         }
         bookLoreUser.setProvisioningMethod(userEntity.getProvisioningMethod());
         return bookLoreUser;
+    }
+
+    private void applyUserSetting(BookLoreUser.UserSettings userSettings, UserSettingEntity settingEntity) {
+        String key = settingEntity.getSettingKey();
+        String value = settingEntity.getSettingValue();
+
+        try {
+            UserSettingKey settingKey = UserSettingKey.fromDbKey(key);
+            if (settingKey.isJson()) {
+                applyJsonUserSetting(userSettings, settingKey, value);
+            } else {
+                applyScalarUserSetting(userSettings, settingKey, value);
+            }
+        } catch (IllegalArgumentException _) {
+            log.debug("Unknown setting key encountered: {}", key);
+        } catch (Exception e) {
+            log.error("Failed to deserialize setting '{}': {}", key, e.getMessage(), e);
+        }
+    }
+
+    private void applyJsonUserSetting(BookLoreUser.UserSettings userSettings, UserSettingKey settingKey, String value) {
+        switch (settingKey) {
+            case PER_BOOK_SETTING -> userSettings.setPerBookSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.PerBookSetting.class));
+            case PDF_READER_SETTING -> userSettings.setPdfReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.PdfReaderSetting.class));
+            case EPUB_READER_SETTING -> userSettings.setEpubReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.EpubReaderSetting.class));
+            case EBOOK_READER_SETTING -> userSettings.setEbookReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.EbookReaderSetting.class));
+            case CBX_READER_SETTING -> userSettings.setCbxReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.CbxReaderSetting.class));
+            case NEW_PDF_READER_SETTING -> userSettings.setNewPdfReaderSetting(objectMapper.readValue(value, BookLoreUser.UserSettings.NewPdfReaderSetting.class));
+            case SIDEBAR_LIBRARY_SORTING -> userSettings.setSidebarLibrarySorting(objectMapper.readValue(value, SidebarSortOption.class));
+            case SIDEBAR_SHELF_SORTING -> userSettings.setSidebarShelfSorting(objectMapper.readValue(value, SidebarSortOption.class));
+            case SIDEBAR_MAGIC_SHELF_SORTING -> userSettings.setSidebarMagicShelfSorting(objectMapper.readValue(value, SidebarSortOption.class));
+            case ENTITY_VIEW_PREFERENCES -> userSettings.setEntityViewPreferences(objectMapper.readValue(value, BookLoreUser.UserSettings.EntityViewPreferences.class));
+            case TABLE_COLUMN_PREFERENCE -> userSettings.setTableColumnPreference(objectMapper.readValue(value, new TypeReference<>() {
+            }));
+            case DASHBOARD_CONFIG -> userSettings.setDashboardConfig(objectMapper.readValue(value, BookLoreUser.UserSettings.DashboardConfig.class));
+            case VISIBLE_FILTERS -> userSettings.setVisibleFilters(objectMapper.readValue(value, new TypeReference<>() {
+            }));
+            case VISIBLE_SORT_FIELDS -> userSettings.setVisibleSortFields(objectMapper.readValue(value, new TypeReference<>() {
+            }));
+            default -> { /* no-op: non-JSON setting keys are handled in the else branch below */ }
+        }
+    }
+
+    private void applyScalarUserSetting(BookLoreUser.UserSettings userSettings, UserSettingKey settingKey, String value) {
+        switch (settingKey) {
+            case FILTER_MODE -> userSettings.setFilterMode(value);
+            case FILTER_SORTING_MODE -> userSettings.setFilterSortingMode(value);
+            case METADATA_CENTER_VIEW_MODE -> userSettings.setMetadataCenterViewMode(value);
+            case ENABLE_SERIES_VIEW -> userSettings.setEnableSeriesView(Boolean.parseBoolean(value));
+            case AUTO_SAVE_METADATA -> userSettings.setAutoSaveMetadata(Boolean.parseBoolean(value));
+            default -> { /* no-op: JSON setting keys are handled in the isJson() branch above */ }
+        }
     }
 }

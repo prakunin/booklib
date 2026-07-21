@@ -624,22 +624,22 @@ class BookRuleEvaluatorNumericFieldsTest {
 
         @Test
         void inBetween_matchesPageRange() {
-            BookEntity short_ = createBook("Short");
-            short_.getMetadata().setPageCount(50);
-            em.merge(short_.getMetadata());
+            BookEntity shortBook = createBook("Short");
+            shortBook.getMetadata().setPageCount(50);
+            em.merge(shortBook.getMetadata());
 
             BookEntity medium = createBook("Medium");
             medium.getMetadata().setPageCount(250);
             em.merge(medium.getMetadata());
 
-            BookEntity long_ = createBook("Long");
-            long_.getMetadata().setPageCount(800);
-            em.merge(long_.getMetadata());
+            BookEntity longBook = createBook("Long");
+            longBook.getMetadata().setPageCount(800);
+            em.merge(longBook.getMetadata());
             em.flush();
             em.clear();
 
             List<Long> ids = findMatchingIds(singleRule(RuleField.PAGE_COUNT, RuleOperator.IN_BETWEEN, null, 100, 500));
-            assertThat(ids).contains(medium.getId()).doesNotContain(short_.getId(), long_.getId());
+            assertThat(ids).contains(medium.getId()).doesNotContain(shortBook.getId(), longBook.getId());
         }
     }
 

@@ -68,7 +68,7 @@ public class AppBookQuickSearchService {
             return Collections.emptyList();
         }
 
-        int limit = Math.min(Math.max(requestedLimit == null ? MAX_RESULTS : requestedLimit, 1), MAX_RESULTS);
+        int limit = Math.clamp(requestedLimit == null ? MAX_RESULTS : requestedLimit, 1, MAX_RESULTS);
         Collection<Long> queryLibraryIds = admin ? ADMIN_LIBRARY_SENTINEL : accessibleLibraryIds;
         List<UserContentRestrictionEntity> restrictions = admin
                 ? List.of()

@@ -13,6 +13,7 @@ import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -88,7 +89,7 @@ public class CoverImageGenerator {
 
         } catch (Exception e) {
             log.error("Cover generation failed: {}", title, e);
-            throw new RuntimeException("Cover generation failed", e);
+            throw new IllegalStateException("Cover generation failed", e);
         } finally {
             cleanup(g, render, result);
         }
@@ -139,7 +140,7 @@ public class CoverImageGenerator {
 
         } catch (Exception e) {
             log.error("Square cover generation failed: {}", title, e);
-            throw new RuntimeException("Square cover generation failed", e);
+            throw new IllegalStateException("Square cover generation failed", e);
         } finally {
             cleanup(g, render, result);
         }
@@ -234,7 +235,14 @@ public class CoverImageGenerator {
             float opacity = 0.018f + Math.abs((seed * (i + 1) * 3) % 25) * 0.0012f;
 
             g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity));
-            Color bokehColor = (i % 3 == 0) ? lighten(p.accent, 0.25f) : (i % 3 == 1) ? Color.WHITE : lighten(p.ornament, 0.2f);
+            Color bokehColor;
+            if (i % 3 == 0) {
+                bokehColor = lighten(p.accent, 0.25f);
+            } else if (i % 3 == 1) {
+                bokehColor = Color.WHITE;
+            } else {
+                bokehColor = lighten(p.ornament, 0.2f);
+            }
 
             g.setPaint(new RadialGradientPaint(px, py, size,
                     new float[]{0f, 0.6f, 1f},
@@ -413,21 +421,13 @@ public class CoverImageGenerator {
         int bottomBound = h - margin;
 
         String[] authors = author.split(",");
-        StringBuilder formattedAuthors = new StringBuilder();
-        for (int i = 0; i < authors.length; i++) {
-            if (i > 0) formattedAuthors.append("\n").append(authors[i].trim());
-            else formattedAuthors.append(authors[i].trim());
-        }
+        String formattedAuthors = formatAuthorNames(authors);
 
-        Font authorFont = resolveFont(g, formattedAuthors.toString(), maxW, authorSize(formattedAuthors.length()), MAX_AUTHOR_LINES, false);
+        Font authorFont = resolveFont(g, formattedAuthors, maxW, authorSize(formattedAuthors.length()), MAX_AUTHOR_LINES, false);
         g.setFont(authorFont);
         FontMetrics authorFm = g.getFontMetrics();
 
-        String[] authorLinesArray = formattedAuthors.toString().split("\n");
-        List<String> lines = new ArrayList<>();
-        for (String line : authorLinesArray) {
-            lines.add(line.trim());
-        }
+        List<String> lines = toTrimmedLines(formattedAuthors);
 
         int authorLineH = (int) (authorFm.getHeight() * 1.18);
         int authorTotalH = lines.size() * authorLineH;
@@ -470,12 +470,38 @@ public class CoverImageGenerator {
         g.setFont(authorFont);
         float tracking = 0.08f;
 
+        renderAuthorLines(g, lines, currentY, authorFm, authorLineH, w, bottomBound, tracking, p);
+    }
+
+    private static String formatAuthorNames(String[] authors) {
+        StringBuilder formattedAuthors = new StringBuilder();
+        for (int i = 0; i < authors.length; i++) {
+            if (i > 0) formattedAuthors.append("\n").append(authors[i].trim());
+            else formattedAuthors.append(authors[i].trim());
+        }
+        return formattedAuthors.toString();
+    }
+
+    private static List<String> toTrimmedLines(String text) {
+        List<String> lines = new ArrayList<>();
+        for (String line : text.split("\n")) {
+            lines.add(line.trim());
+        }
+        return lines;
+    }
+
+    // Private rendering helper: params are heterogeneous graphics/layout inputs (canvas, text,
+    // font metrics, geometry, palette) with no cohesive real-world grouping; a param object here
+    // would be artificial. sonar java:S107.
+    @SuppressWarnings("java:S107")
+    private void renderAuthorLines(Graphics2D g, List<String> lines, int startY, FontMetrics authorFm,
+                                   int authorLineH, int w, int bottomBound, float tracking, Palette p) {
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
             if (!line.isEmpty()) {  // Only render non-empty lines
                 int lw = trackedWidth(authorFm, line, tracking);
                 int x = (w - lw) / 2;
-                int y = currentY + authorFm.getAscent() + i * authorLineH;
+                int y = startY + authorFm.getAscent() + i * authorLineH;
                 if (y + authorFm.getDescent() > bottomBound) break;
                 renderText(g, line, x, y, tracking, p.textSub, false);
             }
@@ -861,7 +887,7 @@ public class CoverImageGenerator {
             writer.write(null, new IIOImage(img, null, null), param);
             return baos.toByteArray();
         } catch (IOException e) {
-            throw new RuntimeException("JPEG encoding failed", e);
+            throw new UncheckedIOException("JPEG encoding failed", e);
         } finally {
             if (writer != null) writer.dispose();
             if (ios != null) try { ios.close(); } catch (IOException _) { /* nothing to recover on close */ }

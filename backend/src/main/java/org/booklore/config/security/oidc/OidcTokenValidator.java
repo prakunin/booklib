@@ -2,9 +2,8 @@ package org.booklore.config.security.oidc;
 
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.jwk.source.DefaultJWKSetCache;
 import com.nimbusds.jose.jwk.source.JWKSource;
-import com.nimbusds.jose.jwk.source.RemoteJWKSet;
+import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
 import com.nimbusds.jose.proc.JWSKeySelector;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier;
@@ -31,7 +30,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import java.text.ParseException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -43,8 +41,9 @@ public class OidcTokenValidator {
 
     private static final int CLOCK_SKEW_SECONDS = 30;
     private static final int MAX_IAT_AGE_SECONDS = 300;
-    private static final long JWKS_CACHE_TTL_MS = 21_600_000; // 6 hours
-    private static final long JWKS_REFRESH_MS = 3_600_000; // 1 hour
+    private static final long JWKS_CACHE_TTL_MS = 3_600_000; // 1 hour - synchronous refresh cadence (matches the old DefaultJWKSetCache refresh time)
+    private static final long JWKS_OUTAGE_TOLERANCE_MS = 21_600_000; // 6 hours - serve the stale JWK set on refresh failure (matches the old DefaultJWKSetCache lifespan)
+    private static final long JWKS_REFRESH_WAIT_TIMEOUT_MS = 15_000; // lock-wait timeout for concurrent refreshes (builder default)
 
     private final OidcDiscoveryService discoveryService;
 
@@ -89,8 +88,12 @@ public class OidcTokenValidator {
         URI jwksUri = discovery.jwksUri();
 
         var resourceRetriever = new DefaultResourceRetriever(10_000, 10_000);
-        var jwkSetCache = new DefaultJWKSetCache(JWKS_CACHE_TTL_MS, JWKS_REFRESH_MS, TimeUnit.MILLISECONDS);
-        JWKSource<SecurityContext> jwkSource = new RemoteJWKSet<>(uriToUrl(jwksUri), resourceRetriever, jwkSetCache);
+        JWKSource<SecurityContext> jwkSource = JWKSourceBuilder.<SecurityContext>create(uriToUrl(jwksUri), resourceRetriever)
+                .cache(JWKS_CACHE_TTL_MS, JWKS_REFRESH_WAIT_TIMEOUT_MS)
+                .outageTolerant(JWKS_OUTAGE_TOLERANCE_MS)
+                .refreshAheadCache(false)
+                .rateLimited(false)
+                .build();
 
         Set<JWSAlgorithm> jwsAlgs = new HashSet<>();
         jwsAlgs.addAll(JWSAlgorithm.Family.RSA);

@@ -134,92 +134,107 @@ public class BookdropEventHandlerService implements SmartLifecycle {
         WatchEvent.Kind<?> kind = event.getKind();
 
         if (kind == StandardWatchEventKinds.ENTRY_CREATE || kind == StandardWatchEventKinds.ENTRY_MODIFY) {
-            try {
-                if (!Files.exists(file)) {
-                    log.warn("File does not exist, ignoring: {}", file);
-                    return;
-                }
+            handleCreatedOrModifiedFile(file);
+        } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
+            handleDeletedFile(file);
+        }
+    }
 
-                if (Files.isDirectory(file)) {
-                    log.info("New folder detected in bookdrop, ignoring: {}", file);
-                    return;
-                }
-
-                String filePath = file.toAbsolutePath().toString();
-                String fileName = file.getFileName().toString();
-
-                if (BookFileExtension.fromFileName(fileName).isEmpty()) {
-                    log.info("Unsupported file type detected, ignoring file: {}", fileName);
-                    return;
-                }
-
-                if (bookdropFileRepository.findByFilePath(filePath).isPresent()) {
-                    log.info("File already exists in Bookdrop and is pending review or acceptance: {}", filePath);
-                    return;
-                }
-
-                if (!waitForFileStability(file)) {
-                    log.warn("File did not stabilize within timeout, skipping: {}", file);
-                    return;
-                }
-
-                log.info("Handling new bookdrop file: {}", file);
-
-                int queueSize = fileQueue.size();
-                notificationService.sendMessageToPermissions(
-                        Topic.LOG,
-                        LogNotification.info("Processing bookdrop file: " + fileName + " (" + queueSize + " files remaining)"),
-                        Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY)
-                );
-
-                BookdropFileEntity bookdropFileEntity = BookdropFileEntity.builder()
-                        .filePath(filePath)
-                        .fileName(fileName)
-                        .fileSize(Files.size(file))
-                        .status(BookdropFileEntity.Status.PENDING_REVIEW)
-                        .createdAt(Instant.now())
-                        .updatedAt(Instant.now())
-                        .build();
-
-                bookdropFileEntity = bookdropFileRepository.save(bookdropFileEntity);
-
-                if (appSettingService.getAppSettings().isMetadataDownloadOnBookdrop()) {
-                    bookdropMetadataService.attachInitialMetadata(bookdropFileEntity.getId());
-                    bookdropMetadataService.attachFetchedMetadata(bookdropFileEntity.getId());
-                } else {
-                    bookdropMetadataService.attachInitialMetadata(bookdropFileEntity.getId());
-                    log.info("Metadata download is disabled. Only initial metadata extracted for file: {}", bookdropFileEntity.getFileName());
-                }
-
-                bookdropNotificationService.sendBookdropFileSummaryNotification();
-
-                if (fileQueue.isEmpty()) {
-                    notificationService.sendMessageToPermissions(
-                            Topic.LOG,
-                            LogNotification.info("All bookdrop files have finished processing"),
-                            Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY)
-                    );
-                } else {
-                    notificationService.sendMessageToPermissions(
-                            Topic.LOG,
-                            LogNotification.info("Finished processing bookdrop file: " + fileName + " (" + fileQueue.size() + " files remaining)"),
-                            Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY)
-                    );
-                }
-
-            } catch (Exception e) {
-                log.error("Error handling bookdrop file: {}", file, e);
+    private void handleCreatedOrModifiedFile(Path file) {
+        try {
+            if (!Files.exists(file)) {
+                log.warn("File does not exist, ignoring: {}", file);
+                return;
             }
 
-        } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
-            String deletedPath = file.toAbsolutePath().toString();
-            log.info("Detected deletion event: {}", deletedPath);
+            if (Files.isDirectory(file)) {
+                log.info("New folder detected in bookdrop, ignoring: {}", file);
+                return;
+            }
 
-            int deletedCount = bookdropFileRepository.deleteAllByFilePathStartingWith(deletedPath);
-            log.info("Deleted {} BookdropFile record(s) from database matching path: {}", deletedCount, deletedPath);
+            String filePath = file.toAbsolutePath().toString();
+            String fileName = file.getFileName().toString();
+
+            if (BookFileExtension.fromFileName(fileName).isEmpty()) {
+                log.info("Unsupported file type detected, ignoring file: {}", fileName);
+                return;
+            }
+
+            if (bookdropFileRepository.findByFilePath(filePath).isPresent()) {
+                log.info("File already exists in Bookdrop and is pending review or acceptance: {}", filePath);
+                return;
+            }
+
+            if (!waitForFileStability(file)) {
+                log.warn("File did not stabilize within timeout, skipping: {}", file);
+                return;
+            }
+
+            log.info("Handling new bookdrop file: {}", file);
+
+            int queueSize = fileQueue.size();
+            notificationService.sendMessageToPermissions(
+                    Topic.LOG,
+                    LogNotification.info("Processing bookdrop file: " + fileName + " (" + queueSize + " files remaining)"),
+                    Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY)
+            );
+
+            BookdropFileEntity bookdropFileEntity = BookdropFileEntity.builder()
+                    .filePath(filePath)
+                    .fileName(fileName)
+                    .fileSize(Files.size(file))
+                    .status(BookdropFileEntity.Status.PENDING_REVIEW)
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+
+            bookdropFileEntity = bookdropFileRepository.save(bookdropFileEntity);
+
+            attachMetadata(bookdropFileEntity);
 
             bookdropNotificationService.sendBookdropFileSummaryNotification();
+
+            sendCompletionNotification(fileName);
+
+        } catch (Exception e) {
+            log.error("Error handling bookdrop file: {}", file, e);
         }
+    }
+
+    private void attachMetadata(BookdropFileEntity bookdropFileEntity) {
+        if (appSettingService.getAppSettings().isMetadataDownloadOnBookdrop()) {
+            bookdropMetadataService.attachInitialMetadata(bookdropFileEntity.getId());
+            bookdropMetadataService.attachFetchedMetadata(bookdropFileEntity.getId());
+        } else {
+            bookdropMetadataService.attachInitialMetadata(bookdropFileEntity.getId());
+            log.info("Metadata download is disabled. Only initial metadata extracted for file: {}", bookdropFileEntity.getFileName());
+        }
+    }
+
+    private void sendCompletionNotification(String fileName) {
+        if (fileQueue.isEmpty()) {
+            notificationService.sendMessageToPermissions(
+                    Topic.LOG,
+                    LogNotification.info("All bookdrop files have finished processing"),
+                    Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY)
+            );
+        } else {
+            notificationService.sendMessageToPermissions(
+                    Topic.LOG,
+                    LogNotification.info("Finished processing bookdrop file: " + fileName + " (" + fileQueue.size() + " files remaining)"),
+                    Set.of(PermissionType.ADMIN, PermissionType.MANAGE_LIBRARY)
+            );
+        }
+    }
+
+    private void handleDeletedFile(Path file) {
+        String deletedPath = file.toAbsolutePath().toString();
+        log.info("Detected deletion event: {}", deletedPath);
+
+        int deletedCount = bookdropFileRepository.deleteAllByFilePathStartingWith(deletedPath);
+        log.info("Deleted {} BookdropFile record(s) from database matching path: {}", deletedCount, deletedPath);
+
+        bookdropNotificationService.sendBookdropFileSummaryNotification();
     }
 
     private boolean waitForFileStability(Path file) {

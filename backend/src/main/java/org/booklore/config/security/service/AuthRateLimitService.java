@@ -16,6 +16,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class AuthRateLimitService {
 
     private static final int MAX_ATTEMPTS = 5;
+    private static final String LOGIN_IP_KEY_PREFIX = "login:ip:";
+    private static final String LOGIN_USER_KEY_PREFIX = "login:user:";
+    private static final String REFRESH_KEY_PREFIX = "refresh:";
 
     private final Cache<String, AtomicInteger> attemptCache;
     private final AuditService auditService;
@@ -31,44 +34,44 @@ public class AuthRateLimitService {
     // --- Login rate limiting ---
 
     public void checkLoginRateLimit(String ip) {
-        checkRateLimit("login:ip:" + ip, AuditAction.LOGIN_RATE_LIMITED, "Login rate limited for IP: " + ip);
+        checkRateLimit(LOGIN_IP_KEY_PREFIX + ip, AuditAction.LOGIN_RATE_LIMITED, "Login rate limited for IP: " + ip);
     }
 
     public void checkLoginRateLimitByUsername(String username) {
         String normalizedUsername = normalizeUsername(username);
-        checkRateLimit("login:user:" + normalizedUsername, AuditAction.LOGIN_RATE_LIMITED, "Login rate limited for username: " + normalizedUsername);
+        checkRateLimit(LOGIN_USER_KEY_PREFIX + normalizedUsername, AuditAction.LOGIN_RATE_LIMITED, "Login rate limited for username: " + normalizedUsername);
     }
 
     public void recordFailedLoginAttempt(String ip) {
-        recordFailedAttempt("login:ip:" + ip);
+        recordFailedAttempt(LOGIN_IP_KEY_PREFIX + ip);
     }
 
     public void recordFailedLoginAttemptByUsername(String username) {
         String normalizedUsername = normalizeUsername(username);
-        recordFailedAttempt("login:user:" + normalizedUsername);
+        recordFailedAttempt(LOGIN_USER_KEY_PREFIX + normalizedUsername);
     }
 
     public void resetLoginAttempts(String ip) {
-        resetAttempts("login:ip:" + ip);
+        resetAttempts(LOGIN_IP_KEY_PREFIX + ip);
     }
 
     public void resetLoginAttemptsByUsername(String username) {
         String normalizedUsername = normalizeUsername(username);
-        resetAttempts("login:user:" + normalizedUsername);
+        resetAttempts(LOGIN_USER_KEY_PREFIX + normalizedUsername);
     }
 
     // --- Refresh token rate limiting ---
 
     public void checkRefreshRateLimit(String ip) {
-        checkRateLimit("refresh:" + ip, AuditAction.REFRESH_RATE_LIMITED, "Refresh rate limited for IP: " + ip);
+        checkRateLimit(REFRESH_KEY_PREFIX + ip, AuditAction.REFRESH_RATE_LIMITED, "Refresh rate limited for IP: " + ip);
     }
 
     public void recordFailedRefreshAttempt(String ip) {
-        recordFailedAttempt("refresh:" + ip);
+        recordFailedAttempt(REFRESH_KEY_PREFIX + ip);
     }
 
     public void resetRefreshAttempts(String ip) {
-        resetAttempts("refresh:" + ip);
+        resetAttempts(REFRESH_KEY_PREFIX + ip);
     }
 
     // --- Alternate authentication rate limiting ---

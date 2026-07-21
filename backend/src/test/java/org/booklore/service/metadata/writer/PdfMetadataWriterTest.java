@@ -15,13 +15,13 @@ import org.booklore.service.metadata.extractor.PdfMetadataExtractor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.booklore.test.RequiresPdfium;
 
@@ -41,7 +43,7 @@ class PdfMetadataWriterTest {
 
     @BeforeEach
     void setup() throws Exception {
-        AppSettingService appSettingService = Mockito.mock(AppSettingService.class);
+        AppSettingService appSettingService = mock(AppSettingService.class);
         AppSettings settings = new AppSettings();
         MetadataPersistenceSettings persistence = new MetadataPersistenceSettings();
         MetadataPersistenceSettings.SaveToOriginalFile save = new MetadataPersistenceSettings.SaveToOriginalFile();
@@ -51,7 +53,7 @@ class PdfMetadataWriterTest {
         save.setPdf(pdfSettings);
         persistence.setSaveToOriginalFile(save);
         settings.setMetadataPersistenceSettings(persistence);
-        Mockito.when(appSettingService.getAppSettings()).thenReturn(settings);
+        when(appSettingService.getAppSettings()).thenReturn(settings);
 
         writer = new PdfMetadataWriter(appSettingService);
         extractor = new PdfMetadataExtractor();
@@ -86,7 +88,7 @@ class PdfMetadataWriterTest {
         meta.setTitle("Dead Simple Python");
         meta.setDescription("A Python programming guide");
         meta.setPublisher("No Starch Press");
-        meta.setPublishedDate(LocalDate.of(2022, 11, 22));
+        meta.setPublishedDate(LocalDate.of(2022, Month.NOVEMBER, 22));
         meta.setLanguage("en");
         meta.setPageCount(754);
 
@@ -334,7 +336,7 @@ class PdfMetadataWriterTest {
         File pdf = createEmptyPdf("date-format.pdf");
 
         BookMetadataEntity meta = createBasicMetadata();
-        meta.setPublishedDate(LocalDate.of(2021, 2, 17));
+        meta.setPublishedDate(LocalDate.of(2021, Month.FEBRUARY, 17));
 
         writer.saveMetadataToFile(pdf, meta, null, null);
 

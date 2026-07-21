@@ -313,10 +313,7 @@ public class SecurityConfig {
                     if (matchPatterns.parallelStream().noneMatch(p -> p.matches(pathContainer))) {
                         return false;
                     }
-                    if (whitelistedPatterns.parallelStream().anyMatch(p -> p.matches(pathContainer))) {
-                        return false;
-                    }
-                    return true;
+                    return whitelistedPatterns.parallelStream().noneMatch(p -> p.matches(pathContainer));
                 })
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)

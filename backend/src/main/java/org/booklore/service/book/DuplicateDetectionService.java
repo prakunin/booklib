@@ -109,21 +109,25 @@ public class DuplicateDetectionService {
 
         forEachDuplicateDetectionBatch(libraryId, books -> {
             for (BookEntity book : books) {
-                if (alreadyGrouped.contains(book.getId())) continue;
-                BookMetadataEntity meta = book.getMetadata();
-                if (meta == null) continue;
-
-                String isbn13 = meta.getIsbn13();
-                if (isbn13 == null && meta.getIsbn10() != null) {
-                    isbn13 = BookUtils.isbn10To13(meta.getIsbn10());
-                }
-                if (isbn13 != null && !isbn13.isBlank()) {
-                    isbnGroups.computeIfAbsent(isbn13.trim(), k -> new ArrayList<>()).add(book);
-                }
+                collectIsbnGroup(book, isbnGroups, alreadyGrouped);
             }
         });
 
         return buildGroups(isbnGroups, "ISBN", alreadyGrouped, formatPriority);
+    }
+
+    private void collectIsbnGroup(BookEntity book, Map<String, List<BookEntity>> isbnGroups, Set<Long> alreadyGrouped) {
+        if (alreadyGrouped.contains(book.getId())) return;
+        BookMetadataEntity meta = book.getMetadata();
+        if (meta == null) return;
+
+        String isbn13 = meta.getIsbn13();
+        if (isbn13 == null && meta.getIsbn10() != null) {
+            isbn13 = BookUtils.isbn10To13(meta.getIsbn10());
+        }
+        if (isbn13 != null && !isbn13.isBlank()) {
+            isbnGroups.computeIfAbsent(isbn13.trim(), k -> new ArrayList<>()).add(book);
+        }
     }
 
     private List<DuplicateGroup> findByExternalId(Long libraryId, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
@@ -133,17 +137,7 @@ public class DuplicateDetectionService {
 
         forEachDuplicateDetectionBatch(libraryId, books -> {
             for (BookEntity book : books) {
-                if (alreadyGrouped.contains(book.getId()) || book.getMetadata() == null) continue;
-                bookMap.put(book.getId(), book);
-                parent.put(book.getId(), book.getId());
-
-                for (String extId : extractExternalIds(book.getMetadata())) {
-                    if (idToBook.containsKey(extId)) {
-                        union(parent, book.getId(), idToBook.get(extId));
-                    } else {
-                        idToBook.put(extId, book.getId());
-                    }
-                }
+                collectExternalIdUnion(book, alreadyGrouped, bookMap, parent, idToBook);
             }
         });
 
@@ -160,6 +154,22 @@ public class DuplicateDetectionService {
             result.add(toDuplicateGroup(group, "EXTERNAL_ID", formatPriority));
         }
         return result;
+    }
+
+    private void collectExternalIdUnion(BookEntity book, Set<Long> alreadyGrouped,
+                                        Map<Long, BookEntity> bookMap, Map<Long, Long> parent,
+                                        Map<String, Long> idToBook) {
+        if (alreadyGrouped.contains(book.getId()) || book.getMetadata() == null) return;
+        bookMap.put(book.getId(), book);
+        parent.put(book.getId(), book.getId());
+
+        for (String extId : extractExternalIds(book.getMetadata())) {
+            if (idToBook.containsKey(extId)) {
+                union(parent, book.getId(), idToBook.get(extId));
+            } else {
+                idToBook.put(extId, book.getId());
+            }
+        }
     }
 
     private List<String> extractExternalIds(BookMetadataEntity meta) {
@@ -200,67 +210,82 @@ public class DuplicateDetectionService {
 
         forEachDuplicateDetectionBatch(libraryId, books -> {
             for (BookEntity book : books) {
-                if (alreadyGrouped.contains(book.getId())) continue;
-                BookMetadataEntity meta = book.getMetadata();
-                if (meta == null || meta.getTitle() == null || meta.getTitle().isBlank()) continue;
-
-                String normalizedTitle = BookUtils.normalizeForSearch(meta.getTitle());
-                if (normalizedTitle != null && !normalizedTitle.isBlank()) {
-                    titleGroups.computeIfAbsent(normalizedTitle, k -> new ArrayList<>()).add(book);
-                }
+                collectTitleGroup(book, titleGroups, alreadyGrouped);
             }
         });
 
         List<DuplicateGroup> result = new ArrayList<>();
         for (List<BookEntity> group : titleGroups.values()) {
-            if (group.size() < 2) continue;
-
-            List<BookEntity> withAuthors = group.stream()
-                    .filter(b -> b.getMetadata().getAuthors() != null && !b.getMetadata().getAuthors().isEmpty())
-                    .toList();
-
-            if (withAuthors.size() < 2) continue;
-
-            Map<Long, Set<String>> normalizedAuthors = new HashMap<>();
-            for (BookEntity book : withAuthors) {
-                Set<String> names = book.getMetadata().getAuthors().stream()
-                        .map(AuthorEntity::getName)
-                        .filter(Objects::nonNull)
-                        .map(BookUtils::normalizeForSearch)
-                        .collect(Collectors.toSet());
-                normalizedAuthors.put(book.getId(), names);
-            }
-
-            Map<Long, Long> parent = new HashMap<>();
-            for (BookEntity book : withAuthors) {
-                parent.put(book.getId(), book.getId());
-            }
-
-            for (int i = 0; i < withAuthors.size(); i++) {
-                for (int j = i + 1; j < withAuthors.size(); j++) {
-                    Set<String> authorsI = normalizedAuthors.get(withAuthors.get(i).getId());
-                    Set<String> authorsJ = normalizedAuthors.get(withAuthors.get(j).getId());
-                    boolean overlap = authorsI.stream().anyMatch(authorsJ::contains);
-                    if (overlap) {
-                        union(parent, withAuthors.get(i).getId(), withAuthors.get(j).getId());
-                    }
-                }
-            }
-
-            Map<Long, List<BookEntity>> subGroups = new HashMap<>();
-            for (BookEntity book : withAuthors) {
-                Long root = find(parent, book.getId());
-                subGroups.computeIfAbsent(root, k -> new ArrayList<>()).add(book);
-            }
-
-            for (List<BookEntity> subGroup : subGroups.values()) {
-                if (subGroup.size() < 2) continue;
-                subGroup.forEach(b -> alreadyGrouped.add(b.getId()));
-                result.add(toDuplicateGroup(subGroup, "TITLE_AUTHOR", formatPriority));
-            }
+            processTitleAuthorGroup(group, alreadyGrouped, formatPriority, result);
         }
 
         return result;
+    }
+
+    private void collectTitleGroup(BookEntity book, Map<String, List<BookEntity>> titleGroups, Set<Long> alreadyGrouped) {
+        if (alreadyGrouped.contains(book.getId())) return;
+        BookMetadataEntity meta = book.getMetadata();
+        if (meta == null || meta.getTitle() == null || meta.getTitle().isBlank()) return;
+
+        String normalizedTitle = BookUtils.normalizeForSearch(meta.getTitle());
+        if (normalizedTitle != null && !normalizedTitle.isBlank()) {
+            titleGroups.computeIfAbsent(normalizedTitle, k -> new ArrayList<>()).add(book);
+        }
+    }
+
+    private void processTitleAuthorGroup(List<BookEntity> group, Set<Long> alreadyGrouped,
+                                          List<BookFileType> formatPriority, List<DuplicateGroup> result) {
+        if (group.size() < 2) return;
+
+        List<BookEntity> withAuthors = group.stream()
+                .filter(b -> b.getMetadata().getAuthors() != null && !b.getMetadata().getAuthors().isEmpty())
+                .toList();
+
+        if (withAuthors.size() < 2) return;
+
+        Map<Long, Set<String>> normalizedAuthors = new HashMap<>();
+        for (BookEntity book : withAuthors) {
+            Set<String> names = book.getMetadata().getAuthors().stream()
+                    .map(AuthorEntity::getName)
+                    .filter(Objects::nonNull)
+                    .map(BookUtils::normalizeForSearch)
+                    .collect(Collectors.toSet());
+            normalizedAuthors.put(book.getId(), names);
+        }
+
+        Map<Long, Long> parent = unionByAuthorOverlap(withAuthors, normalizedAuthors);
+
+        Map<Long, List<BookEntity>> subGroups = new HashMap<>();
+        for (BookEntity book : withAuthors) {
+            Long root = find(parent, book.getId());
+            subGroups.computeIfAbsent(root, k -> new ArrayList<>()).add(book);
+        }
+
+        for (List<BookEntity> subGroup : subGroups.values()) {
+            if (subGroup.size() < 2) continue;
+            subGroup.forEach(b -> alreadyGrouped.add(b.getId()));
+            result.add(toDuplicateGroup(subGroup, "TITLE_AUTHOR", formatPriority));
+        }
+    }
+
+    private Map<Long, Long> unionByAuthorOverlap(List<BookEntity> withAuthors,
+                                                 Map<Long, Set<String>> normalizedAuthors) {
+        Map<Long, Long> parent = new HashMap<>();
+        for (BookEntity book : withAuthors) {
+            parent.put(book.getId(), book.getId());
+        }
+
+        for (int i = 0; i < withAuthors.size(); i++) {
+            for (int j = i + 1; j < withAuthors.size(); j++) {
+                Set<String> authorsI = normalizedAuthors.get(withAuthors.get(i).getId());
+                Set<String> authorsJ = normalizedAuthors.get(withAuthors.get(j).getId());
+                boolean overlap = authorsI.stream().anyMatch(authorsJ::contains);
+                if (overlap) {
+                    union(parent, withAuthors.get(i).getId(), withAuthors.get(j).getId());
+                }
+            }
+        }
+        return parent;
     }
 
     private List<DuplicateGroup> findByDirectory(Long libraryId, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
@@ -268,27 +293,31 @@ public class DuplicateDetectionService {
 
         forEachDuplicateDetectionBatch(libraryId, books -> {
             for (BookEntity book : books) {
-                if (alreadyGrouped.contains(book.getId())) continue;
-                if (book.getLibraryPath() == null) continue;
-
-                List<BookFileEntity> bookFiles = book.getBookFiles();
-                if (bookFiles == null || bookFiles.isEmpty()) continue;
-
-                BookFileEntity primary = bookFiles.stream()
-                        .filter(BookFileEntity::isBookFormat)
-                        .findFirst()
-                        .orElse(null);
-                if (primary == null) continue;
-
-                String subPath = primary.getFileSubPath();
-                if (subPath == null || subPath.isBlank()) continue;
-
-                String key = book.getLibraryPath().getId() + ":" + subPath;
-                dirGroups.computeIfAbsent(key, k -> new ArrayList<>()).add(book);
+                collectDirectoryGroup(book, dirGroups, alreadyGrouped);
             }
         });
 
         return buildGroups(dirGroups, "DIRECTORY", alreadyGrouped, formatPriority);
+    }
+
+    private void collectDirectoryGroup(BookEntity book, Map<String, List<BookEntity>> dirGroups, Set<Long> alreadyGrouped) {
+        if (alreadyGrouped.contains(book.getId())) return;
+        if (book.getLibraryPath() == null) return;
+
+        List<BookFileEntity> bookFiles = book.getBookFiles();
+        if (bookFiles == null || bookFiles.isEmpty()) return;
+
+        BookFileEntity primary = bookFiles.stream()
+                .filter(BookFileEntity::isBookFormat)
+                .findFirst()
+                .orElse(null);
+        if (primary == null) return;
+
+        String subPath = primary.getFileSubPath();
+        if (subPath == null || subPath.isBlank()) return;
+
+        String key = book.getLibraryPath().getId() + ":" + subPath;
+        dirGroups.computeIfAbsent(key, k -> new ArrayList<>()).add(book);
     }
 
     private List<DuplicateGroup> findByFilename(Long libraryId, Set<Long> alreadyGrouped, List<BookFileType> formatPriority) {
@@ -296,33 +325,37 @@ public class DuplicateDetectionService {
 
         forEachDuplicateDetectionBatch(libraryId, books -> {
             for (BookEntity book : books) {
-                if (alreadyGrouped.contains(book.getId())) continue;
-
-                List<BookFileEntity> bookFiles = book.getBookFiles();
-                if (bookFiles == null || bookFiles.isEmpty()) continue;
-
-                BookFileEntity primary = bookFiles.stream()
-                        .filter(BookFileEntity::isBookFormat)
-                        .findFirst()
-                        .orElse(null);
-                if (primary == null || primary.getFileName() == null) continue;
-
-                String fileName = primary.getFileName();
-                int dotIdx = fileName.lastIndexOf('.');
-                String baseName = dotIdx > 0 ? fileName.substring(0, dotIdx) : fileName;
-
-                String normalized = baseName.toLowerCase();
-                normalized = UNDERSCORE_HYPHEN_PATTERN.matcher(normalized).replaceAll(" ");
-                normalized = NON_ALPHANUMERIC_PATTERN.matcher(normalized).replaceAll("");
-                normalized = WHITESPACE_PATTERN.matcher(normalized).replaceAll(" ").trim();
-
-                if (!normalized.isBlank()) {
-                    nameGroups.computeIfAbsent(normalized, k -> new ArrayList<>()).add(book);
-                }
+                collectFilenameGroup(book, nameGroups, alreadyGrouped);
             }
         });
 
         return buildGroups(nameGroups, "FILENAME", alreadyGrouped, formatPriority);
+    }
+
+    private void collectFilenameGroup(BookEntity book, Map<String, List<BookEntity>> nameGroups, Set<Long> alreadyGrouped) {
+        if (alreadyGrouped.contains(book.getId())) return;
+
+        List<BookFileEntity> bookFiles = book.getBookFiles();
+        if (bookFiles == null || bookFiles.isEmpty()) return;
+
+        BookFileEntity primary = bookFiles.stream()
+                .filter(BookFileEntity::isBookFormat)
+                .findFirst()
+                .orElse(null);
+        if (primary == null || primary.getFileName() == null) return;
+
+        String fileName = primary.getFileName();
+        int dotIdx = fileName.lastIndexOf('.');
+        String baseName = dotIdx > 0 ? fileName.substring(0, dotIdx) : fileName;
+
+        String normalized = baseName.toLowerCase();
+        normalized = UNDERSCORE_HYPHEN_PATTERN.matcher(normalized).replaceAll(" ");
+        normalized = NON_ALPHANUMERIC_PATTERN.matcher(normalized).replaceAll("");
+        normalized = WHITESPACE_PATTERN.matcher(normalized).replaceAll(" ").trim();
+
+        if (!normalized.isBlank()) {
+            nameGroups.computeIfAbsent(normalized, k -> new ArrayList<>()).add(book);
+        }
     }
 
     private List<DuplicateGroup> buildGroups(Map<String, List<BookEntity>> groupMap, String reason,

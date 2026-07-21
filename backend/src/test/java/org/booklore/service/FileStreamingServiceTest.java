@@ -335,49 +335,23 @@ class FileStreamingServiceTest {
 
     // ==================== parseRange tests ====================
 
-    @Test
-    void parseRange_fullRange_parsesCorrectly() {
-        var result = fileStreamingService.parseRange("bytes=100-199", 1000);
+    @ParameterizedTest(name = "parseRange(\"{0}\", 1000) -> [{1}, {2}]")
+    @CsvSource({
+            "bytes=100-199,          100, 199",
+            "bytes=500-,             500, 999",
+            "bytes=-200,             800, 999",
+            "bytes=-2000,              0, 999",
+            "bytes=900-2000,         900, 999",
+            "'bytes=0-99, 200-299',    0,  99",
+            "'bytes=  100-199  ',    100, 199",
+            "'bytes= 100-199 , 300-399', 100, 199"
+    })
+    void parseRange_variousValidFormats_parsesCorrectly(String rangeHeader, long expectedStart, long expectedEnd) {
+        var result = fileStreamingService.parseRange(rangeHeader, 1000);
 
         assertNotNull(result);
-        assertEquals(100, result.start());
-        assertEquals(199, result.end());
-    }
-
-    @Test
-    void parseRange_openEndedRange_parsesCorrectly() {
-        var result = fileStreamingService.parseRange("bytes=500-", 1000);
-
-        assertNotNull(result);
-        assertEquals(500, result.start());
-        assertEquals(999, result.end());
-    }
-
-    @Test
-    void parseRange_suffixRange_parsesCorrectly() {
-        var result = fileStreamingService.parseRange("bytes=-200", 1000);
-
-        assertNotNull(result);
-        assertEquals(800, result.start());
-        assertEquals(999, result.end());
-    }
-
-    @Test
-    void parseRange_suffixRangeLargerThanFile_startsAtZero() {
-        var result = fileStreamingService.parseRange("bytes=-2000", 1000);
-
-        assertNotNull(result);
-        assertEquals(0, result.start());
-        assertEquals(999, result.end());
-    }
-
-    @Test
-    void parseRange_clampsEndToFileSize() {
-        var result = fileStreamingService.parseRange("bytes=900-2000", 1000);
-
-        assertNotNull(result);
-        assertEquals(900, result.start());
-        assertEquals(999, result.end());
+        assertEquals(expectedStart, result.start());
+        assertEquals(expectedEnd, result.end());
     }
 
     @ParameterizedTest
@@ -398,33 +372,6 @@ class FileStreamingServiceTest {
     void parseRange_startBeyondFileSize_returnsNull() {
         var result = fileStreamingService.parseRange("bytes=2000-3000", 1000);
         assertNull(result);
-    }
-
-    @Test
-    void parseRange_multipleRanges_usesFirstOnly() {
-        var result = fileStreamingService.parseRange("bytes=0-99, 200-299", 1000);
-
-        assertNotNull(result);
-        assertEquals(0, result.start());
-        assertEquals(99, result.end());
-    }
-
-    @Test
-    void parseRange_withLeadingTrailingWhitespace_parsesCorrectly() {
-        var result = fileStreamingService.parseRange("bytes=100-199", 1000);
-
-        assertNotNull(result);
-        assertEquals(100, result.start());
-        assertEquals(199, result.end());
-    }
-
-    @Test
-    void parseRange_withWhitespaceAroundComma_parsesFirstRange() {
-        var result = fileStreamingService.parseRange("bytes= 100-199 , 300-399", 1000);
-
-        assertNotNull(result);
-        assertEquals(100, result.start());
-        assertEquals(199, result.end());
     }
 
     // ==================== isClientDisconnect tests ====================
@@ -545,6 +492,7 @@ class FileStreamingServiceTest {
 
             @Override
             public void setWriteListener(WriteListener writeListener) {
+                // no-op: test double, write listener notifications are not exercised
             }
 
             @Override

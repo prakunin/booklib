@@ -25,6 +25,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @AllArgsConstructor
 public class EmailProviderV2Service {
 
+    private static final String AUDIT_ENTITY_TYPE_EMAIL_PROVIDER = "EmailProvider";
+
     private final EmailProviderV2Repository repository;
     private final UserEmailProviderPreferenceRepository preferenceRepository;
     private final EmailProviderV2Mapper mapper;
@@ -67,7 +69,7 @@ public class EmailProviderV2Service {
         }
 
         Long defaultProviderId = getDefaultProviderIdForUser(user.getId());
-        auditService.log(AuditAction.EMAIL_PROVIDER_CREATED, "EmailProvider", savedEntity.getId(), "Created email provider: " + savedEntity.getHost() + ":" + savedEntity.getPort());
+        auditService.log(AuditAction.EMAIL_PROVIDER_CREATED, AUDIT_ENTITY_TYPE_EMAIL_PROVIDER, savedEntity.getId(), "Created email provider: " + savedEntity.getHost() + ":" + savedEntity.getPort());
         return mapper.toDTO(savedEntity, defaultProviderId);
     }
 
@@ -82,7 +84,7 @@ public class EmailProviderV2Service {
             existingProvider.setShared(Boolean.TRUE.equals(request.getShared()));
         }
         EmailProviderV2Entity updatedEntity = repository.save(existingProvider);
-        auditService.log(AuditAction.EMAIL_PROVIDER_UPDATED, "EmailProvider", id, "Updated email provider: " + updatedEntity.getHost() + ":" + updatedEntity.getPort());
+        auditService.log(AuditAction.EMAIL_PROVIDER_UPDATED, AUDIT_ENTITY_TYPE_EMAIL_PROVIDER, id, "Updated email provider: " + updatedEntity.getHost() + ":" + updatedEntity.getPort());
 
         Long defaultProviderId = getDefaultProviderIdForUser(user.getId());
         return mapper.toDTO(updatedEntity, defaultProviderId);
@@ -123,7 +125,7 @@ public class EmailProviderV2Service {
         }
 
         repository.deleteById(id);
-        auditService.log(AuditAction.EMAIL_PROVIDER_DELETED, "EmailProvider", id, "Deleted email provider");
+        auditService.log(AuditAction.EMAIL_PROVIDER_DELETED, AUDIT_ENTITY_TYPE_EMAIL_PROVIDER, id, "Deleted email provider");
     }
 
     private Long getDefaultProviderIdForUser(Long userId) {

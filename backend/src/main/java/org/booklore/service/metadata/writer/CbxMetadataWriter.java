@@ -39,6 +39,7 @@ import java.util.zip.ZipOutputStream;
 @RequiredArgsConstructor
 public class CbxMetadataWriter implements MetadataWriter {
     private static final String DEFAULT_COMICINFO_XML = "ComicInfo.xml";
+    private static final String BOOKLORE_NOTE_PREFIX = "[BookLore:";
 
     // Cache JAXBContext for performance
     private static final JAXBContext JAXB_CONTEXT;
@@ -48,7 +49,7 @@ public class CbxMetadataWriter implements MetadataWriter {
         try {
             JAXB_CONTEXT = JAXBContext.newInstance(ComicInfo.class);
         } catch (JAXBException e) {
-            throw new RuntimeException("Failed to initialize JAXB Context", e);
+            throw new IllegalStateException("Failed to initialize JAXB Context", e);
         }
     }
 
@@ -154,45 +155,41 @@ public class CbxMetadataWriter implements MetadataWriter {
     private void applyMetadataChanges(ComicInfo info, BookMetadataEntity metadata, MetadataClearFlags clearFlags) {
         MetadataCopyHelper helper = new MetadataCopyHelper(metadata);
 
+        applyStandardFields(info, helper, metadata, clearFlags);
+
+        // Web field - pick one primary
+        info.setWeb(resolvePrimaryUrl(metadata));
+
+        // Notes - Custom Metadata
+        StringBuilder notesBuilder = buildNotes(info, metadata);
+
+        // Comic-specific metadata from ComicMetadataEntity
+        applyComicMetadata(info, metadata.getComicMetadata(), notesBuilder);
+
+        // Age Rating (from BookMetadataEntity - mapped to ComicInfo AgeRating format)
+        if (metadata.getAgeRating() != null) {
+            info.setAgeRating(mapAgeRatingToComicInfo(metadata.getAgeRating()));
+        }
+
+        info.setNotes(!notesBuilder.isEmpty() ? notesBuilder.toString() : null);
+    }
+
+    private void applyStandardFields(ComicInfo info, MetadataCopyHelper helper, BookMetadataEntity metadata, MetadataClearFlags clearFlags) {
         helper.copyTitle(clearFlags != null && clearFlags.isTitle(), info::setTitle);
-        
+
         // Summary: Remove HTML tags safely using Jsoup (handles complex HTML like attributes with '>')
-        helper.copyDescription(clearFlags != null && clearFlags.isDescription(), val -> {
-            if (val != null) {
-                // Jsoup.clean with Safelist.none() removes all HTML tags safely, 
-                // handling edge cases like '<a href="...>">' that regex fails on
-                String clean = Jsoup.clean(val, Safelist.none()).trim();
-                log.debug("CbxMetadataWriter: Setting Summary to: {} (original length: {}, cleaned length: {})", 
-                    clean.length() > 50 ? clean.substring(0, 50) + "..." : clean, 
-                    val.length(), 
-                    clean.length());
-                info.setSummary(clean);
-            } else {
-                log.debug("CbxMetadataWriter: Clearing Summary (null description)");
-                info.setSummary(null);
-            }
-        });
-        
+        helper.copyDescription(clearFlags != null && clearFlags.isDescription(), val -> applySummary(info, val));
+
         helper.copyPublisher(clearFlags != null && clearFlags.isPublisher(), info::setPublisher);
         helper.copySeriesName(clearFlags != null && clearFlags.isSeriesName(), info::setSeries);
         helper.copySeriesNumber(clearFlags != null && clearFlags.isSeriesNumber(), val -> info.setNumber(formatFloatValue(val)));
         helper.copySeriesTotal(clearFlags != null && clearFlags.isSeriesTotal(), info::setCount);
-        
-        helper.copyPublishedDate(clearFlags != null && clearFlags.isPublishedDate(), date -> {
-             if (date != null) {
-                 info.setYear(date.getYear());
-                 info.setMonth(date.getMonthValue());
-                 info.setDay(date.getDayOfMonth());
-             } else {
-                 info.setYear(null);
-                 info.setMonth(null);
-                 info.setDay(null);
-             }
-        });
-        
+
+        helper.copyPublishedDate(clearFlags != null && clearFlags.isPublishedDate(), date -> applyComicDate(info, date));
+
         helper.copyPageCount(clearFlags != null && clearFlags.isPageCount(), info::setPageCount);
         helper.copyLanguage(clearFlags != null && clearFlags.isLanguage(), info::setLanguageISO);
-        
+
         helper.copyAuthors(clearFlags != null && clearFlags.isAuthors(), set -> {
             info.setWriter(joinStrings(set));
             info.setPenciller(null);
@@ -203,58 +200,95 @@ public class CbxMetadataWriter implements MetadataWriter {
         });
 
         // Genre - categories
-        helper.copyCategories(clearFlags != null && clearFlags.isCategories(), set -> {
-            info.setGenre(joinStrings(set));
-        });
-        
+        helper.copyCategories(clearFlags != null && clearFlags.isCategories(), set ->
+                info.setGenre(joinStrings(set)));
+
         // Tags - separate from Genre per Anansi v2.1
         if (metadata.getTags() != null && !metadata.getTags().isEmpty()) {
             info.setTags(joinStrings(metadata.getTags().stream().map(TagEntity::getName).collect(Collectors.toSet())));
         }
 
         // CommunityRating - normalized to 0-5 scale
-        helper.copyRating(false, rating -> {
-            if (rating != null) {
-                double normalized = Math.clamp(rating / 2.0, 0.0, 5.0);
-                info.setCommunityRating(String.format(Locale.US, "%.1f", normalized));
-            } else {
-                info.setCommunityRating(null);
-            }
-        });
+        helper.copyRating(false, rating -> applyCommunityRating(info, rating));
+    }
 
-        // Web field - pick one primary
-        String primaryUrl = null;
-        if (metadata.getHardcoverBookId() != null && !metadata.getHardcoverBookId().isBlank()) {
-            primaryUrl = "https://hardcover.app/books/" + metadata.getHardcoverBookId();
-        } else if (metadata.getComicvineId() != null && !metadata.getComicvineId().isBlank()) {
-            String cvId = metadata.getComicvineId();
-            if (cvId.startsWith("4050-")) {
-                primaryUrl = "https://comicvine.gamespot.com/volume/" + cvId + "/";
-            } else if (cvId.startsWith("4000-")) {
-                primaryUrl = "https://comicvine.gamespot.com/issue/" + cvId + "/";
-            } else if (COMIC_ID_PATTERN.matcher(cvId).matches()) {
-                // Already prefixed with some other Comicvine namespace; preserve as-is.
-                primaryUrl = "https://comicvine.gamespot.com/issue/" + cvId + "/";
-            } else {
-                // Legacy bare-numeric ID — assume issue.
-                primaryUrl = "https://comicvine.gamespot.com/issue/4000-" + cvId + "/";
-            }
-        } else if (metadata.getGoodreadsId() != null && !metadata.getGoodreadsId().isBlank()) {
-            primaryUrl = "https://www.goodreads.com/book/show/" + metadata.getGoodreadsId();
-        } else if (metadata.getAsin() != null && !metadata.getAsin().isBlank()) {
-            primaryUrl = "https://www.amazon.com/dp/" + metadata.getAsin();
+    private void applySummary(ComicInfo info, String val) {
+        if (val != null) {
+            // Jsoup.clean with Safelist.none() removes all HTML tags safely,
+            // handling edge cases like '<a href="...>">' that regex fails on
+            String clean = Jsoup.clean(val, Safelist.none()).trim();
+            log.debug("CbxMetadataWriter: Setting Summary to: {} (original length: {}, cleaned length: {})",
+                clean.length() > 50 ? clean.substring(0, 50) + "..." : clean,
+                val.length(),
+                clean.length());
+            info.setSummary(clean);
+        } else {
+            log.debug("CbxMetadataWriter: Clearing Summary (null description)");
+            info.setSummary(null);
         }
-        info.setWeb(primaryUrl);
+    }
 
-        // Notes - Custom Metadata
+    private void applyComicDate(ComicInfo info, java.time.LocalDate date) {
+        if (date != null) {
+            info.setYear(date.getYear());
+            info.setMonth(date.getMonthValue());
+            info.setDay(date.getDayOfMonth());
+        } else {
+            info.setYear(null);
+            info.setMonth(null);
+            info.setDay(null);
+        }
+    }
+
+    private void applyCommunityRating(ComicInfo info, Double rating) {
+        if (rating != null) {
+            double normalized = Math.clamp(rating / 2.0, 0.0, 5.0);
+            info.setCommunityRating(String.format(Locale.US, "%.1f", normalized));
+        } else {
+            info.setCommunityRating(null);
+        }
+    }
+
+    private String resolvePrimaryUrl(BookMetadataEntity metadata) {
+        if (metadata.getHardcoverBookId() != null && !metadata.getHardcoverBookId().isBlank()) {
+            return "https://hardcover.app/books/" + metadata.getHardcoverBookId();
+        }
+        if (metadata.getComicvineId() != null && !metadata.getComicvineId().isBlank()) {
+            return resolveComicvineUrl(metadata.getComicvineId());
+        }
+        if (metadata.getGoodreadsId() != null && !metadata.getGoodreadsId().isBlank()) {
+            return "https://www.goodreads.com/book/show/" + metadata.getGoodreadsId();
+        }
+        if (metadata.getAsin() != null && !metadata.getAsin().isBlank()) {
+            return "https://www.amazon.com/dp/" + metadata.getAsin();
+        }
+        return null;
+    }
+
+    private String resolveComicvineUrl(String cvId) {
+        if (cvId.startsWith("4050-")) {
+            return "https://comicvine.gamespot.com/volume/" + cvId + "/";
+        }
+        if (cvId.startsWith("4000-")) {
+            return "https://comicvine.gamespot.com/issue/" + cvId + "/";
+        }
+        if (COMIC_ID_PATTERN.matcher(cvId).matches()) {
+            // Already prefixed with some other Comicvine namespace; preserve as-is.
+            return "https://comicvine.gamespot.com/issue/" + cvId + "/";
+        }
+        // Legacy bare-numeric ID — assume issue.
+        return "https://comicvine.gamespot.com/issue/4000-" + cvId + "/";
+    }
+
+    private StringBuilder buildNotes(ComicInfo info, BookMetadataEntity metadata) {
         StringBuilder notesBuilder = new StringBuilder();
         String existingNotes = info.getNotes();
-        
+
         // Preserve existing notes that don't start with [BookLore
         if (existingNotes != null && !existingNotes.isBlank()) {
             String preservedRules = existingNotes.lines()
                     .map(String::trim)
-                    .filter(line -> !line.startsWith("[BookLore:") && !line.startsWith("[BookLore]"))
+                    .filter(line -> !line.startsWith(BOOKLORE_NOTE_PREFIX) && !line.startsWith("[BookLore]"))
                     .collect(Collectors.joining("\n"));
              if (!preservedRules.isEmpty()) {
                  notesBuilder.append(preservedRules);
@@ -268,12 +302,12 @@ public class CbxMetadataWriter implements MetadataWriter {
             appendBookLoreTag(notesBuilder, "Tags", joinStrings(metadata.getTags().stream().map(TagEntity::getName).collect(Collectors.toSet())));
         }
         appendBookLoreTag(notesBuilder, "Subtitle", metadata.getSubtitle());
-        
+
         if (metadata.getIsbn13() != null && !metadata.getIsbn13().isBlank()) {
             info.setGtin(metadata.getIsbn13());
         }
         appendBookLoreTag(notesBuilder, "ISBN10", metadata.getIsbn10());
-        
+
         appendBookLoreTag(notesBuilder, "AmazonRating", metadata.getAmazonRating());
         appendBookLoreTag(notesBuilder, "GoodreadsRating", metadata.getGoodreadsRating());
         appendBookLoreTag(notesBuilder, "HardcoverRating", metadata.getHardcoverRating());
@@ -288,109 +322,122 @@ public class CbxMetadataWriter implements MetadataWriter {
         appendBookLoreTag(notesBuilder, "GoodreadsId", metadata.getGoodreadsId());
         appendBookLoreTag(notesBuilder, "ASIN", metadata.getAsin());
         appendBookLoreTag(notesBuilder, "ComicvineId", metadata.getComicvineId());
-        
-        // Comic-specific metadata from ComicMetadataEntity
-        ComicMetadataEntity comic = metadata.getComicMetadata();
-        if (comic != null) {
-            // Volume
-            if (comic.getVolumeNumber() != null) {
-                info.setVolume(comic.getVolumeNumber());
-            }
-            
-            // Alternate Series
-            if (comic.getAlternateSeries() != null && !comic.getAlternateSeries().isBlank()) {
-                info.setAlternateSeries(comic.getAlternateSeries());
-            }
-            if (comic.getAlternateIssue() != null && !comic.getAlternateIssue().isBlank()) {
-                info.setAlternateNumber(comic.getAlternateIssue());
-            }
-            
-            // Story Arc
-            if (comic.getStoryArc() != null && !comic.getStoryArc().isBlank()) {
-                info.setStoryArc(comic.getStoryArc());
-            }
-            
-            // Format
-            if (comic.getFormat() != null && !comic.getFormat().isBlank()) {
-                info.setFormat(comic.getFormat());
-            }
-            
-            // Imprint
-            if (comic.getImprint() != null && !comic.getImprint().isBlank()) {
-                info.setImprint(comic.getImprint());
-            }
-            
-            // BlackAndWhite (Yes/No)
-            if (comic.getBlackAndWhite() != null) {
-                info.setBlackAndWhite(comic.getBlackAndWhite() ? "Yes" : "No");
-            }
-            
-            // Manga / Reading Direction
-            if (comic.getManga() != null && comic.getManga()) {
-                if (comic.getReadingDirection() != null && "RTL".equalsIgnoreCase(comic.getReadingDirection())) {
-                    info.setManga("YesAndRightToLeft");
-                } else {
-                    info.setManga("Yes");
-                }
-            } else if (comic.getManga() != null) {
-                info.setManga("No");
-            }
-            
-            // Characters (comma-separated)
-            if (comic.getCharacters() != null && !comic.getCharacters().isEmpty()) {
-                String chars = comic.getCharacters().stream()
-                        .map(ComicCharacterEntity::getName)
-                        .collect(Collectors.joining(", "));
-                info.setCharacters(chars);
-            }
-            
-            // Teams (comma-separated)
-            if (comic.getTeams() != null && !comic.getTeams().isEmpty()) {
-                String teams = comic.getTeams().stream()
-                        .map(ComicTeamEntity::getName)
-                        .collect(Collectors.joining(", "));
-                info.setTeams(teams);
-            }
-            
-            // Locations (comma-separated)
-            if (comic.getLocations() != null && !comic.getLocations().isEmpty()) {
-                String locs = comic.getLocations().stream()
-                        .map(ComicLocationEntity::getName)
-                        .collect(Collectors.joining(", "));
-                info.setLocations(locs);
-            }
-            
-            // Creators by role (overrides the author-based writer if present)
-            if (comic.getCreatorMappings() != null && !comic.getCreatorMappings().isEmpty()) {
-                String pencillers = getCreatorsByRole(comic, ComicCreatorRole.PENCILLER);
-                String inkers = getCreatorsByRole(comic, ComicCreatorRole.INKER);
-                String colorists = getCreatorsByRole(comic, ComicCreatorRole.COLORIST);
-                String letterers = getCreatorsByRole(comic, ComicCreatorRole.LETTERER);
-                String coverArtists = getCreatorsByRole(comic, ComicCreatorRole.COVER_ARTIST);
-                String editors = getCreatorsByRole(comic, ComicCreatorRole.EDITOR);
-                
-                if (!pencillers.isEmpty()) info.setPenciller(pencillers);
-                if (!inkers.isEmpty()) info.setInker(inkers);
-                if (!colorists.isEmpty()) info.setColorist(colorists);
-                if (!letterers.isEmpty()) info.setLetterer(letterers);
-                if (!coverArtists.isEmpty()) info.setCoverArtist(coverArtists);
-                if (!editors.isEmpty()) info.setEditor(editors);
-            }
-            
-            // Store comic-specific metadata in notes as well
-            appendBookLoreTag(notesBuilder, "VolumeName", comic.getVolumeName());
-            appendBookLoreTag(notesBuilder, "StoryArcNumber", comic.getStoryArcNumber());
-            appendBookLoreTag(notesBuilder, "IssueNumber", comic.getIssueNumber());
-        }
-        
-        // Age Rating (from BookMetadataEntity - mapped to ComicInfo AgeRating format)
-        if (metadata.getAgeRating() != null) {
-            info.setAgeRating(mapAgeRatingToComicInfo(metadata.getAgeRating()));
-        }
-        
-        info.setNotes(!notesBuilder.isEmpty() ? notesBuilder.toString() : null);
+
+        return notesBuilder;
     }
-    
+
+    private void applyComicMetadata(ComicInfo info, ComicMetadataEntity comic, StringBuilder notesBuilder) {
+        if (comic == null) {
+            return;
+        }
+
+        applyComicSimpleFields(info, comic);
+        applyMangaDirection(info, comic);
+        applyComicRelations(info, comic);
+        applyComicCreators(info, comic);
+
+        // Store comic-specific metadata in notes as well
+        appendBookLoreTag(notesBuilder, "VolumeName", comic.getVolumeName());
+        appendBookLoreTag(notesBuilder, "StoryArcNumber", comic.getStoryArcNumber());
+        appendBookLoreTag(notesBuilder, "IssueNumber", comic.getIssueNumber());
+    }
+
+    private void applyComicSimpleFields(ComicInfo info, ComicMetadataEntity comic) {
+        // Volume
+        if (comic.getVolumeNumber() != null) {
+            info.setVolume(comic.getVolumeNumber());
+        }
+
+        // Alternate Series
+        if (comic.getAlternateSeries() != null && !comic.getAlternateSeries().isBlank()) {
+            info.setAlternateSeries(comic.getAlternateSeries());
+        }
+        if (comic.getAlternateIssue() != null && !comic.getAlternateIssue().isBlank()) {
+            info.setAlternateNumber(comic.getAlternateIssue());
+        }
+
+        // Story Arc
+        if (comic.getStoryArc() != null && !comic.getStoryArc().isBlank()) {
+            info.setStoryArc(comic.getStoryArc());
+        }
+
+        // Format
+        if (comic.getFormat() != null && !comic.getFormat().isBlank()) {
+            info.setFormat(comic.getFormat());
+        }
+
+        // Imprint
+        if (comic.getImprint() != null && !comic.getImprint().isBlank()) {
+            info.setImprint(comic.getImprint());
+        }
+
+        // BlackAndWhite (Yes/No)
+        if (comic.getBlackAndWhite() != null) {
+            boolean blackAndWhite = comic.getBlackAndWhite();
+            info.setBlackAndWhite(blackAndWhite ? "Yes" : "No");
+        }
+    }
+
+    private void applyMangaDirection(ComicInfo info, ComicMetadataEntity comic) {
+        // Manga / Reading Direction
+        if (comic.getManga() != null && comic.getManga()) {
+            if (comic.getReadingDirection() != null && "RTL".equalsIgnoreCase(comic.getReadingDirection())) {
+                info.setManga("YesAndRightToLeft");
+            } else {
+                info.setManga("Yes");
+            }
+        } else if (comic.getManga() != null) {
+            info.setManga("No");
+        }
+    }
+
+    private void applyComicRelations(ComicInfo info, ComicMetadataEntity comic) {
+        // Characters (comma-separated)
+        if (comic.getCharacters() != null && !comic.getCharacters().isEmpty()) {
+            String chars = comic.getCharacters().stream()
+                    .map(ComicCharacterEntity::getName)
+                    .collect(Collectors.joining(", "));
+            info.setCharacters(chars);
+        }
+
+        // Teams (comma-separated)
+        if (comic.getTeams() != null && !comic.getTeams().isEmpty()) {
+            String teams = comic.getTeams().stream()
+                    .map(ComicTeamEntity::getName)
+                    .collect(Collectors.joining(", "));
+            info.setTeams(teams);
+        }
+
+        // Locations (comma-separated)
+        if (comic.getLocations() != null && !comic.getLocations().isEmpty()) {
+            String locs = comic.getLocations().stream()
+                    .map(ComicLocationEntity::getName)
+                    .collect(Collectors.joining(", "));
+            info.setLocations(locs);
+        }
+    }
+
+    private void applyComicCreators(ComicInfo info, ComicMetadataEntity comic) {
+        // Creators by role (overrides the author-based writer if present)
+        if (comic.getCreatorMappings() == null || comic.getCreatorMappings().isEmpty()) {
+            return;
+        }
+
+        String pencillers = getCreatorsByRole(comic, ComicCreatorRole.PENCILLER);
+        String inkers = getCreatorsByRole(comic, ComicCreatorRole.INKER);
+        String colorists = getCreatorsByRole(comic, ComicCreatorRole.COLORIST);
+        String letterers = getCreatorsByRole(comic, ComicCreatorRole.LETTERER);
+        String coverArtists = getCreatorsByRole(comic, ComicCreatorRole.COVER_ARTIST);
+        String editors = getCreatorsByRole(comic, ComicCreatorRole.EDITOR);
+
+        if (!pencillers.isEmpty()) info.setPenciller(pencillers);
+        if (!inkers.isEmpty()) info.setInker(inkers);
+        if (!colorists.isEmpty()) info.setColorist(colorists);
+        if (!letterers.isEmpty()) info.setLetterer(letterers);
+        if (!coverArtists.isEmpty()) info.setCoverArtist(coverArtists);
+        if (!editors.isEmpty()) info.setEditor(editors);
+    }
+
     private String getCreatorsByRole(ComicMetadataEntity comic, ComicCreatorRole role) {
         if (comic.getCreatorMappings() == null) return "";
         return comic.getCreatorMappings().stream()
@@ -565,28 +612,14 @@ public class CbxMetadataWriter implements MetadataWriter {
         }
     }
 
-    private void rebuildArchiveWithNewXml(Path sourceArchive, Path targetZip, byte[] xmlContent) throws Exception {
+    private void rebuildArchiveWithNewXml(Path sourceArchive, Path targetZip, byte[] xmlContent) throws IOException {
         String comicInfoEntryName = findComicInfoEntryName(sourceArchive);
 
         try (
                 ZipOutputStream zipOutput = new ZipOutputStream(Files.newOutputStream(targetZip))
         ) {
             for (String entryName : archiveService.getEntryNames(sourceArchive)) {
-                if (isComicInfoXml(entryName)) {
-                    // Skip copying over any existing comic info entry
-                    continue;
-                }
-
-                if (!isPathSafe(entryName)) {
-                    log.warn("Skipping unsafe CBZ entry name: {}", entryName);
-                    continue;
-                }
-
-                zipOutput.putNextEntry(new ZipEntry(entryName));
-
-                archiveService.transferEntryTo(sourceArchive, entryName, zipOutput);
-
-                zipOutput.closeEntry();
+                copyEntryIfSafe(sourceArchive, zipOutput, entryName);
             }
 
             String xmlEntryName = (comicInfoEntryName != null ? comicInfoEntryName : CbxMetadataWriter.DEFAULT_COMICINFO_XML);
@@ -596,7 +629,23 @@ public class CbxMetadataWriter implements MetadataWriter {
         }
     }
 
-    private static void replaceFileAtomic(Path source, Path target) throws Exception {
+    private void copyEntryIfSafe(Path sourceArchive, ZipOutputStream zipOutput, String entryName) throws IOException {
+        if (isComicInfoXml(entryName)) {
+            // Skip copying over any existing comic info entry
+            return;
+        }
+
+        if (!isPathSafe(entryName)) {
+            log.warn("Skipping unsafe CBZ entry name: {}", entryName);
+            return;
+        }
+
+        zipOutput.putNextEntry(new ZipEntry(entryName));
+        archiveService.transferEntryTo(sourceArchive, entryName, zipOutput);
+        zipOutput.closeEntry();
+    }
+
+    private static void replaceFileAtomic(Path source, Path target) throws IOException {
         try {
             Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception _) {
@@ -642,18 +691,18 @@ public class CbxMetadataWriter implements MetadataWriter {
 
     private void appendBookLoreTag(StringBuilder sb, String tag, String value) {
         if (value != null && !value.isBlank()) {
-            if (sb.length() > 0) sb.append("\n");
-            sb.append("[BookLore:").append(tag).append("] ").append(value);
+            if (!sb.isEmpty()) sb.append("\n");
+            sb.append(BOOKLORE_NOTE_PREFIX).append(tag).append("] ").append(value);
         }
     }
 
     private void appendBookLoreTag(StringBuilder sb, String tag, Number value) {
         if (value != null) {
-            if (sb.length() > 0) sb.append("\n");
+            if (!sb.isEmpty()) sb.append("\n");
             String formatted = (value instanceof Double || value instanceof Float) 
                     ? String.format(Locale.US, "%.2f", value.doubleValue())
                     : value.toString();
-            sb.append("[BookLore:").append(tag).append("] ").append(formatted);
+            sb.append(BOOKLORE_NOTE_PREFIX).append(tag).append("] ").append(formatted);
         }
     }
 }

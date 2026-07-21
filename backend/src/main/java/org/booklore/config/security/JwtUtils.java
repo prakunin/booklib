@@ -12,7 +12,6 @@ import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.BadJWTException;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import jakarta.annotation.PostConstruct;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.exception.ApiError;
@@ -29,6 +28,8 @@ import java.util.Set;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+// nimbus-jose-jwt's JWTClaimsSet.Builder only accepts java.util.Date for issueTime/expirationTime (no java.time overload).
+@SuppressWarnings("java:S2143")
 public class JwtUtils {
 
     private final JwtSecretService jwtSecretService;
@@ -38,22 +39,20 @@ public class JwtUtils {
     private static final String TOKEN_TYPE_ACCESS = "access";
     private static final String TOKEN_TYPE_REFRESH = "refresh";
     private static final String TOKEN_TYPE_MEDIA = "media";
+    private static final String CLAIM_USER_ID = "userId";
 
     private DefaultJWTClaimsVerifier<?> claimsVerifier;
 
-    @Getter
-    public static final long accessTokenExpirationMs = 1000L * 60 * 60 * 2;  // 2 hours
-    @Getter
-    public static final long refreshTokenExpirationMs = 1000L * 60 * 60 * 24 * 30; // 30 days
-    @Getter
-    public static final long mediaTokenExpirationMs = 1000L * 60 * 10; // 10 minutes
+    public static final long ACCESS_TOKEN_EXPIRATION_MS = 1000L * 60 * 60 * 2;  // 2 hours
+    public static final long REFRESH_TOKEN_EXPIRATION_MS = 1000L * 60 * 60 * 24 * 30; // 30 days
+    public static final long MEDIA_TOKEN_EXPIRATION_MS = 1000L * 60 * 10; // 10 minutes
 
     @PostConstruct
     public void init() {
         validateSecret();
         this.claimsVerifier = new DefaultJWTClaimsVerifier<>(
                 new JWTClaimsSet.Builder().issuer(JWT_ISSUER).build(),
-                Set.of("exp", "iat", "iss", "sub", "userId")
+                Set.of("exp", "iat", "iss", "sub", CLAIM_USER_ID)
         );
     }
 
@@ -78,7 +77,7 @@ public class JwtUtils {
     }
 
     public String generateToken(BookLoreUserEntity user, boolean isRefreshToken) {
-        long expirationTime = isRefreshToken ? refreshTokenExpirationMs : accessTokenExpirationMs;
+        long expirationTime = isRefreshToken ? REFRESH_TOKEN_EXPIRATION_MS : ACCESS_TOKEN_EXPIRATION_MS;
         String tokenType = isRefreshToken ? TOKEN_TYPE_REFRESH : TOKEN_TYPE_ACCESS;
         return generateToken(user, expirationTime, tokenType);
     }
@@ -92,7 +91,7 @@ public class JwtUtils {
             JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                     .issuer(JWT_ISSUER)
                     .subject(user.getUsername())
-                    .claim("userId", user.getId())
+                    .claim(CLAIM_USER_ID, user.getId())
                     .claim("isDefaultPassword", user.isDefaultPassword())
                     .claim(TOKEN_TYPE_CLAIM, tokenType)
                     .issueTime(Date.from(now))
@@ -108,7 +107,7 @@ public class JwtUtils {
             throw new IllegalStateException("JWT secret must be at least " + MIN_SECRET_BYTES + " bytes for HS256", e);
         } catch (Exception e) {
             log.error("Error generating JWT token", e);
-            throw new RuntimeException("Could not generate token", e);
+            throw new IllegalStateException("Could not generate token", e);
         }
     }
 
@@ -121,7 +120,7 @@ public class JwtUtils {
     }
 
     public String generateMediaToken(BookLoreUserEntity user) {
-        return generateToken(user, mediaTokenExpirationMs, TOKEN_TYPE_MEDIA);
+        return generateToken(user, MEDIA_TOKEN_EXPIRATION_MS, TOKEN_TYPE_MEDIA);
     }
 
     /**
@@ -173,7 +172,7 @@ public class JwtUtils {
      */
     private void validateClaims(JWTClaimsSet claims) throws BadJWTException {
         claimsVerifier.verify(claims, null);
-        Object userId = claims.getClaim("userId");
+        Object userId = claims.getClaim(CLAIM_USER_ID);
         if (!(userId instanceof Number)) {
             throw new BadJWTException("Invalid userId claim type");
         }
@@ -231,7 +230,7 @@ public class JwtUtils {
      * @throws RuntimeException if token is invalid or expired.
      */
     public Long extractUserId(String token) {
-        Object userIdClaim = extractClaims(token).getClaim("userId");
+        Object userIdClaim = extractClaims(token).getClaim(CLAIM_USER_ID);
         if (userIdClaim instanceof Number number) {
             return number.longValue();
         }

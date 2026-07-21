@@ -30,7 +30,7 @@ public class FileUploadController {
     @ApiResponse(responseCode = "204", description = "File uploaded successfully")
     @PreAuthorize("@securityUtil.isAdmin() or @securityUtil.canUpload()")
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
-    public ResponseEntity<?> uploadFile(
+    public ResponseEntity<Void> uploadFile(
             @Parameter(description = "File to upload") @RequestParam("file") MultipartFile file,
             @Parameter(description = "Library ID") @RequestParam("libraryId") long libraryId,
             @Parameter(description = "Path ID") @RequestParam("pathId") long pathId) {

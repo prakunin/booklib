@@ -23,6 +23,7 @@ import org.booklore.service.opds.OpdsUserV2Service;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -131,7 +132,7 @@ public class KomgaController {
         Long firstBookId = Long.parseLong(books.getContent().getFirst().getId());
         Resource coverImage = bookService.getBookThumbnail(firstBookId);
         return ResponseEntity.ok()
-                .header("Content-Type", "image/jpeg")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.IMAGE_JPEG_VALUE)
                 .body(coverImage);
     }
 
@@ -163,7 +164,7 @@ public class KomgaController {
 
     @Operation(summary = "Get book page image")
     @GetMapping("/v1/books/{bookId}/pages/{pageNumber}")
-    public ResponseEntity<?> getBookPage(
+    public ResponseEntity<StreamingResponseBody> getBookPage(
             @Parameter(description = "Book ID") @PathVariable Long bookId,
             @Parameter(description = "Page number") @PathVariable Integer pageNumber,
             @Parameter(description = "Convert image format (e.g., 'png')") @RequestParam(required = false) String convert) {
@@ -173,12 +174,12 @@ public class KomgaController {
             boolean convertToPng = "png".equalsIgnoreCase(convert);
             // Note: When not converting, we assume JPEG as most CBZ files contain JPEG images,
             // but the actual format may vary (PNG, WebP, etc.)
-            String contentType = convertToPng ? "image/png" : "image/jpeg";
+            String contentType = convertToPng ? "image/png" : MediaType.IMAGE_JPEG_VALUE;
             StreamingResponseBody body = convertToPng
                     ? outputStream -> komgaService.streamBookPageImageAsPng(bookId, pageNumber, outputStream)
                     : outputStream -> komgaService.streamBookPageImage(bookId, pageNumber, outputStream);
             return ResponseEntity.ok()
-                    .header("Content-Type", contentType)
+                    .header(HttpHeaders.CONTENT_TYPE, contentType)
                     .body(body);
         } catch (Exception e) {
             log.error("Failed to get page {} from book {}", pageNumber, bookId, e);
@@ -203,7 +204,7 @@ public class KomgaController {
 
         Resource coverImage = bookService.getBookThumbnail(bookId);
         return ResponseEntity.ok()
-                .header("Content-Type", "image/jpeg")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.IMAGE_JPEG_VALUE)
                 .body(coverImage);
     }
 

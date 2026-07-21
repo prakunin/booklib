@@ -49,7 +49,7 @@ public class Azw3Processor extends AbstractFileProcessor implements BookFileProc
 
     @Override
     public BookEntity processNewFile(LibraryFile libraryFile) {
-        BookFileType fileType = determineFileType(libraryFile.getFileName());
+        BookFileType fileType = determineFileType();
         BookEntity bookEntity = bookCreatorService.createShellBook(libraryFile, fileType);
         setBookMetadata(bookEntity);
         boolean coverGenerated = generateCover(bookEntity);
@@ -113,7 +113,7 @@ public class Azw3Processor extends AbstractFileProcessor implements BookFileProc
         return List.of(BookFileType.AZW3);
     }
 
-    private BookFileType determineFileType(String fileName) {
+    private BookFileType determineFileType() {
         return BookFileType.AZW3;
     }
 

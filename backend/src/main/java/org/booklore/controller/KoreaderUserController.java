@@ -61,6 +61,9 @@ public class KoreaderUserController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * @deprecated Use {@link #toggleSyncProgressWithWebReader(boolean)} instead; kept as a compat alias.
+     */
     @Operation(
             summary = "[Deprecated] Toggle sync progress with web reader",
             description = "Deprecated alias for /me/sync-progress-with-grimmory. Use the new endpoint; this one will be removed in a future release.",
@@ -69,6 +72,7 @@ public class KoreaderUserController {
     @PatchMapping("/me/sync-progress-with-booklore")
     @PreAuthorize("@securityUtil.canSyncKoReader() or @securityUtil.isAdmin()")
     @Deprecated(forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate long-lived alias for API compatibility; remove once old clients stop calling it.
     public ResponseEntity<Void> toggleSyncProgressWithBooklore(
             @Parameter(description = "Enable or disable sync progress") @RequestParam boolean enabled) {
         return toggleSyncProgressWithWebReader(enabled);

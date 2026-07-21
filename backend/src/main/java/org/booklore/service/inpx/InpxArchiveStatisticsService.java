@@ -84,11 +84,12 @@ public class InpxArchiveStatisticsService {
         generation(libraryId).incrementAndGet();
         cache.invalidate(libraryId);
         // Requests made after the underlying archive data changed must not join a calculation
-        // that started for the previous generation. The old callers still receive their result;
+        // that started for the previous generation, though old callers still receive their result —
         // the next generation is queued behind it on the single-thread executor.
         inFlight.remove(libraryId);
     }
 
+    @SuppressWarnings("java:S1181") // Error must still complete the future and free the dedup slot below, same as Exception - otherwise concurrent awaiters of this in-flight computation would hang forever
     private void compute(long libraryId, long generation,
                          CompletableFuture<Map<String, ArchiveStatistics>> future) {
         try {
@@ -98,7 +99,7 @@ public class InpxArchiveStatisticsService {
             }
             inFlight.remove(libraryId, future);
             future.complete(statistics);
-        } catch (RuntimeException | Error e) {
+        } catch (Exception | Error e) {
             inFlight.remove(libraryId, future);
             future.completeExceptionally(e);
         }

@@ -188,7 +188,7 @@ public class BookMetadataService {
                     Method setter = BookMetadataEntity.class.getMethod(setterName, Boolean.class);
                     setter.invoke(metadataEntity, "LOCK".equalsIgnoreCase(action));
                 } catch (Exception e) {
-                    throw new RuntimeException("Failed to invoke setter for field: " + entityField + " on bookId: " + metadataEntity.getBookId(), e);
+                    throw new IllegalStateException("Failed to invoke setter for field: " + entityField + " on bookId: " + metadataEntity.getBookId(), e);
                 }
             });
         }
@@ -199,10 +199,8 @@ public class BookMetadataService {
     @Transactional
     public List<BookMetadata> toggleAllLock(ToggleAllLockRequest request) {
         boolean lock = request.getLock() == Lock.LOCK;
-        List<BookEntity> books = bookQueryService.findAllWithMetadataByIds(request.getBookIds())
-                .stream()
-                .peek(book -> book.getMetadata().applyLockToAllFields(lock))
-                .toList();
+        List<BookEntity> books = bookQueryService.findAllWithMetadataByIds(request.getBookIds());
+        books.forEach(book -> book.getMetadata().applyLockToAllFields(lock));
         bookRepository.saveAll(books);
         return books.stream().map(b -> bookMetadataMapper.toBookMetadata(b.getMetadata(), false)).toList();
     }

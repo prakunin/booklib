@@ -105,8 +105,9 @@ public class AudiobookReaderService {
         return audioFileUtility.getContentType(audioPath);
     }
 
-    @Transactional(readOnly = true)
-    protected BookFileEntity getAudiobookFile(Long bookId, String bookType) {
+    // Not annotated @Transactional: only called (via 'this') from methods in this class that are
+    // themselves already @Transactional, so it always runs inside an active transaction anyway.
+    private BookFileEntity getAudiobookFile(Long bookId, String bookType) {
         BookEntity bookEntity = bookRepository.findByIdForAudiobook(bookId)
                 .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
 

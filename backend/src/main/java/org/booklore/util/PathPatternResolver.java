@@ -27,11 +27,11 @@ public class PathPatternResolver {
 
     private final String TRUNCATION_SUFFIX = " et al.";
     private final int SUFFIX_BYTES = TRUNCATION_SUFFIX.getBytes(StandardCharsets.UTF_8).length;
+    private final String CURRENT_FILENAME_KEY = "currentFilename";
 
     private final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
     private final Pattern CONTROL_CHARACTER_PATTERN = Pattern.compile("\\p{Cntrl}");
     private final Pattern INVALID_CHARS_PATTERN = Pattern.compile("[\\\\/:*?\"<>|]");
-    private final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{(.*?)}");
     private final Pattern MODIFIER_PLACEHOLDER_PATTERN = Pattern.compile("\\{([^}:]+)(?::([^}]+))?}");
     private final Pattern COMMA_SPACE_PATTERN = Pattern.compile(", ");
     private final Pattern SLASH_PATTERN = Pattern.compile("/");
@@ -69,21 +69,28 @@ public class PathPatternResolver {
             return filename;
         }
 
-        String filenameBase = "Untitled";
-        if (filename != null && !filename.isBlank()) {
-            if (folderBased) {
-                // For folder-based items, don't strip extension from folder name
-                filenameBase = filename;
-            } else {
-                int lastDot = filename.lastIndexOf('.');
-                if (lastDot > 0) {
-                    filenameBase = filename.substring(0, lastDot);
-                } else {
-                    filenameBase = filename;
-                }
-            }
-        }
+        String filenameBase = resolveFilenameBase(filename, folderBased);
+        Map<String, String> values = buildPlaceholderValues(metadata, filenameBase, filename);
 
+        return resolvePatternWithValues(pattern, values, filename, folderBased);
+    }
+
+    private String resolveFilenameBase(String filename, boolean folderBased) {
+        if (filename == null || filename.isBlank()) {
+            return "Untitled";
+        }
+        if (folderBased) {
+            // For folder-based items, don't strip extension from folder name
+            return filename;
+        }
+        int lastDot = filename.lastIndexOf('.');
+        if (lastDot > 0) {
+            return filename.substring(0, lastDot);
+        }
+        return filename;
+    }
+
+    private Map<String, String> buildPlaceholderValues(MetadataProvider metadata, String filenameBase, String filename) {
         String resolvedTitle = metadata != null ? metadata.getTitle() : null;
         String title = sanitize(resolvedTitle);
         if (title.isBlank()) {
@@ -103,32 +110,10 @@ public class PathPatternResolver {
                         : ""
         );
         String series = sanitize(metadata != null ? metadata.getSeriesName() : "");
-        String seriesIndex = "";
-        if (metadata != null && metadata.getSeriesNumber() != null) {
-            Float seriesNumber = metadata.getSeriesNumber();
-            if (seriesNumber % 1 == 0) {
-                // Whole number - format with leading zero for 1-9
-                seriesIndex = String.format("%02d", seriesNumber.intValue());
-            } else {
-                // Decimal number - format integer part with leading zero
-                int intPart = seriesNumber.intValue();
-                String formatted = seriesNumber.toString();
-                String decimalPart = formatted.substring(formatted.indexOf('.'));
-                seriesIndex = String.format("%02d", intPart) + decimalPart;
-            }
-            seriesIndex = sanitize(seriesIndex);
-        }
+        String seriesIndex = resolveSeriesIndex(metadata);
         String language = sanitize(metadata != null ? metadata.getLanguage() : "");
         String publisher = sanitize(metadata != null ? metadata.getPublisher() : "");
-        String isbn = sanitize(
-                metadata != null
-                        ? (metadata.getIsbn13() != null
-                        ? metadata.getIsbn13()
-                        : metadata.getIsbn10() != null
-                        ? metadata.getIsbn10()
-                        : "")
-                        : ""
-        );
+        String isbn = sanitize(metadata != null ? resolveIsbn(metadata) : "");
 
         Map<String, String> values = new LinkedHashMap<>();
         values.put("authors", authors);
@@ -140,23 +125,81 @@ public class PathPatternResolver {
         values.put("language", language);
         values.put("publisher", truncatePathComponent(publisher, MAX_COMPONENT_BYTES));
         values.put("isbn", isbn);
-        values.put("currentFilename", filename);
+        values.put(CURRENT_FILENAME_KEY, filename);
+        return values;
+    }
 
-        return resolvePatternWithValues(pattern, values, filename, folderBased);
+    private String resolveSeriesIndex(MetadataProvider metadata) {
+        if (metadata == null || metadata.getSeriesNumber() == null) {
+            return "";
+        }
+        Float seriesNumber = metadata.getSeriesNumber();
+        String seriesIndex;
+        if (seriesNumber % 1 == 0) {
+            // Whole number - format with leading zero for 1-9
+            seriesIndex = String.format("%02d", seriesNumber.intValue());
+        } else {
+            // Decimal number - format integer part with leading zero
+            int intPart = seriesNumber.intValue();
+            String formatted = seriesNumber.toString();
+            String decimalPart = formatted.substring(formatted.indexOf('.'));
+            seriesIndex = String.format("%02d", intPart) + decimalPart;
+        }
+        return sanitize(seriesIndex);
+    }
+
+    private String resolveIsbn(MetadataProvider metadata) {
+        if (metadata.getIsbn13() != null) {
+            return metadata.getIsbn13();
+        }
+        return metadata.getIsbn10() != null ? metadata.getIsbn10() : "";
     }
 
     private String resolvePatternWithValues(String pattern, Map<String, String> values, String currentFilename, boolean folderBased) {
-        String extension = "";
-        if (!folderBased) {
-            // Only extract extension for regular files, not for folder-based items
-            int lastDot = currentFilename.lastIndexOf('.');
-            if (lastDot >= 0 && lastDot < currentFilename.length() - 1) {
-                extension = sanitize(currentFilename.substring(lastDot + 1));  // e.g. "epub"
-            }
-        }
+        String extension = resolveExtension(currentFilename, folderBased);
 
         values.put("extension", extension);
 
+        String result = resolveOptionalBlocks(pattern, values);
+        result = replaceKnownPlaceholders(result, values);
+
+        boolean usedFallbackFilename = false;
+        if (result.isBlank()) {
+            result = values.getOrDefault(CURRENT_FILENAME_KEY, "untitled");
+            usedFallbackFilename = true;
+        }
+
+        // Guard against patterns like {title}.{extension} resolving to only ".ext"
+        // when metadata title is blank/missing after sanitization.
+        if (!usedFallbackFilename && isExtensionOnlyFilename(result)) {
+            result = values.getOrDefault(CURRENT_FILENAME_KEY, "untitled");
+            usedFallbackFilename = true;
+        }
+
+        boolean patternIncludesExtension = pattern.contains("{extension}");
+        boolean patternIncludesFullFilename = pattern.contains("{currentFilename}");
+
+        // Don't auto-append extension for folder-based items
+        if (!folderBased && !usedFallbackFilename && !patternIncludesExtension && !patternIncludesFullFilename && !extension.isBlank()) {
+            result += "." + extension;
+        }
+
+        return validateFinalPath(result, folderBased);
+    }
+
+    private String resolveExtension(String currentFilename, boolean folderBased) {
+        if (folderBased) {
+            // Only extract extension for regular files, not for folder-based items
+            return "";
+        }
+        int lastDot = currentFilename.lastIndexOf('.');
+        if (lastDot >= 0 && lastDot < currentFilename.length() - 1) {
+            return sanitize(currentFilename.substring(lastDot + 1));  // e.g. "epub"
+        }
+        return "";
+    }
+
+    private String resolveOptionalBlocks(String pattern, Map<String, String> values) {
         // Handle optional blocks enclosed in <...>, supporting else clause via pipe: <left|right>
         Pattern optionalBlockPattern = Pattern.compile("<([^<>]*)>");
         Matcher matcher = optionalBlockPattern.matcher(pattern);
@@ -183,11 +226,12 @@ public class PathPatternResolver {
             }
         }
         matcher.appendTail(resolved);
+        return resolved.toString();
+    }
 
-        String result = resolved.toString();
-
+    private String replaceKnownPlaceholders(String input, Map<String, String> values) {
         // Replace known placeholders (with optional modifiers) with values, preserve unknown ones
-        Matcher placeholderMatcher = MODIFIER_PLACEHOLDER_PATTERN.matcher(result);
+        Matcher placeholderMatcher = MODIFIER_PLACEHOLDER_PATTERN.matcher(input);
         StringBuilder finalResult = new StringBuilder(1024);
 
         while (placeholderMatcher.find()) {
@@ -205,31 +249,7 @@ public class PathPatternResolver {
             }
         }
         placeholderMatcher.appendTail(finalResult);
-
-        result = finalResult.toString();
-
-        boolean usedFallbackFilename = false;
-        if (result.isBlank()) {
-            result = values.getOrDefault("currentFilename", "untitled");
-            usedFallbackFilename = true;
-        }
-
-        // Guard against patterns like {title}.{extension} resolving to only ".ext"
-        // when metadata title is blank/missing after sanitization.
-        if (!usedFallbackFilename && isExtensionOnlyFilename(result)) {
-            result = values.getOrDefault("currentFilename", "untitled");
-            usedFallbackFilename = true;
-        }
-
-        boolean patternIncludesExtension = pattern.contains("{extension}");
-        boolean patternIncludesFullFilename = pattern.contains("{currentFilename}");
-
-        // Don't auto-append extension for folder-based items
-        if (!folderBased && !usedFallbackFilename && !patternIncludesExtension && !patternIncludesFullFilename && !extension.isBlank()) {
-            result += "." + extension;
-        }
-
-        return validateFinalPath(result, folderBased);
+        return finalResult.toString();
     }
 
     private boolean checkAllPlaceholdersHaveValues(String block, Map<String, String> values) {
@@ -389,27 +409,30 @@ public class PathPatternResolver {
             }
 
             boolean isLastComponent = (i == components.length - 1);
-
-            // For folder-based items, don't treat dots as extension separators
-            if (isLastComponent && component.contains(".") && !folderBased) {
-                component = truncateFilenameWithExtension(component);
-            } else {
-                if (component.getBytes(StandardCharsets.UTF_8).length > MAX_FILESYSTEM_COMPONENT_BYTES) {
-                    component = truncatePathComponent(component, MAX_FILESYSTEM_COMPONENT_BYTES);
-                }
-                // Don't strip trailing dots from folder names for folder-based items
-                if (!folderBased) {
-                    while (component != null && !component.isEmpty() && component.endsWith(".")) {
-                        component = component.substring(0, component.length() - 1);
-                    }
-                }
-            }
+            component = sanitizePathComponent(component, isLastComponent, folderBased);
 
             if (!first) result.append("/");
             result.append(component);
             first = false;
         }
         return result.toString();
+    }
+
+    private String sanitizePathComponent(String component, boolean isLastComponent, boolean folderBased) {
+        // For folder-based items, don't treat dots as extension separators
+        if (isLastComponent && component.contains(".") && !folderBased) {
+            return truncateFilenameWithExtension(component);
+        }
+        if (component.getBytes(StandardCharsets.UTF_8).length > MAX_FILESYSTEM_COMPONENT_BYTES) {
+            component = truncatePathComponent(component, MAX_FILESYSTEM_COMPONENT_BYTES);
+        }
+        // Don't strip trailing dots from folder names for folder-based items
+        if (!folderBased) {
+            while (component != null && !component.isEmpty() && component.endsWith(".")) {
+                component = component.substring(0, component.length() - 1);
+            }
+        }
+        return component;
     }
 
     public String truncateFilenameWithExtension(String filename) {

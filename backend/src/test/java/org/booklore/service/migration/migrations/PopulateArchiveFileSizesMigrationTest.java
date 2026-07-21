@@ -152,14 +152,17 @@ class PopulateArchiveFileSizesMigrationTest {
 
         @Override
         protected void doBegin(Object transaction, TransactionDefinition definition) {
+            // no-op: test double, transactions are not actually managed
         }
 
         @Override
         protected void doCommit(DefaultTransactionStatus status) {
+            // no-op: test double, transactions are not actually managed
         }
 
         @Override
         protected void doRollback(DefaultTransactionStatus status) {
+            // no-op: test double, transactions are not actually managed
         }
     }
 }

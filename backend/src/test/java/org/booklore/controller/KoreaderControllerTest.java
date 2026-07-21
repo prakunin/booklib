@@ -55,7 +55,7 @@ class KoreaderControllerTest {
                 .progress("progress")
                 .percentage(0.5F)
                 .device("dev")
-                .device_id("id")
+                .deviceId("id")
                 .build();
         when(koreaderService.getProgress("hash")).thenReturn(progress);
         ResponseEntity<KoreaderProgress> resp = controller.getProgress("hash");
@@ -71,7 +71,7 @@ class KoreaderControllerTest {
                 .progress("progress")
                 .percentage(0.5F)
                 .device("dev")
-                .device_id("id")
+                .deviceId("id")
                 .build();
         doNothing().when(koreaderService).saveProgress("doc", progress);
         ResponseEntity<?> resp = controller.updateProgress(progress);

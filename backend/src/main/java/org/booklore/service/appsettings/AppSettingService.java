@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 @DependsOnDatabaseInitialization
 public class AppSettingService {
     private static final String DEFAULT_MOBILE_REDIRECT_URI = "booklib://oauth2-callback";
+    private static final String DEFAULT_DISABLED = "false";
 
     private final AppProperties appProperties;
     private final SettingPersistenceHelper settingPersistenceHelper;
@@ -95,7 +96,10 @@ public class AppSettingService {
         boolean enabling = Boolean.parseBoolean(String.valueOf(val));
         if (!enabling) return;
 
-        AppSettings current = getAppSettings();
+        // Call the uncached builder directly: calling getAppSettings() here would self-invoke
+        // past the @Cacheable proxy anyway, so this is behaviorally identical and avoids the
+        // misleading self-invocation of an annotated method.
+        AppSettings current = buildAppSettings();
         if (!current.isOidcEnabled()) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Cannot enable OIDC-only mode: OIDC must be enabled first");
         }
@@ -198,14 +202,14 @@ public class AppSettingService {
         Map<String, String> settingsMap = getSettingsMap();
         PublicAppSetting.PublicAppSettingBuilder builder = PublicAppSetting.builder();
 
-        builder.oidcEnabled(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_ENABLED, "false")));
+        builder.oidcEnabled(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_ENABLED, DEFAULT_DISABLED)));
         builder.remoteAuthEnabled(appProperties.getRemoteAuth().isEnabled());
         OidcProviderDetails details = settingPersistenceHelper.getJsonSetting(settingsMap, AppSettingKey.OIDC_PROVIDER_DETAILS, OidcProviderDetails.class, null, false);
         if (details != null) {
             details.setClientSecret(null);
         }
         builder.oidcProviderDetails(details);
-        builder.oidcForceOnlyMode(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_FORCE_ONLY_MODE, "false")));
+        builder.oidcForceOnlyMode(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_FORCE_ONLY_MODE, DEFAULT_DISABLED)));
         builder.passwordPolicy(settingPersistenceHelper.getJsonSetting(
                 settingsMap, AppSettingKey.PASSWORD_POLICY, PasswordPolicy.class, new PasswordPolicy(), true));
 
@@ -242,11 +246,11 @@ public class AppSettingService {
                 true
             )
         );
-        builder.autoBookSearch(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.AUTO_BOOK_SEARCH, "false")));
+        builder.autoBookSearch(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.AUTO_BOOK_SEARCH, DEFAULT_DISABLED)));
         builder.uploadPattern(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.UPLOAD_FILE_PATTERN, "{authors}/<{series}/><{seriesIndex}. >/{title}/{title}< - {authors}>< ({year})>"));
         builder.similarBookRecommendation(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.SIMILAR_BOOK_RECOMMENDATION, "true")));
-        builder.opdsServerEnabled(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OPDS_SERVER_ENABLED, "false")));
-        builder.komgaApiEnabled(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.KOMGA_API_ENABLED, "false")));
+        builder.opdsServerEnabled(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OPDS_SERVER_ENABLED, DEFAULT_DISABLED)));
+        builder.komgaApiEnabled(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.KOMGA_API_ENABLED, DEFAULT_DISABLED)));
         builder.komgaGroupUnknown(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.KOMGA_GROUP_UNKNOWN, "true")));
         builder.pdfCacheSizeInMb(Integer.parseInt(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.PDF_CACHE_SIZE_IN_MB, "5120")));
         builder.maxFileUploadSizeInMb(Integer.parseInt(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.MAX_FILE_UPLOAD_SIZE_IN_MB, "100")));
@@ -261,7 +265,7 @@ public class AppSettingService {
             }
         }
 
-        boolean settingEnabled = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_ENABLED, "false"));
+        boolean settingEnabled = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_ENABLED, DEFAULT_DISABLED));
         Boolean forceDisable = appProperties.getForceDisableOidc();
         boolean finalEnabled = settingEnabled && (forceDisable == null || !forceDisable);
         builder.oidcEnabled(finalEnabled);
@@ -269,7 +273,7 @@ public class AppSettingService {
         builder.oidcGroupSyncMode(settingPersistenceHelper.getOrCreateSetting(
                 AppSettingKey.OIDC_GROUP_SYNC_MODE, "DISABLED"));
 
-        builder.oidcForceOnlyMode(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_FORCE_ONLY_MODE, "false")));
+        builder.oidcForceOnlyMode(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_FORCE_ONLY_MODE, DEFAULT_DISABLED)));
 
         builder.diskType(appProperties.getDiskType());
 

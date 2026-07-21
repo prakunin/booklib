@@ -63,7 +63,7 @@ public class KoreaderService {
                 .progress(progress.getKoreaderProgress())
                 .percentage(progress.getKoreaderProgressPercent())
                 .device("BookLore")
-                .device_id("BookLore")
+                .deviceId("BookLore")
                 .build();
     }
 
@@ -95,6 +95,8 @@ public class KoreaderService {
     }
 
     @Transactional
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     public void syncProgressToKoreader(long bookId, float percentage, long userId) {
         try {
             koreaderUserRepository.findByBookLoreUserId(userId)
@@ -135,6 +137,8 @@ public class KoreaderService {
         }
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void saveToFileProgress(BookLoreUserEntity user, BookEntity book, UserBookProgressEntity progress) {
         try {
             BookFileEntity primaryFile = book.getPrimaryBookFile();
@@ -163,6 +167,9 @@ public class KoreaderService {
                             String.valueOf(progress.getCbxProgress()) : null);
                     fileProgress.setProgressPercent(progress.getCbxProgressPercent());
                 }
+                case AUDIOBOOK -> {
+                    // KOReader syncs ebook readers only; audiobooks have no per-format position fields here.
+                }
             }
 
             fileProgressRepository.save(fileProgress);
@@ -171,11 +178,13 @@ public class KoreaderService {
         }
     }
 
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings("java:S1874")
     private void updateProgressData(UserBookProgressEntity userProgress, KoreaderProgress koProgress, boolean syncWithWebReader, BookEntity book) {
         userProgress.setKoreaderProgress(koProgress.getProgress());
         userProgress.setKoreaderProgressPercent(koProgress.getPercentage());
         userProgress.setKoreaderDevice(koProgress.getDevice());
-        userProgress.setKoreaderDeviceId(koProgress.getDevice_id());
+        userProgress.setKoreaderDeviceId(koProgress.getDeviceId());
         userProgress.setKoreaderLastSyncTime(Instant.now());
         userProgress.setLastReadTime(Instant.now());
         if (syncWithWebReader && koProgress.getProgress() != null) {

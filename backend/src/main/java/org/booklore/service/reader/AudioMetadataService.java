@@ -1,6 +1,7 @@
 package org.booklore.service.reader;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ import org.jaudiotagger.audio.AudioHeader;
 import org.jaudiotagger.tag.FieldKey;
 import org.jaudiotagger.tag.Tag;
 import org.jaudiotagger.tag.images.Artwork;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class AudioMetadataService {
 
-  private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("[^0-9]");
+  private static final Pattern NON_DIGIT_PATTERN = Pattern.compile("\\D");
   private final AudioFileUtilityService audioFileUtility;
   private final AudiobookMetadataExtractor audiobookMetadataExtractor;
   private final BookFileRepository bookFileRepository;
@@ -100,7 +102,7 @@ public class AudioMetadataService {
   }
 
   private AudiobookInfo buildFolderBasedAudiobookInfo(BookFileEntity bookFile, Path folderPath)
-      throws Exception {
+      throws IOException {
     AudiobookInfo.AudiobookInfoBuilder builder =
         AudiobookInfo.builder()
             .bookId(bookFile.getBook().getId())
@@ -112,15 +114,48 @@ public class AudioMetadataService {
       throw new IllegalStateException("No audio files found in folder: " + folderPath);
     }
 
+    TrackScanResult scan = scanTracks(audioFiles);
+    applyAudioTechnicalProperties(builder, bookFile, scan);
+
+    long totalSizeBytes = scan.tracks().stream()
+                .mapToLong(t -> t.getFileSizeBytes() != null ? t.getFileSizeBytes() : 0)
+                .sum();
+    return builder
+                .title(resolveFolderTitle(bookFile, scan))
+                .author(resolveFolderAuthor(bookFile, scan))
+                .durationMs(scan.totalDurationMs())
+                .totalSizeBytes(totalSizeBytes > 0 ? totalSizeBytes : null)
+                .tracks(scan.tracks())
+                .build();
+  }
+
+  private record TrackScanResult(
+      List<AudiobookTrack> tracks,
+      long totalDurationMs,
+      String title,
+      String author,
+      String narrator,
+      Integer bitrate,
+      String codec,
+      Integer sampleRate,
+      Integer channels) {}
+
+  private record FirstTrackInfo(
+      Integer bitrate,
+      String codec,
+      Integer sampleRate,
+      Integer channels,
+      String title,
+      String author,
+      String narrator) {
+    static final FirstTrackInfo EMPTY =
+        new FirstTrackInfo(null, null, null, null, null, null, null);
+  }
+
+  private TrackScanResult scanTracks(List<Path> audioFiles) throws IOException {
     List<AudiobookTrack> tracks = new ArrayList<>();
     long totalDurationMs = 0;
-    String title = null;
-    String author = null;
-    String narrator = null;
-    Integer bitrate = null;
-    String codec = null;
-    Integer sampleRate = null;
-    Integer channels = null;
+    FirstTrackInfo first = FirstTrackInfo.EMPTY;
 
     for (int i = 0; i < audioFiles.size(); i++) {
       Path trackPath = audioFiles.get(i);
@@ -132,20 +167,11 @@ public class AudioMetadataService {
         long trackDurationMs = (long) (header.getPreciseTrackLength() * 1000);
         long fileSizeBytes = Files.size(trackPath);
 
-        String trackTitle = null;
-        if (tag != null) {
-          trackTitle = tag.getFirst(FieldKey.TITLE);
-        }
-        if (trackTitle == null || trackTitle.isEmpty()) {
-          trackTitle =
-              audioFileUtility.getTrackTitleFromFilename(trackPath.getFileName().toString());
-        }
-
         tracks.add(
             AudiobookTrack.builder()
                 .index(i)
                 .fileName(trackPath.getFileName().toString())
-                .title(trackTitle)
+                .title(resolveTrackTitle(tag, trackPath))
                 .durationMs(trackDurationMs)
                 .fileSizeBytes(fileSizeBytes)
                 .cumulativeStartMs(totalDurationMs)
@@ -154,15 +180,7 @@ public class AudioMetadataService {
         totalDurationMs += trackDurationMs;
 
         if (i == 0) {
-          bitrate = safeBitrate(header, trackPath);
-          codec = safeEncodingType(header, trackPath);
-          sampleRate = safeSampleRate(header, trackPath);
-          channels = parseChannels(safeChannels(header, trackPath));
-          if (tag != null) {
-            title = getTagValue(tag, FieldKey.ALBUM, FieldKey.TITLE);
-            author = getTagValue(tag, FieldKey.ALBUM_ARTIST, FieldKey.ARTIST);
-            narrator = getTagValue(tag, FieldKey.COMPOSER);
-          }
+          first = readFirstTrackInfo(header, tag, trackPath);
         }
       } catch (Exception e) {
         log.warn("Failed to read track metadata: {}", trackPath, e);
@@ -178,59 +196,82 @@ public class AudioMetadataService {
       }
     }
 
+    return new TrackScanResult(
+        tracks,
+        totalDurationMs,
+        first.title(),
+        first.author(),
+        first.narrator(),
+        first.bitrate(),
+        first.codec(),
+        first.sampleRate(),
+        first.channels());
+  }
+
+  private String resolveTrackTitle(Tag tag, Path trackPath) {
+    String trackTitle = null;
+    if (tag != null) {
+      trackTitle = tag.getFirst(FieldKey.TITLE);
+    }
+    if (trackTitle == null || trackTitle.isEmpty()) {
+      trackTitle = audioFileUtility.getTrackTitleFromFilename(trackPath.getFileName().toString());
+    }
+    return trackTitle;
+  }
+
+  private FirstTrackInfo readFirstTrackInfo(AudioHeader header, Tag tag, Path trackPath) {
+    Integer bitrate = safeBitrate(header, trackPath);
+    String codec = safeEncodingType(header, trackPath);
+    Integer sampleRate = safeSampleRate(header, trackPath);
+    Integer channels = parseChannels(safeChannels(header, trackPath));
+    String title = null;
+    String author = null;
+    String narrator = null;
+    if (tag != null) {
+      title = getTagValue(tag, FieldKey.ALBUM, FieldKey.TITLE);
+      author = getTagValue(tag, FieldKey.ALBUM_ARTIST, FieldKey.ARTIST);
+      narrator = getTagValue(tag, FieldKey.COMPOSER);
+    }
+    return new FirstTrackInfo(bitrate, codec, sampleRate, channels, title, author, narrator);
+  }
+
+  private void applyAudioTechnicalProperties(
+      AudiobookInfo.AudiobookInfoBuilder builder, BookFileEntity bookFile, TrackScanResult scan) {
     BookMetadataEntity metadata = bookFile.getBook().getMetadata();
     if (metadata != null && metadata.getNarrator() != null) {
       builder.narrator(metadata.getNarrator());
     } else {
-      builder.narrator(narrator);
+      builder.narrator(scan.narrator());
     }
 
-    if (bookFile.getBitrate() != null) {
-      builder.bitrate(bookFile.getBitrate());
-    } else {
-      builder.bitrate(bitrate);
-    }
-
-    if (bookFile.getCodec() != null) {
-      builder.codec(bookFile.getCodec());
-    } else {
-      builder.codec(codec);
-    }
-
-    if (bookFile.getSampleRate() != null) {
-      builder.sampleRate(bookFile.getSampleRate());
-    } else {
-      builder.sampleRate(sampleRate);
-    }
-
-    if (bookFile.getChannels() != null) {
-      builder.channels(bookFile.getChannels());
-    } else {
-      builder.channels(channels);
-    }
-
-    if (metadata != null) {
-      String bookTitle = metadata.getTitle();
-      if (bookTitle != null) {
-        title = bookTitle;
-      }
-      if (metadata.getAuthors() != null && !metadata.getAuthors().isEmpty()) {
-        author = metadata.getAuthors().getFirst().getName();
-      }
-    }
-
-    long totalSizeBytes = tracks.stream()
-                .mapToLong(t -> t.getFileSizeBytes() != null ? t.getFileSizeBytes() : 0)
-                .sum();
-    return builder
-                .title(title)
-                .author(author)
-                .durationMs(totalDurationMs)
-                .totalSizeBytes(totalSizeBytes > 0 ? totalSizeBytes : null)
-                .tracks(tracks)
-                .build();
+    builder.bitrate(bookFile.getBitrate() != null ? bookFile.getBitrate() : scan.bitrate());
+    builder.codec(bookFile.getCodec() != null ? bookFile.getCodec() : scan.codec());
+    builder.sampleRate(
+        bookFile.getSampleRate() != null ? bookFile.getSampleRate() : scan.sampleRate());
+    builder.channels(bookFile.getChannels() != null ? bookFile.getChannels() : scan.channels());
   }
 
+  private String resolveFolderTitle(BookFileEntity bookFile, TrackScanResult scan) {
+    BookMetadataEntity metadata = bookFile.getBook().getMetadata();
+    if (metadata != null && metadata.getTitle() != null) {
+      return metadata.getTitle();
+    }
+    return scan.title();
+  }
+
+  private String resolveFolderAuthor(BookFileEntity bookFile, TrackScanResult scan) {
+    BookMetadataEntity metadata = bookFile.getBook().getMetadata();
+    if (metadata != null && metadata.getAuthors() != null && !metadata.getAuthors().isEmpty()) {
+      return metadata.getAuthors().getFirst().getName();
+    }
+    return scan.author();
+  }
+
+  // jaudiotagger's AudioFileIO.read declares several distinct checked exception types, namely
+  // CannotReadException, TagException, ReadOnlyFileException, InvalidAudioFrameException and IOException.
+  // This "throws Exception" umbrella is shared with sibling methods in this class that are out of
+  // scope for this change, so narrowing only here would be inconsistent without a wider signature pass.
+  @SuppressWarnings("java:S112")
   private AudiobookInfo extractSingleFileMetadata(
       AudiobookInfo.AudiobookInfoBuilder builder, Path audioPath) throws Exception {
     AudioFile audioFile = AudioFileIO.read(audioPath.toFile());
@@ -323,6 +364,9 @@ public class AudioMetadataService {
     return fallback;
   }
 
+  // null is intentional here and distinct from an empty array: AudiobookReaderController checks
+  // `coverData == null` to return 404 Not Found; an empty array would instead return 200 with no body.
+  @SuppressWarnings("java:S1168")
   public byte[] getEmbeddedCoverArt(Path audioPath) {
     try {
       AudioFile audioFile = AudioFileIO.read(audioPath.toFile());
@@ -346,25 +390,29 @@ public class AudioMetadataService {
       if (tag != null) {
         Artwork artwork = tag.getFirstArtwork();
         if (artwork != null) {
-          String mimeType = artwork.getMimeType();
-          if (mimeType != null && !mimeType.isEmpty()) {
-            return mimeType;
-          }
-          byte[] data = artwork.getBinaryData();
-          if (data != null && data.length > 2) {
-            if (data[0] == (byte) 0xFF && data[1] == (byte) 0xD8) {
-              return "image/jpeg";
-            } else if (data[0] == (byte) 0x89 && data[1] == (byte) 0x50) {
-              return "image/png";
-            }
-          }
-          return "image/jpeg";
+          return resolveArtworkMimeType(artwork);
         }
       }
     } catch (Exception e) {
       log.debug("Could not determine cover art MIME type: {}", e.getMessage());
     }
-    return "image/jpeg";
+    return MediaType.IMAGE_JPEG_VALUE;
+  }
+
+  private String resolveArtworkMimeType(Artwork artwork) {
+    String mimeType = artwork.getMimeType();
+    if (mimeType != null && !mimeType.isEmpty()) {
+      return mimeType;
+    }
+    byte[] data = artwork.getBinaryData();
+    if (data != null && data.length > 2) {
+      if (data[0] == (byte) 0xFF && data[1] == (byte) 0xD8) {
+        return MediaType.IMAGE_JPEG_VALUE;
+      } else if (data[0] == (byte) 0x89 && data[1] == (byte) 0x50) {
+        return "image/png";
+      }
+    }
+    return MediaType.IMAGE_JPEG_VALUE;
   }
 
   private String getTagValue(Tag tag, FieldKey... keys) {

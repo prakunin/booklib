@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.ObjectMapper;
 
@@ -16,7 +18,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -172,42 +177,33 @@ class EpubMetadataExtractorTest {
     @Nested
     class TitleAndSubtitleDetection {
 
-        @Test
-        void distinguishesMainTitleFromSubtitleViaRefines() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title id="t1">Main Title</dc:title>
-                    <dc:title id="t2">The Subtitle</dc:title>
-                    <meta refines="#t1" property="title-type">main</meta>
-                    <meta refines="#t2" property="title-type">subtitle</meta>
-                    """);
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("mainTitleDetectionCases")
+        void distinguishesMainTitleFromSubtitle(String scenario, String metadataXml, String expectedSubtitle) throws IOException {
+            String opf = wrapOpf(metadataXml);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
             assertThat(metadata.getTitle()).isEqualTo("Main Title");
-            assertThat(metadata.getSubtitle()).isEqualTo("The Subtitle");
+            assertThat(metadata.getSubtitle()).isEqualTo(expectedSubtitle);
         }
 
-        @Test
-        void distinguishesMainTitleWithoutRefines() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title id="maintitle">Main Title</dc:title>
-                    <dc:title id="subtitle">The Subtitle</dc:title>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getTitle()).isEqualTo("Main Title");
-            assertThat(metadata.getSubtitle()).isNull();
-        }
-
-        @Test
-        void distinguishesMainTitleWithoutIDsOrRefines() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Main Title</dc:title>
-                    <dc:title>The Subtitle</dc:title>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getTitle()).isEqualTo("Main Title");
-            assertThat(metadata.getSubtitle()).isNull();
+        private static Stream<Arguments> mainTitleDetectionCases() {
+            return Stream.of(
+                    Arguments.of("viaRefines", """
+                            <dc:title id="t1">Main Title</dc:title>
+                            <dc:title id="t2">The Subtitle</dc:title>
+                            <meta refines="#t1" property="title-type">main</meta>
+                            <meta refines="#t2" property="title-type">subtitle</meta>
+                            """, "The Subtitle"),
+                    Arguments.of("withoutRefines", """
+                            <dc:title id="maintitle">Main Title</dc:title>
+                            <dc:title id="subtitle">The Subtitle</dc:title>
+                            """, null),
+                    Arguments.of("withoutIDsOrRefines", """
+                            <dc:title>Main Title</dc:title>
+                            <dc:title>The Subtitle</dc:title>
+                            """, null)
+            );
         }
 
         @Test
@@ -270,7 +266,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2024, 1, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2024, Month.JANUARY, 1));
         }
 
         @Test
@@ -281,7 +277,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, 6, 15));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, Month.JUNE, 15));
         }
 
         @Test
@@ -292,7 +288,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2022, 3, 10));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2022, Month.MARCH, 10));
         }
 
         @Test
@@ -303,7 +299,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2021, 12, 25));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2021, Month.DECEMBER, 25));
         }
 
         @Test
@@ -314,7 +310,7 @@ class EpubMetadataExtractorTest {
                     """);
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 8, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.AUGUST, 1));
         }
 
         @Test
@@ -343,48 +339,37 @@ class EpubMetadataExtractorTest {
     @Nested
     class IdentifierSchemeMapping {
 
-        @Test
-        void parsesIsbn13WithOpfScheme() throws IOException {
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("isbnIdentifierCases")
+        void parsesIsbnFromIdentifier(String scenario, String identifierXml, String field, String expectedValue) throws IOException {
             String opf = wrapOpf("""
                     <dc:title>Book</dc:title>
-                    <dc:identifier opf:scheme="ISBN">978-0-13-468599-1</dc:identifier>
-                    """);
+                    %s
+                    """.formatted(identifierXml));
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getIsbn13()).isEqualTo("978-0-13-468599-1");
+            switch (field) {
+                case "isbn13" -> assertThat(metadata.getIsbn13()).isEqualTo(expectedValue);
+                case "isbn10" -> assertThat(metadata.getIsbn10()).isEqualTo(expectedValue);
+                default -> throw new IllegalArgumentException("Unexpected field: " + field);
+            }
         }
 
-        @Test
-        void parsesIsbn10WithOpfScheme() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <dc:identifier opf:scheme="ISBN">0-13-468599-X</dc:identifier>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getIsbn10()).isEqualTo("0-13-468599-X");
-        }
-
-        @Test
-        void parsesUrnIsbnFormat() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <dc:identifier>urn:isbn:9780134685991</dc:identifier>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getIsbn13()).isEqualTo("9780134685991");
-        }
-
-        @Test
-        void parsesIsbnPrefixFormat() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <dc:identifier>isbn:9780134685991</dc:identifier>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getIsbn13()).isEqualTo("9780134685991");
+        private static Stream<Arguments> isbnIdentifierCases() {
+            return Stream.of(
+                    Arguments.of("opfSchemeIsbn13",
+                            "<dc:identifier opf:scheme=\"ISBN\">978-0-13-468599-1</dc:identifier>",
+                            "isbn13", "978-0-13-468599-1"),
+                    Arguments.of("opfSchemeIsbn10",
+                            "<dc:identifier opf:scheme=\"ISBN\">0-13-468599-X</dc:identifier>",
+                            "isbn10", "0-13-468599-X"),
+                    Arguments.of("urnIsbnFormat",
+                            "<dc:identifier>urn:isbn:9780134685991</dc:identifier>",
+                            "isbn13", "9780134685991"),
+                    Arguments.of("isbnPrefixFormat",
+                            "<dc:identifier>isbn:9780134685991</dc:identifier>",
+                            "isbn13", "9780134685991")
+            );
         }
 
         @ParameterizedTest
@@ -412,6 +397,7 @@ class EpubMetadataExtractorTest {
                 case "HARDCOVER" -> assertThat(metadata.getHardcoverId()).isEqualTo(value);
                 case "LUBIMYCZYTAC" -> assertThat(metadata.getLubimyczytacId()).isEqualTo(value);
                 case "RANOBEDB" -> assertThat(metadata.getRanobedbId()).isEqualTo(value);
+                default -> { /* no-op: other schemes are not exercised by this parameterized test */ }
             }
         }
 
@@ -473,64 +459,41 @@ class EpubMetadataExtractorTest {
     @Nested
     class AuthorRoleParsing {
 
-        @Test
-        void extractsAuthorWithOpfRole() throws IOException {
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("authorRoleCases")
+        void extractsAuthorsByRole(String scenario, String creatorXml, List<String> expectedAuthors) throws IOException {
             String opf = wrapOpf("""
                     <dc:title>Book</dc:title>
-                    <dc:creator opf:role="aut">Jane Author</dc:creator>
-                    <dc:creator opf:role="ill">Bob Illustrator</dc:creator>
-                    """);
+                    %s
+                    """.formatted(creatorXml));
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getAuthors()).containsExactly("Jane Author");
+            assertThat(metadata.getAuthors()).containsExactlyInAnyOrderElementsOf(expectedAuthors);
         }
 
-        @Test
-        void creatorWithoutRoleDefaultsToAuthor() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <dc:creator>Simple Author</dc:creator>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getAuthors()).containsExactly("Simple Author");
-        }
-
-        @Test
-        void creatorWithIdAndRefinesRole() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <dc:creator id="c1">Refined Author</dc:creator>
-                    <dc:creator id="c2">The Illustrator</dc:creator>
-                    <meta refines="#c1" property="role">aut</meta>
-                    <meta refines="#c2" property="role">ill</meta>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getAuthors()).containsExactly("Refined Author");
-        }
-
-        @Test
-        void creatorWithIdButNoRoleRefinesDefaultsToAuthor() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <dc:creator id="c1">Default Author</dc:creator>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getAuthors()).containsExactly("Default Author");
-        }
-
-        @Test
-        void multipleAuthors() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <dc:creator opf:role="aut">Author One</dc:creator>
-                    <dc:creator opf:role="aut">Author Two</dc:creator>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getAuthors()).containsExactlyInAnyOrder("Author One", "Author Two");
+        private static Stream<Arguments> authorRoleCases() {
+            return Stream.of(
+                    Arguments.of("opfRole", """
+                            <dc:creator opf:role="aut">Jane Author</dc:creator>
+                            <dc:creator opf:role="ill">Bob Illustrator</dc:creator>
+                            """, List.of("Jane Author")),
+                    Arguments.of("noRoleDefaultsToAuthor", """
+                            <dc:creator>Simple Author</dc:creator>
+                            """, List.of("Simple Author")),
+                    Arguments.of("idAndRefinesRole", """
+                            <dc:creator id="c1">Refined Author</dc:creator>
+                            <dc:creator id="c2">The Illustrator</dc:creator>
+                            <meta refines="#c1" property="role">aut</meta>
+                            <meta refines="#c2" property="role">ill</meta>
+                            """, List.of("Refined Author")),
+                    Arguments.of("idButNoRoleRefinesDefaultsToAuthor", """
+                            <dc:creator id="c1">Default Author</dc:creator>
+                            """, List.of("Default Author")),
+                    Arguments.of("multipleAuthors", """
+                            <dc:creator opf:role="aut">Author One</dc:creator>
+                            <dc:creator opf:role="aut">Author Two</dc:creator>
+                            """, List.of("Author One", "Author Two"))
+            );
         }
 
         @Test
@@ -550,43 +513,34 @@ class EpubMetadataExtractorTest {
     @Nested
     class SeriesExtraction {
 
-        @Test
-        void extractsBookloreSeriesMeta() throws IOException {
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("seriesMetadataCases")
+        void extractsSeriesNameAndNumber(String scenario, String metaXml, String expectedName, float expectedNumber) throws IOException {
             String opf = wrapOpf("""
                     <dc:title>Book</dc:title>
-                    <meta property="booklore:series">The Dark Tower</meta>
-                    <meta property="booklore:series_index">3.5</meta>
-                    """);
+                    %s
+                    """.formatted(metaXml));
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getSeriesName()).isEqualTo("The Dark Tower");
-            assertThat(metadata.getSeriesNumber()).isEqualTo(3.5f);
+            assertThat(metadata.getSeriesName()).isEqualTo(expectedName);
+            assertThat(metadata.getSeriesNumber()).isEqualTo(expectedNumber);
         }
 
-        @Test
-        void extractsCalibreSeriesMeta() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <meta name="calibre:series" content="Calibre Series"/>
-                    <meta name="calibre:series_index" content="2"/>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getSeriesName()).isEqualTo("Calibre Series");
-            assertThat(metadata.getSeriesNumber()).isEqualTo(2.0f);
-        }
-
-        @Test
-        void extractsBelongsToCollection() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <meta property="belongs-to-collection">EPUB3 Collection</meta>
-                    <meta property="group-position">5</meta>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getSeriesName()).isEqualTo("EPUB3 Collection");
-            assertThat(metadata.getSeriesNumber()).isEqualTo(5.0f);
+        private static Stream<Arguments> seriesMetadataCases() {
+            return Stream.of(
+                    Arguments.of("bookloreSeriesMeta", """
+                            <meta property="booklore:series">The Dark Tower</meta>
+                            <meta property="booklore:series_index">3.5</meta>
+                            """, "The Dark Tower", 3.5f),
+                    Arguments.of("calibreSeriesMeta", """
+                            <meta name="calibre:series" content="Calibre Series"/>
+                            <meta name="calibre:series_index" content="2"/>
+                            """, "Calibre Series", 2.0f),
+                    Arguments.of("belongsToCollection", """
+                            <meta property="belongs-to-collection">EPUB3 Collection</meta>
+                            <meta property="group-position">5</meta>
+                            """, "EPUB3 Collection", 5.0f)
+            );
         }
 
         @Test
@@ -799,48 +753,26 @@ class EpubMetadataExtractorTest {
     @Nested
     class PageCountExtraction {
 
-        @Test
-        void extractsCalibrePagesMeta() throws IOException {
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("pageCountCases")
+        void extractsPageCountFromVariousSources(String scenario, String metaXml, int expectedPageCount) throws IOException {
             String opf = wrapOpf("""
                     <dc:title>Book</dc:title>
-                    <meta name="calibre:pages" content="400"/>
-                    """);
+                    %s
+                    """.formatted(metaXml));
             BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
 
-            assertThat(metadata.getPageCount()).isEqualTo(400);
+            assertThat(metadata.getPageCount()).isEqualTo(expectedPageCount);
         }
 
-        @Test
-        void extractsSchemaPagecount() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <meta property="schema:pagecount">250</meta>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getPageCount()).isEqualTo(250);
-        }
-
-        @Test
-        void extractsMediaPagecount() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <meta property="media:pagecount">123</meta>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getPageCount()).isEqualTo(123);
-        }
-
-        @Test
-        void extractsCalibreUserMetadataPagecount() throws IOException {
-            String opf = wrapOpf("""
-                    <dc:title>Book</dc:title>
-                    <meta name="calibre:user_metadata:#pagecount" content='{"#value#": 512}'/>
-                    """);
-            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
-
-            assertThat(metadata.getPageCount()).isEqualTo(512);
+        private static Stream<Arguments> pageCountCases() {
+            return Stream.of(
+                    Arguments.of("calibrePagesMeta", "<meta name=\"calibre:pages\" content=\"400\"/>", 400),
+                    Arguments.of("schemaPagecount", "<meta property=\"schema:pagecount\">250</meta>", 250),
+                    Arguments.of("mediaPagecount", "<meta property=\"media:pagecount\">123</meta>", 123),
+                    Arguments.of("calibreUserMetadataPagecount",
+                            "<meta name=\"calibre:user_metadata:#pagecount\" content='{\"#value#\": 512}'/>", 512)
+            );
         }
 
         @Test
@@ -975,6 +907,43 @@ class EpubMetadataExtractorTest {
     }
 
     @Nested
+    class FixedLayoutAndIgnoredMetaKeys {
+
+        @Test
+        void preePaginatedRenditionLayoutSetsFixedLayoutFlag() throws IOException {
+            String opf = wrapOpf("""
+                    <dc:title>Book</dc:title>
+                    <meta property="rendition:layout">pre-paginated</meta>
+                    """);
+            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
+
+            assertThat(metadata.getIsFixedLayout()).isTrue();
+        }
+
+        @Test
+        void reflowableRenditionLayoutDoesNotSetFixedLayoutFlag() throws IOException {
+            String opf = wrapOpf("""
+                    <dc:title>Book</dc:title>
+                    <meta property="rendition:layout">reflowable</meta>
+                    """);
+            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
+
+            assertThat(metadata.getIsFixedLayout()).isNull();
+        }
+
+        @Test
+        void bookloreRatingKeyIsIgnoredHereSinceRatingIsHandledElsewhere() throws IOException {
+            String opf = wrapOpf("""
+                    <dc:title>Book</dc:title>
+                    <meta property="booklore:rating">4.5</meta>
+                    """);
+            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
+
+            assertThat(metadata.getRating()).isNull();
+        }
+    }
+
+    @Nested
     class MoodsAndTagsSeparationFromCategories {
 
         @Test
@@ -1061,6 +1030,28 @@ class EpubMetadataExtractorTest {
 
             byte[] result = extractor.extractCover(epub);
             assertThat(result).isEqualTo(coverBytes);
+        }
+
+        @Test
+        void coverImagePropertyPointingAtMissingFileFallsThroughToNull() throws IOException {
+            String opf = wrapOpf("", """
+                    <item id="cover" href="images/missing-cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+                    """);
+            // No cover bytes are written for this href, so the declared path never exists in the container.
+            File epub = createEpub(opf, "OEBPS/content.opf", null);
+
+            assertThat(extractor.extractCover(epub)).isNull();
+        }
+
+        @Test
+        void coverLookingManifestEntryPointingAtMissingFileFallsThroughToNull() throws IOException {
+            String opf = wrapOpf("", """
+                    <item id="cover-img" href="images/missing-cover.jpg" media-type="image/jpeg"/>
+                    """);
+            // No cover bytes are written for this href, so the declared path never exists in the container.
+            File epub = createEpub(opf, "OEBPS/content.opf", null);
+
+            assertThat(extractor.extractCover(epub)).isNull();
         }
 
         @Test
@@ -1255,7 +1246,7 @@ class EpubMetadataExtractorTest {
 
             assertThat(metadata.getTitle()).isEqualTo("Root OPF");
             assertThat(metadata.getAuthors()).containsExactly("Root Author");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, 1, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2020, Month.JANUARY, 1));
         }
     }
 
@@ -1339,7 +1330,7 @@ class EpubMetadataExtractorTest {
             assertThat(metadata.getDescription()).isEqualTo("A very detailed description.");
             assertThat(metadata.getPublisher()).isEqualTo("Big Publisher");
             assertThat(metadata.getLanguage()).isEqualTo("en");
-            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, 11, 15));
+            assertThat(metadata.getPublishedDate()).isEqualTo(LocalDate.of(2023, Month.NOVEMBER, 15));
             assertThat(metadata.getCategories()).containsExactlyInAnyOrder("Science Fiction", "Adventure");
             assertThat(metadata.getIsbn13()).isEqualTo("9781234567890");
             assertThat(metadata.getAsin()).isEqualTo("B09FULL");

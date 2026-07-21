@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Set;
 
@@ -91,7 +92,7 @@ class AppBookQuickSearchServiceTest {
 
         assertThat(result).extracting(r -> r.id()).containsExactly(2L, 1L);
         assertThat(result.getFirst().authors()).containsExactly("Frank Herbert");
-        assertThat(result.getFirst().publishedDate()).isEqualTo(LocalDate.of(1969, 1, 1));
+        assertThat(result.getFirst().publishedDate()).isEqualTo(LocalDate.of(1969, Month.JANUARY, 1));
         verify(bookRepository, never()).count(any(Specification.class));
         verify(restrictionRepository, never()).findByUserId(any());
     }
@@ -166,7 +167,7 @@ class AppBookQuickSearchServiceTest {
                 .bookId(id)
                 .title(title)
                 .authors(List.of(author))
-                .publishedDate(LocalDate.of(1969, 1, 1))
+                .publishedDate(LocalDate.of(1969, Month.JANUARY, 1))
                 .build();
         BookFileEntity file = BookFileEntity.builder()
                 .fileName(title + ".epub")

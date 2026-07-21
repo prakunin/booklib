@@ -40,12 +40,7 @@ public class LibraryScanTask implements Task {
 
         try {
             for (Library library : libraryService.getAllLibraries()) {
-                try {
-                    libraryService.rescanLibrary(library.getId());
-                    log.info("{}: Rescanned library '{}'", getTaskType(), library.getName());
-                } catch (Exception e) {
-                    log.error("{}: Failed to rescan library '{}': {}", getTaskType(), library.getName(), e.getMessage(), e);
-                }
+                rescanLibrarySafely(library);
             }
 
             builder.status(TaskStatus.COMPLETED);
@@ -58,6 +53,15 @@ public class LibraryScanTask implements Task {
         log.info("{}: Task completed. Duration: {} ms", getTaskType(), endTime - startTime);
 
         return builder.build();
+    }
+
+    private void rescanLibrarySafely(Library library) {
+        try {
+            libraryService.rescanLibrary(library.getId());
+            log.info("{}: Rescanned library '{}'", getTaskType(), library.getName());
+        } catch (Exception e) {
+            log.error("{}: Failed to rescan library '{}': {}", getTaskType(), library.getName(), e.getMessage(), e);
+        }
     }
 
     @Override

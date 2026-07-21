@@ -183,15 +183,18 @@ public class FileMoveHelper {
             normalizedRoots.add(root.toAbsolutePath().normalize());
         }
         while (dir != null) {
-            if (isLibraryRoot(dir, normalizedRoots)) {
-                break;
-            }
-            if (deleteIfEffectivelyEmpty(dir, normalizedRoots)) {
-                dir = dir.getParent();
-            } else {
-                break;
-            }
+            dir = advanceCleanup(dir, normalizedRoots);
         }
+    }
+
+    private Path advanceCleanup(Path dir, Set<Path> normalizedRoots) {
+        if (isLibraryRoot(dir, normalizedRoots)) {
+            return null;
+        }
+        if (deleteIfEffectivelyEmpty(dir, normalizedRoots)) {
+            return dir.getParent();
+        }
+        return null;
     }
 
     private boolean deleteIfEffectivelyEmpty(Path dir, Set<Path> libraryRoots) {

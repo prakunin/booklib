@@ -377,4 +377,157 @@ class FileUploadServiceTest {
              assertThat(savedName).endsWith(".pdf");
         }
     }
+
+    @Test
+    @DisplayName("Physical book upload resolves and persists a library path via determineLibraryPathForPhysicalBook")
+    void uploadAdditionalFile_physicalBook_resolvesLibraryPathAndUploads() {
+        long bookId = 20L;
+        MockMultipartFile file = new MockMultipartFile("file", "scan.pdf", "application/pdf", "payload".getBytes());
+
+        LibraryEntity lib = new LibraryEntity();
+        lib.setId(30L);
+        LibraryPathEntity libPath = new LibraryPathEntity();
+        libPath.setId(4L);
+        libPath.setPath(tempDir.toString());
+        lib.setLibraryPaths(List.of(libPath));
+
+        BookEntity book = new BookEntity();
+        book.setId(bookId);
+        book.setIsPhysical(true);
+        book.setLibrary(lib);
+
+        when(bookRepository.findByIdWithBookFiles(bookId)).thenReturn(Optional.of(book));
+        when(fileMovingHelper.getFileNamingPattern(lib)).thenReturn("{currentFilename}");
+        when(bookAdditionalFileRepository.save(any(BookFileEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(additionalFileMapper.toAdditionalFile(any(BookFileEntity.class))).thenReturn(mock(BookFile.class));
+
+        try (MockedStatic<FileFingerprint> fp = mockStatic(FileFingerprint.class)) {
+            fp.when(() -> FileFingerprint.generateHash(any())).thenReturn("hash-phys");
+            when(bookAdditionalFileRepository.findByAltFormatCurrentHash("hash-phys")).thenReturn(Optional.empty());
+
+            BookFile result = service.uploadAdditionalFile(bookId, file, true, BookFileType.PDF, "scan");
+
+            assertThat(result).isNotNull();
+            assertThat(book.getLibraryPath()).isEqualTo(libPath);
+            verify(bookRepository).save(book);
+        }
+    }
+
+    @Test
+    @DisplayName("Physical book with no configured library paths fails fast")
+    void uploadAdditionalFile_physicalBookWithoutLibraryPaths_throwsIllegalState() {
+        long bookId = 23L;
+        MockMultipartFile file = new MockMultipartFile("file", "scan2.pdf", "application/pdf", "data".getBytes());
+        BookEntity book = new BookEntity();
+        book.setId(bookId);
+        book.setIsPhysical(true);
+
+        when(bookRepository.findByIdWithBookFiles(bookId)).thenReturn(Optional.of(book));
+
+        try (MockedStatic<FileFingerprint> fp = mockStatic(FileFingerprint.class)) {
+            fp.when(() -> FileFingerprint.generateHash(any())).thenReturn("hash-x");
+            when(bookAdditionalFileRepository.findByAltFormatCurrentHash("hash-x")).thenReturn(Optional.empty());
+
+            assertThatExceptionOfType(IllegalStateException.class)
+                    .isThrownBy(() -> service.uploadAdditionalFile(bookId, file, true, BookFileType.PDF, null))
+                    .withMessageContaining("Cannot upload file to physical book");
+        }
+    }
+
+    @Test
+    @DisplayName("Non-book additional file uses resolveTargetForAdditionalFile")
+    void uploadAdditionalFile_nonBookFile_usesAdditionalFileTargetResolution() {
+        long bookId = 21L;
+        MockMultipartFile file = new MockMultipartFile("file", "cover.jpg", "image/jpeg", "payload".getBytes());
+
+        LibraryPathEntity libPath = new LibraryPathEntity();
+        libPath.setId(5L);
+        libPath.setPath(tempDir.toString());
+        BookEntity book = new BookEntity();
+        book.setId(bookId);
+        book.setLibraryPath(libPath);
+
+        BookFileEntity primaryFile = new BookFileEntity();
+        primaryFile.setBook(book);
+        primaryFile.setFileName("primary.epub");
+        primaryFile.setFileSubPath(".");
+        primaryFile.setBookType(BookFileType.EPUB);
+        book.setBookFiles(new ArrayList<>(List.of(primaryFile)));
+
+        when(bookRepository.findByIdWithBookFiles(bookId)).thenReturn(Optional.of(book));
+        when(bookAdditionalFileRepository.save(any(BookFileEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(additionalFileMapper.toAdditionalFile(any(BookFileEntity.class))).thenReturn(mock(BookFile.class));
+
+        try (MockedStatic<FileFingerprint> fp = mockStatic(FileFingerprint.class)) {
+            fp.when(() -> FileFingerprint.generateHash(any())).thenReturn("hash-cover");
+
+            BookFile result = service.uploadAdditionalFile(bookId, file, false, BookFileType.EPUB, "cover image");
+
+            assertThat(result).isNotNull();
+            verify(bookRepository).save(book);
+            verify(bookAdditionalFileRepository, never()).findByAltFormatCurrentHash(any());
+        }
+    }
+
+    @Test
+    @DisplayName("A book tied to a library re-registers monitoring around the file move")
+    void uploadAdditionalFile_withLibrarySet_reRegistersMonitoring() {
+        long bookId = 22L;
+        MockMultipartFile file = new MockMultipartFile("file", "extra.pdf", "application/pdf", "data".getBytes());
+
+        LibraryEntity lib = new LibraryEntity();
+        lib.setId(60L);
+        LibraryPathEntity libraryRootPath = new LibraryPathEntity();
+        libraryRootPath.setPath(tempDir.toString());
+        lib.setLibraryPaths(List.of(libraryRootPath));
+
+        LibraryPathEntity bookLibPath = new LibraryPathEntity();
+        bookLibPath.setId(7L);
+        bookLibPath.setPath(tempDir.toString());
+
+        BookEntity book = new BookEntity();
+        book.setId(bookId);
+        book.setLibrary(lib);
+        book.setLibraryPath(bookLibPath);
+
+        BookFileEntity primaryFile = new BookFileEntity();
+        primaryFile.setBook(book);
+        primaryFile.setFileName("primary.epub");
+        primaryFile.setFileSubPath(".");
+        primaryFile.setBookType(BookFileType.EPUB);
+        book.setBookFiles(new ArrayList<>(List.of(primaryFile)));
+
+        when(bookRepository.findByIdWithBookFiles(bookId)).thenReturn(Optional.of(book));
+        when(bookAdditionalFileRepository.save(any(BookFileEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(additionalFileMapper.toAdditionalFile(any(BookFileEntity.class))).thenReturn(mock(BookFile.class));
+
+        try (MockedStatic<FileFingerprint> fp = mockStatic(FileFingerprint.class)) {
+            fp.when(() -> FileFingerprint.generateHash(any())).thenReturn("hash-lib");
+            when(bookAdditionalFileRepository.findByAltFormatCurrentHash("hash-lib")).thenReturn(Optional.empty());
+
+            service.uploadAdditionalFile(bookId, file, true, BookFileType.PDF, "desc");
+
+            verify(monitoringRegistrationService).unregisterLibrary(60L);
+            verify(monitoringRegistrationService).registerLibraryPaths(60L, Path.of(tempDir.toString()));
+        }
+    }
+
+    @Test
+    @DisplayName("A library restricted to specific formats rejects disallowed uploads")
+    void uploadFile_throws_when_format_not_allowed() {
+        MockMultipartFile file = new MockMultipartFile("file", "book.pdf", "application/pdf", "data".getBytes());
+        LibraryEntity lib = new LibraryEntity();
+        lib.setId(50L);
+        lib.setName("Comics Only");
+        lib.setAllowedFormats(List.of(BookFileType.CBX));
+        LibraryPathEntity path = new LibraryPathEntity();
+        path.setId(6L);
+        path.setPath(tempDir.toString());
+        lib.setLibraryPaths(List.of(path));
+        when(libraryRepository.findById(50L)).thenReturn(Optional.of(lib));
+
+        assertThatExceptionOfType(APIException.class)
+                .isThrownBy(() -> service.uploadFile(file, 50L, 6L))
+                .satisfies(ex -> assertThat(ex.getStatus()).isEqualTo(ApiError.FORMAT_NOT_ALLOWED.getStatus()));
+    }
 }

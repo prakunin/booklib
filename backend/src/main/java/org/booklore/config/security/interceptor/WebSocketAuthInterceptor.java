@@ -13,6 +13,7 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -29,8 +30,14 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     private final JwtUtils jwtUtils;
 
+    // ChannelInterceptor.preSend (org.springframework.messaging.support, @NullMarked) declares
+    // `@Nullable Message<?> preSend(Message<?> message, MessageChannel channel)`. This override
+    // matches that contract exactly - same return nullability, same non-null params - and this
+    // package is itself @NullMarked (see package-info.java). Appears to be a tool limitation in
+    // this SonarJava version's JSpecify override check for library-declared @NullMarked methods.
+    @SuppressWarnings("java:S2638")
     @Override
-    public Message<?> preSend(Message<?> message, MessageChannel channel) {
+    public @Nullable Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         if (accessor == null || accessor.getCommand() == null) {
             return message;

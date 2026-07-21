@@ -16,18 +16,36 @@ public class ReadProgressRequest {
 
     private BookFileProgress fileProgress;
 
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.dto.request.BookFileProgress}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy fields.
     private EpubProgress epubProgress;
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.dto.request.BookFileProgress}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy fields.
     private PdfProgress pdfProgress;
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.dto.request.BookFileProgress}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy fields.
     private CbxProgress cbxProgress;
-    @Deprecated
+    /**
+     * @deprecated Use per-file progress ({@link org.booklore.model.dto.request.BookFileProgress}) instead; kept for dual-write compatibility.
+     */
+    @Deprecated(since = "1.0", forRemoval = true)
+    @SuppressWarnings("java:S1133") // Deliberate dual-write compat field kept alongside per-file progress; remove with the legacy fields.
     private AudiobookProgress audiobookProgress;
 
     private Instant dateFinished;
 
     @AssertTrue(message = "At least one progress field must be provided")
+    // Deliberate use of the deprecated legacy per-format progress fields (dual-write compat); remove with the legacy columns.
+    @SuppressWarnings({"java:S1874", "java:S5738"})
     public boolean isProgressValid() {
         return fileProgress != null || epubProgress != null || pdfProgress != null || cbxProgress != null || audiobookProgress != null || dateFinished != null;
     }

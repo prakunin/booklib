@@ -57,35 +57,15 @@ public class InpxLibraryScanner {
             InpxScanCaches caches = new InpxScanCaches();
             List<InpxBookDto> batch = new ArrayList<>(BATCH_SIZE);
             boolean[] cancelled = {false};
+            ScanContext scanContext = new ScanContext(libraryId, libraryPathId, library.getInpxArchivePath(),
+                    caches, counters, libraryNameHolder[0]);
 
-            inpxParser.forEach(inpxPath, book -> {
-                if (cancelled[0]) {
-                    return;
-                }
-                batch.add(book);
-                if (batch.size() >= BATCH_SIZE) {
-                    // Checked once a batch has filled but before it is written: a cancel
-                    // requested during/after the previous batch's write stops this batch
-                    // from ever being persisted, so everything already committed stays
-                    // and the scan halts on a batch boundary.
-                    if (scanControl.isCancelRequested(libraryId)) {
-                        cancelled[0] = true;
-                        return;
-                    }
-                    counters.total = Math.max(counters.total, counters.processed + batch.size());
-                    flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
-                    publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
-                }
-            });
+            inpxParser.forEach(inpxPath, book -> processScannedBook(book, cancelled, batch, scanContext));
 
             // Flush index records first. Discovery can then compare each ZIP's FB2 entry
             // count with the freshly committed database count, so archives already covered
             // by the INPX file are not needlessly parsed a second time.
-            if (!cancelled[0] && !batch.isEmpty()) {
-                counters.total = Math.max(counters.total, counters.processed + batch.size());
-                flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
-                publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
-            }
+            flushRemaining(cancelled, batch, scanContext);
 
             if (!cancelled[0]) {
                 counters.total = Math.max(counters.total, counters.processed);
@@ -93,27 +73,10 @@ public class InpxLibraryScanner {
                         libraryId, library.getInpxArchivePath());
                 counters.total += discovery.totalEntries();
 
-                archiveScanner.forEach(discovery, book -> {
-                    if (cancelled[0]) {
-                        return;
-                    }
-                    batch.add(book);
-                    if (batch.size() >= BATCH_SIZE) {
-                        if (scanControl.isCancelRequested(libraryId)) {
-                            cancelled[0] = true;
-                            return;
-                        }
-                        counters.total = Math.max(counters.total, counters.processed + batch.size());
-                        flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
-                        publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
-                    }
-                }, () -> cancelled[0]);
+                archiveScanner.forEach(discovery, book -> processScannedBook(book, cancelled, batch, scanContext),
+                        () -> cancelled[0]);
 
-                if (!cancelled[0] && !batch.isEmpty()) {
-                    counters.total = Math.max(counters.total, counters.processed + batch.size());
-                    flush(batch, libraryId, libraryPathId, library.getInpxArchivePath(), caches, counters);
-                    publish(libraryId, libraryNameHolder[0], counters, InpxScanStatus.RUNNING);
-                }
+                flushRemaining(cancelled, batch, scanContext);
             }
 
             // An index smaller than BATCH_SIZE never reaches the in-loop check above, and a
@@ -139,6 +102,43 @@ public class InpxLibraryScanner {
         } finally {
             scanControl.clear(libraryId);
         }
+    }
+
+    private void processScannedBook(InpxBookDto book, boolean[] cancelled, List<InpxBookDto> batch,
+                                    ScanContext scanContext) {
+        if (cancelled[0]) {
+            return;
+        }
+        batch.add(book);
+        if (batch.size() >= BATCH_SIZE) {
+            // Checked once a batch has filled but before it is written: a cancel
+            // requested during/after the previous batch's write stops this batch
+            // from ever being persisted, so everything already committed stays
+            // and the scan halts on a batch boundary.
+            if (scanControl.isCancelRequested(scanContext.libraryId())) {
+                cancelled[0] = true;
+                return;
+            }
+            Counters counters = scanContext.counters();
+            counters.total = Math.max(counters.total, counters.processed + batch.size());
+            flush(batch, scanContext.libraryId(), scanContext.libraryPathId(), scanContext.archiveRoot(),
+                    scanContext.caches(), counters);
+            publish(scanContext.libraryId(), scanContext.libraryName(), counters, InpxScanStatus.RUNNING);
+        }
+    }
+
+    private void flushRemaining(boolean[] cancelled, List<InpxBookDto> batch, ScanContext scanContext) {
+        if (!cancelled[0] && !batch.isEmpty()) {
+            Counters counters = scanContext.counters();
+            counters.total = Math.max(counters.total, counters.processed + batch.size());
+            flush(batch, scanContext.libraryId(), scanContext.libraryPathId(), scanContext.archiveRoot(),
+                    scanContext.caches(), counters);
+            publish(scanContext.libraryId(), scanContext.libraryName(), counters, InpxScanStatus.RUNNING);
+        }
+    }
+
+    private record ScanContext(long libraryId, long libraryPathId, String archiveRoot,
+                               InpxScanCaches caches, Counters counters, String libraryName) {
     }
 
     private void flush(List<InpxBookDto> batch, long libraryId, long libraryPathId, String archiveRoot,
