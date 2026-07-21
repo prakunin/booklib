@@ -16,6 +16,8 @@ import org.booklore.model.entity.ShelfEntity;
 import org.booklore.model.enums.ComicCreatorRole;
 import org.booklore.model.enums.ReadStatus;
 import org.booklore.repository.BookRepository;
+import org.booklore.repository.LibraryFacetCountRepository;
+import org.booklore.repository.LibraryFacetStateRepository;
 import org.booklore.repository.ShelfRepository;
 import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
@@ -62,6 +64,8 @@ class AppBookServiceFilterOptionsTest {
     @Mock private UserContentRestrictionRepository restrictionRepository;
     @Mock private BookSortRegistry bookSortRegistry;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock private LibraryFacetCountRepository libraryFacetCountRepository;
+    @Mock private LibraryFacetStateRepository libraryFacetStateRepository;
 
     private AppBookService service;
 
@@ -74,7 +78,8 @@ class AppBookServiceFilterOptionsTest {
                 shelfRepository, authenticationService, mobileBookMapper,
                 appBookProgressService, magicShelfBookService, entityManager, restrictionRepository,
                 new AppContentRestrictionQueryService(restrictionRepository), bookSortRegistry, eventPublisher,
-                new CatalogSummaryCache(60), new FilterOptionsCache(), new ShellBookIdsCache()
+                new CatalogSummaryCache(60), new FilterOptionsCache(), new ShellBookIdsCache(),
+                libraryFacetCountRepository, libraryFacetStateRepository
         );
     }
 
