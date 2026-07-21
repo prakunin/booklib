@@ -27,6 +27,8 @@ import org.booklore.model.enums.ComicCreatorRole;
 import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.enums.ReadStatus;
 import org.booklore.repository.BookRepository;
+import org.booklore.repository.LibraryFacetCountRepository;
+import org.booklore.repository.LibraryFacetStateRepository;
 import org.booklore.repository.ShelfRepository;
 import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
@@ -48,10 +50,13 @@ import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Parameter;
 import jakarta.persistence.Tuple;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import jakarta.persistence.Query;
 
@@ -85,6 +90,8 @@ public class AppBookService {
     private final CatalogSummaryCache catalogSummaryCache;
     private final FilterOptionsCache filterOptionsCache;
     private final ShellBookIdsCache shellBookIdsCache;
+    private final LibraryFacetCountRepository libraryFacetCountRepository;
+    private final LibraryFacetStateRepository libraryFacetStateRepository;
 
     public AppBookService(BookRepository bookRepository,
                           UserBookProgressRepository userBookProgressRepository,
@@ -101,7 +108,9 @@ public class AppBookService {
                           ApplicationEventPublisher eventPublisher,
                           CatalogSummaryCache catalogSummaryCache,
                           FilterOptionsCache filterOptionsCache,
-                          ShellBookIdsCache shellBookIdsCache) {
+                          ShellBookIdsCache shellBookIdsCache,
+                          LibraryFacetCountRepository libraryFacetCountRepository,
+                          LibraryFacetStateRepository libraryFacetStateRepository) {
         this.bookRepository = bookRepository;
         this.userBookProgressRepository = userBookProgressRepository;
         this.userBookFileProgressRepository = userBookFileProgressRepository;
@@ -118,6 +127,8 @@ public class AppBookService {
         this.catalogSummaryCache = catalogSummaryCache;
         this.filterOptionsCache = filterOptionsCache;
         this.shellBookIdsCache = shellBookIdsCache;
+        this.libraryFacetCountRepository = libraryFacetCountRepository;
+        this.libraryFacetStateRepository = libraryFacetStateRepository;
     }
 
     public AppPageResponse<AppBookSummary> getBooks(BookListRequest req) {
@@ -653,7 +664,24 @@ public class AppBookService {
                         .map(String::valueOf).collect(Collectors.joining(",")))
                 + "|" + libraryId + "|" + shelfId;
         return filterOptionsCache.get(cacheKey,
-                () -> computeFilterOptions(user, userId, accessibleLibraryIds, libraryId, shelfId));
+                () -> loadFilterOptions(user, userId, accessibleLibraryIds, libraryId, shelfId));
+    }
+
+    /**
+     * Serves the filter options from the materialized per-library facet counts when the scope is
+     * eligible (unrestricted, no shelf filter) and the target libraries have been materialized;
+     * otherwise falls back to the live {@link #computeFilterOptions} aggregation. The materialized
+     * path still computes the per-user facets (read status, personal rating) live and merges them in.
+     */
+    private AppFilterOptions loadFilterOptions(BookLoreUser user, Long userId,
+                                               Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
+        if (shelfId == null && isUnrestricted(user, userId)) {
+            AppFilterOptions materialized = materializedFilterOptionsOrNull(user, userId, accessibleLibraryIds, libraryId);
+            if (materialized != null) {
+                return materialized;
+            }
+        }
+        return computeFilterOptions(user, userId, accessibleLibraryIds, libraryId, shelfId);
     }
 
     private AppFilterOptions computeFilterOptions(BookLoreUser user, Long userId,
@@ -883,6 +911,376 @@ public class AppBookService {
                 .shelves(shelves)
                 .libraries(libraries)
                 .build();
+    }
+
+    // ==== Materialized per-library facet counts ====
+    // Facet-type keys stored in library_facet_count. buildGlobalFacets and assembleFilterOptions
+    // below must mirror the live computeFilterOptions builder exactly; the parity test
+    // AppBookServiceMaterializedFacetsTest fails if the materialized output diverges from live.
+    private static final String F_AUTHORS = "authors";
+    private static final String F_LANGUAGES = "languages";
+    private static final String F_FILE_TYPES = "fileTypes";
+    private static final String F_CATEGORIES = "categories";
+    private static final String F_PUBLISHERS = "publishers";
+    private static final String F_SERIES = "series";
+    private static final String F_TAGS = "tags";
+    private static final String F_MOODS = "moods";
+    private static final String F_NARRATORS = "narrators";
+    private static final String F_AGE_RATINGS = "ageRatings";
+    private static final String F_CONTENT_RATINGS = "contentRatings";
+    private static final String F_MATCH_SCORES = "matchScores";
+    private static final String F_PUBLISHED_YEARS = "publishedYears";
+    private static final String F_FILE_SIZES = "fileSizes";
+    private static final String F_AMAZON_RATINGS = "amazonRatings";
+    private static final String F_GOODREADS_RATINGS = "goodreadsRatings";
+    private static final String F_HARDCOVER_RATINGS = "hardcoverRatings";
+    private static final String F_LUBIMYCZYTAC_RATINGS = "lubimyczytacRatings";
+    private static final String F_RANOBEDB_RATINGS = "ranobedbRatings";
+    private static final String F_AUDIBLE_RATINGS = "audibleRatings";
+    private static final String F_PAGE_COUNTS = "pageCounts";
+    private static final String F_SHELF_STATUSES = "shelfStatuses";
+    private static final String F_COMIC_CHARACTERS = "comicCharacters";
+    private static final String F_COMIC_TEAMS = "comicTeams";
+    private static final String F_COMIC_LOCATIONS = "comicLocations";
+    private static final String F_COMIC_CREATORS = "comicCreators";
+    private static final String F_SHELVES = "shelves";
+    private static final String F_LIBRARIES = "libraries";
+
+    private static final List<String> GLOBAL_FACET_TYPES = List.of(
+            F_AUTHORS, F_LANGUAGES, F_FILE_TYPES, F_CATEGORIES, F_PUBLISHERS, F_SERIES, F_TAGS, F_MOODS,
+            F_NARRATORS, F_AGE_RATINGS, F_CONTENT_RATINGS, F_MATCH_SCORES, F_PUBLISHED_YEARS, F_FILE_SIZES,
+            F_AMAZON_RATINGS, F_GOODREADS_RATINGS, F_HARDCOVER_RATINGS, F_LUBIMYCZYTAC_RATINGS,
+            F_RANOBEDB_RATINGS, F_AUDIBLE_RATINGS, F_PAGE_COUNTS, F_SHELF_STATUSES, F_COMIC_CHARACTERS,
+            F_COMIC_TEAMS, F_COMIC_LOCATIONS, F_COMIC_CREATORS, F_SHELVES, F_LIBRARIES);
+
+    private static final int FACET_LIMIT = 1000;
+    private static final int FACET_VALUE_MAX = 512;
+    private static final int FACET_STALE_HOURS = 24;
+
+    /**
+     * The GLOBAL facets (derived only from book/metadata/file tables, no user dimension), keyed by
+     * facet type. Languages are stored as raw codes; assembleFilterOptions derives the display label.
+     * Shared by the live path and the materialized recompute so both produce identical values.
+     * User-scoped facets (read status, personal rating) are computed separately.
+     */
+    private Map<String, List<AppFilterOptions.CountedOption>> buildGlobalFacets(
+            String scopeClause, Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
+        Map<String, List<AppFilterOptions.CountedOption>> f = new LinkedHashMap<>();
+        f.put(F_AUTHORS, queryCountedOptions("a.name", "JOIN b.metadata m JOIN m.authors a", "",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_LANGUAGES, queryCountedOptions("m.language", METADATA_JOIN_CLAUSE,
+                "AND m.language IS NOT NULL AND m.language <> ''",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_FILE_TYPES, queryCountedOptions("bf.bookType", "JOIN b.bookFiles bf",
+                "AND bf.isBookFormat = true", scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_CATEGORIES, queryCountedOptions("c.name", "JOIN b.metadata m JOIN m.categories c", "",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_PUBLISHERS, queryCountedOptions("m.publisher", METADATA_JOIN_CLAUSE,
+                "AND m.publisher IS NOT NULL AND m.publisher <> ''",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_SERIES, queryCountedOptions("m.seriesName", METADATA_JOIN_CLAUSE,
+                "AND m.seriesName IS NOT NULL AND m.seriesName <> ''",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_TAGS, queryCountedOptions("t.name", "JOIN b.metadata m JOIN m.tags t", "",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_MOODS, queryCountedOptions("mo.name", "JOIN b.metadata m JOIN m.moods mo", "",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_NARRATORS, queryCountedOptions("m.narrator", METADATA_JOIN_CLAUSE,
+                "AND m.narrator IS NOT NULL AND m.narrator <> ''",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_AGE_RATINGS, queryGroupedCount(
+                "CASE " +
+                "  WHEN m.ageRating >= 0 AND m.ageRating < 6 THEN '0' " +
+                "  WHEN m.ageRating >= 6 AND m.ageRating < 10 THEN '6' " +
+                "  WHEN m.ageRating >= 10 AND m.ageRating < 13 THEN '10' " +
+                "  WHEN m.ageRating >= 13 AND m.ageRating < 16 THEN '13' " +
+                "  WHEN m.ageRating >= 16 AND m.ageRating < 18 THEN '16' " +
+                "  WHEN m.ageRating >= 18 AND m.ageRating < 21 THEN '18' " +
+                "  WHEN m.ageRating >= 21 THEN '21' " +
+                "END",
+                METADATA_JOIN_CLAUSE, "AND m.ageRating IS NOT NULL",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_CONTENT_RATINGS, queryCountedOptions("m.contentRating", METADATA_JOIN_CLAUSE,
+                "AND m.contentRating IS NOT NULL AND m.contentRating <> ''",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_MATCH_SCORES, queryGroupedCount(
+                "CASE " +
+                "  WHEN b.metadataMatchScore >= 0.95 THEN '0' " +
+                "  WHEN b.metadataMatchScore >= 0.90 THEN '1' " +
+                "  WHEN b.metadataMatchScore >= 0.80 THEN '2' " +
+                "  WHEN b.metadataMatchScore >= 0.70 THEN '3' " +
+                "  WHEN b.metadataMatchScore >= 0.50 THEN '4' " +
+                "  WHEN b.metadataMatchScore >= 0.30 THEN '5' " +
+                "  WHEN b.metadataMatchScore >= 0.00 THEN '6' " +
+                "END",
+                "", "AND b.metadataMatchScore IS NOT NULL",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_PUBLISHED_YEARS, queryCountedOptions("CAST(YEAR(m.publishedDate) AS string)",
+                METADATA_JOIN_CLAUSE, "AND m.publishedDate IS NOT NULL",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_FILE_SIZES, queryGroupedCount(
+                "CASE " +
+                "  WHEN bf.fileSizeKb < 1024 THEN '0' " +
+                "  WHEN bf.fileSizeKb < 10240 THEN '1' " +
+                "  WHEN bf.fileSizeKb < 51200 THEN '2' " +
+                "  WHEN bf.fileSizeKb < 102400 THEN '3' " +
+                "  WHEN bf.fileSizeKb < 512000 THEN '4' " +
+                "  WHEN bf.fileSizeKb < 1048576 THEN '5' " +
+                "  WHEN bf.fileSizeKb < 2097152 THEN '6' " +
+                "  ELSE '7' " +
+                "END",
+                "JOIN b.bookFiles bf", "AND bf.isBookFormat = true",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_AMAZON_RATINGS, queryRatingBuckets("m.amazonRating", scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_GOODREADS_RATINGS, queryRatingBuckets("m.goodreadsRating", scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_HARDCOVER_RATINGS, queryRatingBuckets("m.hardcoverRating", scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_LUBIMYCZYTAC_RATINGS, queryRatingBuckets("m.lubimyczytacRating", scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_RANOBEDB_RATINGS, queryRatingBuckets("m.ranobedbRating", scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_AUDIBLE_RATINGS, queryRatingBuckets("m.audibleRating", scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_PAGE_COUNTS, queryGroupedCount(
+                "CASE " +
+                "  WHEN m.pageCount < 50 THEN '0' " +
+                "  WHEN m.pageCount < 100 THEN '1' " +
+                "  WHEN m.pageCount < 200 THEN '2' " +
+                "  WHEN m.pageCount < 400 THEN '3' " +
+                "  WHEN m.pageCount < 600 THEN '4' " +
+                "  WHEN m.pageCount < 1000 THEN '5' " +
+                "  ELSE '6' " +
+                "END",
+                METADATA_JOIN_CLAUSE, "AND m.pageCount IS NOT NULL",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_SHELF_STATUSES, queryGroupedCount(
+                "CASE WHEN (SELECT COUNT(s) FROM b.shelves s) > 0 THEN 'shelved' ELSE 'unshelved' END",
+                "", "", scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_COMIC_CHARACTERS, queryCountedOptions("c.name",
+                "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.characters c", "",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_COMIC_TEAMS, queryCountedOptions("t.name",
+                "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.teams t", "",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_COMIC_LOCATIONS, queryCountedOptions("l.name",
+                "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.locations l", "",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_COMIC_CREATORS, queryComicCreators(scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_SHELVES, queryCountedOptions("CAST(s.id AS string) || ':' || s.name", "JOIN b.shelves s", "",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_LIBRARIES, queryCountedOptions("CAST(l.id AS string) || ':' || l.name", "JOIN b.library l", "",
+                scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        return f;
+    }
+
+    private List<AppFilterOptions.CountedOption> queryComicCreators(
+            String scopeClause, Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
+        String creatorJpql = "SELECT cr.name, mapping.role, COUNT(DISTINCT b.id) FROM BookEntity b"
+                + " JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.creatorMappings mapping JOIN mapping.creator cr"
+                + " WHERE (b.deleted IS NULL OR b.deleted = false)"
+                + " " + scopeClause
+                + " GROUP BY cr.name, mapping.role ORDER BY COUNT(DISTINCT b.id) DESC";
+        var creatorQ = entityManager.createQuery(creatorJpql, Tuple.class);
+        setFilterQueryParams(creatorQ, accessibleLibraryIds, libraryId, shelfId);
+        creatorQ.setMaxResults(FACET_LIMIT);
+        return creatorQ.getResultList().stream()
+                .map(t -> new AppFilterOptions.CountedOption(
+                        t.get(0, String.class) + ":" + creatorRoleLabel(t.get(1, ComicCreatorRole.class)),
+                        t.get(2, Long.class)))
+                .toList();
+    }
+
+    private List<AppFilterOptions.CountedOption> queryPersonalRatingCounts(
+            Long userId, String scopeClause, Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
+        String jpql = "SELECT CAST(ubp.personalRating AS string), COUNT(DISTINCT ubp.book.id) "
+                + "FROM UserBookProgressEntity ubp "
+                + "WHERE ubp.user.id = :userId AND ubp.personalRating IS NOT NULL "
+                + "AND ubp.book.id IN (SELECT b.id FROM BookEntity b WHERE (b.deleted IS NULL OR b.deleted = false)"
+                + scopeClause + ") "
+                + "GROUP BY 1 ORDER BY 1 DESC";
+        var q = entityManager.createQuery(jpql, Tuple.class);
+        q.setParameter(PARAM_USER_ID, userId);
+        setFilterQueryParams(q, accessibleLibraryIds, libraryId, shelfId);
+        return q.getResultList().stream()
+                .map(t -> new AppFilterOptions.CountedOption(t.get(0, String.class), t.get(1, Long.class)))
+                .toList();
+    }
+
+    private AppFilterOptions assembleFilterOptions(
+            Map<String, List<AppFilterOptions.CountedOption>> g,
+            List<AppFilterOptions.CountedOption> readStatuses,
+            List<AppFilterOptions.CountedOption> personalRatings) {
+        return AppFilterOptions.builder()
+                .authors(facet(g, F_AUTHORS))
+                .languages(facet(g, F_LANGUAGES).stream()
+                        .map(c -> new AppFilterOptions.LanguageOption(
+                                c.name(),
+                                Locale.forLanguageTag(c.name()).getDisplayLanguage(Locale.ENGLISH),
+                                c.count()))
+                        .toList())
+                .fileTypes(facet(g, F_FILE_TYPES))
+                .readStatuses(readStatuses)
+                .categories(facet(g, F_CATEGORIES))
+                .publishers(facet(g, F_PUBLISHERS))
+                .series(facet(g, F_SERIES))
+                .tags(facet(g, F_TAGS))
+                .moods(facet(g, F_MOODS))
+                .narrators(facet(g, F_NARRATORS))
+                .ageRatings(facet(g, F_AGE_RATINGS))
+                .contentRatings(facet(g, F_CONTENT_RATINGS))
+                .matchScores(facet(g, F_MATCH_SCORES))
+                .publishedYears(facet(g, F_PUBLISHED_YEARS))
+                .fileSizes(facet(g, F_FILE_SIZES))
+                .personalRatings(personalRatings)
+                .amazonRatings(facet(g, F_AMAZON_RATINGS))
+                .goodreadsRatings(facet(g, F_GOODREADS_RATINGS))
+                .hardcoverRatings(facet(g, F_HARDCOVER_RATINGS))
+                .lubimyczytacRatings(facet(g, F_LUBIMYCZYTAC_RATINGS))
+                .ranobedbRatings(facet(g, F_RANOBEDB_RATINGS))
+                .audibleRatings(facet(g, F_AUDIBLE_RATINGS))
+                .pageCounts(facet(g, F_PAGE_COUNTS))
+                .shelfStatuses(facet(g, F_SHELF_STATUSES))
+                .comicCharacters(facet(g, F_COMIC_CHARACTERS))
+                .comicTeams(facet(g, F_COMIC_TEAMS))
+                .comicLocations(facet(g, F_COMIC_LOCATIONS))
+                .comicCreators(facet(g, F_COMIC_CREATORS))
+                .shelves(facet(g, F_SHELVES))
+                .libraries(facet(g, F_LIBRARIES))
+                .build();
+    }
+
+    private static List<AppFilterOptions.CountedOption> facet(
+            Map<String, List<AppFilterOptions.CountedOption>> g, String key) {
+        return g.getOrDefault(key, List.of());
+    }
+
+    private boolean isUnrestricted(BookLoreUser user, Long userId) {
+        return user.getPermissions().isAdmin() || restrictionQueryScope(userId).clause().isEmpty();
+    }
+
+    private AppFilterOptions materializedFilterOptionsOrNull(BookLoreUser user, Long userId,
+                                                             Set<Long> accessibleLibraryIds, Long libraryId) {
+        List<Long> targetLibraryIds = resolveTargetLibraryIds(accessibleLibraryIds, libraryId);
+        if (targetLibraryIds.isEmpty()) {
+            return null;
+        }
+        Set<Long> computed = libraryFacetStateRepository.findAll().stream()
+                .map(LibraryFacetStateEntity::getLibraryId).collect(Collectors.toSet());
+        if (!computed.containsAll(targetLibraryIds)) {
+            return null;
+        }
+        Map<String, List<AppFilterOptions.CountedOption>> global = toFacetMap(
+                libraryFacetCountRepository.sumByLibraryIds(targetLibraryIds));
+
+        String scopeClause = unrestrictedFacetScope(accessibleLibraryIds, libraryId);
+        List<AppFilterOptions.CountedOption> readStatuses = queryReadStatusCounts(
+                userId, scopeClause, accessibleLibraryIds, libraryId, null);
+        List<AppFilterOptions.CountedOption> personalRatings = queryPersonalRatingCounts(
+                userId, scopeClause, accessibleLibraryIds, libraryId, null);
+        return assembleFilterOptions(global, readStatuses, personalRatings);
+    }
+
+    private List<Long> resolveTargetLibraryIds(Set<Long> accessibleLibraryIds, Long libraryId) {
+        if (libraryId != null) {
+            return List.of(libraryId);
+        }
+        if (accessibleLibraryIds != null) {
+            return List.copyOf(accessibleLibraryIds);
+        }
+        return allLibraryIds();
+    }
+
+    private List<Long> allLibraryIds() {
+        return entityManager.createQuery("SELECT DISTINCT b.library.id FROM BookEntity b", Long.class)
+                .getResultList();
+    }
+
+    private String unrestrictedFacetScope(Set<Long> accessibleLibraryIds, Long libraryId) {
+        String libraryClause = "";
+        if (libraryId != null) {
+            libraryClause = "AND b.library.id = :libraryId";
+        } else if (accessibleLibraryIds != null) {
+            libraryClause = "AND b.library.id IN :libraryIds";
+        }
+        return buildScopeClause(libraryClause, "") + visibilityClause(findShellBookIds());
+    }
+
+    private Map<String, List<AppFilterOptions.CountedOption>> toFacetMap(
+            List<LibraryFacetCountRepository.FacetCountSum> rows) {
+        Map<String, List<AppFilterOptions.CountedOption>> byType = new HashMap<>();
+        for (LibraryFacetCountRepository.FacetCountSum r : rows) {
+            byType.computeIfAbsent(r.getFacetType(), k -> new ArrayList<>())
+                    .add(new AppFilterOptions.CountedOption(r.getFacetValue(), r.getBookCount()));
+        }
+        Map<String, List<AppFilterOptions.CountedOption>> result = new LinkedHashMap<>();
+        for (String type : GLOBAL_FACET_TYPES) {
+            List<AppFilterOptions.CountedOption> options = byType.getOrDefault(type, new ArrayList<>());
+            options.sort(Comparator.comparingLong(AppFilterOptions.CountedOption::count).reversed());
+            result.put(type, options.size() > FACET_LIMIT
+                    ? List.copyOf(options.subList(0, FACET_LIMIT))
+                    : List.copyOf(options));
+        }
+        return result;
+    }
+
+    /**
+     * Recomputes the materialized facet rows for one library from the current book data, unrestricted
+     * and shell-excluded (matching the live facet visibility). Delete-then-insert replaces the
+     * library's rows atomically within the transaction. Called per library by the recompute task so
+     * each library commits independently.
+     */
+    @Transactional
+    public void recomputeLibraryFacetCounts(Long libraryId) {
+        String scopeClause = "AND b.library.id = :libraryId" + visibilityClause(findShellBookIds());
+        Map<String, List<AppFilterOptions.CountedOption>> global =
+                buildGlobalFacets(scopeClause, null, libraryId, null);
+        libraryFacetCountRepository.deleteByLibraryId(libraryId);
+        List<LibraryFacetCountEntity> rows = new ArrayList<>();
+        global.forEach((type, options) -> {
+            for (AppFilterOptions.CountedOption o : options) {
+                if (o.name() == null) {
+                    continue;
+                }
+                String value = o.name().length() > FACET_VALUE_MAX ? o.name().substring(0, FACET_VALUE_MAX) : o.name();
+                rows.add(LibraryFacetCountEntity.builder()
+                        .libraryId(libraryId).facetType(type).facetValue(value).bookCount(o.count()).build());
+            }
+        });
+        libraryFacetCountRepository.saveAll(rows);
+        libraryFacetStateRepository.save(LibraryFacetStateEntity.builder()
+                .libraryId(libraryId).computedAt(Instant.now()).build());
+    }
+
+    /**
+     * Libraries whose materialized facet counts are missing, older than {@value #FACET_STALE_HOURS}h
+     * (a safety net for changes the timestamp check can't see, e.g. hard deletes), or stale relative
+     * to the newest book change in the library.
+     */
+    public List<Long> findDirtyLibraryIds() {
+        List<Long> libraryIds = allLibraryIds();
+        Map<Long, Instant> computedAt = libraryFacetStateRepository.findAll().stream()
+                .collect(Collectors.toMap(LibraryFacetStateEntity::getLibraryId,
+                        LibraryFacetStateEntity::getComputedAt));
+        Instant staleBefore = Instant.now().minus(FACET_STALE_HOURS, ChronoUnit.HOURS);
+        return libraryIds.stream()
+                .filter(id -> {
+                    Instant computed = computedAt.get(id);
+                    if (computed == null || computed.isBefore(staleBefore)) {
+                        return true;
+                    }
+                    Instant maxChange = maxBookChange(id);
+                    return maxChange != null && maxChange.isAfter(computed);
+                })
+                .toList();
+    }
+
+    private Instant maxBookChange(Long libraryId) {
+        Tuple t = entityManager.createQuery(
+                        "SELECT MAX(b.addedOn), MAX(b.scannedOn), MAX(b.metadataUpdatedAt), MAX(b.deletedAt) "
+                                + "FROM BookEntity b WHERE b.library.id = :libraryId", Tuple.class)
+                .setParameter("libraryId", libraryId)
+                .getSingleResult();
+        return Stream.of(t.get(0, Instant.class), t.get(1, Instant.class),
+                        t.get(2, Instant.class), t.get(3, Instant.class))
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     public void updateReadStatus(Long bookId, ReadStatus status) {

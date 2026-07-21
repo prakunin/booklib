@@ -9,6 +9,8 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.repository.BookRepository;
+import org.booklore.repository.LibraryFacetCountRepository;
+import org.booklore.repository.LibraryFacetStateRepository;
 import org.booklore.repository.ShelfRepository;
 import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
@@ -58,7 +60,8 @@ class AppBookServiceLazyInpxCoverTest {
                 shelfRepository, authenticationService, mobileBookMapper, appBookProgressService,
                 magicShelfBookService, entityManager, restrictionRepository,
                 new AppContentRestrictionQueryService(restrictionRepository), bookSortRegistry,
-                eventPublisher, new CatalogSummaryCache(60), new FilterOptionsCache(), new ShellBookIdsCache());
+                eventPublisher, new CatalogSummaryCache(60), new FilterOptionsCache(), new ShellBookIdsCache(),
+                mock(LibraryFacetCountRepository.class), mock(LibraryFacetStateRepository.class));
     }
 
     @Test

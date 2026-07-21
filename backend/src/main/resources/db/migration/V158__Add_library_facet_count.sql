@@ -11,7 +11,9 @@
 CREATE TABLE IF NOT EXISTS library_facet_count (
     library_id  BIGINT       NOT NULL,
     facet_type  VARCHAR(32)  NOT NULL,
-    facet_value VARCHAR(255) NOT NULL,
+    -- Holds the final CountedOption name: a metadata value (series/category name, up to 255),
+    -- a language code, a bucket code, or a composite like "<id>:<name>" / "<name>:<role>".
+    facet_value VARCHAR(512) NOT NULL,
     book_count  BIGINT       NOT NULL,
     PRIMARY KEY (library_id, facet_type, facet_value),
     CONSTRAINT fk_library_facet_count_library
