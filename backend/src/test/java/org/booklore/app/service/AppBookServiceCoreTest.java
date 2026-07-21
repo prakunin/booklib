@@ -332,7 +332,7 @@ class AppBookServiceCoreTest {
         @DisplayName("returns an empty page when the magic shelf has no matching books")
         void emptyShelf_returnsEmptyPage() {
             when(authenticationService.getAuthenticatedUser()).thenReturn(adminUser());
-            when(magicShelfBookService.getBooksByMagicShelfId(eq(USER_ID), eq(9L), eq(0), eq(20)))
+            when(magicShelfBookService.getBooksByMagicShelfId(USER_ID, 9L, 0, 20))
                     .thenReturn(new PageImpl<>(List.of()));
 
             AppPageResponse<AppBookSummary> result = service.getBooksByMagicShelf(9L, 0, 20);
@@ -347,7 +347,7 @@ class AppBookServiceCoreTest {
             when(authenticationService.getAuthenticatedUser()).thenReturn(adminUser());
             Book shelfBook1 = Book.builder().id(1L).build();
             Book shelfBook2 = Book.builder().id(2L).build();
-            when(magicShelfBookService.getBooksByMagicShelfId(eq(USER_ID), eq(9L), eq(0), eq(20)))
+            when(magicShelfBookService.getBooksByMagicShelfId(USER_ID, 9L, 0, 20))
                     .thenReturn(new PageImpl<>(List.of(shelfBook1, shelfBook2), Pageable.ofSize(20), 2));
 
             BookEntity entity1 = BookEntity.builder().id(1L).isPhysical(true).build();

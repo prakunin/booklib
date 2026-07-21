@@ -461,7 +461,7 @@ class LubimyCzytacParserTest {
             assertThat(metadata.getSeriesName()).isEqualTo("Rich Series");
             assertThat(metadata.getSeriesNumber()).isEqualTo(3.0f);
             assertThat(metadata.getPageCount()).isEqualTo(350);
-            assertThat(metadata.getPublishedDate()).isEqualTo(java.time.LocalDate.of(2020, 5, 1));
+            assertThat(metadata.getPublishedDate()).isEqualTo(java.time.LocalDate.of(2020, java.time.Month.MAY, 1));
             assertThat(metadata.getAuthors()).containsExactly("Author One", "Author Two");
             assertThat(metadata.getCategories()).containsExactly("fantastyka");
         }

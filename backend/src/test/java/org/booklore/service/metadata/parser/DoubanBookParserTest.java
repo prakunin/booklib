@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -460,9 +461,8 @@ class DoubanBookParserTest {
             List<BookMetadata> results = parser.fetchMetadata(book, request);
 
             assertThat(results).hasSize(1);
-            // The broadest selector also matches nested comment-info and comment-content elements
-            // whose class names contain the word comment, so more than one candidate is produced;
-            // what matters for this branch is that the fallback selector fired and found the review body.
+            // The broadest fallback selector also matches nested review elements, so it may return
+            // several candidates; what matters here is that it fired and found the review body text.
             assertThat(results.getFirst().getBookReviews())
                     .isNotEmpty()
                     .anyMatch(review -> "Broadest fallback body.".equals(review.getBody()));
@@ -562,7 +562,7 @@ class DoubanBookParserTest {
             assertThat(results).hasSize(3);
             assertThat(results).extracting(BookMetadata::getDoubanId).containsExactly("101", "102", "103");
             // The fourth item's detail page is never connected to, since the loop breaks before reaching it.
-            mockJsoup.verify(() -> Jsoup.connect("https://book.douban.com/subject/104"), org.mockito.Mockito.never());
+            mockJsoup.verify(() -> Jsoup.connect("https://book.douban.com/subject/104"), never());
         }
     }
 

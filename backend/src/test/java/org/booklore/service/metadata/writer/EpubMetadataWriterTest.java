@@ -17,6 +17,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
@@ -1077,67 +1081,53 @@ class EpubMetadataWriterTest {
     @DisplayName("Creator Removal Edge Case Tests")
     class CreatorRemovalEdgeCaseTests {
 
-        @Test
-        @DisplayName("Should remove a pre-existing creator that has no id attribute at all")
-        void removesCreatorWithoutIdAttribute() throws Exception {
-            String opfContent = """
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
-                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
-                            <dc:title>Book</dc:title>
-                            <dc:creator>Anonymous Old Author</dc:creator>
-                        </metadata>
-                    </package>""";
-
-            File epubFile = createEpubWithOpf(opfContent, "test-creator-no-id-" + System.nanoTime() + ".epub");
-            writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
-
-            String content = readOpfContent(epubFile);
-            assertThat(content)
-                    .doesNotContain("Anonymous Old Author")
-                    .contains("Test Author");
+        static Stream<Arguments> preExistingCreatorForms() {
+            return Stream.of(
+                    Arguments.of(
+                            "no id attribute at all",
+                            """
+                            <?xml version="1.0" encoding="UTF-8"?>
+                            <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+                                <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+                                    <dc:title>Book</dc:title>
+                                    <dc:creator>Anonymous Old Author</dc:creator>
+                                </metadata>
+                            </package>""",
+                            "Anonymous Old Author"),
+                    Arguments.of(
+                            "role set directly via an opf:role attribute",
+                            """
+                            <?xml version="1.0" encoding="UTF-8"?>
+                            <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+                                <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+                                    <dc:title>Book</dc:title>
+                                    <dc:creator id="c1" opf:role="aut">Direct Role Author</dc:creator>
+                                </metadata>
+                            </package>""",
+                            "Direct Role Author"),
+                    Arguments.of(
+                            "role from a refining meta using the content attribute form",
+                            """
+                            <?xml version="1.0" encoding="UTF-8"?>
+                            <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                                <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                                    <dc:title>Book</dc:title>
+                                    <dc:creator id="c1">Content Attr Author</dc:creator>
+                                    <meta property="role" refines="#c1" content="aut"/>
+                                </metadata>
+                            </package>""",
+                            "Content Attr Author"));
         }
 
-        @Test
-        @DisplayName("Should remove a pre-existing creator whose role is set directly via an opf:role attribute")
-        void removesCreatorWithDirectOpfRoleAttribute() throws Exception {
-            String opfContent = """
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
-                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
-                            <dc:title>Book</dc:title>
-                            <dc:creator id="c1" opf:role="aut">Direct Role Author</dc:creator>
-                        </metadata>
-                    </package>""";
-
-            File epubFile = createEpubWithOpf(opfContent, "test-creator-direct-role-" + System.nanoTime() + ".epub");
+        @ParameterizedTest(name = "removes pre-existing creator with {0}")
+        @MethodSource("preExistingCreatorForms")
+        void removesPreExistingCreator(String form, String opfContent, String oldAuthorName) throws Exception {
+            File epubFile = createEpubWithOpf(opfContent, "test-creator-" + System.nanoTime() + ".epub");
             writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
 
             String content = readOpfContent(epubFile);
             assertThat(content)
-                    .doesNotContain("Direct Role Author")
-                    .contains("Test Author");
-        }
-
-        @Test
-        @DisplayName("Should resolve a creator's role from a refining meta that uses the content attribute form")
-        void removesCreatorWithRoleFromContentAttributeMeta() throws Exception {
-            String opfContent = """
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
-                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-                            <dc:title>Book</dc:title>
-                            <dc:creator id="c1">Content Attr Author</dc:creator>
-                            <meta property="role" refines="#c1" content="aut"/>
-                        </metadata>
-                    </package>""";
-
-            File epubFile = createEpubWithOpf(opfContent, "test-creator-content-attr-role-" + System.nanoTime() + ".epub");
-            writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
-
-            String content = readOpfContent(epubFile);
-            assertThat(content)
-                    .doesNotContain("Content Attr Author")
+                    .doesNotContain(oldAuthorName)
                     .contains("Test Author");
         }
     }
