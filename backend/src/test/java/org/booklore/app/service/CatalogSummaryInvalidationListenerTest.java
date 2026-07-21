@@ -15,7 +15,7 @@ class CatalogSummaryInvalidationListenerTest {
 
     @Test
     void handleInvalidatesCatalogSummaryCache() {
-        CatalogSummaryCache cache = new CatalogSummaryCache();
+        CatalogSummaryCache cache = new CatalogSummaryCache(60);
         CatalogSummaryInvalidationListener listener = new CatalogSummaryInvalidationListener(cache);
         AtomicInteger computations = new AtomicInteger();
         Supplier<AppCatalogSummary> loader = () -> new AppCatalogSummary(

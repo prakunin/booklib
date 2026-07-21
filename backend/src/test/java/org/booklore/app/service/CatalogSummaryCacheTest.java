@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CatalogSummaryCacheTest {
 
-    private final CatalogSummaryCache cache = new CatalogSummaryCache();
+    private final CatalogSummaryCache cache = new CatalogSummaryCache(60);
 
     private static AppCatalogSummary summary(long totalAuthors) {
         return new AppCatalogSummary(0, totalAuthors, 0, 0, Map.of());
