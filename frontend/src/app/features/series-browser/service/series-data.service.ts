@@ -75,7 +75,7 @@ export class SeriesDataService {
 
   fetchNextPage(): void {
     if (this.seriesQuery.hasNextPage() && !this.seriesQuery.isFetchingNextPage()) {
-      void this.seriesQuery.fetchNextPage();
+      this.seriesQuery.fetchNextPage();
     }
   }
 

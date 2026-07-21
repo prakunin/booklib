@@ -143,7 +143,6 @@ export class SeriesBrowserComponent implements OnInit {
 
   constructor() {
     effect(() => {
-      this.filteredSeries().length;
       this.fetchNextPageIfNearLoadedEnd();
     });
   }
