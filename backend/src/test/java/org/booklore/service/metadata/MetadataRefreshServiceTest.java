@@ -24,6 +24,7 @@ import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.metadata.parser.BookParser;
 import org.booklore.task.TaskCancellationManager;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -1554,6 +1555,72 @@ class MetadataRefreshServiceTest {
             verify(transactionStatus).setRollbackOnly();
             verify(bookRepository, never()).saveAndFlush(any());
             verify(bookMetadataUpdater, never()).setBookMetadata(any());
+        }
+
+        @Test
+        @DisplayName("a LIBRARY refresh with no per-request options resolves library-level options/providers and defaults a null replaceMode to REPLACE_MISSING")
+        void libraryRefresh_resolvesLibraryOptionsAndDefaultsReplaceMode() {
+            Long libraryId = 42L;
+            LibraryEntity library = new LibraryEntity();
+            library.setId(libraryId);
+            when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
+            when(bookRepository.findBookIdsByLibraryId(libraryId)).thenReturn(Set.of(8L));
+
+            BookEntity book = unlockedBook(8L);
+            when(bookRepository.findAllWithMetadataByIds(Set.of(8L))).thenReturn(List.of(book));
+            when(bookMapper.toBook(book)).thenReturn(Book.builder().id(8L)
+                    .metadata(BookMetadata.builder().title("Title 8").build()).build());
+            when(bookMapper.toBookWithDescription(book, true)).thenReturn(Book.builder().id(8L).build());
+
+            // No replaceMode set here: applyFetchedMetadata() must default it to REPLACE_MISSING.
+            MetadataRefreshOptions libraryOptions = MetadataRefreshOptions.builder()
+                    .libraryId(libraryId)
+                    .fieldOptions(new MetadataRefreshOptions.FieldOptions())
+                    .enabledFields(new MetadataRefreshOptions.EnabledFields())
+                    .reviewBeforeApply(false)
+                    .build();
+            when(appSettingService.getAppSettings()).thenReturn(AppSettings.builder()
+                    .defaultMetadataRefreshOptions(MetadataRefreshOptions.builder().build())
+                    .libraryMetadataRefreshOptions(List.of(libraryOptions))
+                    .build());
+
+            MetadataRefreshRequest request = MetadataRefreshRequest.builder()
+                    .refreshType(MetadataRefreshRequest.RefreshType.LIBRARY)
+                    .libraryId(libraryId)
+                    .build();
+
+            service.refreshMetadata(request, JOB_ID);
+
+            verify(bookRepository).saveAndFlush(book);
+            verify(bookMetadataUpdater).setBookMetadata(argThat(ctx -> ctx.getReplaceMode() == MetadataReplaceMode.REPLACE_MISSING));
+        }
+
+        @Test
+        @DisplayName("an ordinary (non-interrupted) exception while processing a book is reported as an error but the book is still flushed and the task completes")
+        void regularExceptionDuringProcessing_reportsErrorButStillCompletes() {
+            BookEntity book = unlockedBook(9L);
+            when(bookRepository.findAllWithMetadataByIds(Set.of(9L))).thenReturn(List.of(book));
+            // bookMapper.toBook(book) is left unstubbed (returns null), so
+            // bookMapper.toBook(book).getMetadata() throws an uninterrupted NullPointerException.
+
+            MetadataRefreshOptions options = MetadataRefreshOptions.builder()
+                    .fieldOptions(new MetadataRefreshOptions.FieldOptions())
+                    .enabledFields(new MetadataRefreshOptions.EnabledFields())
+                    .build();
+
+            service.refreshMetadata(booksRequest(9L, options), JOB_ID);
+
+            verify(bookRepository).saveAndFlush(book);
+            verify(bookMetadataUpdater, never()).setBookMetadata(any());
+            verify(notificationService).sendMessage(any(), argThat(notification ->
+                    notification instanceof MetadataBatchProgressNotification progress
+                            && progress.getStatus().equals(MetadataFetchTaskStatus.ERROR.name())));
+
+            ArgumentCaptor<MetadataFetchJobEntity> jobCaptor = ArgumentCaptor.forClass(MetadataFetchJobEntity.class);
+            verify(metadataFetchJobRepository, atLeastOnce()).save(jobCaptor.capture());
+            assertThat(jobCaptor.getAllValues())
+                    .extracting(MetadataFetchJobEntity::getStatus)
+                    .contains(MetadataFetchTaskStatus.COMPLETED);
         }
     }
 }

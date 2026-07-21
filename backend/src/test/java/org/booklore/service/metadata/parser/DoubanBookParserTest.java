@@ -512,5 +512,175 @@ class DoubanBookParserTest {
 
             assertThat(results).isEmpty();
         }
+
+        @Test
+        @DisplayName("a single-part abstract (no slash separators) yields no authors, publisher, or date")
+        void singlePartAbstract_yieldsNoAuthorsPublisherOrDate() throws Exception {
+            mockReviewsSettingEmpty();
+            String html = "<html><body><script>window.__DATA__ = {\"items\": ["
+                    + "{\"title\": \"Solo\", \"url\": \"https://book.douban.com/subject/222/\", "
+                    + "\"cover_url\": \"\", \"abstract\": \"JustOnePart\"}"
+                    + "]};</script></body></html>";
+            mockConnect("https://search.douban.com/book/subject_search?search_text=Solo", html);
+
+            Book book = bookWithTitle("Solo");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Solo").build();
+
+            BookMetadata metadata = parser.fetchTopMetadata(book, request);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getAuthors()).isEmpty();
+            assertThat(metadata.getPublisher()).isNull();
+            assertThat(metadata.getPublishedDate()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("fetchMetadata detail count cap")
+    class DetailCountCapTests {
+
+        @Test
+        @DisplayName("stops fetching detail pages once 3 have been collected, even with more search results available")
+        void capsDetailFetchesAtThree() throws Exception {
+            mockReviewsSettingEmpty();
+            String html = "<html><body><script>window.__DATA__ = {\"items\": ["
+                    + "{\"title\": \"One\", \"url\": \"https://book.douban.com/subject/101/\", \"cover_url\": \"\", \"abstract\": \"\"},"
+                    + "{\"title\": \"Two\", \"url\": \"https://book.douban.com/subject/102/\", \"cover_url\": \"\", \"abstract\": \"\"},"
+                    + "{\"title\": \"Three\", \"url\": \"https://book.douban.com/subject/103/\", \"cover_url\": \"\", \"abstract\": \"\"},"
+                    + "{\"title\": \"Four\", \"url\": \"https://book.douban.com/subject/104/\", \"cover_url\": \"\", \"abstract\": \"\"}"
+                    + "]};</script></body></html>";
+            mockConnect("https://search.douban.com/book/subject_search?search_text=Many", html);
+            mockConnect("https://book.douban.com/subject/101", "<html><body><div id=\"wrapper\"><h1>One</h1></div></body></html>");
+            mockConnect("https://book.douban.com/subject/102", "<html><body><div id=\"wrapper\"><h1>Two</h1></div></body></html>");
+            mockConnect("https://book.douban.com/subject/103", "<html><body><div id=\"wrapper\"><h1>Three</h1></div></body></html>");
+
+            Book book = bookWithTitle("Many");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("Many").build();
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results).hasSize(3);
+            assertThat(results).extracting(BookMetadata::getDoubanId).containsExactly("101", "102", "103");
+            // The fourth item's detail page is never connected to, since the loop breaks before reaching it.
+            mockJsoup.verify(() -> Jsoup.connect("https://book.douban.com/subject/104"), org.mockito.Mockito.never());
+        }
+    }
+
+    @Nested
+    @DisplayName("review parsing edge cases")
+    class ReviewParsingEdgeCaseTests {
+
+        private String detailPageWithComments(String commentsHtml) {
+            return "<html><body><div id=\"wrapper\"><h1>Title</h1></div><div id=\"comments\">"
+                    + commentsHtml + "</div></body></html>";
+        }
+
+        @Test
+        @DisplayName("a review with no rating element present has a null rating")
+        void reviewWithoutRatingElement_hasNullRating() throws Exception {
+            mockReviewsSetting(true, 5);
+            mockConnect("https://search.douban.com/book/subject_search?search_text=三体", searchResponseFixture);
+            String detailHtml = detailPageWithComments(
+                    "<div class=\"comment-item\">"
+                            + "<div class=\"comment-info\"><a>Reader X</a></div>"
+                            + "<p class=\"comment-content\">No rating here.</p>"
+                            + "</div>");
+            mockConnect("https://book.douban.com/subject/2567698", detailHtml);
+
+            Book book = bookWithTitle("三体");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("三体").build();
+
+            BookMetadata metadata = parser.fetchTopMetadata(book, request);
+
+            assertThat(metadata.getBookReviews()).hasSize(1);
+            assertThat(metadata.getBookReviews().getFirst().getRating()).isNull();
+        }
+
+        @Test
+        @DisplayName("a review with an unparseable date keeps the review but leaves the date null")
+        void reviewWithMalformedDate_dateIsNullButReviewKept() throws Exception {
+            mockReviewsSetting(true, 5);
+            mockConnect("https://search.douban.com/book/subject_search?search_text=三体", searchResponseFixture);
+            String detailHtml = detailPageWithComments(
+                    "<div class=\"comment-item\">"
+                            + "<div class=\"comment-info\"><a>Reader Y</a><span class=\"comment-time\">not-a-date</span></div>"
+                            + "<p class=\"comment-content\">Body text.</p>"
+                            + "</div>");
+            mockConnect("https://book.douban.com/subject/2567698", detailHtml);
+
+            Book book = bookWithTitle("三体");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("三体").build();
+
+            BookMetadata metadata = parser.fetchTopMetadata(book, request);
+
+            assertThat(metadata.getBookReviews()).hasSize(1);
+            assertThat(metadata.getBookReviews().getFirst().getDate()).isNull();
+            assertThat(metadata.getBookReviews().getFirst().getBody()).isEqualTo("Body text.");
+        }
+
+        @Test
+        @DisplayName("stops collecting reviews once maxReviews is reached, even though more review elements exist")
+        void maxReviewsCutoff_stopsBeforeExhaustingElements() throws Exception {
+            mockReviewsSetting(true, 1);
+            mockConnect("https://search.douban.com/book/subject_search?search_text=三体", searchResponseFixture);
+            String detailHtml = detailPageWithComments(
+                    "<div class=\"comment-item\"><p class=\"comment-content\">First review.</p></div>"
+                            + "<div class=\"comment-item\"><p class=\"comment-content\">Second review.</p></div>");
+            mockConnect("https://book.douban.com/subject/2567698", detailHtml);
+
+            Book book = bookWithTitle("三体");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("三体").build();
+
+            BookMetadata metadata = parser.fetchTopMetadata(book, request);
+
+            assertThat(metadata.getBookReviews()).hasSize(1);
+            assertThat(metadata.getBookReviews().getFirst().getBody()).isEqualTo("First review.");
+        }
+    }
+
+    @Nested
+    @DisplayName("date parsing edge cases")
+    class DateParsingEdgeCaseTests {
+
+        @Test
+        @DisplayName("an out-of-range day/month (e.g. 2011-13-45) is rejected and yields a null publication date")
+        void invalidCalendarDate_yieldsNullPublicationDate() throws Exception {
+            mockReviewsSettingEmpty();
+            mockConnect("https://search.douban.com/book/subject_search?search_text=三体", searchResponseFixture);
+            String detailHtml = "<html><body><div id=\"wrapper\"><h1>Title</h1></div>"
+                    + "<div id=\"info\"><span>出版年:</span> 2011-13-45<br/></div>"
+                    + "</body></html>";
+            mockConnect("https://book.douban.com/subject/2567698", detailHtml);
+
+            Book book = bookWithTitle("三体");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("三体").build();
+
+            // fetchMetadata() (unlike fetchTopMetadata()) doesn't backfill publishedDate from the
+            // search result, so the invalid detail-page date is observable as null here.
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getPublishedDate()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("buildQueryUrl - additional branches")
+    class BuildQueryUrlAdditionalTests {
+
+        @Test
+        @DisplayName("appends the author after a title-derived search term")
+        void appendsAuthorAfterTitle() throws Exception {
+            mockConnect("https://search.douban.com/book/subject_search?search_text=三体+刘慈欣",
+                    "<html><body></body></html>");
+
+            Book book = bookWithTitle("三体");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("三体").author("刘慈欣").build();
+
+            List<BookMetadata> results = parser.fetchMetadata(book, request);
+
+            assertThat(results).isEmpty();
+            mockJsoup.verify(() -> Jsoup.connect("https://search.douban.com/book/subject_search?search_text=三体+刘慈欣"));
+        }
     }
 }

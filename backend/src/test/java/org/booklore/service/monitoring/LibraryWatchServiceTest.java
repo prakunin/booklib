@@ -152,4 +152,100 @@ class LibraryWatchServiceTest {
         service.unregisterLibrary(5L);
         assertThat(service.isLibraryMonitored(5L)).isFalse();
     }
+
+    @Test
+    void registerLibraries_registersOnlyWatchedLibrariesButTracksStatusForBoth() throws Exception {
+        Path watchedRoot = tmp.resolve("watched-lib");
+        Files.createDirectories(watchedRoot);
+        Path unwatchedRoot = tmp.resolve("unwatched-lib");
+        Files.createDirectories(unwatchedRoot);
+
+        Library watched = mock(Library.class);
+        LibraryPath watchedPath = mock(LibraryPath.class);
+        when(watchedPath.getPath()).thenReturn(watchedRoot.toString());
+        when(watched.getPaths()).thenReturn(List.of(watchedPath));
+        when(watched.getId()).thenReturn(21L);
+        when(watched.getName()).thenReturn("watched");
+        when(watched.isWatch()).thenReturn(true);
+
+        Library unwatched = mock(Library.class);
+        when(unwatched.getId()).thenReturn(22L);
+        when(unwatched.isWatch()).thenReturn(false);
+
+        service.registerLibraries(List.of(watched, unwatched));
+
+        assertThat(service.isPathMonitored(watchedRoot)).isTrue();
+        assertThat(service.isLibraryMonitored(21L)).isTrue();
+        assertThat(service.isLibraryMonitored(22L)).isFalse();
+        assertThat(service.isPathMonitored(unwatchedRoot)).isFalse();
+    }
+
+    @Test
+    void unregisterPath_removesARegisteredPathAndIsANoOpOtherwise() throws Exception {
+        Path dir = tmp.resolve("unreg-dir");
+        Files.createDirectories(dir);
+        service.registerPath(dir, 30L);
+        assertThat(service.isPathMonitored(dir)).isTrue();
+
+        service.unregisterPath(dir);
+        assertThat(service.isPathMonitored(dir)).isFalse();
+
+        // Unregistering an already-unregistered (or never-registered) path is a no-op, not an error.
+        service.unregisterPath(dir);
+        assertThat(service.isPathMonitored(dir)).isFalse();
+    }
+
+    @Test
+    void registerLibraryPaths_registersRootAndNestedDirectoriesWhenRootExists() throws Exception {
+        Path root = tmp.resolve("lp-root");
+        Path nested = root.resolve("nested");
+        Files.createDirectories(nested);
+
+        service.registerLibraryPaths(40L, root);
+
+        assertThat(service.isPathMonitored(root)).isTrue();
+        assertThat(service.isPathMonitored(nested)).isTrue();
+    }
+
+    @Test
+    void registerLibraryPaths_isANoOpWhenRootDoesNotExist() {
+        Path missingRoot = tmp.resolve("does-not-exist");
+
+        service.registerLibraryPaths(41L, missingRoot);
+
+        assertThat(service.isPathMonitored(missingRoot)).isFalse();
+    }
+
+    @Test
+    void waitForEventsDrained_returnsTrueWithoutQueryingWhenLibraryIdsIsNullOrEmpty() {
+        assertThat(service.waitForEventsDrained(null, 1000)).isTrue();
+        assertThat(service.waitForEventsDrained(Set.of(), 1000)).isTrue();
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void waitForEventsDrainedByPaths_returnsTrueImmediatelyWhenNoPendingEvents() {
+        Path dir = tmp.resolve("drain-dir");
+        when(processor.hasPendingEventsForPaths(Set.of(dir))).thenReturn(false);
+
+        assertThat(service.waitForEventsDrainedByPaths(Set.of(dir), 1000)).isTrue();
+    }
+
+    @Test
+    void waitForEventsDrainedByPaths_returnsFalseAfterTimeoutWhenEventsNeverDrain() {
+        Path dir = tmp.resolve("stuck-dir");
+        when(processor.hasPendingEventsForPaths(Set.of(dir))).thenReturn(true);
+
+        assertThat(service.waitForEventsDrainedByPaths(Set.of(dir), 60)).isFalse();
+    }
+
+    @Test
+    void waitForEventsDrained_delegatesToPathsForTheGivenLibraryIds() throws Exception {
+        Path dir = tmp.resolve("delegate-dir");
+        Files.createDirectories(dir);
+        service.registerPath(dir, 50L);
+        when(processor.hasPendingEventsForPaths(Set.of(dir))).thenReturn(false);
+
+        assertThat(service.waitForEventsDrained(Set.of(50L), 1000)).isTrue();
+    }
 }

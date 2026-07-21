@@ -2,6 +2,7 @@ package org.booklore.service.metadata.parser;
 
 
 import org.booklore.model.dto.Book;
+import org.booklore.model.dto.BookFile;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.request.FetchMetadataRequest;
 import org.booklore.model.dto.settings.AppSettings;
@@ -632,6 +633,196 @@ class ComicvineBookParserTest {
             assertThat(metadata.getPublisher()).isNull();
             assertThat(metadata.getAuthors()).containsExactly("Some Writer");
             assertThat(metadata.getExternalUrl()).isEqualTo("https://comicvine.gamespot.com/example/4000-7001/");
+        }
+    }
+
+    @Nested
+    @DisplayName("search term resolution")
+    class SearchTermResolutionTests {
+
+        @Test
+        @DisplayName("falls back to the primary file name (extension stripped) when no title is provided")
+        void noTitle_usesPrimaryFileNameWithoutExtension() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume,issue&query=The%20Example", 200, readFixture("search.json"));
+
+            BookMetadata bookMetadata = BookMetadata.builder().build();
+            Book book = Book.builder()
+                    .title("Example")
+                    .metadata(bookMetadata)
+                    .primaryFile(BookFile.builder().fileName("The Example.cbz").build())
+                    .build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            List<BookMetadata> results = comicvineBookParser.fetchMetadata(book, request);
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getTitle()).isEqualTo("The Example");
+        }
+
+        @Test
+        @DisplayName("returns an empty list without calling the API when neither a title nor a primary file name is available")
+        void noTitleNoPrimaryFile_returnsEmptyWithoutCalling() throws IOException, InterruptedException {
+            Book book = Book.builder().title("Example").metadata(BookMetadata.builder().build()).build();
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            List<BookMetadata> results = comicvineBookParser.fetchMetadata(book, request);
+
+            assertThat(results).isEmpty();
+            verify(httpClient, never()).send(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("HTTP response handling")
+    class HttpResponseHandlingTests {
+
+        @Test
+        @DisplayName("retries a 500 response and returns the successful retry result")
+        void serverError_retriesAndSucceeds() throws IOException, InterruptedException {
+            HttpResponse<String> errorResponse = getResponse(500, "");
+            HttpResponse<String> successResponse = getResponse(200, readFixture("search.json"));
+            when(httpClient.<String>send(argThat(r -> r != null && r.uri().toString().contains("/search/")), any()))
+                    .thenReturn(errorResponse)
+                    .thenReturn(successResponse);
+
+            Book book = getBook(null);
+            FetchMetadataRequest request = FetchMetadataRequest.builder().isbn("9780134685991").build();
+
+            List<BookMetadata> results = comicvineBookParser.fetchMetadata(book, request);
+
+            assertThat(results).hasSize(1);
+            verify(httpClient, times(2)).send(any(), any());
+        }
+
+        @Test
+        @DisplayName("an unhandled status code (e.g. 404) yields an empty result without retrying")
+        void unhandledStatusCode_returnsEmpty() throws IOException, InterruptedException {
+            mockResponse("/search/", 404, "");
+
+            Book book = getBook(null);
+            FetchMetadataRequest request = FetchMetadataRequest.builder().isbn("9780134685991").build();
+
+            List<BookMetadata> results = comicvineBookParser.fetchMetadata(book, request);
+
+            assertThat(results).isEmpty();
+            verify(httpClient, times(1)).send(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("issue number normalization via API responses")
+    class IssueNumberNormalizationTests {
+
+        @Test
+        @DisplayName("a fractional issue_number returned by the API (e.g. '1/2') is normalized before the match check")
+        void fractionalIssueNumber_isNormalizedAndMatched() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume&query=The%20Example", 200, readFixture("search.json"));
+            mockResponse(
+                    "/issues/?api_key=example&format=json&filter=volume:60593,issue_number:0.5",
+                    200,
+                    readFixture("issues.json").replace("\"issue_number\": \"1\"", "\"issue_number\": \"1/2\"")
+            );
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("The Example #0.5");
+
+            // The fractional "1/2" is normalized to "0.5" purely for the issue-number match check;
+            // it matches the requested "0.5" and the issue is returned.
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getComicvineId()).isEqualTo("4000-400275");
+        }
+
+        @Test
+        @DisplayName("a non-numeric returned issue_number is normalized as-is and fails the numeric requested-issue match")
+        void nonNumericReturnedIssueNumber_failsMatch() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume&query=The%20Example", 200, readFixture("search.json"));
+            mockResponse(
+                    "/issues/?api_key=example&format=json&filter=volume:60593,issue_number:1",
+                    200,
+                    readFixture("issues.json").replace("\"issue_number\": \"1\"", "\"issue_number\": \"TPB\"")
+            );
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("The Example #1");
+
+            assertThat(results).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("volume scoring - publisher and recency")
+    class VolumeScoringPublisherRecencyTests {
+
+        private static final String TWO_VOLUMES_SAME_NAME = """
+                {"results": [
+                  {"id": 500, "name": "Rangers", "start_year": "1995", "count_of_issues": 4, "publisher": {"name": "Small Press"}, "resource_type": "volume"},
+                  {"id": 600, "name": "Rangers", "start_year": "2021", "count_of_issues": 4, "publisher": {"name": "Marvel"}, "resource_type": "volume"}
+                ]}""";
+
+        @Test
+        @DisplayName("a major publisher and a more recent start year outscore an older small-press volume of the same name")
+        void majorPublisherAndRecentYear_windOverOlderSmallPressVolume() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume&query=Rangers", 200, TWO_VOLUMES_SAME_NAME);
+            mockResponse(
+                    "/issues/?api_key=example&format=json&filter=volume:600,issue_number:2",
+                    200,
+                    "{\"results\": [{\"id\": 9010, \"issue_number\": \"2\", \"name\": \"Rangers #2\", \"person_credits\": [{\"name\": \"Someone\", \"role\": \"writer\"}], \"volume\": {\"id\": 600, \"name\": \"Rangers\"}}]}"
+            );
+            mockResponse("/issues/?api_key=example&format=json&filter=volume:500,issue_number:2", 200, "{\"results\": []}");
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("Rangers #2");
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getPublisher()).isEqualTo("Marvel");
+            assertThat(results.getFirst().getAuthors()).containsExactly("Someone");
+        }
+    }
+
+    @Nested
+    @DisplayName("alternative series name fallback - additional branches")
+    class AlternativeSeriesNameAdditionalTests {
+
+        @Test
+        @DisplayName("adds a 'The ' prefix when the original series name has no matches and does not already start with 'The'")
+        void addsThePrefixAndRetries() throws IOException, InterruptedException {
+            mockResponse("/search/?api_key=example&format=json&resources=volume&query=Rangers", 200, "{\"results\": []}");
+            mockResponse("/volumes/?api_key=example&format=json&filter=name:Rangers", 200, "{\"results\": []}");
+            mockResponse(
+                    "/search/?api_key=example&format=json&resources=volume&query=The%20Rangers",
+                    200,
+                    "{\"results\": [{\"id\": 700, \"name\": \"The Rangers\", \"start_year\": \"2018\", \"count_of_issues\": 6, \"publisher\": {\"name\": \"Marvel\"}, \"resource_type\": \"volume\"}]}"
+            );
+            mockResponse(
+                    "/issues/?api_key=example&format=json&filter=volume:700,issue_number:2",
+                    200,
+                    "{\"results\": [{\"id\": 9011, \"issue_number\": \"2\", \"name\": \"The Rangers #2\", \"person_credits\": [{\"name\": \"Someone\", \"role\": \"writer\"}], \"volume\": {\"id\": 700, \"name\": \"The Rangers\"}}]}"
+            );
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("Rangers 2");
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getSeriesName()).isEqualTo("The Rangers");
+        }
+
+        @Test
+        @DisplayName("strips a trailing 'Vol.N' suffix (no separating space, so it's not misparsed as the issue) when the original series name has no matches")
+        void stripsVolSuffixAndRetries() throws IOException, InterruptedException {
+            // "Rangers Vol.2" has no space between "Vol." and "2", so the issue-number regex (which
+            // requires a preceding whitespace) skips it and instead captures the trailing " 3" as the
+            // issue, leaving "Rangers Vol.2" as the extracted series name for the alternative-name pass.
+            mockResponse(
+                    "/search/?api_key=example&format=json&resources=volume&query=Rangers",
+                    200,
+                    "{\"results\": [{\"id\": 800, \"name\": \"Rangers\", \"start_year\": \"2019\", \"count_of_issues\": 6, \"publisher\": {\"name\": \"Marvel\"}, \"resource_type\": \"volume\"}]}"
+            );
+            mockResponse(
+                    "/issues/?api_key=example&format=json&filter=volume:800,issue_number:3",
+                    200,
+                    "{\"results\": [{\"id\": 9012, \"issue_number\": \"3\", \"name\": \"Rangers #3\", \"person_credits\": [{\"name\": \"Someone\", \"role\": \"writer\"}], \"volume\": {\"id\": 800, \"name\": \"Rangers\"}}]}"
+            );
+
+            List<BookMetadata> results = comicvineBookParser.getMetadataListByTerm("Rangers Vol.2 3");
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().getSeriesName()).isEqualTo("Rangers");
         }
     }
 }

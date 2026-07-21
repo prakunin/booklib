@@ -714,6 +714,54 @@ class HardcoverSyncServiceTest {
         verify(restClient, times(3)).post();
     }
 
+    @Test
+    @DisplayName("getUserBookAndReads swallows its own IllegalStateException when the GraphQL response is null")
+    void syncProgressToHardcover_whenGetUserBookAndReadsResponseNull_shouldNotThrow() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(null);
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        // Resolve (1) + the null-response getUserBookAndReads call (2), then abort
+        verify(restClient, times(2)).post();
+    }
+
+    @Test
+    @DisplayName("getUserBookAndReads swallows its own IllegalStateException when the response has no data key")
+    void syncProgressToHardcover_whenGetUserBookAndReadsResponseHasNoData_shouldNotThrow() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(Map.of("extensions", Map.of()));
+
+        assertDoesNotThrow(() -> service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID));
+
+        verify(restClient, times(2)).post();
+    }
+
+    @Test
+    @DisplayName("insertUserBook returns null when the response has neither errors nor a data key")
+    void syncProgressToHardcover_whenInsertUserBookResponseHasNoData_shouldAbort() {
+        testMetadata.setHardcoverBookId("12345");
+        testMetadata.setPageCount(300);
+
+        when(responseSpec.body(Map.class))
+                .thenReturn(createBookByIdResponse(12345, 300, edition(10, 300), null, null))
+                .thenReturn(createEmptyBooksResponse())
+                .thenReturn(Map.of("extensions", Map.of()));
+
+        service.syncProgressToHardcover(TEST_BOOK_ID, 50.0f, TEST_USER_ID);
+
+        // Resolve (1) + getUserBookAndReads (2) + insertUserBook with no data key (3), then abort
+        verify(restClient, times(3)).post();
+    }
+
     // === Reflection helpers ===
 
     private Object resolveHardcoverBook(String bookId, String isbn13, String isbn10) throws Exception {

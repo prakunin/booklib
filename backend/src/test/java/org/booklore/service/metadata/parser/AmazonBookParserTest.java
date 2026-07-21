@@ -628,4 +628,177 @@ class AmazonBookParserTest {
             assertThrows(UncheckedIOException.class, () -> amazonBookParser.fetchDetailedMetadata("NETDOWN0001"));
         }
     }
+
+    @Nested
+    @DisplayName("review parsing edge cases")
+    class ReviewParsingEdgeCaseTests {
+
+        @Test
+        @DisplayName("a Japanese-formatted review date is recognized when it doesn't match the 'Reviewed in ... on ...' pattern")
+        void japaneseReviewDate_isParsed() throws Exception {
+            when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettingsWithReviews("co.jp", 5));
+            String html = """
+                    <html><body>
+                    <li data-hook="review">
+                    <div data-hook="review-date">2019年4月1日にレビュー済み</div>
+                    <div data-hook="review-body">良い本です。</div>
+                    </li>
+                    </body></html>
+                    """;
+            mockJsoupConnect("https://www.amazon.co.jp/dp/JAPANDATE1", html);
+
+            Book book = getBook("JAPANDATE1");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            BookMetadata metadata = amazonBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata.getBookReviews()).hasSize(1);
+            var review = metadata.getBookReviews().getFirst();
+            assertThat(review.getCountry()).isEqualTo("日本");
+            assertThat(review.getDate()).isEqualTo(LocalDate.of(2019, Month.APRIL, 1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant());
+        }
+
+        @Test
+        @DisplayName("a trailing ' Read more' is stripped from the review body")
+        void readMoreSuffix_isStrippedFromBody() throws Exception {
+            when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettingsWithReviews("com", 5));
+            String html = """
+                    <html><body>
+                    <li data-hook="review">
+                    <div data-hook="review-body">Great book overall. Read more</div>
+                    </li>
+                    </body></html>
+                    """;
+            mockJsoupConnect("https://www.amazon.com/dp/READMORE01", html);
+
+            Book book = getBook("READMORE01");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            BookMetadata metadata = amazonBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata.getBookReviews()).hasSize(1);
+            assertThat(metadata.getBookReviews().getFirst().getBody()).isEqualTo("Great book overall.");
+        }
+
+        @Test
+        @DisplayName("stops collecting reviews once maxReviews is reached, even though more review elements exist")
+        void maxReviewsCutoff_stopsBeforeExhaustingElements() throws Exception {
+            when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettingsWithReviews("com", 1));
+            String html = """
+                    <html><body>
+                    <li data-hook="review"><div data-hook="review-body">First review.</div></li>
+                    <li data-hook="review"><div data-hook="review-body">Second review.</div></li>
+                    </body></html>
+                    """;
+            mockJsoupConnect("https://www.amazon.com/dp/MAXREVIEW0", html);
+
+            Book book = getBook("MAXREVIEW0");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            BookMetadata metadata = amazonBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata.getBookReviews()).hasSize(1);
+            assertThat(metadata.getBookReviews().getFirst().getBody()).isEqualTo("First review.");
+        }
+
+        @Test
+        @DisplayName("a review with a blank body is skipped entirely")
+        void blankReviewBody_isSkipped() throws Exception {
+            when(mockAppSettingService.getAppSettings()).thenReturn(getAppSettingsWithReviews("com", 5));
+            String html = """
+                    <html><body>
+                    <li data-hook="review"><div data-hook="review-body"></div></li>
+                    </body></html>
+                    """;
+            mockJsoupConnect("https://www.amazon.com/dp/BLANKBODY1", html);
+
+            Book book = getBook("BLANKBODY1");
+            FetchMetadataRequest request = FetchMetadataRequest.builder().build();
+
+            BookMetadata metadata = amazonBookParser.fetchTopMetadata(book, request);
+
+            assertThat(metadata.getBookReviews()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("page count / review count parsing edge cases")
+    class CountParsingEdgeCaseTests {
+
+        @Test
+        @DisplayName("a non-numeric page count value is left as null rather than throwing")
+        void nonNumericPageCount_returnsNull() throws Exception {
+            String html = """
+                    <html><body>
+                    <div id="rpi-attribute-book_details-fiona_pages" class="rpi-attribute">
+                    <div class="rpi-attribute-value"><span>N/A</span></div>
+                    </div>
+                    </body></html>
+                    """;
+            mockJsoupConnect("https://www.amazon.com/dp/BADPAGECNT1", html);
+
+            BookMetadata metadata = amazonBookParser.fetchDetailedMetadata("BADPAGECNT1");
+
+            assertThat(metadata.getPageCount()).isNull();
+        }
+
+        @Test
+        @DisplayName("a review count with no digits after cleanup is left as null")
+        void nonNumericReviewCount_returnsNull() throws Exception {
+            String html = """
+                    <html><body>
+                    <div id="averageCustomerReviews_feature_div">
+                    <span id="acrCustomerReviewText">many ratings</span>
+                    </div>
+                    </body></html>
+                    """;
+            mockJsoupConnect("https://www.amazon.com/dp/BADREVCNT01", html);
+
+            BookMetadata metadata = amazonBookParser.fetchDetailedMetadata("BADREVCNT01");
+
+            assertThat(metadata.getAmazonReviewCount()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("buildQueryUrl - additional branches")
+    class BuildQueryUrlAdditionalTests {
+
+        @Test
+        @DisplayName("falls back to just the author when the title is blank and there is no primary file")
+        void blankTitleWithAuthor_usesAuthorOnly() throws Exception {
+            mockJsoupConnect("https://www.amazon.com/s?k=Some+Author", "<html/>");
+
+            Book book = getBook(null);
+            FetchMetadataRequest request = FetchMetadataRequest.builder().title("").author("Some Author").build();
+
+            amazonBookParser.fetchMetadata(book, request);
+
+            mockJsoup.verify(() -> Jsoup.connect("https://www.amazon.com/s?k=Some+Author"));
+        }
+    }
+
+    @Nested
+    @DisplayName("parseSeriesInfo - additional branches")
+    class SeriesInfoAdditionalTests {
+
+        @Test
+        @DisplayName("a series name without a parseable 'Book X of Y' label yields a name but no number/total")
+        void seriesNameWithoutBookOfYLabel_yieldsNameOnly() throws Exception {
+            String html = """
+                    <html><body>
+                    <div id="rpi-attribute-book_details-series" class="rpi-attribute">
+                    <div class="rpi-attribute-value"><a href="/series"><span>The Example Series</span></a></div>
+                    </div>
+                    </body></html>
+                    """;
+            mockJsoupConnect("https://www.amazon.com/dp/SERIESNOLBL", html);
+
+            BookMetadata metadata = amazonBookParser.fetchDetailedMetadata("SERIESNOLBL");
+
+            assertThat(metadata.getSeriesName()).isEqualTo("The Example Series");
+            assertThat(metadata.getSeriesNumber()).isNull();
+            assertThat(metadata.getSeriesTotal()).isNull();
+        }
+    }
 }
