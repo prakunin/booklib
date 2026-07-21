@@ -20,11 +20,15 @@ public class AuthorReconcileStateEntity {
     private Long authorId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "state", nullable = false, length = 20)
+    @Column(name = "state", nullable = false, length = 32)
     private AuthorReconcileState state;
 
     @Column(name = "evidence_hash", length = 64)
     private String evidenceHash;
+
+    @Column(name = "algorithm_version", nullable = false)
+    @Builder.Default
+    private int algorithmVersion = 1;
 
     @Column(name = "attempt_count", nullable = false)
     private int attemptCount;
