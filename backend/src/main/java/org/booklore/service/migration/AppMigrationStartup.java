@@ -23,6 +23,7 @@ public class AppMigrationStartup {
     private final MigrateProgressToFileProgressMigration migrateProgressToFileProgressMigration;
     private final PopulateAuthorSortNameMigration populateAuthorSortNameMigration;
     private final RemoveBundledCustomSvgIconsMigration removeBundledCustomSvgIconsMigration;
+    private final PopulateAuthorNormalizedNameMigration populateAuthorNormalizedNameMigration;
 
     @EventListener(ApplicationReadyEvent.class)
     public void runMigrationsOnce() {
@@ -38,5 +39,6 @@ public class AppMigrationStartup {
         appMigrationService.executeMigration(migrateProgressToFileProgressMigration);
         appMigrationService.executeMigration(populateAuthorSortNameMigration);
         appMigrationService.executeMigration(removeBundledCustomSvgIconsMigration);
+        appMigrationService.executeMigration(populateAuthorNormalizedNameMigration);
     }
 }
