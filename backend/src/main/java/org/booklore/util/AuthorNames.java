@@ -3,6 +3,13 @@ package org.booklore.util;
 import java.text.Normalizer;
 import java.util.Locale;
 
+/**
+ * Utilities for cleaning and normalizing author names.
+ *
+ * <p>Performs case-folding, diacritic stripping, and punctuation removal for display and key generation.
+ * <strong>Transliteration (e.g., Cyrillic→Latin cross-script folding) is deliberately omitted</strong>;
+ * script-crossing equivalence is deferred to the reconciliation layer to avoid false aliases.
+ */
 public final class AuthorNames {
 
     private AuthorNames() {
@@ -25,6 +32,17 @@ public final class AuthorNames {
         return sb.toString().trim().replaceAll("\\s+", " ");
     }
 
+    /**
+     * Produces a conservative blocking/alias key for name matching.
+     *
+     * <p>Applies case-folding (to ROOT locale), diacritic stripping (Unicode NFD + combining-mark removal),
+     * and punctuation removal. <strong>Does not transliterate</strong> — Cyrillic, Arabic, Han, etc. remain
+     * in their original scripts. Cross-script equivalence (e.g., "Иван" and "Ivan") is handled by the
+     * reconciliation layer, not here, to avoid false positives within a single script.
+     *
+     * @param cleaned a pre-cleaned name from {@link #cleanDisplayName(String)}
+     * @return normalized key for blocking/aliasing, or empty string if the input is null or blank
+     */
     public static String normalizeKey(String cleaned) {
         if (cleaned == null || cleaned.isBlank()) {
             return "";
