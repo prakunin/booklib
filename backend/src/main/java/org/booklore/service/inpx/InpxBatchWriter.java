@@ -207,7 +207,11 @@ public class InpxBatchWriter {
             if (cleaned.isEmpty()) {
                 continue;
             }
-            String key = AuthorNames.normalizeKey(cleaned);
+            // Cache key must be the EXACT cleaned name, not AuthorNames.normalizeKey(cleaned):
+            // the resolver's identity is AuthorLocalResolver.resolve(name) -> findByName(cleanDisplayName(name)),
+            // and normalizeKey additionally folds diacritics/case/punctuation, which would collapse
+            // genuinely distinct authors (e.g. "Stanislaw Lem" vs "Stanisław Lem") into one cache entry.
+            String key = cleaned;
             Long id = committedCache.get(key);
             if (id == null) {
                 id = pendingCache.get(key);

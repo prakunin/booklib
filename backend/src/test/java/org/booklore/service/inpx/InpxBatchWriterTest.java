@@ -148,7 +148,7 @@ class InpxBatchWriterTest {
 
         // second batch must hit the cache, not the resolver
         verify(authorLocalResolver, times(1)).resolve("Strugatsky Arkady");
-        assertThat(caches.authors()).containsEntry("strugatsky arkady", 42L);
+        assertThat(caches.authors()).containsEntry("Strugatsky Arkady", 42L);
     }
 
     @Test
@@ -163,7 +163,7 @@ class InpxBatchWriterTest {
         writer.persist(List.of(book("fb2-1.zip", "b", "B", "New Author", null)), 7L, 3L, caches);
 
         verify(authorLocalResolver, times(1)).resolve("New Author");
-        assertThat(caches.authors()).containsEntry("new author", 99L);
+        assertThat(caches.authors()).containsEntry("New Author", 99L);
     }
 
     @Test
@@ -261,7 +261,7 @@ class InpxBatchWriterTest {
             writer.persist(List.of(book("fb2-1.zip", "a", "A", "New Author", null)), 7L, 3L, caches);
 
             // Not promoted yet: the enclosing (simulated) batch transaction has not committed.
-            assertThat(caches.authors()).doesNotContainKey("new author");
+            assertThat(caches.authors()).doesNotContainKey("New Author");
 
             List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
             synchronizations.forEach(TransactionSynchronization::afterCommit);
@@ -269,7 +269,7 @@ class InpxBatchWriterTest {
             TransactionSynchronizationManager.clearSynchronization();
         }
 
-        assertThat(caches.authors()).containsEntry("new author", 99L);
+        assertThat(caches.authors()).containsEntry("New Author", 99L);
     }
 
     @Test
@@ -295,11 +295,11 @@ class InpxBatchWriterTest {
         // The id for the never-committed author must never reach the scan-wide cache:
         // a later batch reusing this cache would otherwise call entityManager.getReference
         // with a dangling id and fail at flush.
-        assertThat(caches.authors()).doesNotContainKey("new author");
+        assertThat(caches.authors()).doesNotContainKey("New Author");
     }
 
     @Test
-    void passesTheRawNameToTheResolverButCachesByNormalizedKeySoWhitespaceCannotDuplicateAnAuthor() {
+    void passesTheRawNameToTheResolverButCachesByCleanedNameSoWhitespaceCannotDuplicateAnAuthor() {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
         when(authorLocalResolver.resolve("  Padded Author  "))
                 .thenReturn(Optional.of(AuthorEntity.builder().id(11L).name("Padded Author").build()));
@@ -309,13 +309,15 @@ class InpxBatchWriterTest {
         // Cleaning/trimming the name is AuthorLocalResolver's job now, so the writer passes
         // the raw (padded) name straight through to it...
         writer.persist(List.of(book("fb2-1.zip", "a", "A", "  Padded Author  ", null)), 7L, 3L, caches);
-        // ...but the cache key is AuthorNames.normalizeKey(), so a second batch with an
-        // unpadded variant of the same name must hit the cache rather than calling the
-        // resolver again - otherwise "  Padded Author  " and "Padded Author" would be
-        // treated as different authors.
+        // ...but the cache key is AuthorNames.cleanDisplayName() (exact cleaned name, matching
+        // what the resolver's identity is keyed on), and cleanDisplayName trims and collapses
+        // whitespace, so a second batch with an unpadded variant of the same name must hit the
+        // cache rather than calling the resolver again - otherwise "  Padded Author  " and
+        // "Padded Author" would be treated as different authors.
         writer.persist(List.of(book("fb2-1.zip", "b", "B", "Padded Author", null)), 7L, 3L, caches);
 
         verify(authorLocalResolver).resolve("  Padded Author  ");
         verify(authorLocalResolver, never()).resolve("Padded Author");
+        assertThat(caches.authors()).containsEntry("Padded Author", 11L);
     }
 }
