@@ -19,6 +19,7 @@ class AuthorEntityMappingTest extends AbstractAuthorPersistenceTest {
                 AuthorEntity.builder().name("Jim Ward").normalizedName("jim ward")
                         .mergedIntoAuthorId(canonical.getId()).build());
 
+        flushAndClear(); // force a real SELECT, not a first-level-cache hit
         AuthorEntity reloaded = authorRepository.findById(loser.getId()).orElseThrow();
         assertThat(reloaded.getMergedIntoAuthorId()).isEqualTo(canonical.getId());
         assertThat(reloaded.getNormalizedName()).isEqualTo("jim ward");

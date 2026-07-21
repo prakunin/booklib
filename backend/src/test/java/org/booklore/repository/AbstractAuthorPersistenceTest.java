@@ -1,5 +1,7 @@
 package org.booklore.repository;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.booklore.BookloreApplication;
 import org.booklore.service.task.TaskCronService;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +34,20 @@ import static org.mockito.Mockito.mock;
 })
 @Import(AbstractAuthorPersistenceTest.TestConfig.class)
 public abstract class AbstractAuthorPersistenceTest {
+
+    @PersistenceContext
+    protected EntityManager entityManager;
+
+    /**
+     * Flush pending writes and evict the persistence context so a following
+     * findById/query issues a real SELECT instead of returning the same managed
+     * instance from Hibernate's first-level cache. Round-trip assertions MUST
+     * call this between save and reload.
+     */
+    protected void flushAndClear() {
+        entityManager.flush();
+        entityManager.clear();
+    }
 
     @TestConfiguration
     static class TestConfig {
