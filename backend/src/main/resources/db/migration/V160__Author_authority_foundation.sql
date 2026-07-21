@@ -24,3 +24,18 @@ CREATE TABLE IF NOT EXISTS author_reconcile_state
 
 CREATE INDEX IF NOT EXISTS idx_author_reconcile_state_pending
     ON author_reconcile_state (state, next_attempt_at);
+
+CREATE TABLE IF NOT EXISTS author_alias
+(
+    id               BIGINT AUTO_INCREMENT PRIMARY KEY,
+    author_id        BIGINT       NOT NULL,
+    name             VARCHAR(255) NOT NULL,
+    normalized_alias VARCHAR(255) NOT NULL,
+    language         VARCHAR(20)  NOT NULL DEFAULT 'und',
+    source           VARCHAR(20)  NOT NULL,
+    resolvable       BOOLEAN      NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_author_alias_author FOREIGN KEY (author_id) REFERENCES author (id) ON DELETE CASCADE,
+    CONSTRAINT uq_author_alias UNIQUE (author_id, normalized_alias, language)
+);
+
+CREATE INDEX IF NOT EXISTS idx_author_alias_lookup ON author_alias (normalized_alias, resolvable);
