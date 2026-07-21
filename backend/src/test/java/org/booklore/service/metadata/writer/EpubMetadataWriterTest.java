@@ -885,6 +885,264 @@ class EpubMetadataWriterTest {
     }
 
     @Nested
+    @DisplayName("Cover Replacement findOpfPath Failure Tests")
+    class CoverReplacementFindOpfPathFailureTests {
+
+        private static final String OPF_WITH_COVER_ITEM = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                        <dc:title>Book</dc:title>
+                    </metadata>
+                    <manifest>
+                        <item id="cover-image" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+                    </manifest>
+                </package>""";
+
+        @Test
+        @DisplayName("Should not throw when container.xml is entirely missing during cover replacement")
+        void missingContainerXmlDoesNotThrow() throws Exception {
+            File epubFile = createEpubWithoutContainerXml(OPF_WITH_COVER_ITEM, "no-container-cover-" + System.nanoTime() + ".epub");
+
+            assertDoesNotThrow(() -> writer.replaceCoverImageFromBytes(bookEntity(epubFile), createMinimalPngImage()));
+        }
+
+        @Test
+        @DisplayName("Should not throw when container.xml is malformed XML during cover replacement")
+        void malformedContainerXmlDoesNotThrow() throws Exception {
+            String badContainerXml = "<?xml version=\"1.0\"?><container><rootfiles><rootfile full-path=\"OEBPS/content.opf\"";
+            File epubFile = createEpubWithCustomContainer(badContainerXml, OPF_WITH_COVER_ITEM, "bad-container-cover-" + System.nanoTime() + ".epub");
+
+            assertDoesNotThrow(() -> writer.replaceCoverImageFromBytes(bookEntity(epubFile), createMinimalPngImage()));
+        }
+
+        @Test
+        @DisplayName("Should not throw when container.xml has no rootfile during cover replacement")
+        void noRootfileDoesNotThrow() throws Exception {
+            String containerXmlNoRootfile = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                        <rootfiles/>
+                    </container>""";
+            File epubFile = createEpubWithCustomContainer(containerXmlNoRootfile, OPF_WITH_COVER_ITEM, "no-rootfile-cover-" + System.nanoTime() + ".epub");
+
+            assertDoesNotThrow(() -> writer.replaceCoverImageFromBytes(bookEntity(epubFile), createMinimalPngImage()));
+        }
+
+        @Test
+        @DisplayName("Should not throw when container.xml's rootfile has a blank full-path during cover replacement")
+        void blankFullPathDoesNotThrow() throws Exception {
+            String containerXmlBlankFullPath = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                        <rootfiles>
+                            <rootfile full-path="" media-type="application/oebps-package+xml"/>
+                        </rootfiles>
+                    </container>""";
+            File epubFile = createEpubWithCustomContainer(containerXmlBlankFullPath, OPF_WITH_COVER_ITEM, "blank-fullpath-cover-" + System.nanoTime() + ".epub");
+
+            assertDoesNotThrow(() -> writer.replaceCoverImageFromBytes(bookEntity(epubFile), createMinimalPngImage()));
+        }
+
+        private File createEpubWithoutContainerXml(String opfContent, String filename) throws IOException {
+            File epubFile = tempDir.resolve(filename).toFile();
+            try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(epubFile))) {
+                zos.putNextEntry(new ZipEntry("mimetype"));
+                zos.write("application/epub+zip".getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("OEBPS/content.opf"));
+                zos.write(opfContent.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("OEBPS/cover.jpg"));
+                zos.write(new byte[]{1, 2, 3});
+                zos.closeEntry();
+            }
+            return epubFile;
+        }
+
+        private File createEpubWithCustomContainer(String containerXml, String opfContent, String filename) throws IOException {
+            File epubFile = tempDir.resolve(filename).toFile();
+            try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(epubFile))) {
+                zos.putNextEntry(new ZipEntry("mimetype"));
+                zos.write("application/epub+zip".getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("META-INF/container.xml"));
+                zos.write(containerXml.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("OEBPS/content.opf"));
+                zos.write(opfContent.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("OEBPS/cover.jpg"));
+                zos.write(new byte[]{1, 2, 3});
+                zos.closeEntry();
+            }
+            return epubFile;
+        }
+
+        private BookEntity bookEntity(File epubFile) {
+            BookEntity entity = new BookEntity();
+            LibraryPathEntity libraryPath = new LibraryPathEntity();
+            libraryPath.setPath(epubFile.getParentFile().toString());
+            entity.setLibraryPath(libraryPath);
+            BookFileEntity primaryFile = new BookFileEntity();
+            primaryFile.setBook(entity);
+            entity.setBookFiles(Collections.singletonList(primaryFile));
+            entity.getPrimaryBookFile().setFileSubPath("");
+            entity.getPrimaryBookFile().setFileName(epubFile.getName());
+            return entity;
+        }
+    }
+
+    @Nested
+    @DisplayName("OPF At ZIP Root Tests")
+    class OpfAtZipRootTests {
+
+        @Test
+        @DisplayName("Should locate and write the OPF when it sits directly at the extracted ZIP root")
+        void findsOpfDirectlyAtRootWithoutRecursion() throws Exception {
+            File epubFile = tempDir.resolve("opf-at-root-" + System.nanoTime() + ".epub").toFile();
+            String containerXml = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                        <rootfiles>
+                            <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+                        </rootfiles>
+                    </container>
+                    """;
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Root Level Book</dc:title>
+                        </metadata>
+                    </package>""";
+
+            try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(epubFile))) {
+                zos.putNextEntry(new ZipEntry("mimetype"));
+                zos.write("application/epub+zip".getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("META-INF/container.xml"));
+                zos.write(containerXml.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("content.opf"));
+                zos.write(opfContent.getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+            }
+
+            writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
+
+            try (ZipFile zf = new ZipFile(epubFile)) {
+                ZipEntry ze = zf.getEntry("content.opf");
+                try (InputStream is = zf.getInputStream(ze)) {
+                    String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                    assertThat(content).contains(metadata.getTitle());
+                }
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Cleanup Calibre Prefix Removal Tests")
+    class CleanupCalibrePrefixRemovalTests {
+
+        @Test
+        @DisplayName("Should remove the prefix attribute entirely when it contains only calibre entries (EPUB2)")
+        void pureCalibrePrefixIsRemovedEntirely() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="2.0" prefix="calibre: https://calibre-ebook.com/">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+                            <dc:title>Old Title</dc:title>
+                        </metadata>
+                    </package>""";
+
+            metadata.setTitle("New Title");
+
+            File epubFile = createEpubWithOpf(opfContent, "test-pure-calibre-prefix-" + System.nanoTime() + ".epub");
+            writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
+
+            String content = readOpfContent(epubFile);
+            assertThat(content).doesNotContain("prefix=");
+        }
+    }
+
+    @Nested
+    @DisplayName("Creator Removal Edge Case Tests")
+    class CreatorRemovalEdgeCaseTests {
+
+        @Test
+        @DisplayName("Should remove a pre-existing creator that has no id attribute at all")
+        void removesCreatorWithoutIdAttribute() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+                            <dc:title>Book</dc:title>
+                            <dc:creator>Anonymous Old Author</dc:creator>
+                        </metadata>
+                    </package>""";
+
+            File epubFile = createEpubWithOpf(opfContent, "test-creator-no-id-" + System.nanoTime() + ".epub");
+            writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
+
+            String content = readOpfContent(epubFile);
+            assertThat(content)
+                    .doesNotContain("Anonymous Old Author")
+                    .contains("Test Author");
+        }
+
+        @Test
+        @DisplayName("Should remove a pre-existing creator whose role is set directly via an opf:role attribute")
+        void removesCreatorWithDirectOpfRoleAttribute() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+                            <dc:title>Book</dc:title>
+                            <dc:creator id="c1" opf:role="aut">Direct Role Author</dc:creator>
+                        </metadata>
+                    </package>""";
+
+            File epubFile = createEpubWithOpf(opfContent, "test-creator-direct-role-" + System.nanoTime() + ".epub");
+            writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
+
+            String content = readOpfContent(epubFile);
+            assertThat(content)
+                    .doesNotContain("Direct Role Author")
+                    .contains("Test Author");
+        }
+
+        @Test
+        @DisplayName("Should resolve a creator's role from a refining meta that uses the content attribute form")
+        void removesCreatorWithRoleFromContentAttributeMeta() throws Exception {
+            String opfContent = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <dc:title>Book</dc:title>
+                            <dc:creator id="c1">Content Attr Author</dc:creator>
+                            <meta property="role" refines="#c1" content="aut"/>
+                        </metadata>
+                    </package>""";
+
+            File epubFile = createEpubWithOpf(opfContent, "test-creator-content-attr-role-" + System.nanoTime() + ".epub");
+            writer.saveMetadataToFile(epubFile, metadata, null, new MetadataClearFlags());
+
+            String content = readOpfContent(epubFile);
+            assertThat(content)
+                    .doesNotContain("Content Attr Author")
+                    .contains("Test Author");
+        }
+    }
+
+    @Nested
     @DisplayName("shouldSaveMetadataToFile Tests")
     class ShouldSaveMetadataToFileTests {
 

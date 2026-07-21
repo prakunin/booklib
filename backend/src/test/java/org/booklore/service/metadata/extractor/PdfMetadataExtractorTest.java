@@ -203,6 +203,62 @@ class PdfMetadataExtractorTest {
             BookMetadata meta = extractor.extractMetadata(pdf);
             assertThat(meta.getLanguage()).isEqualTo("English");
         }
+
+        @Test
+        void blankAuthor_noAuthorsSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.AUTHOR, "   ");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getAuthors()).isNullOrEmpty();
+        }
+
+        @Test
+        void authorWithOnlyDelimiters_noAuthorsSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.AUTHOR, " , & ");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getAuthors()).isNullOrEmpty();
+        }
+
+        @Test
+        void blankKeywords_noCategoriesSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.KEYWORDS, "   ");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getCategories()).isNullOrEmpty();
+        }
+
+        @Test
+        void keywordsWithOnlyDelimiters_noCategoriesSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.KEYWORDS, ";;;");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getCategories()).isNullOrEmpty();
+        }
+
+        @Test
+        void blankOptionalDocumentInfoFields_noneAreSet() throws Exception {
+            File pdf = createPdf(doc -> {
+                doc.setMetadata(MetadataTag.TITLE, "T");
+                doc.setMetadata(MetadataTag.SUBJECT, "   ");
+                doc.setMetadata("EBX_PUBLISHER", "   ");
+                doc.setMetadata(MetadataTag.CREATION_DATE, "   ");
+                doc.setMetadata("Language", "   ");
+            });
+            BookMetadata meta = extractor.extractMetadata(pdf);
+            assertThat(meta.getDescription()).isNull();
+            assertThat(meta.getPublisher()).isNull();
+            assertThat(meta.getPublishedDate()).isNull();
+            assertThat(meta.getLanguage()).isNull();
+        }
     }
 
     // --- parsePdfDate format variants, driven through the CreationDate document-info field ---

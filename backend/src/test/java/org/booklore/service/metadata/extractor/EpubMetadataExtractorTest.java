@@ -907,6 +907,43 @@ class EpubMetadataExtractorTest {
     }
 
     @Nested
+    class FixedLayoutAndIgnoredMetaKeys {
+
+        @Test
+        void preePaginatedRenditionLayoutSetsFixedLayoutFlag() throws IOException {
+            String opf = wrapOpf("""
+                    <dc:title>Book</dc:title>
+                    <meta property="rendition:layout">pre-paginated</meta>
+                    """);
+            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
+
+            assertThat(metadata.getIsFixedLayout()).isTrue();
+        }
+
+        @Test
+        void reflowableRenditionLayoutDoesNotSetFixedLayoutFlag() throws IOException {
+            String opf = wrapOpf("""
+                    <dc:title>Book</dc:title>
+                    <meta property="rendition:layout">reflowable</meta>
+                    """);
+            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
+
+            assertThat(metadata.getIsFixedLayout()).isNull();
+        }
+
+        @Test
+        void bookloreRatingKeyIsIgnoredHereSinceRatingIsHandledElsewhere() throws IOException {
+            String opf = wrapOpf("""
+                    <dc:title>Book</dc:title>
+                    <meta property="booklore:rating">4.5</meta>
+                    """);
+            BookMetadata metadata = extractor.extractMetadata(createEpub(opf));
+
+            assertThat(metadata.getRating()).isNull();
+        }
+    }
+
+    @Nested
     class MoodsAndTagsSeparationFromCategories {
 
         @Test
@@ -993,6 +1030,28 @@ class EpubMetadataExtractorTest {
 
             byte[] result = extractor.extractCover(epub);
             assertThat(result).isEqualTo(coverBytes);
+        }
+
+        @Test
+        void coverImagePropertyPointingAtMissingFileFallsThroughToNull() throws IOException {
+            String opf = wrapOpf("", """
+                    <item id="cover" href="images/missing-cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+                    """);
+            // No cover bytes are written for this href, so the declared path never exists in the container.
+            File epub = createEpub(opf, "OEBPS/content.opf", null);
+
+            assertThat(extractor.extractCover(epub)).isNull();
+        }
+
+        @Test
+        void coverLookingManifestEntryPointingAtMissingFileFallsThroughToNull() throws IOException {
+            String opf = wrapOpf("", """
+                    <item id="cover-img" href="images/missing-cover.jpg" media-type="image/jpeg"/>
+                    """);
+            // No cover bytes are written for this href, so the declared path never exists in the container.
+            File epub = createEpub(opf, "OEBPS/content.opf", null);
+
+            assertThat(extractor.extractCover(epub)).isNull();
         }
 
         @Test
