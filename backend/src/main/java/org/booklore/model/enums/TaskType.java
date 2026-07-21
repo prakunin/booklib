@@ -58,6 +58,14 @@ public enum TaskType {
             true,
             "Refresh Metadata",
             "Updates metadata information for your selected books."
+    ),
+    RECOMPUTE_FACET_COUNTS(
+            false,
+            true,
+            true,
+            false,
+            "Recompute Facet Counts",
+            "Recomputes the materialized per-library facet counts that power the filter panel and library stats, so those aggregates are served from a table instead of scanning the whole catalog per request."
     );
 
     @Getter
