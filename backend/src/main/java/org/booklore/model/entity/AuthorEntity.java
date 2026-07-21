@@ -38,6 +38,12 @@ public class AuthorEntity {
     @Column(name = "asin", length = 20)
     private String asin;
 
+    @Column(name = "merged_into_author_id")
+    private Long mergedIntoAuthorId;
+
+    @Column(name = "normalized_name", length = 255)
+    private String normalizedName;
+
     @Column(name = "name_locked", nullable = false)
     private boolean nameLocked;
 
