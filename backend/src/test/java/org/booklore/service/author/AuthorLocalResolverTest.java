@@ -1,6 +1,7 @@
 package org.booklore.service.author;
 
 import org.booklore.model.entity.AuthorEntity;
+import org.booklore.repository.AuthorAliasRepository;
 import org.booklore.repository.AuthorRepository;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -16,8 +17,9 @@ import static org.mockito.Mockito.*;
 class AuthorLocalResolverTest {
 
     private final AuthorRepository repo = mock(AuthorRepository.class);
+    private final AuthorAliasRepository aliasRepo = mock(AuthorAliasRepository.class);
     private final AuthorCreationService creator = mock(AuthorCreationService.class);
-    private final AuthorLocalResolver resolver = new AuthorLocalResolver(repo, creator);
+    private final AuthorLocalResolver resolver = new AuthorLocalResolver(repo, aliasRepo, creator);
 
     @Nested
     class Hardening {
