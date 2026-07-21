@@ -8,3 +8,19 @@ ALTER TABLE author
 
 CREATE INDEX IF NOT EXISTS idx_author_merged_into ON author (merged_into_author_id);
 CREATE INDEX IF NOT EXISTS idx_author_normalized_name ON author (normalized_name);
+
+CREATE TABLE IF NOT EXISTS author_reconcile_state
+(
+    author_id       BIGINT       NOT NULL,
+    state           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    evidence_hash   VARCHAR(64)  NULL,
+    attempt_count   INT          NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMP    NULL,
+    last_error      VARCHAR(1000) NULL,
+    reconciled_at   TIMESTAMP    NULL,
+    PRIMARY KEY (author_id),
+    CONSTRAINT fk_author_reconcile_state_author FOREIGN KEY (author_id) REFERENCES author (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_author_reconcile_state_pending
+    ON author_reconcile_state (state, next_attempt_at);
