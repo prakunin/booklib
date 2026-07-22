@@ -17,6 +17,7 @@ import org.booklore.model.enums.ComicCreatorRole;
 import org.booklore.model.enums.MetadataReplaceMode;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.booklore.service.file.FileFingerprint;
 import org.booklore.service.file.FileMoveService;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
@@ -43,7 +44,6 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class BookMetadataUpdater {
 
-    private final AuthorRepository authorRepository;
     private final CategoryRepository categoryRepository;
     private final MoodRepository moodRepository;
     private final TagRepository tagRepository;
@@ -61,6 +61,7 @@ public class BookMetadataUpdater {
     private final BookReviewUpdateService bookReviewUpdateService;
     private final FileMoveService fileMoveService;
     private final SidecarMetadataWriter sidecarMetadataWriter;
+    private final AuthorLocalResolver authorLocalResolver;
 
     @Transactional
     public void setBookMetadata(MetadataUpdateContext context) {
@@ -306,9 +307,9 @@ public class BookMetadataUpdater {
 
     private List<AuthorEntity> resolveAuthors(List<String> authorNames) {
         return authorNames.stream()
-                .filter(name -> name != null && !name.isBlank())
-                .map(name -> authorRepository.findByName(name)
-                        .orElseGet(() -> authorRepository.save(AuthorEntity.builder().name(name).build())))
+                .map(authorLocalResolver::resolve)
+                .flatMap(Optional::stream)
+                .distinct()
                 .toList();
     }
 

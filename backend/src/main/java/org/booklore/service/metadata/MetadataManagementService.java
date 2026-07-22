@@ -1,6 +1,7 @@
 package org.booklore.service.metadata;
 
 import org.booklore.config.AppProperties;
+import org.booklore.exception.ApiError;
 import org.booklore.model.dto.FileMoveResult;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.*;
@@ -8,6 +9,7 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.MergeMetadataType;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.booklore.service.file.FileFingerprint;
 import org.booklore.service.file.FileMoveService;
 import org.booklore.service.metadata.writer.MetadataWriter;
@@ -28,6 +30,7 @@ public class MetadataManagementService {
 
     private final AppProperties appProperties;
     private final AuthorRepository authorRepository;
+    private final AuthorLocalResolver authorLocalResolver;
     private final CategoryRepository categoryRepository;
     private final MoodRepository moodRepository;
     private final TagRepository tagRepository;
@@ -108,23 +111,35 @@ public class MetadataManagementService {
     }
 
     private void consolidateAuthors(List<String> targetValues, List<String> valuesToMerge, boolean moveFile) {
+        if (targetValues == null || targetValues.isEmpty()) {
+            throw ApiError.INVALID_INPUT.createException("No target author(s) provided to consolidate into");
+        }
+
+        if (valuesToMerge == null || valuesToMerge.isEmpty()) {
+            throw ApiError.INVALID_INPUT.createException("No author(s) provided to merge");
+        }
+
         List<AuthorEntity> targetAuthors = targetValues.stream()
-                .map(name -> authorRepository.findByNameIgnoreCase(name)
+                .flatMap(name -> authorRepository.findByNameIgnoreCase(name)
                         .map(existing -> {
                             existing.setName(name);
                             return authorRepository.save(existing);
                         })
-                        .orElseGet(() -> {
-                            AuthorEntity author = new AuthorEntity();
-                            author.setName(name);
-                            return authorRepository.save(author);
-                        }))
+                        .or(() -> authorLocalResolver.resolve(name))
+                        .stream())
+                .distinct()
                 .toList();
+
+        if (targetAuthors.isEmpty()) {
+            throw ApiError.INVALID_INPUT.createException("No valid target author(s) to consolidate into");
+        }
 
         List<AuthorEntity> authorsToMerge = valuesToMerge.stream()
                 .map(authorRepository::findByNameIgnoreCase)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
+                .filter(author -> !targetAuthors.contains(author))
+                .distinct()
                 .toList();
 
         for (AuthorEntity oldAuthor : authorsToMerge) {
@@ -132,7 +147,11 @@ public class MetadataManagementService {
 
             for (BookMetadataEntity metadata : booksWithOldAuthor) {
                 metadata.getAuthors().remove(oldAuthor);
-                metadata.getAuthors().addAll(targetAuthors);
+                for (AuthorEntity target : targetAuthors) {
+                    if (!metadata.getAuthors().contains(target)) {
+                        metadata.getAuthors().add(target);
+                    }
+                }
                 metadata.updateSearchText();
             }
 

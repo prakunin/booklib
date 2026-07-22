@@ -1,7 +1,9 @@
 package org.booklore.repository;
 
 import org.booklore.model.entity.AuthorEntity;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,6 +24,16 @@ public interface AuthorRepository extends JpaRepository<AuthorEntity, Long> {
 
     Optional<AuthorEntity> findByAsin(String asin);
 
+    @Query("SELECT a.id AS id, a.name AS name FROM AuthorEntity a " +
+           "WHERE (a.normalizedName IS NULL OR NOT EXISTS " +
+           "(SELECT 1 FROM AuthorReconcileStateEntity s WHERE s.authorId = a.id)) " +
+           "AND a.id > :lastId ORDER BY a.id")
+    List<AuthorBackfillView> findAuthorsNeedingBackfillAfter(@Param("lastId") Long lastId, Pageable pageable);
+
+    @Modifying
+    @Query("UPDATE AuthorEntity a SET a.normalizedName = :nn WHERE a.id = :id AND a.normalizedName IS NULL")
+    int backfillNormalizedName(@Param("id") Long id, @Param("nn") String nn);
+
     @Query("SELECT a, COUNT(bm) FROM AuthorEntity a LEFT JOIN a.bookMetadataEntityList bm GROUP BY a ORDER BY a.name")
     List<Object[]> findAllWithBookCount();
 
@@ -37,5 +49,10 @@ public interface AuthorRepository extends JpaRepository<AuthorEntity, Long> {
     interface AuthorBookProjection {
         Long getBookId();
         String getAuthorName();
+    }
+
+    interface AuthorBackfillView {
+        Long getId();
+        String getName();
     }
 }

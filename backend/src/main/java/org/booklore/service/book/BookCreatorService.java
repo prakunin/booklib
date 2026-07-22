@@ -7,6 +7,7 @@ import org.booklore.model.entity.*;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.ComicCreatorRole;
 import org.booklore.repository.*;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.booklore.service.file.FileFingerprint;
 import org.booklore.util.FileUtils;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class BookCreatorService {
     private final ComicTeamRepository comicTeamRepository;
     private final ComicLocationRepository comicLocationRepository;
     private final ComicCreatorRepository comicCreatorRepository;
+    private final AuthorLocalResolver authorLocalResolver;
 
     // Temporary storage for comic metadata DTOs during processing
     private final Map<Long, ComicMetadata> pendingComicMetadata = new ConcurrentHashMap<>();
@@ -45,7 +47,8 @@ public class BookCreatorService {
                               ComicCharacterRepository comicCharacterRepository,
                               ComicTeamRepository comicTeamRepository,
                               ComicLocationRepository comicLocationRepository,
-                              ComicCreatorRepository comicCreatorRepository) {
+                              ComicCreatorRepository comicCreatorRepository,
+                              AuthorLocalResolver authorLocalResolver) {
         this.authorRepository = authorRepository;
         this.categoryRepository = categoryRepository;
         this.moodRepository = moodRepository;
@@ -57,6 +60,7 @@ public class BookCreatorService {
         this.comicTeamRepository = comicTeamRepository;
         this.comicLocationRepository = comicLocationRepository;
         this.comicCreatorRepository = comicCreatorRepository;
+        this.authorLocalResolver = authorLocalResolver;
     }
 
     public BookEntity createShellBook(LibraryFile libraryFile, BookFileType bookFileType) {
@@ -144,11 +148,11 @@ public class BookCreatorService {
         if (bookEntity.getMetadata().getAuthors() == null) {
             bookEntity.getMetadata().setAuthors(new ArrayList<>());
         }
-        authors.stream()
-                .map(authorName -> truncate(authorName, 255))
-                .map(authorName -> authorRepository.findByName(authorName)
-                        .orElseGet(() -> authorRepository.save(AuthorEntity.builder().name(authorName).build())))
-                .forEach(authorEntity -> bookEntity.getMetadata().getAuthors().add(authorEntity));
+        for (String rawName : authors) {
+            authorLocalResolver.resolve(rawName)
+                    .filter(author -> !bookEntity.getMetadata().getAuthors().contains(author))
+                    .ifPresent(author -> bookEntity.getMetadata().getAuthors().add(author));
+        }
         bookEntity.getMetadata().updateSearchText(); // Manually trigger search text update since collection modification doesn't trigger @PreUpdate
     }
 

@@ -2,6 +2,7 @@ package org.booklore.model.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.booklore.util.AuthorNames;
 import org.booklore.util.AuthorSortName;
 import org.hibernate.Hibernate;
 import org.hibernate.annotations.BatchSize;
@@ -38,6 +39,12 @@ public class AuthorEntity {
     @Column(name = "asin", length = 20)
     private String asin;
 
+    @Column(name = "merged_into_author_id")
+    private Long mergedIntoAuthorId;
+
+    @Column(name = "normalized_name", length = 255)
+    private String normalizedName;
+
     @Column(name = "name_locked", nullable = false)
     private boolean nameLocked;
 
@@ -57,10 +64,13 @@ public class AuthorEntity {
 
     @PrePersist
     @PreUpdate
-    public void computeSortName() {
+    public void computeDerivedFields() {
         if (!sortNameLocked) {
-            sortName = AuthorSortName.compute(name);
+            sortName = AuthorNames.clampByCodePoints(AuthorSortName.compute(name), 255);
         }
+        // NOTE: renaming an author does NOT re-queue its reconcile state to PENDING here; that
+        // belongs to the (not-yet-built) reconciliation phase, not this entity lifecycle callback.
+        normalizedName = AuthorNames.normalizeKey(AuthorNames.cleanDisplayName(name));
     }
 
     @Override

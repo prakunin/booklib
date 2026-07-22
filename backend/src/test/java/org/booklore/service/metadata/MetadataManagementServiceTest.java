@@ -1,6 +1,7 @@
 package org.booklore.service.metadata;
 
 import org.booklore.config.AppProperties;
+import org.booklore.exception.APIException;
 import org.booklore.model.dto.FileMoveResult;
 import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
@@ -9,6 +10,7 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.MergeMetadataType;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.booklore.service.file.FileMoveService;
 import org.booklore.service.metadata.writer.MetadataWriter;
 import org.booklore.service.metadata.writer.MetadataWriterFactory;
@@ -36,6 +38,7 @@ class MetadataManagementServiceTest {
 
     @Mock private AppProperties appProperties;
     @Mock private AuthorRepository authorRepository;
+    @Mock private AuthorLocalResolver authorLocalResolver;
     @Mock private CategoryRepository categoryRepository;
     @Mock private MoodRepository moodRepository;
     @Mock private TagRepository tagRepository;
@@ -87,7 +90,7 @@ class MetadataManagementServiceTest {
         AuthorEntity newAuthor = AuthorEntity.builder().id(3L).name("New Author").build();
 
         when(authorRepository.findByNameIgnoreCase("New Author")).thenReturn(Optional.empty());
-        when(authorRepository.save(any(AuthorEntity.class))).thenReturn(newAuthor);
+        when(authorLocalResolver.resolve("New Author")).thenReturn(Optional.of(newAuthor));
         when(authorRepository.findByNameIgnoreCase("Old")).thenReturn(Optional.of(oldAuthor));
 
         List<AuthorEntity> authors = new ArrayList<>(List.of(oldAuthor));
@@ -96,6 +99,125 @@ class MetadataManagementServiceTest {
 
         service.consolidateMetadata(MergeMetadataType.authors, List.of("New Author"), List.of("Old"));
 
+        verify(authorLocalResolver).resolve("New Author");
+        assertThat(metadata.getAuthors()).contains(newAuthor);
+        verify(authorRepository).delete(oldAuthor);
+    }
+
+    @Test
+    void consolidateAuthors_throwsWhenTargetValuesEmpty() {
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, List.of(), List.of("Old"))
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No target author(s) provided to consolidate into");
+
+        verifyNoInteractions(authorRepository, authorLocalResolver, bookMetadataRepository);
+    }
+
+    @Test
+    void consolidateAuthors_throwsWhenTargetValuesNull() {
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, null, List.of("Old"))
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No target author(s) provided to consolidate into");
+
+        verifyNoInteractions(authorRepository, authorLocalResolver, bookMetadataRepository);
+    }
+
+    @Test
+    void consolidateAuthors_throwsWhenValuesToMergeNull() {
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, List.of("Target"), null)
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No author(s) provided to merge");
+
+        verifyNoInteractions(authorRepository, authorLocalResolver, bookMetadataRepository);
+    }
+
+    @Test
+    void consolidateAuthors_throwsWhenValuesToMergeEmpty() {
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, List.of("Target"), List.of())
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No author(s) provided to merge");
+
+        verifyNoInteractions(authorRepository, authorLocalResolver, bookMetadataRepository);
+    }
+
+    @Test
+    void consolidateAuthors_doesNotDeleteTargetWhenMergeValueResolvesToSameAuthorDifferentCase() {
+        AuthorEntity targetAuthor = AuthorEntity.builder().id(2L).name("Stephen King").build();
+
+        when(authorRepository.findByNameIgnoreCase("Stephen King")).thenReturn(Optional.of(targetAuthor));
+        when(authorRepository.save(targetAuthor)).thenReturn(targetAuthor);
+        when(authorRepository.findByNameIgnoreCase("stephen king")).thenReturn(Optional.of(targetAuthor));
+
+        List<AuthorEntity> authors = new ArrayList<>(List.of(targetAuthor));
+        BookMetadataEntity metadata = BookMetadataEntity.builder().authors(authors).build();
+
+        service.consolidateMetadata(MergeMetadataType.authors, List.of("Stephen King"), List.of("stephen king"));
+
+        assertThat(metadata.getAuthors()).containsExactly(targetAuthor);
+        verify(authorRepository, never()).delete(any());
+        verify(bookMetadataRepository, never()).findAllByAuthorsContaining(any());
+        verify(bookMetadataRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void consolidateAuthors_dedupesWhenBookAlreadyHasTargetAuthor() {
+        AuthorEntity oldAuthor = AuthorEntity.builder().id(1L).name("Old Author").build();
+        AuthorEntity targetAuthor = AuthorEntity.builder().id(2L).name("Target Author").build();
+
+        when(authorRepository.findByNameIgnoreCase("Target Author")).thenReturn(Optional.of(targetAuthor));
+        when(authorRepository.save(targetAuthor)).thenReturn(targetAuthor);
+        when(authorRepository.findByNameIgnoreCase("Old Author")).thenReturn(Optional.of(oldAuthor));
+
+        List<AuthorEntity> authors = new ArrayList<>(List.of(oldAuthor, targetAuthor));
+        BookMetadataEntity metadata = BookMetadataEntity.builder().authors(authors).build();
+        when(bookMetadataRepository.findAllByAuthorsContaining(oldAuthor)).thenReturn(List.of(metadata));
+
+        service.consolidateMetadata(MergeMetadataType.authors, List.of("Target Author"), List.of("Old Author"));
+
+        assertThat(metadata.getAuthors()).containsExactly(targetAuthor);
+        verify(authorRepository).delete(oldAuthor);
+    }
+
+    @Test
+    void consolidateAuthors_throwsWhenAllTargetsResolveEmpty() {
+        when(authorRepository.findByNameIgnoreCase("   ")).thenReturn(Optional.empty());
+        when(authorLocalResolver.resolve("   ")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, List.of("   "), List.of("Old"))
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No valid target author(s) to consolidate into");
+
+        verify(authorLocalResolver).resolve("   ");
+        verify(authorRepository, never()).save(any());
+        verify(authorRepository, never()).delete(any());
+        verify(bookMetadataRepository, never()).saveAll(anyList());
+        verify(bookMetadataRepository, never()).findAllByAuthorsContaining(any());
+    }
+
+    @Test
+    void consolidateAuthors_partiallyEmptyTargetsStillMergeIntoValidTarget() {
+        AuthorEntity oldAuthor = AuthorEntity.builder().id(1L).name("Old").build();
+        AuthorEntity validTarget = AuthorEntity.builder().id(2L).name("Valid Target").build();
+
+        when(authorRepository.findByNameIgnoreCase("   ")).thenReturn(Optional.empty());
+        when(authorLocalResolver.resolve("   ")).thenReturn(Optional.empty());
+        when(authorRepository.findByNameIgnoreCase("Valid Target")).thenReturn(Optional.empty());
+        when(authorLocalResolver.resolve("Valid Target")).thenReturn(Optional.of(validTarget));
+        when(authorRepository.findByNameIgnoreCase("Old")).thenReturn(Optional.of(oldAuthor));
+
+        List<AuthorEntity> authors = new ArrayList<>(List.of(oldAuthor));
+        BookMetadataEntity metadata = BookMetadataEntity.builder().authors(authors).build();
+        when(bookMetadataRepository.findAllByAuthorsContaining(oldAuthor)).thenReturn(List.of(metadata));
+
+        service.consolidateMetadata(MergeMetadataType.authors, List.of("   ", "Valid Target"), List.of("Old"));
+
+        assertThat(metadata.getAuthors()).contains(validTarget);
+        assertThat(metadata.getAuthors()).doesNotContain(oldAuthor);
         verify(authorRepository).delete(oldAuthor);
     }
 

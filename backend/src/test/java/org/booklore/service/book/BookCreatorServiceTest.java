@@ -7,6 +7,7 @@ import org.booklore.model.entity.CategoryEntity;
 import org.booklore.model.entity.MoodEntity;
 import org.booklore.model.entity.TagEntity;
 import org.booklore.repository.*;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,8 +25,6 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 /* BookCreatorService has the following functions that are not tested and should be added in the future
@@ -53,6 +52,7 @@ class BookCreatorServiceTest {
     @Mock private ComicTeamRepository comicTeamRepository;
     @Mock private ComicLocationRepository comicLocationRepository;
     @Mock private ComicCreatorRepository comicCreatorRepository;
+    @Mock private AuthorLocalResolver authorLocalResolver;
 
     @InjectMocks
     private BookCreatorService bookCreatorService;
@@ -85,7 +85,7 @@ class BookCreatorServiceTest {
     @Test
     void addAuthorsToBook_validAuthors_addsToBook() {
         AuthorEntity author = AuthorEntity.builder().name("Test Author").build();
-        when(authorRepository.findByName("Test Author")).thenReturn(Optional.of(author));
+        when(authorLocalResolver.resolve("Test Author")).thenReturn(Optional.of(author));
 
         bookCreatorService.addAuthorsToBook(Set.of("Test Author"), bookEntity);
 
@@ -99,7 +99,7 @@ class BookCreatorServiceTest {
         assertTrue(bookEntity.getMetadata().getAuthors().isEmpty());
 
         AuthorEntity author = AuthorEntity.builder().name("Author").build();
-        when(authorRepository.findByName("Author")).thenReturn(Optional.of(author));
+        when(authorLocalResolver.resolve("Author")).thenReturn(Optional.of(author));
 
         bookCreatorService.addAuthorsToBook(Set.of("Author"), bookEntity);
 
@@ -207,7 +207,7 @@ class BookCreatorServiceTest {
         bookEntity.getMetadata().setAuthors(new ArrayList<>(List.of(existingAuthor)));
 
         AuthorEntity newAuthor = AuthorEntity.builder().name("New Author").build();
-        when(authorRepository.findByName("New Author")).thenReturn(Optional.of(newAuthor));
+        when(authorLocalResolver.resolve("New Author")).thenReturn(Optional.of(newAuthor));
 
         bookCreatorService.addAuthorsToBook(Set.of("New Author"), bookEntity);
 
@@ -220,12 +220,11 @@ class BookCreatorServiceTest {
     @Test
     void addAuthorsToBook_newAuthorNotInRepo_savesAndAdds() {
         AuthorEntity saved = AuthorEntity.builder().name("Brand New").build();
-        when(authorRepository.findByName("Brand New")).thenReturn(Optional.empty());
-        when(authorRepository.save(any(AuthorEntity.class))).thenReturn(saved);
+        when(authorLocalResolver.resolve("Brand New")).thenReturn(Optional.of(saved));
 
         bookCreatorService.addAuthorsToBook(Set.of("Brand New"), bookEntity);
 
-        verify(authorRepository).save(argThat(author -> "Brand New".equals(author.getName())));
+        verify(authorLocalResolver).resolve("Brand New");
 
         assertThat(bookEntity.getMetadata().getAuthors())
                 .isNotNull()

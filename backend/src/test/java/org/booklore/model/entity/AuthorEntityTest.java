@@ -10,7 +10,7 @@ class AuthorEntityTest {
     void computesSortNameOnSaveWhenUnlocked() {
         AuthorEntity author = AuthorEntity.builder().name("George Orwell").build();
 
-        author.computeSortName();
+        author.computeDerivedFields();
 
         assertThat(author.getSortName()).isEqualTo("Orwell, George");
     }
@@ -23,7 +23,7 @@ class AuthorEntityTest {
                 .sortNameLocked(true)
                 .build();
 
-        author.computeSortName();
+        author.computeDerivedFields();
 
         assertThat(author.getSortName()).isEqualTo("Orwell the Great");
     }
@@ -32,7 +32,7 @@ class AuthorEntityTest {
     void leavesSortNameNullForNullName() {
         AuthorEntity author = AuthorEntity.builder().build();
 
-        author.computeSortName();
+        author.computeDerivedFields();
 
         assertThat(author.getSortName()).isNull();
     }
@@ -41,7 +41,7 @@ class AuthorEntityTest {
     void computesBlankSortNameForBlankName() {
         AuthorEntity author = AuthorEntity.builder().name("   ").build();
 
-        author.computeSortName();
+        author.computeDerivedFields();
 
         assertThat(author.getSortName()).isEmpty();
     }
@@ -55,7 +55,7 @@ class AuthorEntityTest {
                 .build();
 
         author.setSortNameLocked(false);
-        author.computeSortName();
+        author.computeDerivedFields();
 
         assertThat(author.getSortName()).isEqualTo("Orwell, George");
     }
