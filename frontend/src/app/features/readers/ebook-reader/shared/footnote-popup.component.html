@@ -1,0 +1,21 @@
+@if (visible()) {
+  <div class="footnote-backdrop" (click)="dismissed.emit()"></div>
+  <div
+    *transloco="let t"
+    class="footnote-popup"
+    role="dialog"
+    [attr.aria-label]="t('readerEbook.footnote.title')"
+    [class.show-below]="showBelow()"
+    [style.left.px]="position().x"
+    [style.top.px]="position().y">
+    <div class="footnote-body" [innerHTML]="html()"></div>
+    <div class="footnote-actions">
+      <button type="button" class="footnote-open-full" (click)="openFullRequested.emit()">
+        {{ t('readerEbook.footnote.openFull') }}
+      </button>
+      <button type="button" class="footnote-close" (click)="dismissed.emit()">
+        {{ t('readerEbook.footnote.close') }}
+      </button>
+    </div>
+  </div>
+}
