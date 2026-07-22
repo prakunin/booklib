@@ -105,6 +105,45 @@ class MetadataManagementServiceTest {
     }
 
     @Test
+    void consolidateAuthors_throwsWhenTargetValuesEmpty() {
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, List.of(), List.of("Old"))
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No target author(s) provided to consolidate into");
+
+        verifyNoInteractions(authorRepository, authorLocalResolver, bookMetadataRepository);
+    }
+
+    @Test
+    void consolidateAuthors_throwsWhenTargetValuesNull() {
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, null, List.of("Old"))
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No target author(s) provided to consolidate into");
+
+        verifyNoInteractions(authorRepository, authorLocalResolver, bookMetadataRepository);
+    }
+
+    @Test
+    void consolidateAuthors_dedupesWhenBookAlreadyHasTargetAuthor() {
+        AuthorEntity oldAuthor = AuthorEntity.builder().id(1L).name("Old Author").build();
+        AuthorEntity targetAuthor = AuthorEntity.builder().id(2L).name("Target Author").build();
+
+        when(authorRepository.findByNameIgnoreCase("Target Author")).thenReturn(Optional.of(targetAuthor));
+        when(authorRepository.save(targetAuthor)).thenReturn(targetAuthor);
+        when(authorRepository.findByNameIgnoreCase("Old Author")).thenReturn(Optional.of(oldAuthor));
+
+        List<AuthorEntity> authors = new ArrayList<>(List.of(oldAuthor, targetAuthor));
+        BookMetadataEntity metadata = BookMetadataEntity.builder().authors(authors).build();
+        when(bookMetadataRepository.findAllByAuthorsContaining(oldAuthor)).thenReturn(List.of(metadata));
+
+        service.consolidateMetadata(MergeMetadataType.authors, List.of("Target Author"), List.of("Old Author"));
+
+        assertThat(metadata.getAuthors()).containsExactly(targetAuthor);
+        verify(authorRepository).delete(oldAuthor);
+    }
+
+    @Test
     void consolidateAuthors_throwsWhenAllTargetsResolveEmpty() {
         when(authorRepository.findByNameIgnoreCase("   ")).thenReturn(Optional.empty());
         when(authorLocalResolver.resolve("   ")).thenReturn(Optional.empty());

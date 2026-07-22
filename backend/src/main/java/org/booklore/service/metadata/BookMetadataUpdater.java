@@ -309,6 +309,7 @@ public class BookMetadataUpdater {
         return authorNames.stream()
                 .map(authorLocalResolver::resolve)
                 .flatMap(Optional::stream)
+                .distinct()
                 .toList();
     }
 

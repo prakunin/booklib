@@ -111,6 +111,10 @@ public class MetadataManagementService {
     }
 
     private void consolidateAuthors(List<String> targetValues, List<String> valuesToMerge, boolean moveFile) {
+        if (targetValues == null || targetValues.isEmpty()) {
+            throw ApiError.INVALID_INPUT.createException("No target author(s) provided to consolidate into");
+        }
+
         List<AuthorEntity> targetAuthors = targetValues.stream()
                 .flatMap(name -> authorRepository.findByNameIgnoreCase(name)
                         .map(existing -> {
@@ -122,7 +126,7 @@ public class MetadataManagementService {
                 .distinct()
                 .toList();
 
-        if (!targetValues.isEmpty() && targetAuthors.isEmpty()) {
+        if (targetAuthors.isEmpty()) {
             throw ApiError.INVALID_INPUT.createException("No valid target author(s) to consolidate into");
         }
 
@@ -137,7 +141,11 @@ public class MetadataManagementService {
 
             for (BookMetadataEntity metadata : booksWithOldAuthor) {
                 metadata.getAuthors().remove(oldAuthor);
-                metadata.getAuthors().addAll(targetAuthors);
+                for (AuthorEntity target : targetAuthors) {
+                    if (!metadata.getAuthors().contains(target)) {
+                        metadata.getAuthors().add(target);
+                    }
+                }
                 metadata.updateSearchText();
             }
 

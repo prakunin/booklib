@@ -374,6 +374,25 @@ class BookMetadataUpdaterTest {
     }
 
     @Test
+    void setBookMetadata_authorsReplaceMissing_dedupesWhenNamesResolveToSameAuthor() {
+        metadataEntity.setAuthors(new ArrayList<>());
+        AuthorEntity sameAuthor = AuthorEntity.builder().id(2L).name("New").build();
+        when(authorLocalResolver.resolve("New")).thenReturn(Optional.of(sameAuthor));
+        when(authorLocalResolver.resolve("Alias")).thenReturn(Optional.of(sameAuthor));
+
+        BookMetadata newMeta = BookMetadata.builder().title("T").authors(List.of("New", "Alias")).build();
+        MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_MISSING);
+
+        try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+            mockSettingsAndChangeDetector(mcd, true, true);
+
+            updater.setBookMetadata(context);
+
+            assertThat(metadataEntity.getAuthors()).containsExactly(sameAuthor);
+        }
+    }
+
+    @Test
     void setBookMetadata_authorsLocked_notUpdated() {
         metadataEntity.setAuthorsLocked(true);
         AuthorEntity existing = AuthorEntity.builder().id(1L).name("Locked").build();
