@@ -119,6 +119,7 @@ public class MetadataManagementService {
                         })
                         .or(() -> authorLocalResolver.resolve(name))
                         .stream())
+                .distinct()
                 .toList();
 
         if (!targetValues.isEmpty() && targetAuthors.isEmpty()) {

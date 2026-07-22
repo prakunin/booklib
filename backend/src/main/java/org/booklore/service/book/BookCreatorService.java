@@ -150,6 +150,7 @@ public class BookCreatorService {
         }
         for (String rawName : authors) {
             authorLocalResolver.resolve(rawName)
+                    .filter(author -> !bookEntity.getMetadata().getAuthors().contains(author))
                     .ifPresent(author -> bookEntity.getMetadata().getAuthors().add(author));
         }
         bookEntity.getMetadata().updateSearchText(); // Manually trigger search text update since collection modification doesn't trigger @PreUpdate

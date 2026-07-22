@@ -202,6 +202,7 @@ public class InpxBatchWriter {
     private List<AuthorEntity> resolveAuthors(List<String> names, Map<String, Long> committedCache,
                                               Map<String, Long> pendingCache) {
         List<AuthorEntity> result = new ArrayList<>();
+        Set<Long> addedIds = new HashSet<>();
         for (String name : names) {
             String cleaned = AuthorNames.cleanDisplayName(name);
             if (cleaned.isEmpty()) {
@@ -226,7 +227,9 @@ public class InpxBatchWriter {
                 id = resolved.get().getId();
                 pendingCache.put(key, id);
             }
-            result.add(entityManager.getReference(AuthorEntity.class, id));
+            if (addedIds.add(id)) {
+                result.add(entityManager.getReference(AuthorEntity.class, id));
+            }
         }
         return result;
     }

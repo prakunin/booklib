@@ -133,6 +133,7 @@ public class PhysicalBookService {
         }
         for (String rawName : authors) {
             authorLocalResolver.resolve(rawName)
+                    .filter(author -> !bookEntity.getMetadata().getAuthors().contains(author))
                     .ifPresent(author -> bookEntity.getMetadata().getAuthors().add(author));
         }
         bookEntity.getMetadata().updateSearchText();

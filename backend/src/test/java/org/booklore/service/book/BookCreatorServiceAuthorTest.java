@@ -31,4 +31,19 @@ class BookCreatorServiceAuthorTest {
                 .containsExactly("Valid Author");
         verify(resolver).resolve("Valid Author");
     }
+
+    @Test
+    void dedupsAuthorWhenTwoRawNamesResolveToTheSameEntity() {
+        AuthorEntity sharedAuthor = AuthorEntity.builder().id(1L).name("Canonical Author").build();
+        AuthorLocalResolver resolver = mock(AuthorLocalResolver.class);
+        when(resolver.resolve("Canonical Author")).thenReturn(Optional.of(sharedAuthor));
+        when(resolver.resolve("Alias For Canonical")).thenReturn(Optional.of(sharedAuthor));
+
+        BookCreatorService service = BookCreatorServiceTestFactory.withResolver(resolver);
+        BookEntity book = BookEntity.builder().metadata(BookMetadataEntity.builder().build()).build();
+
+        service.addAuthorsToBook(List.of("Canonical Author", "Alias For Canonical"), book);
+
+        assertThat(book.getMetadata().getAuthors()).containsExactly(sharedAuthor);
+    }
 }
