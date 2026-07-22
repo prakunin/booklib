@@ -104,4 +104,54 @@ describe('ReaderViewManagerService', () => {
 
     expect(view.goTo).toHaveBeenCalledWith('epubcfi(/6/12)');
   });
+
+  describe('link resolution', () => {
+    it('resolves an href through the book model', () => {
+      const target = {index: 3, anchor: () => null};
+      Reflect.set(service, 'view', {
+        book: {resolveHref: (href: string) => (href === '#n_3' ? target : null)},
+      });
+
+      expect(service.resolveHref('#n_3')).toBe(target);
+      expect(service.resolveHref('#missing')).toBeNull();
+    });
+
+    it('returns null when the book model throws', () => {
+      Reflect.set(service, 'view', {
+        book: {
+          resolveHref: () => {
+            throw new Error('bad href');
+          },
+        },
+      });
+
+      expect(service.resolveHref('#n_3')).toBeNull();
+    });
+
+    it('returns null when no book is open', () => {
+      Reflect.set(service, 'view', null);
+
+      expect(service.resolveHref('#n_3')).toBeNull();
+      expect(service.getSection(0)).toBeNull();
+    });
+
+    it('returns the section at an index', () => {
+      const sections = [{linear: 'yes'}, {linear: 'no'}];
+      Reflect.set(service, 'view', {book: {sections}});
+
+      expect(service.getSection(1)).toBe(sections[1]);
+      expect(service.getSection(9)).toBeNull();
+    });
+
+    it('clears the link handler on destroy', () => {
+      const eventService = TestBed.inject(ReaderEventService) as unknown as {destroy?: () => void};
+      eventService.destroy = vi.fn();
+      service.setLinkHandler(() => true);
+      Reflect.set(service, 'view', null);
+
+      service.destroy();
+
+      expect(Reflect.get(service, 'linkHandler')).toBeNull();
+    });
+  });
 });
