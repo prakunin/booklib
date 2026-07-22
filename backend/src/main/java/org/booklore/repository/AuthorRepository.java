@@ -1,6 +1,7 @@
 package org.booklore.repository;
 
 import org.booklore.model.entity.AuthorEntity;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,6 +22,9 @@ public interface AuthorRepository extends JpaRepository<AuthorEntity, Long> {
     List<AuthorEntity> findAuthorsByBookId(@Param("bookId") Long bookId);
 
     Optional<AuthorEntity> findByAsin(String asin);
+
+    @Query("SELECT a FROM AuthorEntity a WHERE a.normalizedName IS NULL AND a.id > :lastId ORDER BY a.id")
+    List<AuthorEntity> findUnnormalizedAfter(@Param("lastId") Long lastId, Pageable pageable);
 
     @Query("SELECT a, COUNT(bm) FROM AuthorEntity a LEFT JOIN a.bookMetadataEntityList bm GROUP BY a ORDER BY a.name")
     List<Object[]> findAllWithBookCount();
