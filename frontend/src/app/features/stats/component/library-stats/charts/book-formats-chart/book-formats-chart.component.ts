@@ -1,10 +1,8 @@
 import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {LibraryFilterService} from '../../service/library-filter.service';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {LibraryStatsApiService} from '../../service/library-stats-api.service';
 
 interface FormatStats {
   format: string;
@@ -31,20 +29,20 @@ const FORMAT_COLORS: Record<string, string> = {
   styleUrls: ['./book-formats-chart.component.scss']
 })
 export class BookFormatsChartComponent {
-  private readonly bookService = inject(BookService);
-  private readonly libraryFilterService = inject(LibraryFilterService);
+  private readonly libraryStats = inject(LibraryStatsApiService);
   private readonly t = inject(TranslocoService);
-  private readonly filteredBooks = computed(() => {
-    if (this.bookService.isBooksLoading()) {
-      return [];
-    }
-
-    return this.filterBooksByLibrary(this.bookService.books(), this.libraryFilterService.selectedLibrary());
-  });
 
   public readonly chartType = 'pie' as const;
-  public readonly formatStats = computed(() => this.calculateFormatStats(this.filteredBooks()));
-  public readonly totalBooks = computed(() => this.filteredBooks().length);
+  public readonly formatStats = computed<FormatStats[]>(() => {
+    const formats = this.libraryStats.facets()?.fileTypes ?? [];
+    const total = formats.reduce((sum, item) => sum + item.count, 0);
+    return formats.map(item => ({
+      format: item.name,
+      count: item.count,
+      percentage: total > 0 ? item.count / total * 100 : 0
+    }));
+  });
+  public readonly totalBooks = computed(() => this.libraryStats.data()?.totalBooks ?? 0);
 
   public readonly chartOptions: ChartConfiguration<'pie'>['options'] = {
     responsive: true,
@@ -108,27 +106,4 @@ export class BookFormatsChartComponent {
     };
   });
 
-  private filterBooksByLibrary(books: Book[], selectedLibraryId: number | null): Book[] {
-    return selectedLibraryId
-      ? books.filter(book => book.libraryId === selectedLibraryId)
-      : books;
-  }
-
-  private calculateFormatStats(books: Book[]): FormatStats[] {
-    const formatCounts = new Map<string, number>();
-
-    books.forEach(book => {
-      const format = book.primaryFile?.bookType || 'Unknown';
-      formatCounts.set(format, (formatCounts.get(format) || 0) + 1);
-    });
-
-    const total = books.length;
-    return Array.from(formatCounts.entries())
-      .map(([format, count]) => ({
-        format,
-        count,
-        percentage: (count / total) * 100
-      }))
-      .sort((a, b) => b.count - a.count);
-  }
 }

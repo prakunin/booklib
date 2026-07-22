@@ -386,7 +386,9 @@ public class FileUtils {
       "#recycle",
       "@eaDir",
       // calibre
-      ".caltrash"
+      ".caltrash",
+      // macOS archive metadata (AppleDouble resource-fork sidecars are stored here)
+      "__MACOSX"
     );
 
     private final Set<String> tempExtensions = Set.of(
@@ -394,6 +396,11 @@ public class FileUtils {
             ".bak", ".old", ".temp", ".tempfile"
     );
 
+    /**
+     * Returns whether a path is scanner metadata/temporary content rather than a library file.
+     * Hidden files cover macOS AppleDouble sidecars (for example {@code ._book.epub}) and
+     * {@code .DS_Store}; {@code __MACOSX} is handled as a directory component below.
+     */
     public boolean shouldIgnore(Path path) {
         String fileName = path.getFileName().toString();
         if (!fileName.isEmpty() && fileName.charAt(0) == '.') {

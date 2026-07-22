@@ -2,10 +2,9 @@ import {Component, effect, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {Tooltip} from 'primeng/tooltip';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {sortStrings} from '../../../../../../shared/util/string-sort.util';
+import {UserBookStatsService} from '../../service/user-book-stats.service';
 
 @Component({
   selector: 'app-publication-era-chart',
@@ -15,14 +14,10 @@ import {sortStrings} from '../../../../../../shared/util/string-sort.util';
   styleUrls: ['./publication-era-chart.component.scss']
 })
 export class PublicationEraChartComponent {
-  private readonly bookService = inject(BookService);
+  private readonly userBookStats = inject(UserBookStatsService);
   private readonly t = inject(TranslocoService);
   private readonly syncChartEffect = effect(() => {
-    if (this.bookService.isBooksLoading()) {
-      return;
-    }
-
-    this.processData(this.bookService.books());
+    this.processData();
   });
 
   public readonly chartType = 'line' as const;
@@ -73,8 +68,9 @@ export class PublicationEraChartComponent {
     interaction: {mode: 'index', intersect: false}
   };
 
-  private processData(books: Book[]): void {
-    if (books.length === 0) {
+  private processData(): void {
+    const ratings = this.userBookStats.data()?.publicationRatings ?? [];
+    if (ratings.length < 3) {
       this.hasData = false;
       this.bestDecade = '';
       this.bestAvgRating = 0;
@@ -83,61 +79,45 @@ export class PublicationEraChartComponent {
       return;
     }
 
-    const ratedBooks = books.filter(b => b.metadata?.publishedDate && b.personalRating && b.personalRating > 0);
-    if (ratedBooks.length < 3) return;
-
-    this.totalRated = ratedBooks.length;
-
     const decadeData = new Map<string, Map<number, number>>();
     const decadeAvg = new Map<string, {total: number; count: number}>();
     const ratingLabels = ['1-2', '3-4', '5-6', '7-8', '9-10'];
-
-    for (const book of ratedBooks) {
-      const pubYear = new Date(book.metadata!.publishedDate!).getFullYear();
+    this.totalRated = 0;
+    for (const item of ratings) {
+      const pubYear = item.year;
       if (pubYear < 1900 || pubYear > 2030) continue;
       const decade = `${Math.floor(pubYear / 10) * 10}s`;
-      const rating = book.personalRating!;
-      const bucket = Math.min(4, Math.floor((rating - 1) / 2));
-
+      const bucket = Math.min(4, Math.floor((item.personalRating - 1) / 2));
       if (!decadeData.has(decade)) decadeData.set(decade, new Map());
-      const dMap = decadeData.get(decade)!;
-      dMap.set(bucket, (dMap.get(bucket) || 0) + 1);
-
-      if (!decadeAvg.has(decade)) decadeAvg.set(decade, {total: 0, count: 0});
-      const avg = decadeAvg.get(decade)!;
-      avg.total += rating;
-      avg.count++;
+      const buckets = decadeData.get(decade)!;
+      buckets.set(bucket, (buckets.get(bucket) ?? 0) + item.count);
+      const average = decadeAvg.get(decade) ?? {total: 0, count: 0};
+      average.total += item.personalRating * item.count;
+      average.count += item.count;
+      decadeAvg.set(decade, average);
+      this.totalRated += item.count;
     }
-
     if (decadeData.size === 0) return;
-
     const decades = sortStrings([...decadeData.keys()]);
-    let bestDec = '';
-    let bestAvg = 0;
-    for (const [dec, avg] of decadeAvg) {
-      const a = avg.total / avg.count;
-      if (a > bestAvg) { bestAvg = a; bestDec = dec; }
-    }
-    this.bestDecade = bestDec;
-    this.bestAvgRating = Math.round(bestAvg * 10) / 10;
-
-    const datasets = decades.map((decade, i) => {
-      const dMap = decadeData.get(decade)!;
-      return {
+    const best = [...decadeAvg.entries()]
+      .map(([decade, value]) => [decade, value.total / value.count] as const)
+      .sort((a, b) => b[1] - a[1])[0];
+    this.bestDecade = best?.[0] ?? '';
+    this.bestAvgRating = Math.round((best?.[1] ?? 0) * 10) / 10;
+    this.chartData = {
+      labels: ratingLabels,
+      datasets: decades.map((decade, index) => ({
         label: decade,
-        data: ratingLabels.map((_, idx) => dMap.get(idx) || 0),
-        borderColor: this.DECADE_COLORS[i % this.DECADE_COLORS.length],
-        backgroundColor: this.DECADE_COLORS[i % this.DECADE_COLORS.length] + '20',
+        data: ratingLabels.map((_, bucket) => decadeData.get(decade)?.get(bucket) ?? 0),
+        borderColor: this.DECADE_COLORS[index % this.DECADE_COLORS.length],
+        backgroundColor: this.DECADE_COLORS[index % this.DECADE_COLORS.length] + '20',
         borderWidth: 2.5,
         pointRadius: 5,
-        pointBackgroundColor: this.DECADE_COLORS[i % this.DECADE_COLORS.length],
-        pointBorderWidth: 1.5,
+        pointBackgroundColor: this.DECADE_COLORS[index % this.DECADE_COLORS.length],
         tension: 0.3,
         fill: false
-      };
-    });
-
-    this.chartData = {labels: ratingLabels, datasets};
+      }))
+    };
     this.hasData = true;
   }
 }

@@ -53,7 +53,7 @@ class AuthorNamesTest {
 
     @Test
     void normalizeKeyCollapsesUnicodeDashAndNbspToSingleSpace() {
-        // em-dash (U+2014) and NBSP (U+00A0) are Unicode punctuation/separator, not ASCII \p{Punct}
+        // em-dash (U+2014) and NBSP (U+00A0) are Unicode punctuation and separators, unlike plain ASCII punctuation
         assertThat(AuthorNames.normalizeKey("Anne—Marie Smith"))
                 .isEqualTo("anne marie smith");
     }

@@ -29,6 +29,7 @@ import org.booklore.service.inpx.InpxScanControl;
 import org.booklore.service.monitoring.LibraryWatchService;
 import org.booklore.task.options.RescanLibraryContext;
 import org.booklore.util.FileService;
+import org.booklore.util.FileUtils;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.context.event.EventListener;
@@ -396,6 +397,9 @@ public class LibraryService {
     }
 
     private boolean isProcessableFile(Path file, Set<BookFileType> allowedFormats) {
+        if (FileUtils.shouldIgnore(file)) {
+            return false;
+        }
         String fileName = file.getFileName().toString().toLowerCase();
         for (BookFileType fileType : BookFileType.values()) {
             if (allowedFormats != null && !allowedFormats.contains(fileType)) {

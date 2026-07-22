@@ -1,9 +1,10 @@
 import {AfterViewInit, Component, effect, ElementRef, inject, ViewChild} from '@angular/core';
 import {Tooltip} from 'primeng/tooltip';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book, ReadStatus} from '../../../../../book/model/book.model';
+import {ReadStatus} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {StatsChartThemeService} from '../../../shared/stats-chart-theme.service';
+import {UserBookStatsService} from '../../service/user-book-stats.service';
+import {BookFlowCount} from '../../../library-stats/service/library-stats-api.service';
 
 interface SankeyNode {
   id: string;
@@ -30,20 +31,23 @@ interface SankeyLink {
   styleUrls: ['./book-flow-chart.component.scss']
 })
 export class BookFlowChartComponent implements AfterViewInit {
+  private static readonly TOTAL_HEIGHT = 420;
+  private static readonly NODE_PADDING = 6;
+
   @ViewChild('flowCanvas', {static: false}) canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  private readonly bookService = inject(BookService);
+  private readonly userBookStats = inject(UserBookStatsService);
   private readonly t = inject(TranslocoService);
   private readonly chartTheme = inject(StatsChartThemeService);
   private readonly syncChartEffect = effect(() => {
     this.chartTheme.themeRevision();
 
-    if (this.bookService.isBooksLoading()) {
+    if (this.userBookStats.isLoading()) {
       this.dataReady = false;
       return;
     }
 
-    this.processData(this.bookService.books());
+    this.processData();
     this.dataReady = true;
     this.tryRender();
   });
@@ -70,7 +74,7 @@ export class BookFlowChartComponent implements AfterViewInit {
     }
   }
 
-  private processData(books: Book[]): void {
+  private processData(): void {
     this.hasData = false;
     this.totalBooks = 0;
     this.topQuarter = '';
@@ -79,69 +83,16 @@ export class BookFlowChartComponent implements AfterViewInit {
     this.nodes = [];
     this.links = [];
 
-    if (books.length === 0) {
+    const snapshot = this.userBookStats.data();
+    if (!snapshot || snapshot.totalBooks === 0) {
       return;
     }
 
-    const quarterMap = new Map<string, number>();
-    const statusMap = new Map<string, number>();
-    const ratingMap = new Map<string, number>();
-    const quarterToStatus = new Map<string, Map<string, number>>();
-    const statusToRating = new Map<string, Map<string, number>>();
-
-    const statusColors: Record<string, string> = {
-      'Read': '#66bb6a', 'Reading': '#42a5f5', 'Unread': '#78909c',
-      'Paused': '#ffa726', 'Abandoned': '#ef5350', 'Other': '#ab47bc'
-    };
-
-    const ratingColors: Record<string, string> = {
-      'Rated 4-5': '#66bb6a', 'Rated 3': '#ffc107',
-      'Rated 1-2': '#ef5350', 'Unrated': '#78909c'
-    };
-
-    for (const book of books) {
-      const addedOn = book.addedOn;
-      let quarter = 'Unknown';
-      if (addedOn) {
-        const date = new Date(addedOn);
-        const q = Math.ceil((date.getMonth() + 1) / 3);
-        quarter = `${date.getFullYear()} Q${q}`;
-      }
-
-      let status = 'Other';
-      switch (book.readStatus) {
-        case ReadStatus.READ: status = 'Read'; break;
-        case ReadStatus.READING: case ReadStatus.RE_READING: status = 'Reading'; break;
-        case ReadStatus.UNREAD: case ReadStatus.UNSET: status = 'Unread'; break;
-        case ReadStatus.PAUSED: status = 'Paused'; break;
-        case ReadStatus.ABANDONED: case ReadStatus.WONT_READ: status = 'Abandoned'; break;
-      }
-
-      let ratingBucket = 'Unrated';
-      const rating = book.personalRating;
-      if (rating && rating > 0) {
-        const normalized = rating / 2;
-        if (normalized >= 4) ratingBucket = 'Rated 4-5';
-        else if (normalized >= 3) ratingBucket = 'Rated 3';
-        else ratingBucket = 'Rated 1-2';
-      }
-
-      quarterMap.set(quarter, (quarterMap.get(quarter) || 0) + 1);
-      statusMap.set(status, (statusMap.get(status) || 0) + 1);
-      ratingMap.set(ratingBucket, (ratingMap.get(ratingBucket) || 0) + 1);
-
-      if (!quarterToStatus.has(quarter)) quarterToStatus.set(quarter, new Map());
-      const qsMap = quarterToStatus.get(quarter)!;
-      qsMap.set(status, (qsMap.get(status) || 0) + 1);
-
-      if (!statusToRating.has(status)) statusToRating.set(status, new Map());
-      const srMap = statusToRating.get(status)!;
-      srMap.set(ratingBucket, (srMap.get(ratingBucket) || 0) + 1);
-    }
+    const {quarterMap, statusMap, ratingMap, quarterToStatus, statusToRating} = this.aggregateBookFlow(snapshot.bookFlow);
 
     if (quarterMap.size === 0) return;
     this.hasData = true;
-    this.totalBooks = books.length;
+    this.totalBooks = snapshot.totalBooks;
 
     const sortedQuarters = [...quarterMap.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -152,64 +103,127 @@ export class BookFlowChartComponent implements AfterViewInit {
     this.topStatus = topStatusEntry?.[0] || '';
 
     const readCount = statusMap.get('Read') || 0;
-    this.completionRate = books.length > 0 ? Math.round((readCount / books.length) * 100) + '%' : '0%';
+    this.completionRate = snapshot.totalBooks > 0 ? Math.round((readCount / snapshot.totalBooks) * 100) + '%' : '0%';
 
     const quarterColors = ['#42a5f5', '#26c6da', '#66bb6a', '#ffa726', '#ab47bc', '#ef5350', '#ec407a', '#7e57c2'];
-
-    const totalHeight = 420;
-    const padding = 6;
-
-    const createColumnNodes = (
-      entries: [string, number][],
-      column: number,
-      colors: Record<string, string> | string[]
-    ): SankeyNode[] => {
-      const total = entries.reduce((s, e) => s + e[1], 0);
-      let currentY = 30;
-      return entries.map(([id, count], i) => {
-        const height = Math.max(10, (count / total) * (totalHeight - entries.length * padding));
-        const node: SankeyNode = {
-          id, label: id, column,
-          y: currentY, height,
-          color: Array.isArray(colors) ? colors[i % colors.length] : (colors[id] || '#78909c'),
-          count
-        };
-        currentY += height + padding;
-        return node;
-      });
+    const statusColors: Record<string, string> = {
+      'Read': '#66bb6a', 'Reading': '#42a5f5', 'Unread': '#78909c',
+      'Paused': '#ffa726', 'Abandoned': '#ef5350', 'Other': '#ab47bc'
+    };
+    const ratingColors: Record<string, string> = {
+      'Rated 4-5': '#66bb6a', 'Rated 3': '#ffc107',
+      'Rated 1-2': '#ef5350', 'Unrated': '#78909c'
     };
 
-    const quarterNodes = createColumnNodes(sortedQuarters, 0, quarterColors);
+    const quarterNodes = this.createColumnNodes(sortedQuarters, 0, quarterColors);
     const statusEntries = [...statusMap.entries()].sort((a, b) => b[1] - a[1]);
-    const statusNodes = createColumnNodes(statusEntries, 1, statusColors);
+    const statusNodes = this.createColumnNodes(statusEntries, 1, statusColors);
     const ratingEntries = [...ratingMap.entries()].sort((a, b) => b[1] - a[1]);
-    const ratingNodes = createColumnNodes(ratingEntries, 2, ratingColors);
+    const ratingNodes = this.createColumnNodes(ratingEntries, 2, ratingColors);
 
     this.nodes = [...quarterNodes, ...statusNodes, ...ratingNodes];
-    this.links = [];
+    this.links = this.buildLinks(quarterToStatus, statusToRating);
+  }
 
+  private ratingBucketFor(personalRating: number | null): string {
+    if (personalRating == null || personalRating <= 0) return 'Unrated';
+    if (personalRating >= 8) return 'Rated 4-5';
+    if (personalRating >= 6) return 'Rated 3';
+    return 'Rated 1-2';
+  }
+
+  private aggregateBookFlow(bookFlow: BookFlowCount[]): {
+    quarterMap: Map<string, number>;
+    statusMap: Map<string, number>;
+    ratingMap: Map<string, number>;
+    quarterToStatus: Map<string, Map<string, number>>;
+    statusToRating: Map<string, Map<string, number>>;
+  } {
+    const quarterMap = new Map<string, number>();
+    const statusMap = new Map<string, number>();
+    const ratingMap = new Map<string, number>();
+    const quarterToStatus = new Map<string, Map<string, number>>();
+    const statusToRating = new Map<string, Map<string, number>>();
+
+    for (const item of bookFlow) {
+      const quarter = `${item.year} Q${item.quarter}`;
+      const status = this.statusBucket(item.readStatus as ReadStatus);
+      const ratingBucket = this.ratingBucketFor(item.personalRating);
+      quarterMap.set(quarter, (quarterMap.get(quarter) ?? 0) + item.count);
+      statusMap.set(status, (statusMap.get(status) ?? 0) + item.count);
+      ratingMap.set(ratingBucket, (ratingMap.get(ratingBucket) ?? 0) + item.count);
+      const quarterStatuses = quarterToStatus.get(quarter) ?? new Map<string, number>();
+      quarterStatuses.set(status, (quarterStatuses.get(status) ?? 0) + item.count);
+      quarterToStatus.set(quarter, quarterStatuses);
+      const statusRatings = statusToRating.get(status) ?? new Map<string, number>();
+      statusRatings.set(ratingBucket, (statusRatings.get(ratingBucket) ?? 0) + item.count);
+      statusToRating.set(status, statusRatings);
+    }
+
+    return {quarterMap, statusMap, ratingMap, quarterToStatus, statusToRating};
+  }
+
+  private createColumnNodes(
+    entries: [string, number][],
+    column: number,
+    colors: Record<string, string> | string[]
+  ): SankeyNode[] {
+    const total = entries.reduce((s, e) => s + e[1], 0);
+    let currentY = 30;
+    return entries.map(([id, count], i) => {
+      const height = Math.max(10, (count / total) * (BookFlowChartComponent.TOTAL_HEIGHT - entries.length * BookFlowChartComponent.NODE_PADDING));
+      const node: SankeyNode = {
+        id, label: id, column,
+        y: currentY, height,
+        color: Array.isArray(colors) ? colors[i % colors.length] : (colors[id] || '#78909c'),
+        count
+      };
+      currentY += height + BookFlowChartComponent.NODE_PADDING;
+      return node;
+    });
+  }
+
+  private buildLinks(
+    quarterToStatus: Map<string, Map<string, number>>,
+    statusToRating: Map<string, Map<string, number>>
+  ): SankeyLink[] {
+    return [
+      ...this.linkColumns(quarterToStatus, 0, 1),
+      ...this.linkColumns(statusToRating, 1, 2),
+    ];
+  }
+
+  private linkColumns(
+    mapping: Map<string, Map<string, number>>,
+    sourceCol: number,
+    targetCol: number
+  ): SankeyLink[] {
+    const links: SankeyLink[] = [];
     const findNode = (id: string, col: number) => this.nodes.find(n => n.id === id && n.column === col);
-
-    for (const [quarter, statusCounts] of quarterToStatus) {
-      const qNode = findNode(quarter, 0);
-      if (!qNode) continue;
-      for (const [status, count] of statusCounts) {
-        const sNode = findNode(status, 1);
-        if (sNode) {
-          this.links.push({source: qNode, target: sNode, value: count, color: qNode.color});
+    for (const [sourceId, targetCounts] of mapping) {
+      const sourceNode = findNode(sourceId, sourceCol);
+      if (!sourceNode) continue;
+      for (const [targetId, count] of targetCounts) {
+        const targetNode = findNode(targetId, targetCol);
+        if (targetNode) {
+          links.push({source: sourceNode, target: targetNode, value: count, color: sourceNode.color});
         }
       }
     }
+    return links;
+  }
 
-    for (const [status, ratingCounts] of statusToRating) {
-      const sNode = findNode(status, 1);
-      if (!sNode) continue;
-      for (const [rating, count] of ratingCounts) {
-        const rNode = findNode(rating, 2);
-        if (rNode) {
-          this.links.push({source: sNode, target: rNode, value: count, color: sNode.color});
-        }
-      }
+  private statusBucket(status: ReadStatus): string {
+    switch (status) {
+      case ReadStatus.READ: return 'Read';
+      case ReadStatus.READING:
+      case ReadStatus.RE_READING: return 'Reading';
+      case ReadStatus.UNREAD:
+      case ReadStatus.UNSET: return 'Unread';
+      case ReadStatus.PAUSED: return 'Paused';
+      case ReadStatus.ABANDONED:
+      case ReadStatus.WONT_READ: return 'Abandoned';
+      default: return 'Other';
     }
   }
 

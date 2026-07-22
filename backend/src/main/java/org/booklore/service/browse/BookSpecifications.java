@@ -26,6 +26,7 @@ public class BookSpecifications {
     private static final String ATTR_BOOK_FILES = "bookFiles";
     private static final String ATTR_BOOK_TYPE = "bookType";
     private static final String ATTR_PERSONAL_RATING = "personalRating";
+    private static final String ATTR_HAS_FILES = "hasFiles";
 
     private BookSpecifications() {
     }
@@ -231,12 +232,12 @@ public class BookSpecifications {
     }
 
     public static Specification<BookEntity> hasDigitalFile() {
-        return (root, query, cb) -> cb.isTrue(root.get("hasFiles"));
+        return (root, query, cb) -> cb.isTrue(root.get(ATTR_HAS_FILES));
     }
 
     public static Specification<BookEntity> hasDigitalFileOrIsPhysical() {
         return (root, query, cb) -> cb.or(
-                cb.isTrue(root.get("hasFiles")),
+                cb.isTrue(root.get(ATTR_HAS_FILES)),
                 cb.equal(root.get("isPhysical"), true)
         );
     }
@@ -256,7 +257,7 @@ public class BookSpecifications {
             }
             if (shellBookIds.size() > maxInClause) {
                 return cb.or(
-                        cb.isTrue(root.get("hasFiles")),
+                        cb.isTrue(root.get(ATTR_HAS_FILES)),
                         cb.equal(root.get("isPhysical"), true)
                 );
             }

@@ -1,10 +1,8 @@
 import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {LibraryFilterService} from '../../service/library-filter.service';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {LibraryStatsApiService} from '../../service/library-stats-api.service';
 
 interface PageRange {
   label: string;
@@ -22,13 +20,13 @@ interface PageStats {
 type PageChartData = ChartData<'bar', number[], string>;
 
 const PAGE_RANGES: PageRange[] = [
-  {label: '0-100', min: 0, max: 100, color: '#06B6D4'},
-  {label: '101-200', min: 101, max: 200, color: '#0EA5E9'},
-  {label: '201-300', min: 201, max: 300, color: '#3B82F6'},
-  {label: '301-500', min: 301, max: 500, color: '#6366F1'},
-  {label: '501-750', min: 501, max: 750, color: '#8B5CF6'},
-  {label: '751-1000', min: 751, max: 1000, color: '#A855F7'},
-  {label: '1000+', min: 1001, max: Infinity, color: '#D946EF'}
+  {label: '<50', min: 0, max: 49, color: '#06B6D4'},
+  {label: '50-99', min: 50, max: 99, color: '#0EA5E9'},
+  {label: '100-199', min: 100, max: 199, color: '#3B82F6'},
+  {label: '200-399', min: 200, max: 399, color: '#6366F1'},
+  {label: '400-599', min: 400, max: 599, color: '#8B5CF6'},
+  {label: '600-999', min: 600, max: 999, color: '#A855F7'},
+  {label: '1000+', min: 1000, max: Infinity, color: '#D946EF'}
 ];
 
 @Component({
@@ -39,20 +37,11 @@ const PAGE_RANGES: PageRange[] = [
   styleUrls: ['./page-count-chart.component.scss']
 })
 export class PageCountChartComponent {
-  private readonly bookService = inject(BookService);
-  private readonly libraryFilterService = inject(LibraryFilterService);
+  private readonly libraryStats = inject(LibraryStatsApiService);
   private readonly t = inject(TranslocoService);
-  private readonly booksWithPageCount = computed(() => {
-    if (this.bookService.isBooksLoading()) {
-      return [];
-    }
-
-    const filteredBooks = this.filterBooksByLibrary(this.bookService.books(), this.libraryFilterService.selectedLibrary());
-    return filteredBooks.filter(b => b.metadata?.pageCount != null && b.metadata.pageCount > 0);
-  });
 
   public readonly chartType = 'bar' as const;
-  public readonly totalBooks = computed(() => this.booksWithPageCount().length);
+  public readonly totalBooks = computed(() => (this.libraryStats.facets()?.pageCounts ?? []).reduce((sum, item) => sum + item.count, 0));
 
   public readonly chartOptions: ChartConfiguration<'bar'>['options'] = {
     responsive: true,
@@ -127,12 +116,10 @@ export class PageCountChartComponent {
   };
 
   public readonly chartData = computed<PageChartData>(() => {
-    const booksWithPageCount = this.booksWithPageCount();
-    if (booksWithPageCount.length === 0) {
+    const stats = this.calculatePageStats();
+    if (stats.every(item => item.count === 0)) {
       return {labels: [], datasets: []};
     }
-
-    const stats = this.calculatePageStats(booksWithPageCount);
     const labels = stats.map(s => s.range);
     const data = stats.map(s => s.count);
     const colors = stats.map(s => s.color);
@@ -150,37 +137,12 @@ export class PageCountChartComponent {
     };
   });
 
-  private filterBooksByLibrary(books: Book[], selectedLibraryId: number | null): Book[] {
-    return selectedLibraryId
-      ? books.filter(book => book.libraryId === selectedLibraryId)
-      : books;
-  }
-
-  private calculatePageStats(books: Book[]): PageStats[] {
-    const rangeCounts = new Map<string, { count: number, color: string }>();
-
-    PAGE_RANGES.forEach(range => {
-      rangeCounts.set(range.label, {count: 0, color: range.color});
-    });
-
-    books.forEach(book => {
-      const pageCount = book.metadata!.pageCount!;
-      for (const range of PAGE_RANGES) {
-        if (pageCount >= range.min && pageCount <= range.max) {
-          const data = rangeCounts.get(range.label)!;
-          data.count++;
-          break;
-        }
-      }
-    });
-
-    return PAGE_RANGES.map(range => {
-      const data = rangeCounts.get(range.label)!;
-      return {
-        range: range.label,
-        count: data.count,
-        color: data.color
-      };
-    });
+  private calculatePageStats(): PageStats[] {
+    const counts = new Map((this.libraryStats.facets()?.pageCounts ?? []).map(item => [Number(item.name), item.count]));
+    return PAGE_RANGES.map((range, index) => ({
+      range: range.label,
+      count: counts.get(index) ?? 0,
+      color: range.color
+    }));
   }
 }

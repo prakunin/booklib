@@ -130,7 +130,7 @@ export class ReaderViewManagerService {
     });
   }
 
-  loadEpub(epubPath: string): Observable<void> {
+  loadEpub(epubPath: string, bookType: string = 'EPUB'): Observable<void> {
     if (!this.view) {
       return throwError(() => new Error('View not created'));
     }
@@ -145,8 +145,9 @@ export class ReaderViewManagerService {
         return from(response.blob());
       }),
       switchMap(blob => {
-        const file = new File([blob], epubPath.split('/').pop() || 'book.epub', {
-          type: 'application/epub+zip'
+        const isFb2 = bookType.toUpperCase() === 'FB2';
+        const file = new File([blob], isFb2 ? 'book.fb2' : (epubPath.split('/').pop() || 'book.epub'), {
+          type: isFb2 ? 'application/x-fictionbook+xml' : 'application/epub+zip'
         });
         return from(view.open(file));
       }),

@@ -54,7 +54,10 @@ export class CoverSearchComponent implements OnInit {
 
   ngOnInit() {
     this.bookId = this.dynamicDialogConfig.data.bookId;
-    const book = this.bookService.findBookById(this.bookId);
+    // The metadata center already has the full book detail. Prefer that object so the
+    // search fields are populated even when the paginated catalog does not contain this book.
+    // Keep the service lookup as a fallback for callers that only provide an id.
+    const book = this.dynamicDialogConfig.data.book ?? this.bookService.findBookById(this.bookId);
 
     // Use explicitly provided coverType, or auto-detect based on primary file
     if (this.dynamicDialogConfig.data.coverType) {
@@ -124,7 +127,12 @@ export class CoverSearchComponent implements OnInit {
             ? this.t.translate('metadata.coverSearch.toast.audiobookCoverUpdatedDetail')
             : this.t.translate('metadata.coverSearch.toast.ebookCoverUpdatedDetail')
         });
-        this.dynamicDialogRef.close(true);
+        // The cover endpoints return an empty response. Refresh the detail query before
+        // closing so the already-open metadata view receives the new cover timestamp and
+        // immediately switches from the placeholder to the uploaded image.
+        this.bookService.fetchFreshBookDetail(this.bookId, true)
+          .catch(() => undefined)
+          .finally(() => this.dynamicDialogRef.close(true));
       },
       error: err => {
         this.messageService.add({

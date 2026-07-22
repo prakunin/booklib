@@ -106,8 +106,10 @@ class MetadataManagementServiceTest {
 
     @Test
     void consolidateAuthors_throwsWhenTargetValuesEmpty() {
+        List<String> targets = List.of();
+        List<String> toMerge = List.of("Old");
         assertThatThrownBy(() ->
-                service.consolidateMetadata(MergeMetadataType.authors, List.of(), List.of("Old"))
+                service.consolidateMetadata(MergeMetadataType.authors, targets, toMerge)
         ).isInstanceOf(APIException.class)
                 .hasMessageContaining("No target author(s) provided to consolidate into");
 
@@ -116,8 +118,9 @@ class MetadataManagementServiceTest {
 
     @Test
     void consolidateAuthors_throwsWhenTargetValuesNull() {
+        List<String> toMerge = List.of("Old");
         assertThatThrownBy(() ->
-                service.consolidateMetadata(MergeMetadataType.authors, null, List.of("Old"))
+                service.consolidateMetadata(MergeMetadataType.authors, null, toMerge)
         ).isInstanceOf(APIException.class)
                 .hasMessageContaining("No target author(s) provided to consolidate into");
 
@@ -126,8 +129,9 @@ class MetadataManagementServiceTest {
 
     @Test
     void consolidateAuthors_throwsWhenValuesToMergeNull() {
+        List<String> targets = List.of("Target");
         assertThatThrownBy(() ->
-                service.consolidateMetadata(MergeMetadataType.authors, List.of("Target"), null)
+                service.consolidateMetadata(MergeMetadataType.authors, targets, null)
         ).isInstanceOf(APIException.class)
                 .hasMessageContaining("No author(s) provided to merge");
 
@@ -136,8 +140,10 @@ class MetadataManagementServiceTest {
 
     @Test
     void consolidateAuthors_throwsWhenValuesToMergeEmpty() {
+        List<String> targets = List.of("Target");
+        List<String> toMerge = List.of();
         assertThatThrownBy(() ->
-                service.consolidateMetadata(MergeMetadataType.authors, List.of("Target"), List.of())
+                service.consolidateMetadata(MergeMetadataType.authors, targets, toMerge)
         ).isInstanceOf(APIException.class)
                 .hasMessageContaining("No author(s) provided to merge");
 

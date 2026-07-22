@@ -2,9 +2,9 @@ import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {Tooltip} from 'primeng/tooltip';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {toSignal} from '@angular/core/rxjs-interop';
+import {UserStatsService} from '../../../../../settings/user-management/user-stats.service';
 
 interface ReadingProgressStats {
   progressRange: string;
@@ -40,15 +40,16 @@ type ProgressChartData = ChartData<'doughnut', number[], string>;
   styleUrls: ['./reading-progress-chart.component.scss']
 })
 export class ReadingProgressChartComponent {
-  private readonly bookService = inject(BookService);
+  private readonly userStatsService = inject(UserStatsService);
   private readonly t = inject(TranslocoService);
-  private readonly progressStats = computed(() => {
-    if (this.bookService.isBooksLoading()) {
-      return [];
-    }
-
-    return this.calculateReadingProgressStats(this.bookService.books());
-  });
+  private readonly distributions = toSignal(this.userStatsService.getBookDistributions(), {initialValue: null});
+  private readonly progressStats = computed<ReadingProgressStats[]>(() =>
+    (this.distributions()?.progressDistribution ?? []).map(item => ({
+      progressRange: item.range,
+      count: item.count,
+      description: PROGRESS_RANGES.find(range => range.range === item.range)?.desc ?? ''
+    }))
+  );
 
   public readonly chartType = 'doughnut' as const;
 
@@ -154,42 +155,4 @@ export class ReadingProgressChartComponent {
     }
   });
 
-  private calculateReadingProgressStats(books: Book[]): ReadingProgressStats[] {
-    if (books.length === 0) {
-      return [];
-    }
-
-    return this.processReadingProgressStats(books);
-  }
-
-  private processReadingProgressStats(books: Book[]): ReadingProgressStats[] {
-    const rangeCounts = new Map<string, number>();
-    PROGRESS_RANGES.forEach(range => rangeCounts.set(range.range, 0));
-
-    for (const book of books) {
-      const progress = this.getBookProgress(book);
-
-      for (const range of PROGRESS_RANGES) {
-        if (progress >= range.min && progress <= range.max) {
-          rangeCounts.set(range.range, (rangeCounts.get(range.range) || 0) + 1);
-          break;
-        }
-      }
-    }
-
-    return PROGRESS_RANGES.map(range => ({
-      progressRange: range.range,
-      count: rangeCounts.get(range.range) || 0,
-      description: range.desc
-    }));
-  }
-
-  private getBookProgress(book: Book): number {
-    if (book.pdfProgress?.percentage) return book.pdfProgress.percentage;
-    if (book.epubProgress?.percentage) return book.epubProgress.percentage;
-    if (book.cbxProgress?.percentage) return book.cbxProgress.percentage;
-    if (book.koreaderProgress?.percentage) return book.koreaderProgress.percentage;
-    if (book.koboProgress?.percentage) return book.koboProgress.percentage;
-    return 0;
-  }
 }

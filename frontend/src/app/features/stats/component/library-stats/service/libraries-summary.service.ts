@@ -1,6 +1,5 @@
 import {computed, inject, Injectable} from '@angular/core';
-import {LibraryFilterService} from './library-filter.service';
-import {BookService} from '../../../../book/service/book.service';
+import {LibraryStatsApiService} from './library-stats-api.service';
 
 export interface BooksSummary {
   totalBooks: number;
@@ -14,48 +13,18 @@ export interface BooksSummary {
   providedIn: 'root'
 })
 export class LibrariesSummaryService {
-  private readonly bookService = inject(BookService);
-  private readonly libraryFilterService = inject(LibraryFilterService);
+  private readonly libraryStats = inject(LibraryStatsApiService);
   readonly booksSummary = computed<BooksSummary>(() => {
-    const books = this.bookService.books();
-    const selectedLibraryId = this.libraryFilterService.selectedLibrary();
-
-    if (books.length === 0) {
+    const stats = this.libraryStats.data();
+    if (!stats) {
       return {totalBooks: 0, totalSizeKb: 0, totalAuthors: 0, totalSeries: 0, totalPublishers: 0};
     }
-
-    const filteredBooks = selectedLibraryId
-      ? books.filter(book => book.libraryId === selectedLibraryId)
-      : books;
-
-    const totalBooks = filteredBooks.length;
-    const totalSizeKb = filteredBooks.reduce((sum, book) => sum + (book.fileSizeKb ?? book.primaryFile?.fileSizeKb ?? 0), 0);
-
-    const authorSet = new Set<string>();
-    const seriesSet = new Set<string>();
-    const publisherSet = new Set<string>();
-
-    filteredBooks.forEach(book => {
-      if (Array.isArray(book.metadata?.authors)) {
-        book.metadata.authors.forEach(author => {
-          const name = author?.trim();
-          if (name) authorSet.add(name);
-        });
-      }
-
-      const seriesName = book.metadata?.seriesName?.trim();
-      if (seriesName) seriesSet.add(seriesName);
-
-      const publisher = book.metadata?.publisher?.trim();
-      if (publisher) publisherSet.add(publisher);
-    });
-
     return {
-      totalBooks,
-      totalSizeKb,
-      totalAuthors: authorSet.size,
-      totalSeries: seriesSet.size,
-      totalPublishers: publisherSet.size
+      totalBooks: stats.totalBooks,
+      totalSizeKb: stats.totalSizeKb,
+      totalAuthors: stats.totalAuthors,
+      totalSeries: stats.totalSeries,
+      totalPublishers: stats.totalPublishers
     };
   });
   readonly formattedSize = computed(() => this.formatSizeKb(this.booksSummary().totalSizeKb));

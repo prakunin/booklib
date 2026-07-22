@@ -49,11 +49,8 @@ public class FacetCountRecomputeTask implements Task {
             List<Long> dirty = appBookService.findDirtyLibraryIds();
             int recomputed = 0;
             for (Long libraryId : dirty) {
-                try {
-                    appBookService.recomputeLibraryFacetCounts(libraryId);
+                if (recomputeQuietly(libraryId)) {
                     recomputed++;
-                } catch (Exception e) {
-                    log.error("{}: Failed to recompute facet counts for library {}", getTaskType(), libraryId, e);
                 }
             }
             log.info("{}: Recomputed facet counts for {} of {} dirty librar{}",
@@ -68,6 +65,16 @@ public class FacetCountRecomputeTask implements Task {
         log.info("{}: Task completed. Duration: {} ms", getTaskType(), endTime - startTime);
 
         return builder.build();
+    }
+
+    private boolean recomputeQuietly(Long libraryId) {
+        try {
+            appBookService.recomputeLibraryFacetCounts(libraryId);
+            return true;
+        } catch (Exception e) {
+            log.error("{}: Failed to recompute facet counts for library {}", getTaskType(), libraryId, e);
+            return false;
+        }
     }
 
     @Override

@@ -87,6 +87,30 @@ class Fb2MetadataExtractorTest {
     }
 
     @Test
+    void recoversBrokenTitleInfoFromBodyTitlePage() throws IOException {
+        File file = writeFb2("""
+                <description>
+                  <title-info>
+                    <book-title>_201.DOCX</book-title>
+                    <author><nickname>ebook.convertstandard.com</nickname></author>
+                  </title-info>
+                </description>
+                <body><section>
+                  <p>Лорел К. Гамильтон</p>
+                  <p>«Страдание»</p>
+                  <p>Оригинальное название:</p>
+                  <p>Laurell K. Hamilton. «Affliction», 2013</p>
+                </section></body>
+                """);
+
+        BookMetadata metadata = extractor.extractMetadata(file);
+
+        assertThat(metadata.getTitle()).isEqualTo("Страдание");
+        assertThat(metadata.getAuthors()).containsExactly("Лорел К. Гамильтон");
+        assertThat(metadata.getSubtitle()).isEqualTo("Laurell K. Hamilton. «Affliction», 2013");
+    }
+
+    @Test
     void extractMetadata_fromArchiveEntryStream() throws IOException {
         File file = writeFb2("""
                 <description>

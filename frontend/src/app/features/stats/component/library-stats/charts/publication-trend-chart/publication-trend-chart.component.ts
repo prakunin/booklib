@@ -1,10 +1,8 @@
 import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {LibraryFilterService} from '../../service/library-filter.service';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {LibraryStatsApiService} from '../../service/library-stats-api.service';
 
 interface TrendInsights {
   peakYear: number;
@@ -34,37 +32,34 @@ type TrendChartData = ChartData<'line', number[], string>;
   styleUrls: ['./publication-trend-chart.component.scss']
 })
 export class PublicationTrendChartComponent {
-  private readonly bookService = inject(BookService);
-  private readonly libraryFilterService = inject(LibraryFilterService);
+  private readonly libraryStats = inject(LibraryStatsApiService);
   private readonly t = inject(TranslocoService);
-  private readonly booksWithDate = computed(() => {
-    if (this.bookService.isBooksLoading()) {
-      return [];
-    }
-
-    const filteredBooks = this.filterBooksByLibrary(this.bookService.books(), this.libraryFilterService.selectedLibrary());
-    return filteredBooks.filter(b => b.metadata?.publishedDate);
-  });
-  private readonly yearCounts = computed(() => this.calculateYearCounts(this.booksWithDate()));
+  private readonly yearCounts = computed(() => new Map(
+    (this.libraryStats.facets()?.publishedYears ?? [])
+      .map(item => [Number(item.name), item.count] as const)
+      .filter(([year]) => Number.isInteger(year) && year >= 1000 && year <= new Date().getFullYear() + 1)
+  ));
 
   public readonly chartType = 'line' as const;
   public chartOptions: ChartConfiguration<'line'>['options'];
   public readonly insights = computed(() => {
-    const booksWithDate = this.booksWithDate();
-    if (booksWithDate.length === 0) {
+    const totalBooks = this.totalBooks();
+    if (totalBooks === 0) {
       return null;
     }
-
-    return this.calculateInsights(this.yearCounts(), booksWithDate.length);
+    return this.calculateInsights(this.yearCounts(), totalBooks);
   });
-  public readonly totalBooks = computed(() => this.booksWithDate().length);
+  public readonly totalBooks = computed(() => Array.from(this.yearCounts().values()).reduce((sum, count) => sum + count, 0));
   public readonly yearRange = computed(() => {
     const years = Array.from(this.yearCounts().keys()).sort((a, b) => a - b);
     if (years.length === 0) {
       return '';
     }
 
-    return `${years[0]} - ${years.at(-1)!}`;
+    // years holds publication years (numbers); coerce the last element explicitly
+    // so it is rendered as a number rather than stringified as an object.
+    const lastYear = Number(years.at(-1));
+    return `${years[0]} - ${lastYear}`;
   });
   public readonly chartData = computed<TrendChartData>(() => {
     const yearCounts = this.yearCounts();
@@ -198,37 +193,6 @@ export class PublicationTrendChartComponent {
         mode: 'index'
       }
     };
-  }
-
-  private filterBooksByLibrary(books: Book[], selectedLibraryId: number | null): Book[] {
-    return selectedLibraryId
-      ? books.filter(book => book.libraryId === selectedLibraryId)
-      : books;
-  }
-
-  private calculateYearCounts(books: Book[]): Map<number, number> {
-    const yearCounts = new Map<number, number>();
-
-    for (const book of books) {
-      const year = this.extractYear(book.metadata?.publishedDate);
-      if (!year) continue;
-      yearCounts.set(year, (yearCounts.get(year) || 0) + 1);
-    }
-
-    return yearCounts;
-  }
-
-  private extractYear(dateStr: string | undefined): number | null {
-    if (!dateStr) return null;
-
-    const yearMatch = dateStr.match(/\d{4}/);
-    if (yearMatch) {
-      const year = Number.parseInt(yearMatch[0], 10);
-      if (year >= 1000 && year <= new Date().getFullYear() + 1) {
-        return year;
-      }
-    }
-    return null;
   }
 
   private calculateInsights(yearCounts: Map<number, number>, totalBooks: number): TrendInsights {

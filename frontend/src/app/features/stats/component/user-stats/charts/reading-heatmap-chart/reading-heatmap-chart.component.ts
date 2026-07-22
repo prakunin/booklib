@@ -3,11 +3,11 @@ import {BaseChartDirective} from 'ng2-charts';
 import {Tooltip} from 'primeng/tooltip';
 import {BehaviorSubject, Observable} from 'rxjs';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {AsyncPipe} from '@angular/common';
 import {readStatsChartThemeColors} from '../../../shared/stats-chart-theme.service';
+import {toSignal} from '@angular/core/rxjs-interop';
+import {UserStatsService} from '../../../../../settings/user-management/user-stats.service';
 
 interface MatrixDataPoint {
   x: number; // month (0-11)
@@ -38,15 +38,11 @@ type HeatmapChartData = ChartData<'matrix', MatrixDataPoint[], string>;
   styleUrls: ['./reading-heatmap-chart.component.scss']
 })
 export class ReadingHeatmapChartComponent {
-  private readonly bookService = inject(BookService);
+  private readonly userStatsService = inject(UserStatsService);
   private readonly t = inject(TranslocoService);
+  private readonly heatmap = toSignal(this.userStatsService.getBookCompletionHeatmap(), {initialValue: []});
   private readonly syncChartEffect = effect(() => {
-    if (this.bookService.isBooksLoading()) {
-      return;
-    }
-
-    const stats = this.calculateHeatmapData(this.bookService.books());
-    this.updateChartData(stats);
+    this.updateChartData(this.heatmap());
   });
 
   public readonly chartType = 'matrix' as const;
@@ -181,37 +177,4 @@ export class ReadingHeatmapChartComponent {
     });
   }
 
-  private calculateHeatmapData(books: Book[]): YearMonthData[] {
-    if (books.length === 0) {
-      return [];
-    }
-
-    return this.processHeatmapData(books);
-  }
-
-  private processHeatmapData(books: Book[]): YearMonthData[] {
-    const yearMonthMap = new Map<string, number>();
-    const currentYear = new Date().getFullYear();
-    const startYear = currentYear - 9;
-
-    books
-      .filter(book => book.dateFinished)
-      .forEach(book => {
-        const finishedDate = new Date(book.dateFinished!);
-        const year = finishedDate.getFullYear();
-
-        if (year >= startYear && year <= currentYear) {
-          const month = finishedDate.getMonth() + 1;
-          const key = `${year}-${month}`;
-          yearMonthMap.set(key, (yearMonthMap.get(key) || 0) + 1);
-        }
-      });
-
-    return Array.from(yearMonthMap.entries())
-      .map(([key, count]) => {
-        const [year, month] = key.split('-').map(Number);
-        return {year, month, count};
-      })
-      .sort((a, b) => a.year - b.year || a.month - b.month);
-  }
 }

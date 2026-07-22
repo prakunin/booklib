@@ -64,4 +64,17 @@ describe('BookDialogHelperService', () => {
       })
     );
   });
+
+  it('passes the full book to cover search so metadata fields can be prefilled', async () => {
+    const book = {id: 42, metadata: {title: 'A title', authors: ['An author']}} as never;
+
+    await service.openCoverSearchDialog(book, 'ebook');
+
+    expect(dialogLauncherService.openDialog).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        data: {bookId: 42, coverType: 'ebook', book},
+      })
+    );
+  });
 });

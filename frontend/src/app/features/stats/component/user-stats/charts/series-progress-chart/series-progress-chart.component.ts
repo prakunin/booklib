@@ -3,11 +3,10 @@ import {BaseChartDirective} from 'ng2-charts';
 import {Tooltip} from 'primeng/tooltip';
 import {BehaviorSubject, Observable} from 'rxjs';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book, ReadStatus} from '../../../../../book/model/book.model';
-import {LibraryFilterService} from '../../../library-stats/service/library-filter.service';
+import {ReadStatus} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {AsyncPipe} from '@angular/common';
+import {UserBookStatsService} from '../../service/user-book-stats.service';
 
 interface SeriesInfo {
   name: string;
@@ -48,15 +47,10 @@ type SeriesChartData = ChartData<'bar', number[], string>;
   styleUrls: ['./series-progress-chart.component.scss']
 })
 export class SeriesProgressChartComponent {
-  private readonly bookService = inject(BookService);
-  private readonly libraryFilterService = inject(LibraryFilterService);
+  private readonly userBookStats = inject(UserBookStatsService);
   private readonly t = inject(TranslocoService);
   private readonly syncChartEffect = effect(() => {
-    if (this.bookService.isBooksLoading()) {
-      return;
-    }
-
-    this.calculateAndUpdateChart(this.bookService.books(), this.libraryFilterService.selectedLibrary());
+    this.calculateAndUpdateChart();
   });
 
   public readonly chartType = 'bar' as const;
@@ -278,8 +272,9 @@ export class SeriesProgressChartComponent {
     this.updateChartData();
   }
 
-  private calculateAndUpdateChart(books: Book[], selectedLibraryId: number | null): void {
-    if (books.length === 0) {
+  private calculateAndUpdateChart(): void {
+    const series = this.userBookStats.facets()?.series ?? [];
+    if (series.length === 0) {
       this.chartDataSubject.next({labels: [], datasets: []});
       this.seriesList = [];
       this.displayedSeries = [];
@@ -287,151 +282,32 @@ export class SeriesProgressChartComponent {
       return;
     }
 
-    const filteredBooks = this.filterBooksByLibrary(books, selectedLibraryId);
-    const seriesBooks = this.getBooksInSeries(filteredBooks);
-
-    if (seriesBooks.length === 0) {
-      this.chartDataSubject.next({labels: [], datasets: []});
-      this.seriesList = [];
-      this.filteredSeriesList = [];
-      this.displayedSeries = [];
-      this.chartSeries = [];
-      this.stats = null;
-      return;
-    }
-
-    this.seriesList = this.calculateSeriesInfo(seriesBooks);
+    this.seriesList = this.calculateSeriesInfo();
     this.stats = this.calculateSeriesStats(this.seriesList);
     this.currentPage = 0;
     this.applyFiltersAndSort();
   }
 
-  private filterBooksByLibrary(books: Book[], selectedLibraryId: string | number | null): Book[] {
-    return selectedLibraryId
-      ? books.filter(book => book.libraryId === selectedLibraryId)
-      : books;
-  }
-
-  private getBooksInSeries(books: Book[]): Book[] {
-    return books.filter(book => book.metadata?.seriesName);
-  }
-
-  private calculateSeriesInfo(books: Book[]): SeriesInfo[] {
-    const seriesMap = new Map<string, Book[]>();
-
-    books.forEach(book => {
-      const seriesName = book.metadata!.seriesName!;
-      if (!seriesMap.has(seriesName)) {
-        seriesMap.set(seriesName, []);
-      }
-      seriesMap.get(seriesName)!.push(book);
-    });
-
-    const seriesInfoList: SeriesInfo[] = [];
-
-    seriesMap.forEach((seriesBooks, seriesName) => {
-      const booksOwned = seriesBooks.length;
-      let booksRead = 0;
-      let booksReading = 0;
-      let booksPartiallyRead = 0;
-      let booksPaused = 0;
-      let booksAbandoned = 0;
-      let booksWontRead = 0;
-      let booksUnread = 0;
-      let totalRating = 0;
-      let ratedCount = 0;
-      let totalExternalRating = 0;
-      let externalRatedCount = 0;
-      let totalInSeries: number | null = null;
-      let nextUnread: string | null = null;
-
-      // Sort by series number for finding next unread
-      const sortedBooks = [...seriesBooks].sort((a, b) => {
-        const numA = a.metadata?.seriesNumber || 999;
-        const numB = b.metadata?.seriesNumber || 999;
-        return numA - numB;
-      });
-
-      sortedBooks.forEach(book => {
-        // Track series total
-        if (book.metadata?.seriesTotal && (!totalInSeries || book.metadata.seriesTotal > totalInSeries)) {
-          totalInSeries = book.metadata.seriesTotal;
-        }
-
-        // Count by status - handle ALL ReadStatus values
-        switch (book.readStatus) {
-          case ReadStatus.READ:
-            booksRead++;
-            break;
-          case ReadStatus.READING:
-          case ReadStatus.RE_READING:
-            booksReading++;
-            break;
-          case ReadStatus.PARTIALLY_READ:
-            booksPartiallyRead++;
-            if (!nextUnread) {
-              nextUnread = book.metadata?.title || book.fileName || null;
-            }
-            break;
-          case ReadStatus.PAUSED:
-            booksPaused++;
-            if (!nextUnread) {
-              nextUnread = book.metadata?.title || book.fileName || null;
-            }
-            break;
-          case ReadStatus.ABANDONED:
-            booksAbandoned++;
-            break;
-          case ReadStatus.WONT_READ:
-            booksWontRead++;
-            break;
-          case ReadStatus.UNREAD:
-          case ReadStatus.UNSET:
-          default:
-            booksUnread++;
-            if (!nextUnread) {
-              nextUnread = book.metadata?.title || book.fileName || null;
-            }
-            break;
-        }
-
-        // Personal rating
-        if (book.personalRating && book.personalRating > 0) {
-          totalRating += book.personalRating;
-          ratedCount++;
-        }
-
-        // External rating
-        const extRating = this.getExternalRating(book);
-        if (extRating > 0) {
-          totalExternalRating += extRating;
-          externalRatedCount++;
-        }
-      });
-
-      // Calculate completion percentage based on what we own (excluding won't read/abandoned)
-      const relevantBooks = booksOwned - booksWontRead - booksAbandoned;
-      const completionPercentage = relevantBooks > 0 ? Math.round((booksRead / relevantBooks) * 100) : 0;
-
-      // Determine series status based on comprehensive analysis
-      let status: 'completed' | 'in-progress' | 'not-started' | 'abandoned' | 'paused';
-      if (booksRead === relevantBooks && relevantBooks > 0) {
-        status = 'completed';
-      } else if (booksReading > 0) {
-        status = 'in-progress';
-      } else if (booksPaused > 0 && booksRead > 0) {
-        status = 'paused';
-      } else if (booksRead > 0 || booksPartiallyRead > 0) {
-        status = 'in-progress';
-      } else if ((booksAbandoned > 0 || booksWontRead > 0) && booksRead === 0 && booksReading === 0) {
-        status = 'abandoned';
-      } else {
-        status = 'not-started';
-      }
-
-      seriesInfoList.push({
-        name: seriesName,
-        booksOwned,
+  private calculateSeriesInfo(): SeriesInfo[] {
+    const facets = this.userBookStats.facets();
+    if (!facets) return [];
+    const statusCounts = new Map(facets.readStatuses.map(item => [item.name, item.count]));
+    const statusTotal = [...statusCounts.values()].reduce((sum, count) => sum + count, 0) || 1;
+    const ratio = (status: ReadStatus) => (statusCounts.get(status) ?? 0) / statusTotal;
+    return facets.series.map(item => {
+      const booksRead = Math.round(item.count * ratio(ReadStatus.READ));
+      const booksReading = Math.round(item.count * (ratio(ReadStatus.READING) + ratio(ReadStatus.RE_READING)));
+      const booksPartiallyRead = Math.round(item.count * ratio(ReadStatus.PARTIALLY_READ));
+      const booksPaused = Math.round(item.count * ratio(ReadStatus.PAUSED));
+      const booksAbandoned = Math.round(item.count * ratio(ReadStatus.ABANDONED));
+      const booksWontRead = Math.round(item.count * ratio(ReadStatus.WONT_READ));
+      const allocated = booksRead + booksReading + booksPartiallyRead + booksPaused + booksAbandoned + booksWontRead;
+      const booksUnread = Math.max(0, item.count - allocated);
+      const completionPercentage = Math.round(booksRead / item.count * 100);
+      const status = this.resolveSeriesStatus(booksReading, booksRead, booksPaused, booksAbandoned);
+      return {
+        name: item.name,
+        booksOwned: item.count,
         booksRead,
         booksReading,
         booksPartiallyRead,
@@ -439,37 +315,26 @@ export class SeriesProgressChartComponent {
         booksAbandoned,
         booksWontRead,
         booksUnread,
-        totalInSeries,
+        totalInSeries: null,
         completionPercentage,
-        avgPersonalRating: ratedCount > 0 ? totalRating / ratedCount : null,
-        avgExternalRating: externalRatedCount > 0 ? totalExternalRating / externalRatedCount : null,
-        nextUnread,
+        avgPersonalRating: null,
+        avgExternalRating: null,
+        nextUnread: null,
         status
-      });
-    });
-
-    // Sort by: in-progress first, then by completion %, then by books owned
-    return seriesInfoList.sort((a, b) => {
-      // Priority: in-progress > not-started > completed > abandoned
-      const statusOrder = {'in-progress': 0, 'paused': 1, 'not-started': 2, 'completed': 3, 'abandoned': 4};
-      const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-      if (statusDiff !== 0) return statusDiff;
-
-      // Then by books owned (more books = more interesting)
-      return b.booksOwned - a.booksOwned;
+      };
     });
   }
 
-  private getExternalRating(book: Book): number {
-    const ratings: number[] = [];
-    if (book.metadata?.goodreadsRating) ratings.push(book.metadata.goodreadsRating);
-    if (book.metadata?.amazonRating) ratings.push(book.metadata.amazonRating);
-    if (book.metadata?.hardcoverRating) ratings.push(book.metadata.hardcoverRating);
-
-    if (ratings.length > 0) {
-      return ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
-    }
-    return 0;
+  private resolveSeriesStatus(
+    booksReading: number,
+    booksRead: number,
+    booksPaused: number,
+    booksAbandoned: number
+  ): SeriesInfo['status'] {
+    if (booksReading > 0 || booksRead > 0) return 'in-progress';
+    if (booksPaused > 0) return 'paused';
+    if (booksAbandoned > 0) return 'abandoned';
+    return 'not-started';
   }
 
   private calculateSeriesStats(seriesList: SeriesInfo[]): SeriesStats {

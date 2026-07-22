@@ -2,10 +2,9 @@ import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {Tooltip} from 'primeng/tooltip';
 import {ChartConfiguration, ChartData, ScatterDataPoint} from 'chart.js';
-import {BookService} from '../../../../../book/service/book.service';
-import {LibraryFilterService} from '../../../library-stats/service/library-filter.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {UserBookStatsService} from '../../service/user-book-stats.service';
+import {RatingTasteCount} from '../../../library-stats/service/library-stats-api.service';
 
 interface TasteQuadrant {
   name: string;
@@ -21,6 +20,7 @@ interface BookDataPoint extends ScatterDataPoint {
   personalRatingNormalized: number;
   externalRating: number;
   quadrant: string;
+  weight: number;
 }
 
 type RatingTasteChartData = ChartData<'scatter', BookDataPoint[], string>;
@@ -40,16 +40,9 @@ interface RatingTasteMetrics {
   styleUrls: ['./rating-taste-chart.component.scss']
 })
 export class RatingTasteChartComponent {
-  private readonly bookService = inject(BookService);
-  private readonly libraryFilterService = inject(LibraryFilterService);
+  private readonly userBookStats = inject(UserBookStatsService);
   private readonly t = inject(TranslocoService);
-  private readonly metrics = computed<RatingTasteMetrics>(() => {
-    if (this.bookService.isBooksLoading()) {
-      return this.emptyMetrics();
-    }
-
-    return this.calculateMetrics(this.bookService.books(), this.libraryFilterService.selectedLibrary());
-  });
+  private readonly metrics = computed<RatingTasteMetrics>(() => this.calculateMetrics());
 
   public readonly chartType = 'scatter' as const;
   public readonly quadrants = computed(() => this.metrics().quadrants);
@@ -162,20 +155,13 @@ export class RatingTasteChartComponent {
 
   public readonly chartData = computed(() => this.metrics().chartData);
 
-  private calculateMetrics(books: Book[], selectedLibraryId: string | number | null): RatingTasteMetrics {
-    if (books.length === 0) {
+  private calculateMetrics(): RatingTasteMetrics {
+    const ratings = this.userBookStats.data()?.ratingTaste ?? [];
+    if (ratings.length === 0) {
       return this.emptyMetrics();
     }
-
-    const filteredBooks = this.filterBooksByLibrary(books, selectedLibraryId);
-    const ratedBooks = this.getBooksWithBothRatings(filteredBooks);
-
-    if (ratedBooks.length === 0) {
-      return this.emptyMetrics();
-    }
-
-    const totalRatedBooks = ratedBooks.length;
-    const dataPoints = this.categorizeBooks(ratedBooks);
+    const dataPoints = this.categorizeRatings(ratings);
+    const totalRatedBooks = ratings.reduce((sum, item) => sum + item.count, 0);
     const chartData = this.buildChartData(dataPoints);
     const {quadrants, averageDeviation} = this.calculateStatistics(dataPoints);
 
@@ -187,38 +173,7 @@ export class RatingTasteChartComponent {
     };
   }
 
-  private filterBooksByLibrary(books: Book[], selectedLibraryId: string | number | null): Book[] {
-    return selectedLibraryId
-      ? books.filter(book => book.libraryId === selectedLibraryId)
-      : books;
-  }
-
-  private getBooksWithBothRatings(books: Book[]): Book[] {
-    return books.filter(book => {
-      const hasPersonalRating = book.personalRating && book.personalRating > 0;
-      const hasExternalRating = this.getExternalRating(book) > 0;
-      return hasPersonalRating && hasExternalRating;
-    });
-  }
-
-  private getExternalRating(book: Book): number {
-    const ratings: number[] = [];
-
-    if (book.metadata?.goodreadsRating) ratings.push(book.metadata.goodreadsRating);
-    if (book.metadata?.amazonRating) ratings.push(book.metadata.amazonRating);
-    if (book.metadata?.hardcoverRating) ratings.push(book.metadata.hardcoverRating);
-    if (book.metadata?.lubimyczytacRating) ratings.push(book.metadata.lubimyczytacRating);
-    if (book.metadata?.ranobedbRating) ratings.push(book.metadata.ranobedbRating);
-
-    if (ratings.length > 0) {
-      return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
-    }
-
-    if (book.metadata?.rating) return book.metadata.rating;
-    return 0;
-  }
-
-  private categorizeBooks(books: Book[]): Map<string, BookDataPoint[]> {
+  private categorizeRatings(ratings: RatingTasteCount[]): Map<string, BookDataPoint[]> {
     const categories = new Map<string, BookDataPoint[]>([
       [this.t.translate('statsUser.ratingTaste.quadrantHiddenGems'), []],
       [this.t.translate('statsUser.ratingTaste.quadrantPopularFavorites'), []],
@@ -226,14 +181,17 @@ export class RatingTasteChartComponent {
       [this.t.translate('statsUser.ratingTaste.quadrantAgreedMisses'), []]
     ]);
 
-    books.forEach(book => {
-      const personalRating = book.personalRating!;
-      // Normalize personal rating from 1-10 to 1-5 scale for comparison
+    ratings.forEach(item => {
+      const externalRatings = [
+        item.goodreadsRating, item.amazonRating, item.hardcoverRating,
+        item.lubimyczytacRating, item.ranobedbRating
+      ].filter((rating): rating is number => rating != null && rating > 0);
+      const externalRating = externalRatings.length > 0
+        ? externalRatings.reduce((sum, rating) => sum + rating, 0) / externalRatings.length
+        : item.metadataRating ?? 0;
+      if (externalRating <= 0) return;
+      const personalRating = item.personalRating;
       const personalRatingNormalized = personalRating / 2;
-      const externalRating = this.getExternalRating(book);
-      const bookTitle = book.metadata?.title || book.fileName || 'Unknown';
-
-      // Use normalized rating (3 is midpoint on 1-5 scale) for quadrant calculation
       let quadrant: string;
       if (personalRatingNormalized >= 3 && externalRating >= 3) {
         quadrant = this.t.translate('statsUser.ratingTaste.quadrantPopularFavorites');
@@ -248,11 +206,12 @@ export class RatingTasteChartComponent {
       const dataPoint: BookDataPoint = {
         x: externalRating,
         y: personalRatingNormalized,
-        bookTitle,
+        bookTitle: `${item.count} books`,
         personalRating,
         personalRatingNormalized,
         externalRating,
-        quadrant
+        quadrant,
+        weight: item.count
       };
 
       categories.get(quadrant)!.push(dataPoint);
@@ -276,7 +235,7 @@ export class RatingTasteChartComponent {
     const datasets = Array.from(dataPoints.entries())
       .filter(([, points]) => points.length > 0)
       .map(([label, points]) => ({
-        label: `${label} (${points.length})`,
+        label: `${label} (${points.reduce((sum, point) => sum + point.weight, 0)})`,
         data: points,
         backgroundColor: quadrantColors[label].bg,
         borderColor: quadrantColors[label].border,
@@ -319,7 +278,7 @@ export class RatingTasteChartComponent {
     const quadrants = Array.from(dataPoints.entries()).map(([name, points]) => ({
       name,
       description: quadrantInfo[name].description,
-      count: points.length,
+      count: points.reduce((sum, point) => sum + point.weight, 0),
       color: quadrantInfo[name].color,
       icon: quadrantInfo[name].icon
     }));
@@ -329,8 +288,8 @@ export class RatingTasteChartComponent {
     let totalPoints = 0;
     dataPoints.forEach(points => {
       points.forEach(point => {
-        totalDeviation += Math.abs(point.personalRatingNormalized - point.externalRating);
-        totalPoints++;
+        totalDeviation += Math.abs(point.personalRatingNormalized - point.externalRating) * point.weight;
+        totalPoints += point.weight;
       });
     });
     const averageDeviation = totalPoints > 0 ? totalDeviation / totalPoints : 0;

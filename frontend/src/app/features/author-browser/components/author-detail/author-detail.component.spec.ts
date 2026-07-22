@@ -1,12 +1,12 @@
-import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {TranslocoService} from '@jsverse/transloco';
 import {MessageService} from 'primeng/api';
-import {ActivatedRoute, convertToParamMap, Router} from '@angular/router';
+import {ActivatedRoute, convertToParamMap} from '@angular/router';
 import {Subject, of, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {BookService} from '../../../book/service/book.service';
+import {Book} from '../../../book/model/book.model';
+import {AppPageResponse} from '../../../book/model/app-book.model';
 import {BookCardOverlayPreferenceService} from '../../../book/components/book-browser/book-card-overlay-preference.service';
 import {CoverScalePreferenceService} from '../../../book/components/book-browser/cover-scale-preference.service';
 import {UserService} from '../../../settings/user-management/user.service';
@@ -17,6 +17,7 @@ import {AuthorDetailComponent} from './author-detail.component';
 
 describe('AuthorDetailComponent', () => {
   let getAuthorDetails: ReturnType<typeof vi.fn>;
+  let getAuthorBooks: ReturnType<typeof vi.fn>;
   let getAuthorPhotoUrl: ReturnType<typeof vi.fn>;
   let patchAuthorInCache: ReturnType<typeof vi.fn>;
   let quickMatchAuthor: ReturnType<typeof vi.fn>;
@@ -49,8 +50,19 @@ describe('AuthorDetailComponent', () => {
 
   const createComponent = () => TestBed.runInInjectionContext(() => new AuthorDetailComponent());
 
+  const bookPage = (content: Book[], page = 0, totalElements = content.length): AppPageResponse<Book> => ({
+    content,
+    page,
+    size: 50,
+    totalElements,
+    totalPages: Math.ceil(totalElements / 50),
+    hasNext: (page + 1) * 50 < totalElements,
+    hasPrevious: page > 0,
+  });
+
   beforeEach(() => {
     getAuthorDetails = vi.fn();
+    getAuthorBooks = vi.fn(() => of(bookPage([])));
     getAuthorPhotoUrl = vi.fn((authorId: number, cacheBuster?: number) => `/api/authors/${authorId}/photo?t=${cacheBuster ?? 'none'}`);
     patchAuthorInCache = vi.fn();
     quickMatchAuthor = vi.fn();
@@ -74,22 +86,13 @@ describe('AuthorDetailComponent', () => {
           useValue: route,
         },
         {
-          provide: Router,
-          useValue: {},
-        },
-        {
           provide: AuthorService,
           useValue: {
             getAuthorDetails,
+            getAuthorBooks,
             getAuthorPhotoUrl,
             patchAuthorInCache,
             quickMatchAuthor,
-          },
-        },
-        {
-          provide: BookService,
-          useValue: {
-            books: signal([]),
           },
         },
         {
@@ -142,10 +145,31 @@ describe('AuthorDetailComponent', () => {
     component.ngOnInit();
 
     expect(getAuthorDetails).toHaveBeenCalledWith(42);
+    expect(getAuthorBooks).toHaveBeenCalledWith('Grace Hopper', 0);
     expect(component.tab).toBe('series');
     expect(component.loading()).toBe(false);
     expect(component.author()).toEqual({...baseAuthor, id: 42, name: 'Grace Hopper'});
     expect(setPageTitle).toHaveBeenCalledWith('Grace Hopper');
+  });
+
+  it('loads author books from the server page instead of the legacy catalog', () => {
+    const firstBook: Book = {
+      id: 101,
+      libraryId: 1,
+      libraryName: 'Library',
+      metadata: {bookId: 101, title: 'Server Book', authors: ['Ada Lovelace']},
+    };
+    getAuthorDetails.mockReturnValue(of(baseAuthor));
+    getAuthorBooks.mockReturnValue(of(bookPage([firstBook])));
+
+    const component = createComponent();
+    component.ngOnInit();
+
+    expect(getAuthorBooks).toHaveBeenCalledWith('Ada Lovelace', 0);
+    expect(component.authorBooks()).toEqual([firstBook]);
+    expect(component.authorBookCount()).toBe(1);
+    expect(component.booksLoading()).toBe(false);
+    expect(component.booksLoadError()).toBe(false);
   });
 
   it('keeps the default tab and clears loading when author load fails', () => {

@@ -35,6 +35,37 @@ describe('ReaderHeaderFooterVisibilityManager', () => {
     expect(manager.getVisibilityState()).toEqual({headerVisible: true, footerVisible: false});
   });
 
+  it('restores an initially pinned header and does not hide it on a middle tap', () => {
+    const manager = new ReaderHeaderFooterVisibilityManager(1000, true);
+
+    manager.toggleTemporary();
+
+    expect(manager.isPinned()).toBe(true);
+    expect(manager.getVisibilityState()).toEqual({headerVisible: true, footerVisible: false});
+  });
+
+  it('temporarily toggles both bars without changing the pin state', () => {
+    const manager = new ReaderHeaderFooterVisibilityManager(1000);
+
+    manager.toggleTemporary();
+    expect(manager.getVisibilityState()).toEqual({headerVisible: true, footerVisible: true});
+
+    manager.toggleTemporary();
+    expect(manager.isPinned()).toBe(false);
+    expect(manager.getVisibilityState()).toEqual({headerVisible: false, footerVisible: false});
+  });
+
+  it('restores a pinned header after leaving immersive mode', () => {
+    const manager = new ReaderHeaderFooterVisibilityManager(1000, true);
+
+    manager.setImmersive(true);
+    expect(manager.getVisibilityState()).toEqual({headerVisible: false, footerVisible: false});
+
+    manager.setImmersive(false);
+    expect(manager.isPinned()).toBe(true);
+    expect(manager.getVisibilityState()).toEqual({headerVisible: true, footerVisible: false});
+  });
+
   it('shows each zone independently when the explicit enter handlers run', () => {
     const manager = new ReaderHeaderFooterVisibilityManager(1000);
 

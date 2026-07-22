@@ -451,7 +451,10 @@ export class MetadataSearcherComponent implements OnDestroy, OnChanges {
 
   sanitizeHtml(htmlString: string | null | undefined): string {
     if (!htmlString) return '';
-    return htmlString.replaceAll(/<\/?[^>]+(>|$)/g, '').trim();
+    // Strip HTML tags: '<', optional '/', one or more non-'>' chars, optional closing '>'.
+    // The disjoint character classes keep matching linear (no super-linear backtracking);
+    // a trailing unclosed '<tag' at end of string is still removed via the optional '>'.
+    return htmlString.replaceAll(/<\/?[^>]+>?/g, '').trim();
   }
 
   truncateText(text: string | null, length: number): string {

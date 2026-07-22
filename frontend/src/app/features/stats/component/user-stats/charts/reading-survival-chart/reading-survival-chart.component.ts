@@ -2,9 +2,9 @@ import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {Tooltip} from 'primeng/tooltip';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {toSignal} from '@angular/core/rxjs-interop';
+import {UserStatsService} from '../../../../../settings/user-management/user-stats.service';
 
 type SurvivalChartData = ChartData<'line', number[], string>;
 
@@ -27,15 +27,10 @@ const THRESHOLDS = [0, 10, 25, 50, 75, 90, 100];
   styleUrls: ['./reading-survival-chart.component.scss']
 })
 export class ReadingSurvivalChartComponent {
-  private readonly bookService = inject(BookService);
+  private readonly userStatsService = inject(UserStatsService);
   private readonly t = inject(TranslocoService);
-  private readonly survivalMetrics = computed<SurvivalMetrics>(() => {
-    if (this.bookService.isBooksLoading()) {
-      return this.emptyMetrics();
-    }
-
-    return this.calculateSurvivalMetrics(this.bookService.books());
-  });
+  private readonly distributions = toSignal(this.userStatsService.getBookDistributions(), {initialValue: null});
+  private readonly survivalMetrics = computed<SurvivalMetrics>(() => this.calculateSurvivalMetrics());
 
   public readonly chartType = 'line' as const;
   public readonly totalStarted = computed(() => this.survivalMetrics().totalStarted);
@@ -98,21 +93,21 @@ export class ReadingSurvivalChartComponent {
 
   public readonly chartData = computed(() => this.survivalMetrics().chartData);
 
-  private calculateSurvivalMetrics(books: Book[]): SurvivalMetrics {
-    if (books.length === 0) {
-      return this.emptyMetrics();
-    }
-
-    const startedBooks = books.filter(b => this.getBookProgress(b) > 0);
-    const totalStarted = startedBooks.length;
+  private calculateSurvivalMetrics(): SurvivalMetrics {
+    const ranges = this.distributions()?.progressDistribution ?? [];
+    const totalStarted = ranges.filter(range => range.max > 0).reduce((sum, range) => sum + range.count, 0);
 
     if (totalStarted === 0) {
       return this.emptyMetrics();
     }
 
-    const progresses = startedBooks.map(b => this.getBookProgress(b));
     const survivalValues = THRESHOLDS.map(threshold => {
-      const survived = progresses.filter(p => p >= threshold).length;
+      const survived = ranges.reduce((sum, range) => {
+        if (range.max < threshold || range.max === 0) return sum;
+        if (range.min >= threshold) return sum + range.count;
+        const width = Math.max(1, range.max - range.min);
+        return sum + range.count * (range.max - threshold) / width;
+      }, 0);
       return (survived / totalStarted) * 100;
     });
 
@@ -174,12 +169,4 @@ export class ReadingSurvivalChartComponent {
     };
   }
 
-  private getBookProgress(book: Book): number {
-    if (book.pdfProgress?.percentage) return book.pdfProgress.percentage;
-    if (book.epubProgress?.percentage) return book.epubProgress.percentage;
-    if (book.cbxProgress?.percentage) return book.cbxProgress.percentage;
-    if (book.koreaderProgress?.percentage) return book.koreaderProgress.percentage;
-    if (book.koboProgress?.percentage) return book.koboProgress.percentage;
-    return 0;
-  }
 }

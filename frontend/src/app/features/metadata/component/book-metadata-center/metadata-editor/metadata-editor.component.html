@@ -19,7 +19,7 @@
               }
               <app-cover
                 style="width: 200px; height: 280px;"
-                [src]="urlHelper.getCoverUrl(book.id, book.metadata?.coverUpdatedOn)"
+                [src]="urlHelper.getCoverUrl(book.id, book.metadata?.coverUpdatedOn) || urlHelper.getDirectCoverUrl(book.id)"
                 [title]="book.metadata?.title"
                 [authors]="book.metadata?.authors ?? []"
                 size="lg"

@@ -7,6 +7,7 @@ import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.inpx.InpxBookDto;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.service.metadata.extractor.Fb2MetadataExtractor;
+import org.booklore.util.FileUtils;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -274,7 +275,9 @@ public class InpxArchiveScanner {
         }
         try {
             Path entryPath = Path.of(entry.getName());
-            return entryPath.getNameCount() == 1 && entryPath.getFileName().toString().equals(entry.getName());
+            return entryPath.getNameCount() == 1
+                    && entryPath.getFileName().toString().equals(entry.getName())
+                    && !FileUtils.shouldIgnore(entryPath);
         } catch (InvalidPathException _) {
             return false;
         }

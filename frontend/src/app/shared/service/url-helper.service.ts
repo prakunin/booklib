@@ -40,6 +40,15 @@ export class UrlHelperService {
     return this.appendToken(`${this.mediaBaseUrl}/book/${bookId}/cover?${coverUpdatedOn}`);
   }
 
+  /** Returns the cover endpoint even when metadata has not supplied a cache-busting timestamp. */
+  getDirectCoverUrl(bookId: number, coverUpdatedOn?: string): string {
+    let url = `${this.mediaBaseUrl}/book/${bookId}/cover`;
+    if (coverUpdatedOn) {
+      url += `?${coverUpdatedOn}`;
+    }
+    return this.appendToken(url);
+  }
+
   getBackupCoverUrl(bookId: number): string {
     const url = `${this.mediaBaseUrl}/book/${bookId}/backup-cover`;
     return this.appendToken(url);

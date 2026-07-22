@@ -33,11 +33,11 @@ class JwtUtilsTest {
     }
 
     @Test
-    void generateAccessToken_doesNotValidateAsMediaToken() {
+    void generateAccessToken_canAuthenticateBrowserMediaRequests() {
         String token = jwtUtils.generateAccessToken(user());
 
         assertThat(jwtUtils.validateAccessToken(token)).isTrue();
-        assertThat(jwtUtils.validateMediaToken(token)).isFalse();
+        assertThat(jwtUtils.validateMediaToken(token)).isTrue();
     }
 
     private BookLoreUserEntity user() {

@@ -9,7 +9,7 @@ import {API_CONFIG} from '../../../core/config/api-config';
 import {AuthService} from '../../../shared/service/auth.service';
 import {Book} from '../../book/model/book.model';
 import {AUTHORS_QUERY_KEY} from './author-query-keys';
-import {AuthorService} from './author.service';
+import {AuthorService, buildAuthorBrowserParams, toApiAuthorSort} from './author.service';
 
 function makeBook(authors?: string[]): Book {
   return {
@@ -120,6 +120,21 @@ describe('AuthorService', () => {
     );
   });
 
+  it('loads a paginated author book page from the app catalog API', () => {
+    service.getAuthorBooks('Андрей Федин', 2);
+
+    expect(httpClient.get).toHaveBeenCalledWith(
+      `${API_CONFIG.BASE_URL}/api/v1/app/books`,
+      {params: expect.anything()},
+    );
+    const params = httpClient.get.mock.calls.at(-1)?.[1]?.params;
+    expect(params.get('page')).toBe('2');
+    expect(params.get('size')).toBe('50');
+    expect(params.get('sort')).toBe('title');
+    expect(params.get('dir')).toBe('asc');
+    expect(params.getAll('authors')).toEqual(['Андрей Федин']);
+  });
+
   it('coalesces author query invalidation when newly created books introduce authors', () => {
     vi.useFakeTimers();
 
@@ -133,8 +148,8 @@ describe('AuthorService', () => {
     expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(1);
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: AUTHORS_QUERY_KEY, exact: true});
-    expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: AUTHORS_QUERY_KEY});
+    expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(2);
   });
 
   it('clears pending author invalidation when the service is destroyed', () => {
@@ -193,5 +208,38 @@ describe('AuthorService', () => {
     expect(service.getAuthorPhotoUrl(5)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/photo`);
     expect(service.getAuthorPhotoUrl(5, 88)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/photo?t=88`);
     expect(service.getAuthorThumbnailUrl(5, 99)).toBe(`${API_CONFIG.BASE_URL}/api/v1/media/author/5/thumbnail?t=99`);
+  });
+
+  it('maps browser sort fields to app API fields', () => {
+    expect(toApiAuthorSort('name')).toBe('name');
+    expect(toApiAuthorSort('book-count')).toBe('bookCount');
+    expect(toApiAuthorSort('recently-added')).toBe('recentlyAdded');
+    expect(toApiAuthorSort('recently-read')).toBe('lastReadTime');
+    expect(toApiAuthorSort('reading-progress')).toBe('readProgress');
+    expect(toApiAuthorSort('avg-rating')).toBe('avgRating');
+    expect(toApiAuthorSort('series-count')).toBe('seriesCount');
+  });
+
+  it('builds paginated author browser params with server-side filters', () => {
+    const params = buildAuthorBrowserParams(2, '  Ada  ', {
+      matchStatus: 'matched',
+      photoStatus: 'has-photo',
+      readStatus: 'some-read',
+      bookCount: '6-10',
+      library: 7,
+      genre: 'Science',
+    }, 'reading-progress', 'desc');
+
+    expect(params.get('page')).toBe('2');
+    expect(params.get('size')).toBe('50');
+    expect(params.get('search')).toBe('Ada');
+    expect(params.get('sort')).toBe('readProgress');
+    expect(params.get('dir')).toBe('desc');
+    expect(params.get('matchStatus')).toBe('matched');
+    expect(params.get('hasPhoto')).toBe('true');
+    expect(params.get('readStatus')).toBe('some-read');
+    expect(params.get('bookCount')).toBe('6-10');
+    expect(params.get('libraryId')).toBe('7');
+    expect(params.get('genre')).toBe('Science');
   });
 });

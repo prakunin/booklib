@@ -35,7 +35,15 @@
 
             <div class="metadata-item">
               <span class="label">{{ t('authors') }}</span>
-              <span class="value">{{ formatAuthors(metadata?.authors) }}</span>
+              <span class="value authors-value">
+                @if (metadata?.authors?.length) {
+                  @for (author of metadata?.authors; track author) {
+                    <button type="button" class="author-link" (click)="goToAuthorBooks(author)">{{ author }}</button>@if (!$last) {<span>, </span>}
+                  }
+                } @else {
+                  {{ t('unknown') }}
+                }
+              </span>
             </div>
 
             @if (metadata?.publisher) {

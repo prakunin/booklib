@@ -204,34 +204,39 @@ public class InpxBatchWriter {
         List<AuthorEntity> result = new ArrayList<>();
         Set<Long> addedIds = new HashSet<>();
         for (String name : names) {
-            String cleaned = AuthorNames.cleanDisplayName(name);
-            if (cleaned.isEmpty()) {
-                continue;
-            }
-            // Cache key must be the EXACT cleaned name, not AuthorNames.normalizeKey(cleaned):
-            // the resolver's identity is AuthorLocalResolver.resolve(name) -> findByName(cleanDisplayName(name)),
-            // and normalizeKey additionally folds diacritics/case/punctuation, which would collapse
-            // genuinely distinct authors (e.g. "Stanislaw Lem" vs "Stanisław Lem") into one cache entry.
-            String key = cleaned;
-            Long id = committedCache.get(key);
-            if (id == null) {
-                id = pendingCache.get(key);
-            }
-            if (id == null) {
-                Optional<AuthorEntity> resolved = authorLocalResolver.resolve(name);
-                if (resolved.isEmpty()) {
-                    continue;
-                }
-                // Not yet promoted scan-wide: reusable within this batch, but only promoted
-                // scan-wide once this batch's transaction commits (see registerCachePromotion).
-                id = resolved.get().getId();
-                pendingCache.put(key, id);
-            }
-            if (addedIds.add(id)) {
+            Long id = resolveAuthorId(name, committedCache, pendingCache);
+            if (id != null && addedIds.add(id)) {
                 result.add(entityManager.getReference(AuthorEntity.class, id));
             }
         }
         return result;
+    }
+
+    private Long resolveAuthorId(String name, Map<String, Long> committedCache, Map<String, Long> pendingCache) {
+        String cleaned = AuthorNames.cleanDisplayName(name);
+        if (cleaned.isEmpty()) {
+            return null;
+        }
+        // Cache key must be the EXACT cleaned name, not AuthorNames.normalizeKey(cleaned):
+        // the resolver's identity is AuthorLocalResolver.resolve(name) -> findByName(cleanDisplayName(name)),
+        // and normalizeKey additionally folds diacritics/case/punctuation, which would collapse
+        // genuinely distinct authors (e.g. "Stanislaw Lem" vs "Stanisław Lem") into one cache entry.
+        String key = cleaned;
+        Long id = committedCache.get(key);
+        if (id == null) {
+            id = pendingCache.get(key);
+        }
+        if (id == null) {
+            Optional<AuthorEntity> resolved = authorLocalResolver.resolve(name);
+            if (resolved.isEmpty()) {
+                return null;
+            }
+            // Not yet promoted scan-wide: reusable within this batch, but only promoted
+            // scan-wide once this batch's transaction commits (see registerCachePromotion).
+            id = resolved.get().getId();
+            pendingCache.put(key, id);
+        }
+        return id;
     }
 
     private Set<CategoryEntity> resolveCategories(List<String> names, Map<String, Long> committedCache,

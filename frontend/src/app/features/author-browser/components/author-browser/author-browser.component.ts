@@ -10,23 +10,21 @@ import {Tooltip} from 'primeng/tooltip';
 import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
 import {RouteScrollPositionService} from '../../../../shared/service/route-scroll-position.service';
 import {MessageService} from 'primeng/api';
-import {AuthorService} from '../../service/author.service';
-import {AuthorSummary, EnrichedAuthor, AuthorFilters, DEFAULT_AUTHOR_FILTERS} from '../../model/author.model';
+import {AuthorBrowserSort, AuthorService} from '../../service/author.service';
+import {AuthorSummary, AuthorFilters, DEFAULT_AUTHOR_FILTERS} from '../../model/author.model';
 import {AuthorCardComponent} from '../author-card/author-card.component';
 import {AuthorSelectionService, AuthorCheckboxClickEvent} from '../../service/author-selection.service';
 import {PageTitleService} from '../../../../shared/service/page-title.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {UserService} from '../../../settings/user-management/user.service';
-import {BookService} from '../../../book/service/book.service';
 import {AppMessageComponent} from '../../../../shared/ui/message/app-message.component';
-import {Book, ReadStatus} from '../../../book/model/book.model';
 import {createVirtualGrid} from '../../../../shared/util/virtual-grid.util';
 import {GridDensityButtonsComponent, type GridDensityDirection} from '../../../../shared/components/grid-density-buttons/grid-density-buttons.component';
 import {LocalStorageService} from '../../../../shared/service/local-storage.service';
 import {ScalePreference} from '../../../../shared/util/scale-preference.util';
 import {LayoutService} from '../../../../shared/layout/layout.service';
 import {createGridDensity} from '../../../../shared/util/grid-density.util';
-import {sortStrings} from '../../../../shared/util/string-sort.util';
+import {LibraryService} from '../../../book/service/library.service';
 
 type SortDirection = 'asc' | 'desc';
 
@@ -37,7 +35,7 @@ interface SortOption {
 
 interface FilterOption {
   label: string;
-  value: string;
+  value: string | number;
 }
 
 const DEFAULT_SORT_DIRECTIONS: Record<string, SortDirection> = {
@@ -86,9 +84,10 @@ export class AuthorBrowserComponent implements OnInit {
   private static readonly MOBILE_COLUMNS_STORAGE_KEY = 'authorMobileColumnsPreference';
   private static readonly MIN_SCALE = 0.7;
   private static readonly MAX_SCALE = 1.3;
+  private static readonly SEARCH_DEBOUNCE_MS = 300;
 
   private readonly authorService = inject(AuthorService);
-  private readonly bookService = inject(BookService);
+  private readonly libraryService = inject(LibraryService);
   private readonly messageService = inject(MessageService);
   private readonly pageTitle = inject(PageTitleService);
   private readonly scrollService = inject(RouteScrollPositionService);
@@ -103,14 +102,11 @@ export class AuthorBrowserComponent implements OnInit {
 
   constructor() {
     effect(() => {
-      const authors = this.authorService.allAuthors();
-      if (authors !== null) {
-        this.allAuthorsState.set(authors);
-      }
+      this.selectionService.setCurrentAuthors(this.filteredAuthors());
     });
 
     effect(() => {
-      this.selectionService.setCurrentAuthors(this.filteredAuthors());
+      this.fetchNextPageIfNearLoadedEnd();
     });
   }
 
@@ -127,54 +123,31 @@ export class AuthorBrowserComponent implements OnInit {
   readonly screenWidth = signal(globalThis.window !== undefined ? globalThis.window.innerWidth : 1024);
   thumbnailCacheBusters = new Map<number, number>();
   private readonly selectedAuthors = this.selectionService.selectedAuthors;
-  private readonly allAuthorsState = signal<AuthorSummary[] | null>(null);
+  private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  loading = computed(() => this.allAuthorsState() === null || this.bookService.isBooksLoading());
-  // Authors are enriched from the whole catalog client-side (library names, per-author counts),
-  // so an oversized catalog must be reported rather than rendered as an empty author list.
-  readonly catalogTooLarge = this.bookService.legacyCatalogTooLarge;
+  readonly loading = this.authorService.isAuthorsLoading;
+  readonly loadError = this.authorService.isAuthorsError;
+  readonly isFetchingNextPage = this.authorService.isFetchingNextPage;
   protected currentUser = this.userService.currentUser;
   selectedCount = computed(() => this.selectedAuthors().size);
   searchTerm = signal('');
   sortBy = signal('name');
   sortDirection = signal<SortDirection>('asc');
   filters = signal<AuthorFilters>({...DEFAULT_AUTHOR_FILTERS});
-  private readonly enrichedAuthors = computed(() => {
-    const authors = this.allAuthorsState();
-    if (!authors) {
-      return [];
-    }
-
-    return this.enrichAuthors(authors, this.bookService.books());
-  });
   libraryOptions = computed<FilterOption[]>(() => {
     const allLabel = this.t.translate('authorBrowser.filters.all');
-    const librarySet = new Set<string>();
-
-    for (const author of this.enrichedAuthors()) {
-      for (const library of author.libraryNames) {
-        librarySet.add(library);
-      }
-    }
-
     return [
       {label: allLabel, value: 'all'},
-      ...sortStrings([...librarySet]).map(library => ({label: library, value: library}))
+      ...this.libraryService.libraries()
+        .filter((library): library is typeof library & {id: number} => library.id !== undefined)
+        .map(library => ({label: library.name, value: library.id}))
     ];
   });
   genreOptions = computed<FilterOption[]>(() => {
     const allLabel = this.t.translate('authorBrowser.filters.all');
-    const genreSet = new Set<string>();
-
-    for (const author of this.enrichedAuthors()) {
-      for (const category of author.categories) {
-        genreSet.add(category);
-      }
-    }
-
     return [
       {label: allLabel, value: 'all'},
-      ...sortStrings([...genreSet]).map(category => ({label: category, value: category}))
+      ...this.authorService.authorCategories().map(category => ({label: category, value: category}))
     ];
   });
   activeFilterCount = computed(() => {
@@ -188,17 +161,7 @@ export class AuthorBrowserComponent implements OnInit {
     if (filters.genre !== 'all') count++;
     return count;
   });
-  filteredAuthors = computed<EnrichedAuthor[]>(() => {
-    let result = this.enrichedAuthors();
-    const search = this.searchTerm().trim().toLowerCase();
-
-    if (search) {
-      result = result.filter(author => author.name.toLowerCase().includes(search));
-    }
-
-    result = this.applyFilters(result, this.filters());
-    return this.applySort(result, this.sortBy(), this.sortDirection());
-  });
+  readonly filteredAuthors = this.authorService.allAuthors;
   @HostListener('window:resize')
   onResize(): void {
     this.screenWidth.set(window.innerWidth);
@@ -237,6 +200,7 @@ export class AuthorBrowserComponent implements OnInit {
   );
   readonly virtualGrid = createVirtualGrid({
     items: this.filteredAuthors,
+    count: this.authorService.totalAuthors,
     scrollElement: this.scrollElement,
     minItemWidth: this.minCardWidth,
     gap: this.gridDensity.gap,
@@ -255,6 +219,7 @@ export class AuthorBrowserComponent implements OnInit {
 
   ngOnInit(): void {
     this.pageTitle.setPageTitle(this.t.translate('authorBrowser.pageTitle'));
+    this.authorService.enableBrowser();
 
     this.sortOptions = [
       {label: this.t.translate('authorBrowser.sort.name'), value: 'name'},
@@ -274,6 +239,7 @@ export class AuthorBrowserComponent implements OnInit {
       this.sortBy.set(sortParam);
       this.sortDirection.set(dirParam === 'asc' || dirParam === 'desc' ? dirParam : DEFAULT_SORT_DIRECTIONS[sortParam]);
     }
+    this.authorService.setBrowserSort(this.sortBy() as AuthorBrowserSort, this.sortDirection());
 
     this.scrollService.trackRoute({
       scrollElement: this.scrollElement,
@@ -281,7 +247,12 @@ export class AuthorBrowserComponent implements OnInit {
       destroyRef: this.destroyRef,
       dismissOverlaysBeforeSave: true,
     });
-    this.destroyRef.onDestroy(() => this.selectionService.deselectAll());
+    this.destroyRef.onDestroy(() => {
+      this.selectionService.deselectAll();
+      if (this.searchDebounceTimer !== null) {
+        clearTimeout(this.searchDebounceTimer);
+      }
+    });
   }
 
   adjustGridDensity(direction: GridDensityDirection): void {
@@ -290,27 +261,43 @@ export class AuthorBrowserComponent implements OnInit {
 
   onSearchChange(value: string): void {
     this.searchTerm.set(value);
+    if (this.searchDebounceTimer !== null) {
+      clearTimeout(this.searchDebounceTimer);
+    }
+    this.searchDebounceTimer = setTimeout(() => {
+      this.searchDebounceTimer = null;
+      this.authorService.setBrowserSearch(value);
+      this.scrollToTop();
+    }, AuthorBrowserComponent.SEARCH_DEBOUNCE_MS);
   }
 
   onSortChange(value: string): void {
     this.sortBy.set(value);
     const nextDirection = DEFAULT_SORT_DIRECTIONS[value] || 'asc';
     this.sortDirection.set(nextDirection);
+    this.authorService.setBrowserSort(value as AuthorBrowserSort, nextDirection);
     this.updateSortQueryParams(value, nextDirection);
+    this.scrollToTop();
   }
 
   toggleSortDirection(): void {
     const next: SortDirection = this.sortDirection() === 'asc' ? 'desc' : 'asc';
     this.sortDirection.set(next);
+    this.authorService.setBrowserSort(this.sortBy() as AuthorBrowserSort, next);
     this.updateSortQueryParams(this.sortBy(), next);
+    this.scrollToTop();
   }
 
-  onFilterChange(key: keyof AuthorFilters, value: string): void {
-    this.filters.update(current => ({...current, [key]: value}));
+  onFilterChange(key: keyof AuthorFilters, value: string | number): void {
+    this.filters.update(current => ({...current, [key]: value} as AuthorFilters));
+    this.authorService.setBrowserFilters(this.filters());
+    this.scrollToTop();
   }
 
   resetFilters(): void {
     this.filters.set({...DEFAULT_AUTHOR_FILTERS});
+    this.authorService.setBrowserFilters(this.filters());
+    this.scrollToTop();
   }
 
   get canEditMetadata(): boolean {
@@ -369,9 +356,8 @@ export class AuthorBrowserComponent implements OnInit {
 
   onAuthorQuickMatched(updated: AuthorSummary): void {
     this.thumbnailCacheBusters.set(updated.id, updated.photoLastModified ?? Date.now());
-    this.allAuthorsState.update(current =>
-      (current ?? []).map(author => author.id === updated.id ? updated : author)
-    );
+    this.authorService.patchAuthorInCache(updated.id, updated);
+    this.authorService.refreshAuthorPages();
   }
 
   autoMatchSelected(): void {
@@ -380,12 +366,14 @@ export class AuthorBrowserComponent implements OnInit {
     this.authorService.autoMatchAuthors(ids).subscribe({
       next: (matched) => {
         this.thumbnailCacheBusters.set(matched.id, matched.photoLastModified ?? Date.now());
-        this.allAuthorsState.update(current => (current ?? []).map(author => author.id === matched.id
-          ? {...author, asin: matched.asin, hasPhoto: matched.hasPhoto, photoLastModified: matched.photoLastModified}
-          : author
-        ));
+        this.authorService.patchAuthorInCache(matched.id, {
+          asin: matched.asin,
+          hasPhoto: matched.hasPhoto,
+          photoLastModified: matched.photoLastModified,
+        });
       },
       complete: () => {
+        this.authorService.refreshAuthorPages();
         this.messageService.add({
           severity: 'success',
           summary: this.t.translate('authorBrowser.toast.autoMatchSuccessSummary'),
@@ -432,176 +420,30 @@ export class AuthorBrowserComponent implements OnInit {
     });
   }
 
-  private enrichAuthors(authors: AuthorSummary[], books: Book[]): EnrichedAuthor[] {
-    const booksByAuthor = new Map<string, Book[]>();
-    for (const book of books) {
-      if (book.metadata?.authors) {
-        for (const authorName of book.metadata.authors) {
-          const key = authorName.toLowerCase();
-          let list = booksByAuthor.get(key);
-          if (!list) {
-            list = [];
-            booksByAuthor.set(key, list);
-          }
-          list.push(book);
-        }
-      }
-    }
-
-    return authors.map(author => {
-      const authorBooks = booksByAuthor.get(author.name.toLowerCase()) || [];
-
-      const libraryIds = new Set<number>();
-      const libraryNameSet = new Set<string>();
-      const categorySet = new Set<string>();
-      const seriesSet = new Set<string>();
-      let latestAddedOn: string | null = null;
-      let lastReadTime: string | null = null;
-      let readCount = 0;
-      let inProgressCount = 0;
-      let ratingSum = 0;
-      let ratingCount = 0;
-
-      for (const book of authorBooks) {
-        libraryIds.add(book.libraryId);
-        if (book.libraryName) libraryNameSet.add(book.libraryName);
-
-        if (book.metadata?.categories) {
-          for (const cat of book.metadata.categories) categorySet.add(cat);
-        }
-        if (book.metadata?.seriesName) {
-          seriesSet.add(book.metadata.seriesName.toLowerCase());
-        }
-        if (book.addedOn && (!latestAddedOn || book.addedOn > latestAddedOn)) {
-          latestAddedOn = book.addedOn;
-        }
-        if (book.lastReadTime && (!lastReadTime || book.lastReadTime > lastReadTime)) {
-          lastReadTime = book.lastReadTime;
-        }
-        if (book.readStatus === ReadStatus.READ) readCount++;
-        if (book.readStatus === ReadStatus.READING || book.readStatus === ReadStatus.RE_READING) inProgressCount++;
-        if (book.personalRating != null) {
-          ratingSum += book.personalRating;
-          ratingCount++;
-        }
-      }
-
-      const totalBooks = authorBooks.length;
-      let readStatus: EnrichedAuthor['readStatus'] = 'unread';
-      if (totalBooks > 0) {
-        if (readCount === totalBooks) {
-          readStatus = 'all-read';
-        } else if (inProgressCount > 0) {
-          readStatus = 'in-progress';
-        } else if (readCount > 0) {
-          readStatus = 'some-read';
-        }
-      }
-
-      return {
-        ...author,
-        libraryIds,
-        libraryNames: sortStrings([...libraryNameSet]),
-        categories: sortStrings([...categorySet]),
-        readStatus,
-        hasSeries: seriesSet.size > 0,
-        seriesCount: seriesSet.size,
-        latestAddedOn,
-        lastReadTime,
-        readingProgress: totalBooks > 0 ? Math.round((readCount / totalBooks) * 100) : 0,
-        avgPersonalRating: ratingCount > 0 ? ratingSum / ratingCount : null
-      };
-    });
-  }
-
-  private applyFilters(authors: EnrichedAuthor[], filters: AuthorFilters): EnrichedAuthor[] {
-    return authors.filter(a => {
-      if (filters.matchStatus === 'matched' && !a.asin) return false;
-      if (filters.matchStatus === 'unmatched' && a.asin) return false;
-
-      if (filters.photoStatus === 'has-photo' && !a.hasPhoto) return false;
-      if (filters.photoStatus === 'no-photo' && a.hasPhoto) return false;
-
-      if (filters.readStatus !== 'all' && a.readStatus !== filters.readStatus) return false;
-
-      if (filters.bookCount !== 'all') {
-        const c = a.bookCount;
-        switch (filters.bookCount) {
-          case '0': if (c !== 0) return false; break;
-          case '1': if (c !== 1) return false; break;
-          case '2': if (c !== 2) return false; break;
-          case '3': if (c !== 3) return false; break;
-          case '4': if (c !== 4) return false; break;
-          case '5': if (c !== 5) return false; break;
-          case '6-10': if (c < 6 || c > 10) return false; break;
-          case '11-20': if (c < 11 || c > 20) return false; break;
-          case '21-35': if (c < 21 || c > 35) return false; break;
-          case '36+': if (c < 36) return false; break;
-        }
-      }
-
-      if (filters.library !== 'all' && !a.libraryNames.includes(filters.library)) return false;
-      if (filters.genre !== 'all' && !a.categories.includes(filters.genre)) return false;
-
-      return true;
-    });
-  }
-
   private removeAuthorsFromList(ids: number[]): void {
-    const idSet = new Set(ids);
-    this.allAuthorsState.update(current => (current ?? []).filter(author => !idSet.has(author.id)));
+    this.authorService.removeAuthorsFromCache(ids);
+    this.authorService.invalidateAuthors();
   }
 
-  private applySort(authors: EnrichedAuthor[], sortBy: string, direction: SortDirection): EnrichedAuthor[] {
-    const sorted = [...authors];
-    const dir = direction === 'asc' ? 1 : -1;
+  onAuthorsScroll(): void {
+    this.fetchNextPageIfNearLoadedEnd();
+  }
 
-    switch (sortBy) {
-      case 'name':
-        return sorted.sort((a, b) => dir * a.name.localeCompare(b.name));
-      case 'book-count':
-        return sorted.sort((a, b) => dir * (a.bookCount - b.bookCount));
-      case 'matched':
-        return sorted.sort((a, b) => {
-          const aVal = a.asin ? 1 : 0;
-          const bVal = b.asin ? 1 : 0;
-          if (aVal !== bVal) return dir * (aVal - bVal);
-          return a.name.localeCompare(b.name);
-        });
-      case 'recently-added':
-        return sorted.sort((a, b) => {
-          if (!a.latestAddedOn && !b.latestAddedOn) return a.name.localeCompare(b.name);
-          if (!a.latestAddedOn) return 1;
-          if (!b.latestAddedOn) return -1;
-          return dir * a.latestAddedOn.localeCompare(b.latestAddedOn);
-        });
-      case 'recently-read':
-        return sorted.sort((a, b) => {
-          if (!a.lastReadTime && !b.lastReadTime) return a.name.localeCompare(b.name);
-          if (!a.lastReadTime) return 1;
-          if (!b.lastReadTime) return -1;
-          return dir * a.lastReadTime.localeCompare(b.lastReadTime);
-        });
-      case 'reading-progress':
-        return sorted.sort((a, b) => dir * (a.readingProgress - b.readingProgress));
-      case 'avg-rating':
-        return sorted.sort((a, b) => {
-          if (a.avgPersonalRating == null && b.avgPersonalRating == null) return a.name.localeCompare(b.name);
-          if (a.avgPersonalRating == null) return 1;
-          if (b.avgPersonalRating == null) return -1;
-          return dir * (a.avgPersonalRating - b.avgPersonalRating);
-        });
-      case 'photo':
-        return sorted.sort((a, b) => {
-          const aVal = a.hasPhoto ? 1 : 0;
-          const bVal = b.hasPhoto ? 1 : 0;
-          if (aVal !== bVal) return dir * (aVal - bVal);
-          return a.name.localeCompare(b.name);
-        });
-      case 'series-count':
-        return sorted.sort((a, b) => dir * (a.seriesCount - b.seriesCount));
-      default:
-        return sorted;
+  private fetchNextPageIfNearLoadedEnd(): void {
+    if (this.isFetchingNextPage()) return;
+
+    const loaded = this.filteredAuthors().length;
+    const total = this.authorService.totalAuthors();
+    if (loaded >= total) return;
+
+    const lastVisibleIndex = this.virtualGrid.virtualizer.getVirtualItems().at(-1)?.index ?? 0;
+    const preloadItems = Math.max(this.virtualGrid.gridColumns() * 4, 12);
+    if (lastVisibleIndex >= loaded - preloadItems) {
+      this.authorService.fetchNextPage();
     }
+  }
+
+  private scrollToTop(): void {
+    queueMicrotask(() => this.virtualGrid.virtualizer.scrollToOffset(0));
   }
 }

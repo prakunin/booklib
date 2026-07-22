@@ -148,7 +148,7 @@ export class FileMoverComponent implements OnDestroy {
   applyPattern(): void {
     const previews = this.books().map(book => {
       const fileName = book.fileName ?? '';
-      const fileSubPath = book.fileSubPath ? `${book.fileSubPath.replaceAll(/\/+$/g, '')}/` : '';
+      const fileSubPath = book.fileSubPath ? `${FileMoverComponent.stripTrailingSlashes(book.fileSubPath)}/` : '';
 
       const relativeOriginalPath = `${fileSubPath}${fileName}`;
 
@@ -316,8 +316,18 @@ export class FileMoverComponent implements OnDestroy {
     if (!libraryId) return relativePath;
 
     const paths = this.getLibraryPathsById(libraryId);
-    const libraryPath = paths.length > 0 ? paths[0].path.replaceAll(/\/+$/g, '') : '';
+    const libraryPath = paths.length > 0 ? FileMoverComponent.stripTrailingSlashes(paths[0].path) : '';
     return libraryPath ? `${libraryPath}/${relativePath}`.replaceAll(/\/\/+/g, '/') : relativePath;
+  }
+
+  // Removes one or more trailing '/' characters, equivalent to /\/+$/ but with a simple
+  // linear scan instead of an anchored quantifier that can backtrack super-linearly.
+  private static stripTrailingSlashes(value: string): string {
+    let end = value.length;
+    while (end > 0 && value.charAt(end - 1) === '/') {
+      end--;
+    }
+    return value.slice(0, end);
   }
 
   get movedFileCount(): number {

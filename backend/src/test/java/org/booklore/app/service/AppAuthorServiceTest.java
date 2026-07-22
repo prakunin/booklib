@@ -47,6 +47,7 @@ class AppAuthorServiceTest {
     @BeforeEach
     void setUp() {
         when(fileService.getAuthorThumbnailFile(anyLong())).thenReturn("/tmp/missing-author-thumbnail.jpg");
+        when(authorPhotoIndex.authorIdsWithPhoto()).thenReturn(Collections.emptySet());
         service = new AppAuthorService(authorRepository, authenticationService, authorPhotoIndex, entityManager, fileService);
     }
 
@@ -141,16 +142,12 @@ class AppAuthorServiceTest {
         @Test
         void getAuthors_withHasPhotoTrue_filtersToAuthorsWithPhotos() {
             mockAdminUser();
-            mockCountQuery(2L);
+            when(authorPhotoIndex.authorIdsWithPhoto()).thenReturn(Set.of(6L));
+            mockCountQuery(1L);
             mockDataQuery(List.<Object[]>of(
-                    new Object[]{buildAuthor(6L, "Author E"), 4L},
-                    new Object[]{buildAuthor(7L, "Author F"), 2L}
+                    new Object[]{buildAuthor(6L, "Author E"), 4L}
             ));
             mockAuthorThumbnailExists(6L, true);
-            mockAuthorThumbnailExists(7L, false);
-            // Mock the hasPhoto count query: matching ids intersected with the photo index
-            mockAuthorIdQuery(List.of(6L, 7L));
-            when(authorPhotoIndex.authorIdsWithPhoto()).thenReturn(Set.of(6L));
 
             AppPageResponse<AppAuthorSummary> result = service.getAuthors(0, 30, null, null, null, null, true);
 
@@ -163,15 +160,12 @@ class AppAuthorServiceTest {
         @Test
         void getAuthors_withHasPhotoFalse_filtersToAuthorsWithoutPhotos() {
             mockAdminUser();
-            mockCountQuery(2L);
+            when(authorPhotoIndex.authorIdsWithPhoto()).thenReturn(Set.of(8L));
+            mockCountQuery(1L);
             mockDataQuery(List.<Object[]>of(
-                    new Object[]{buildAuthor(8L, "Author G"), 3L},
                     new Object[]{buildAuthor(9L, "Author H"), 1L}
             ));
-            mockAuthorThumbnailExists(8L, true);
             mockAuthorThumbnailExists(9L, false);
-            mockAuthorIdQuery(List.of(8L, 9L));
-            when(authorPhotoIndex.authorIdsWithPhoto()).thenReturn(Set.of(8L));
 
             AppPageResponse<AppAuthorSummary> result = service.getAuthors(0, 30, null, null, null, null, false);
 
@@ -179,6 +173,47 @@ class AppAuthorServiceTest {
             assertEquals(1, result.getContent().size());
             assertEquals("Author H", result.getContent().get(0).getName());
             assertFalse(result.getContent().get(0).isHasPhoto());
+        }
+
+        @Test
+        void getAuthors_withHasPhotoTrueAndEmptyIndex_returnsEmptyPageWithoutQueryingDatabase() {
+            mockAdminUser();
+
+            AppPageResponse<AppAuthorSummary> result = service.getAuthors(
+                    0, 30, null, null, null, null, true);
+
+            assertTrue(result.getContent().isEmpty());
+            assertEquals(0, result.getTotalElements());
+            verifyNoInteractions(entityManager);
+        }
+
+        @Test
+        void getAuthors_nonAdminCannotRequestUnassignedLibrary() {
+            mockNonAdminUser(Set.of(5L));
+
+            assertThrows(APIException.class,
+                    () -> service.getAuthors(0, 30, null, null, 10L, null, null));
+            verifyNoInteractions(entityManager);
+        }
+
+        @Test
+        void getAuthors_advancedFilters_areAppliedBeforePagination() {
+            mockAdminUser();
+            mockGroupedCountQuery(List.of(5L));
+            mockDataQuery(List.<Object[]>of(
+                    new Object[]{buildAuthor(5L, "Filtered Author"), 8L}
+            ));
+
+            AppPageResponse<AppAuthorSummary> result = service.getAuthors(
+                    0, 30, "readProgress", "desc", null, "filtered", null,
+                    "matched", "some-read", "6-10", "Fantasy");
+
+            assertEquals(1, result.getTotalElements());
+            assertEquals("Filtered Author", result.getContent().getFirst().getName());
+            verify(entityManager).createQuery(argThat(jpql -> jpql.contains("JOIN m.categories category")
+                    && jpql.contains("a.asin IS NOT NULL")
+                    && jpql.contains("HAVING")
+                    && jpql.contains("BETWEEN 6 AND 10")), eq(Long.class));
         }
 
         @Test
@@ -330,13 +365,12 @@ class AppAuthorServiceTest {
     }
 
     @SuppressWarnings("unchecked")
-    private void mockAuthorIdQuery(List<Long> ids) {
-        TypedQuery<Long> idQ = mock(TypedQuery.class);
-        when(idQ.setParameter(anyString(), any())).thenReturn(idQ);
-        when(idQ.getResultList()).thenReturn(ids);
-        // Distinct from the COUNT(DISTINCT a.id) query, which also uses Long.class.
-        when(entityManager.createQuery(argThat(jpql -> jpql != null && jpql.contains("SELECT DISTINCT a.id")), eq(Long.class)))
-                .thenReturn(idQ);
+    private void mockGroupedCountQuery(List<Long> ids) {
+        TypedQuery<Long> groupedCountQuery = mock(TypedQuery.class);
+        when(groupedCountQuery.setParameter(anyString(), any())).thenReturn(groupedCountQuery);
+        when(groupedCountQuery.getResultList()).thenReturn(ids);
+        when(entityManager.createQuery(argThat(jpql -> jpql != null && jpql.contains("GROUP BY a.id")), eq(Long.class)))
+                .thenReturn(groupedCountQuery);
     }
 
     @SuppressWarnings("unchecked")

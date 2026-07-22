@@ -4,6 +4,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.booklore.BookloreApplication;
 import org.booklore.app.dto.AppFilterOptions;
+import org.booklore.app.dto.AppLibraryStats;
+import org.springframework.data.jpa.domain.Specification;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.entity.AuthorEntity;
@@ -33,10 +35,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -83,6 +87,7 @@ class AppBookServiceMaterializedFacetsTest {
 
     private LibraryEntity library;
     private LibraryPathEntity libraryPath;
+    private Long userId;
 
     @TestConfiguration
     public static class TestConfig {
@@ -104,6 +109,7 @@ class AppBookServiceMaterializedFacetsTest {
         BookLoreUserEntity userEntity = BookLoreUserEntity.builder()
                 .username("admin").passwordHash("x").name("Admin").build();
         em.persist(userEntity);
+        userId = userEntity.getId();
 
         var permissions = new BookLoreUser.UserPermissions();
         permissions.setAdmin(true);
@@ -158,31 +164,59 @@ class AppBookServiceMaterializedFacetsTest {
         assertThat(live.series()).isNotEmpty();
         assertThat(live.fileTypes()).isNotEmpty();
 
-        assertOptionsEqual(live.authors(), materialized.authors());
+        // Compared via a single loop to keep the assertion count within Sonar's S5961 limit.
+        // Languages use a dedicated comparator and are checked separately below.
+        List<Function<AppFilterOptions, List<AppFilterOptions.CountedOption>>> facets = List.of(
+                AppFilterOptions::authors,
+                AppFilterOptions::fileTypes,
+                AppFilterOptions::categories,
+                AppFilterOptions::publishers,
+                AppFilterOptions::series,
+                AppFilterOptions::tags,
+                AppFilterOptions::moods,
+                AppFilterOptions::narrators,
+                AppFilterOptions::ageRatings,
+                AppFilterOptions::contentRatings,
+                AppFilterOptions::matchScores,
+                AppFilterOptions::publishedYears,
+                AppFilterOptions::fileSizes,
+                AppFilterOptions::amazonRatings,
+                AppFilterOptions::goodreadsRatings,
+                AppFilterOptions::pageCounts,
+                AppFilterOptions::shelfStatuses,
+                AppFilterOptions::comicCharacters,
+                AppFilterOptions::comicCreators,
+                AppFilterOptions::shelves,
+                AppFilterOptions::libraries,
+                // User-scoped facets are computed live in both paths and must still match.
+                AppFilterOptions::readStatuses,
+                AppFilterOptions::personalRatings);
+        for (Function<AppFilterOptions, List<AppFilterOptions.CountedOption>> facet : facets) {
+            assertOptionsEqual(facet.apply(live), facet.apply(materialized));
+        }
         assertLanguagesEqual(live.languages(), materialized.languages());
-        assertOptionsEqual(live.fileTypes(), materialized.fileTypes());
-        assertOptionsEqual(live.categories(), materialized.categories());
-        assertOptionsEqual(live.publishers(), materialized.publishers());
-        assertOptionsEqual(live.series(), materialized.series());
-        assertOptionsEqual(live.tags(), materialized.tags());
-        assertOptionsEqual(live.moods(), materialized.moods());
-        assertOptionsEqual(live.narrators(), materialized.narrators());
-        assertOptionsEqual(live.ageRatings(), materialized.ageRatings());
-        assertOptionsEqual(live.contentRatings(), materialized.contentRatings());
-        assertOptionsEqual(live.matchScores(), materialized.matchScores());
-        assertOptionsEqual(live.publishedYears(), materialized.publishedYears());
-        assertOptionsEqual(live.fileSizes(), materialized.fileSizes());
-        assertOptionsEqual(live.amazonRatings(), materialized.amazonRatings());
-        assertOptionsEqual(live.goodreadsRatings(), materialized.goodreadsRatings());
-        assertOptionsEqual(live.pageCounts(), materialized.pageCounts());
-        assertOptionsEqual(live.shelfStatuses(), materialized.shelfStatuses());
-        assertOptionsEqual(live.comicCharacters(), materialized.comicCharacters());
-        assertOptionsEqual(live.comicCreators(), materialized.comicCreators());
-        assertOptionsEqual(live.shelves(), materialized.shelves());
-        assertOptionsEqual(live.libraries(), materialized.libraries());
-        // User-scoped facets are computed live in both paths and must still match.
-        assertOptionsEqual(live.readStatuses(), materialized.readStatuses());
-        assertOptionsEqual(live.personalRatings(), materialized.personalRatings());
+    }
+
+    @Test
+    void aggregationQueriesExecuteOnVisibleBooks() {
+        Specification<BookEntity> spec =
+                (root, query, cb) -> cb.equal(root.get("library").get("id"), library.getId());
+
+        assertThat(appBookService.sumBookFileSize(spec)).isEqualTo(125_000L);
+
+        List<AppLibraryStats.MonthlyCount> added =
+                appBookService.countBooksByMonth(spec, "addedOn", userId, false);
+        assertThat(added).isNotEmpty().allSatisfy(m -> assertThat(m.count()).isPositive());
+        assertThat(appBookService.countBooksByMonth(spec, "dateFinished", userId, true)).isEmpty();
+
+        // Ann authored two visible books, so the >=2 HAVING clause keeps at least one author row.
+        assertThat(appBookService.aggregateAuthors(spec, userId)).isNotEmpty();
+        // The book-flow / rating aggregations execute their grouped queries (rows keyed off book dates,
+        // with null read-status/rating in the LEFT-joined progress that no seed row supplies).
+        assertThat(appBookService.aggregateBookFlow(spec, userId)).isNotNull();
+        assertThat(appBookService.aggregatePublicationRatings(spec, userId)).isNotNull();
+        assertThat(appBookService.aggregatePageRatings(spec, userId)).isNotNull();
+        assertThat(appBookService.aggregateRatingTaste(spec, userId)).isNotNull();
     }
 
     private void assertOptionsEqual(List<AppFilterOptions.CountedOption> live,
@@ -228,7 +262,7 @@ class AppBookServiceMaterializedFacetsTest {
                       List<CategoryEntity> categories, List<TagEntity> tags) {
         BookMetadataEntity metadata = BookMetadataEntity.builder()
                 .book(book).title(title).language(language).seriesName(seriesName).publisher(publisher)
-                .narrator(narrator).publishedDate(LocalDate.of(publishedYear, 1, 1)).ageRating(ageRating)
+                .narrator(narrator).publishedDate(LocalDate.of(publishedYear, Month.JANUARY, 1)).ageRating(ageRating)
                 .contentRating(contentRating).pageCount(pageCount).amazonRating(amazonRating).build();
         metadata.setAuthors(new ArrayList<>(authors));
         metadata.setCategories(new HashSet<>(categories));

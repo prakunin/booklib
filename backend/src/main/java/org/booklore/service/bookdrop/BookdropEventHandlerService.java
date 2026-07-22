@@ -9,6 +9,7 @@ import org.booklore.model.websocket.Topic;
 import org.booklore.repository.BookdropFileRepository;
 import org.booklore.service.NotificationService;
 import org.booklore.service.appsettings.AppSettingService;
+import org.booklore.util.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Service;
@@ -155,7 +156,7 @@ public class BookdropEventHandlerService implements SmartLifecycle {
             String filePath = file.toAbsolutePath().toString();
             String fileName = file.getFileName().toString();
 
-            if (BookFileExtension.fromFileName(fileName).isEmpty()) {
+            if (FileUtils.shouldIgnore(file) || BookFileExtension.fromFileName(fileName).isEmpty()) {
                 log.info("Unsupported file type detected, ignoring file: {}", fileName);
                 return;
             }

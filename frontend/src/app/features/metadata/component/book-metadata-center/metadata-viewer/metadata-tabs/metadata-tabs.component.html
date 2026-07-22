@@ -55,7 +55,7 @@
               </div>
               <app-cover
                 style="width: 200px; height: 280px;"
-                [src]="urlHelper.getCoverUrl(currentBook.id, currentBook.metadata?.coverUpdatedOn)"
+                  [src]="urlHelper.getCoverUrl(currentBook.id, currentBook.metadata?.coverUpdatedOn) || urlHelper.getDirectCoverUrl(currentBook.id)"
                 [title]="currentBook.metadata?.title"
                 [authors]="currentBook.metadata?.authors ?? []"
                 size="lg"

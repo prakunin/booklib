@@ -606,7 +606,12 @@ public class LibraryFileEventProcessor implements SmartLifecycle {
     }
 
     private boolean isBookFile(String fileName) {
-        return BookFileExtension.fromFileName(fileName).isPresent();
+        // Watch events bypass the full-library walker, so apply the same
+        // hidden/system-file guard here. In particular macOS AppleDouble
+        // companions ("._*"), when copied into a watched library, must not
+        // be imported as books merely because their suffix looks book-like.
+        return !FileUtils.shouldIgnore(Path.of(fileName))
+                && BookFileExtension.fromFileName(fileName).isPresent();
     }
 
     private void scheduleWithStabilityCheck(Path path, Runnable onStable) {

@@ -2,8 +2,8 @@ import {Component, effect, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {Tooltip} from 'primeng/tooltip';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {BookService} from '../../../../../book/service/book.service';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {UserBookStatsService} from '../../service/user-book-stats.service';
 
 @Component({
   selector: 'app-reading-debt-chart',
@@ -13,14 +13,10 @@ import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
   styleUrls: ['./reading-debt-chart.component.scss']
 })
 export class ReadingDebtChartComponent {
-  private readonly bookService = inject(BookService);
+  private readonly userBookStats = inject(UserBookStatsService);
   private readonly t = inject(TranslocoService);
   private readonly syncChartEffect = effect(() => {
-    if (this.bookService.isBooksLoading()) {
-      return;
-    }
-
-    this.processData(this.bookService.books());
+    this.processData();
   });
 
   public readonly chartType = 'bar' as const;
@@ -60,8 +56,9 @@ export class ReadingDebtChartComponent {
     }
   };
 
-  private processData(books: ReturnType<BookService['books']>): void {
-    if (books.length === 0) {
+  private processData(): void {
+    const snapshot = this.userBookStats.data();
+    if (!snapshot) {
       this.hasData = false;
       this.currentBacklog = 0;
       this.trend = '';
@@ -85,17 +82,13 @@ export class ReadingDebtChartComponent {
       monthlyFinished.set(key, 0);
     }
 
-    for (const book of books) {
-      if (book.addedOn) {
-        const d = new Date(book.addedOn);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        if (monthlyAdded.has(key)) monthlyAdded.set(key, monthlyAdded.get(key)! + 1);
-      }
-      if (book.dateFinished) {
-        const d = new Date(book.dateFinished);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        if (monthlyFinished.has(key)) monthlyFinished.set(key, monthlyFinished.get(key)! + 1);
-      }
+    for (const item of snapshot.booksAddedByMonth) {
+      const key = `${item.year}-${String(item.month).padStart(2, '0')}`;
+      if (monthlyAdded.has(key)) monthlyAdded.set(key, item.count);
+    }
+    for (const item of snapshot.booksFinishedByMonth) {
+      const key = `${item.year}-${String(item.month).padStart(2, '0')}`;
+      if (monthlyFinished.has(key)) monthlyFinished.set(key, item.count);
     }
 
     const added = months.map(m => monthlyAdded.get(m) || 0);

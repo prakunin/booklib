@@ -2,13 +2,14 @@ import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {Tooltip} from 'primeng/tooltip';
 import {ChartConfiguration, ChartData, ScatterDataPoint} from 'chart.js';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book, ReadStatus} from '../../../../../book/model/book.model';
+import {ReadStatus} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {UserBookStatsService} from '../../service/user-book-stats.service';
 
 interface BookScatterPoint extends ScatterDataPoint {
   bookTitle: string;
   readStatus: string;
+  count: number;
 }
 
 type LengthChartData = ChartData<'scatter', BookScatterPoint[], string>;
@@ -27,15 +28,6 @@ const STATUS_COLORS: Record<string, { bg: string; border: string }> = {
   'other': {bg: 'rgba(158, 158, 158, 0.7)', border: '#9e9e9e'}
 };
 
-const PAGE_RANGES = [
-  {label: '0-100', min: 0, max: 100},
-  {label: '101-200', min: 101, max: 200},
-  {label: '201-300', min: 201, max: 300},
-  {label: '301-400', min: 301, max: 400},
-  {label: '401-500', min: 401, max: 500},
-  {label: '501+', min: 501, max: Infinity}
-];
-
 @Component({
   selector: 'app-book-length-chart',
   standalone: true,
@@ -44,15 +36,9 @@ const PAGE_RANGES = [
   styleUrls: ['./book-length-chart.component.scss']
 })
 export class BookLengthChartComponent {
-  private readonly bookService = inject(BookService);
+  private readonly userBookStats = inject(UserBookStatsService);
   private readonly t = inject(TranslocoService);
-  private readonly metrics = computed<BookLengthMetrics>(() => {
-    if (this.bookService.isBooksLoading()) {
-      return this.emptyMetrics();
-    }
-
-    return this.calculateMetrics(this.bookService.books());
-  });
+  private readonly metrics = computed<BookLengthMetrics>(() => this.calculateMetrics());
 
   public readonly chartType = 'scatter' as const;
   public readonly sweetSpot = computed(() => this.metrics().sweetSpot);
@@ -137,39 +123,31 @@ export class BookLengthChartComponent {
 
   public readonly chartData = computed(() => this.metrics().chartData);
 
-  private calculateMetrics(books: Book[]): BookLengthMetrics {
-    if (books.length === 0) {
+  private calculateMetrics(): BookLengthMetrics {
+    const aggregates = this.userBookStats.data()?.pageRatings ?? [];
+    if (aggregates.length === 0) {
       return this.emptyMetrics();
     }
-
-    const ratedBooks = books.filter(b =>
-      b.personalRating != null && b.personalRating > 0 &&
-      b.metadata?.pageCount != null && b.metadata.pageCount > 0
-    );
-
-    const totalRatedBooks = ratedBooks.length;
-    if (totalRatedBooks === 0) {
-      return this.emptyMetrics();
-    }
-
-    const grouped = new Map<string, { label: string; points: BookScatterPoint[] }>();
-    for (const book of ratedBooks) {
-      const statusKey = this.getStatusKey(book.readStatus);
-      const statusLabel = this.getStatusLabel(book.readStatus);
-      if (!grouped.has(statusKey)) grouped.set(statusKey, {label: statusLabel, points: []});
-      grouped.get(statusKey)!.points.push({
-        x: book.metadata!.pageCount!,
-        y: book.personalRating!,
-        bookTitle: book.metadata?.title || book.fileName || 'Unknown',
-        readStatus: statusLabel
+    const grouped = new Map<string, {label: string; points: BookScatterPoint[]}>();
+    for (const item of aggregates) {
+      const status = item.readStatus as ReadStatus;
+      const key = this.getStatusKey(status);
+      const label = this.getStatusLabel(status);
+      if (!grouped.has(key)) grouped.set(key, {label, points: []});
+      grouped.get(key)!.points.push({
+        x: item.pageCount,
+        y: item.personalRating,
+        count: item.count,
+        bookTitle: `${item.count} books`,
+        readStatus: label
       });
     }
-
-    const datasets = Array.from(grouped.entries()).map(([key, {label, points}]) => {
-      const colors = STATUS_COLORS[key] || STATUS_COLORS['other'];
+    const datasets = [...grouped.entries()].map(([key, value]) => {
+      const colors = STATUS_COLORS[key] ?? STATUS_COLORS['other'];
+      const count = value.points.reduce((sum, point) => sum + point.count, 0);
       return {
-        label: `${label} (${points.length})`,
-        data: points,
+        label: `${value.label} (${count})`,
+        data: value.points,
         backgroundColor: colors.bg,
         borderColor: colors.border,
         pointRadius: 6,
@@ -177,114 +155,47 @@ export class BookLengthChartComponent {
         pointBorderWidth: 2
       };
     });
-
-    // Add trend line
-    const allPoints = ratedBooks.map(b => ({x: b.metadata!.pageCount!, y: b.personalRating!}));
-    const trend = this.computeTrendLine(allPoints);
-    if (trend) {
-      datasets.push({
-        label: this.t.translate('statsUser.bookLength.trend'),
-        data: trend as BookScatterPoint[],
-        backgroundColor: 'transparent',
-        borderColor: 'transparent',
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        pointBorderWidth: 0
-      });
+    const ranges = [
+      {label: '0-100', min: 0, max: 100}, {label: '101-200', min: 101, max: 200},
+      {label: '201-300', min: 201, max: 300}, {label: '301-400', min: 301, max: 400},
+      {label: '401-500', min: 401, max: 500}, {label: '501+', min: 501, max: Number.MAX_SAFE_INTEGER}
+    ];
+    let sweetSpot = '-';
+    let bestAverage = 0;
+    for (const range of ranges) {
+      const values = aggregates.filter(item => item.pageCount >= range.min && item.pageCount <= range.max);
+      const count = values.reduce((sum, item) => sum + item.count, 0);
+      if (count < 2) continue;
+      const average = values.reduce((sum, item) => sum + item.personalRating * item.count, 0) / count;
+      if (average > bestAverage) {
+        bestAverage = average;
+        sweetSpot = `${range.label} pages (avg ${average.toFixed(1)})`;
+      }
     }
-
-    const {sweetSpot, highestRatedLength} = this.computeStats(ratedBooks);
+    const highest = [...aggregates].sort((a, b) => b.personalRating - a.personalRating || b.count - a.count)[0];
     return {
-      totalRatedBooks,
+      totalRatedBooks: aggregates.reduce((sum, item) => sum + item.count, 0),
       sweetSpot,
-      highestRatedLength,
+      highestRatedLength: highest ? `${highest.pageCount} pages` : '-',
       chartData: {datasets}
     };
   }
 
-  private getStatusKey(status?: ReadStatus): string {
-    if (!status) return 'other';
+  private getStatusKey(status: ReadStatus): string {
     switch (status) {
       case ReadStatus.READ:
-      case ReadStatus.PARTIALLY_READ:
-        return 'read';
+      case ReadStatus.PARTIALLY_READ: return 'read';
       case ReadStatus.READING:
-      case ReadStatus.RE_READING:
-        return 'reading';
+      case ReadStatus.RE_READING: return 'reading';
       case ReadStatus.ABANDONED:
-      case ReadStatus.WONT_READ:
-        return 'abandoned';
-      default:
-        return 'other';
+      case ReadStatus.WONT_READ: return 'abandoned';
+      default: return 'other';
     }
   }
 
-  private getStatusLabel(status?: ReadStatus): string {
-    if (!status) return this.t.translate('statsUser.bookLength.statusOther');
-    switch (status) {
-      case ReadStatus.READ:
-      case ReadStatus.PARTIALLY_READ:
-        return this.t.translate('statsUser.bookLength.statusRead');
-      case ReadStatus.READING:
-      case ReadStatus.RE_READING:
-        return this.t.translate('statsUser.bookLength.statusReading');
-      case ReadStatus.ABANDONED:
-      case ReadStatus.WONT_READ:
-        return this.t.translate('statsUser.bookLength.statusAbandoned');
-      default:
-        return this.t.translate('statsUser.bookLength.statusOther');
-    }
-  }
-
-  private computeStats(books: Book[]): Pick<BookLengthMetrics, 'sweetSpot' | 'highestRatedLength'> {
-    let bestRange = '';
-    let bestAvg = 0;
-
-    for (const range of PAGE_RANGES) {
-      const rangeBooks = books.filter(b =>
-        b.metadata!.pageCount! >= range.min && b.metadata!.pageCount! <= range.max
-      );
-      if (rangeBooks.length >= 2) {
-        const avg = rangeBooks.reduce((s, b) => s + b.personalRating!, 0) / rangeBooks.length;
-        if (avg > bestAvg) {
-          bestAvg = avg;
-          bestRange = range.label;
-        }
-      }
-    }
-
-    const sweetSpot = bestRange ? `${bestRange} pages (avg ${bestAvg.toFixed(1)})` : '-';
-    const highestRated = books.reduce((a, b) => (a.personalRating! >= b.personalRating! ? a : b), books[0]);
-    const highestRatedLength = `${highestRated.metadata!.pageCount} pages`;
-
-    return {sweetSpot, highestRatedLength};
-  }
-
-  private computeTrendLine(points: { x: number; y: number }[]): { x: number; y: number }[] | null {
-    if (points.length < 2) return null;
-
-    const n = points.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    for (const p of points) {
-      sumX += p.x;
-      sumY += p.y;
-      sumXY += p.x * p.y;
-      sumX2 += p.x * p.x;
-    }
-
-    const denominator = n * sumX2 - sumX * sumX;
-    if (denominator === 0) return null;
-
-    const slope = (n * sumXY - sumX * sumY) / denominator;
-    const intercept = (sumY - slope * sumX) / n;
-
-    const minX = Math.min(...points.map(p => p.x));
-    const maxX = Math.max(...points.map(p => p.x));
-
-    return [
-      {x: minX, y: Math.max(0, Math.min(10, slope * minX + intercept))},
-      {x: maxX, y: Math.max(0, Math.min(10, slope * maxX + intercept))}
-    ];
+  private getStatusLabel(status: ReadStatus): string {
+    const key = this.getStatusKey(status);
+    return this.t.translate(`statsUser.bookLength.status${key[0].toUpperCase()}${key.slice(1)}`);
   }
 
   private emptyMetrics(): BookLengthMetrics {

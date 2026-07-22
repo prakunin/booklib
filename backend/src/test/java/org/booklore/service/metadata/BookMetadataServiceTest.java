@@ -28,6 +28,7 @@ import org.booklore.service.book.BookQueryService;
 import org.booklore.service.metadata.extractor.CbxMetadataExtractor;
 import org.booklore.service.metadata.extractor.MetadataExtractorFactory;
 import org.booklore.service.metadata.parser.BookParser;
+import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.service.metadata.parser.DetailedMetadataProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -61,6 +62,7 @@ class BookMetadataServiceTest {
     @Mock private MetadataClearFlagsMapper metadataClearFlagsMapper;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private AppSettingService appSettingService;
+    @Mock private ArchivedBookContentService archivedBookContentService;
 
     private Map<MetadataProvider, BookParser> parserMap;
     private BookMetadataService service;
@@ -72,7 +74,7 @@ class BookMetadataServiceTest {
                 bookRepository, bookMapper, bookMetadataMapper, bookMetadataUpdater,
                 notificationService, bookMetadataRepository, bookQueryService,
                 auditService, parserMap, cbxMetadataExtractor, metadataExtractorFactory,
-                metadataClearFlagsMapper, transactionManager, appSettingService
+                metadataClearFlagsMapper, transactionManager, appSettingService, archivedBookContentService
         );
     }
 

@@ -338,7 +338,7 @@ class LibraryFileHelperTest {
 
     @Test
     void ignoresSystemDirectories() throws IOException {
-        for (String sysDir : List.of("#recycle", "@eaDir", ".caltrash")) {
+        for (String sysDir : List.of("#recycle", "@eaDir", ".caltrash", "__MACOSX")) {
             Path dir = Files.createDirectories(tempDir.resolve(sysDir));
             Files.write(dir.resolve("book.epub"), new byte[]{1});
         }

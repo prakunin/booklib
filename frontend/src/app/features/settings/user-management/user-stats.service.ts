@@ -1,6 +1,6 @@
 import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
-import {Observable} from 'rxjs';
+import {Observable, shareReplay} from 'rxjs';
 import {API_CONFIG} from '../../../core/config/api-config';
 import {BookType} from '../../book/model/book.model';
 
@@ -76,12 +76,38 @@ export interface SessionScatterResponse {
   dayOfWeek: number;
 }
 
+export interface BookDistributionsResponse {
+  ratingDistribution: {rating: number; count: number}[];
+  progressDistribution: {range: string; min: number; max: number; count: number}[];
+  statusDistribution: {status: string; count: number}[];
+}
+
+export interface BookCompletionHeatmapResponse {
+  year: number;
+  month: number;
+  count: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class UserStatsService {
   private readonly readingSessionsUrl = `${API_CONFIG.BASE_URL}/api/v1/user-stats`;
   private readonly http = inject(HttpClient);
+  private readonly bookDistributions$ = this.http.get<BookDistributionsResponse>(
+    `${this.readingSessionsUrl}/reading/book-distributions`
+  ).pipe(shareReplay({bufferSize: 1, refCount: true}));
+  private readonly bookCompletionHeatmap$ = this.http.get<BookCompletionHeatmapResponse[]>(
+    `${this.readingSessionsUrl}/reading/book-completion-heatmap`
+  ).pipe(shareReplay({bufferSize: 1, refCount: true}));
+
+  getBookDistributions(): Observable<BookDistributionsResponse> {
+    return this.bookDistributions$;
+  }
+
+  getBookCompletionHeatmap(): Observable<BookCompletionHeatmapResponse[]> {
+    return this.bookCompletionHeatmap$;
+  }
 
   getHeatmapForYear(year: number): Observable<ReadingSessionHeatmapResponse[]> {
     return this.http.get<ReadingSessionHeatmapResponse[]>(

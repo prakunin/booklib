@@ -1,5 +1,7 @@
 package org.booklore.app.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Join;
@@ -13,6 +15,7 @@ import org.booklore.app.dto.AppBookDetail;
 import org.booklore.app.dto.AppBookProgressResponse;
 import org.booklore.app.dto.AppBookSummary;
 import org.booklore.app.dto.AppCatalogSummary;
+import org.booklore.app.dto.AppLibraryStats;
 import org.booklore.app.dto.AppFilterOptions;
 import org.booklore.app.dto.AppPageResponse;
 import org.booklore.app.dto.UpdateProgressRequest;
@@ -51,6 +54,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Parameter;
 import jakarta.persistence.Tuple;
 import java.time.Instant;
+import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -73,6 +77,17 @@ public class AppBookService {
     private static final String ACCESS_DENIED_TO_LIBRARY_MESSAGE = "Access denied to library ";
     private static final String METADATA_JOIN_CLAUSE = "JOIN b.metadata m";
     private static final String PARAM_USER_ID = "userId";
+    private static final String PARAM_LIBRARY_ID = "libraryId";
+    private static final String ATTR_METADATA = "metadata";
+    private static final String ATTR_READ_STATUS = "readStatus";
+    private static final String ATTR_PERSONAL_RATING = "personalRating";
+    private static final String ATTR_ADDED_ON = "addedOn";
+    private static final String LIBRARY_ID_CLAUSE = "AND b.library.id = :libraryId";
+    private static final String BOOK_FILES_JOIN = "JOIN b.bookFiles bf";
+    private static final String BOOK_FORMAT_CLAUSE = "AND bf.isBookFormat = true";
+    private static final String COL_C_NAME = "c.name";
+    private static final String COL_T_NAME = "t.name";
+    private static final Duration LIBRARY_STATS_CACHE_TTL = Duration.ofMinutes(5);
 
     private final BookRepository bookRepository;
     private final UserBookProgressRepository userBookProgressRepository;
@@ -92,6 +107,10 @@ public class AppBookService {
     private final ShellBookIdsCache shellBookIdsCache;
     private final LibraryFacetCountRepository libraryFacetCountRepository;
     private final LibraryFacetStateRepository libraryFacetStateRepository;
+    private final Cache<String, AppLibraryStats> libraryStatsCache = Caffeine.newBuilder()
+            .expireAfterWrite(LIBRARY_STATS_CACHE_TTL)
+            .maximumSize(10_000)
+            .build();
 
     public AppBookService(BookRepository bookRepository,
                           UserBookProgressRepository userBookProgressRepository,
@@ -213,6 +232,40 @@ public class AppBookService {
         return catalogSummaryCache.get(key, () -> computeCatalogSummary(user, accessibleLibraryIds, admin));
     }
 
+    public AppLibraryStats getLibraryStats(Long libraryId) {
+        BookLoreUser user = authenticationService.getAuthenticatedUser();
+        Set<Long> accessibleLibraryIds = getAccessibleLibraryIds(user);
+        boolean admin = user.getPermissions().isAdmin();
+        String cacheKey = catalogSummaryKey(user.getId(), admin, accessibleLibraryIds)
+                + "|library=" + Objects.toString(libraryId, "all");
+        return libraryStatsCache.get(cacheKey,
+                ignored -> computeLibraryStats(user, accessibleLibraryIds, admin, libraryId));
+    }
+
+    private AppLibraryStats computeLibraryStats(
+            BookLoreUser user, Set<Long> accessibleLibraryIds, boolean admin, Long libraryId) {
+        Specification<BookEntity> visibleBooks = buildAggregateSpecification(
+                accessibleLibraryIds, libraryId, user.getId(), admin);
+        boolean simpleVisibility = admin || !userHasContentRestrictions(user.getId());
+        AppFilterOptions facets = getFilterOptions(libraryId, null, null);
+
+        return new AppLibraryStats(
+                bookRepository.count(visibleBooks),
+                sumBookFileSize(visibleBooks),
+                countDistinctAuthors(visibleBooks, simpleVisibility),
+                countDistinctSeries(visibleBooks),
+                countDistinctPublishers(visibleBooks),
+                averageDaysToFinish(visibleBooks, user.getId()),
+                facets,
+                countBooksByMonth(visibleBooks, ATTR_ADDED_ON, user.getId(), false),
+                countBooksByMonth(visibleBooks, "dateFinished", user.getId(), true),
+                aggregateAuthors(visibleBooks, user.getId()),
+                aggregateBookFlow(visibleBooks, user.getId()),
+                aggregatePublicationRatings(visibleBooks, user.getId()),
+                aggregatePageRatings(visibleBooks, user.getId()),
+                aggregateRatingTaste(visibleBooks, user.getId()));
+    }
+
     static String catalogSummaryKey(Long userId, boolean admin, Set<Long> accessibleLibraryIds) {
         String libraries = accessibleLibraryIds == null
                 ? "*"
@@ -277,7 +330,7 @@ public class AppBookService {
         Root<AuthorEntity> author = query.from(AuthorEntity.class);
         Subquery<Long> sub = query.subquery(Long.class);
         Root<BookEntity> book = sub.from(BookEntity.class);
-        Join<Object, Object> authors = book.join("metadata").join("authors");
+        Join<Object, Object> authors = book.join(ATTR_METADATA).join(F_AUTHORS);
         sub.select(cb.literal(1L)).where(cb.and(
                 cb.equal(authors.get("id"), author.get("id")),
                 spec.toPredicate(book, query, cb)));
@@ -289,7 +342,7 @@ public class AppBookService {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Long> query = cb.createQuery(Long.class);
         Root<BookEntity> root = query.from(BookEntity.class);
-        query.select(cb.countDistinct(root.join("metadata").join("authors").get("id")));
+        query.select(cb.countDistinct(root.join(ATTR_METADATA).join(F_AUTHORS).get("id")));
         query.where(spec.toPredicate(root, query, cb));
         return entityManager.createQuery(query).getSingleResult();
     }
@@ -298,13 +351,237 @@ public class AppBookService {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Long> query = cb.createQuery(Long.class);
         Root<BookEntity> root = query.from(BookEntity.class);
-        var seriesName = root.join("metadata").get("seriesName");
+        var seriesName = root.join(ATTR_METADATA).get("seriesName");
         query.select(cb.countDistinct(seriesName));
         query.where(cb.and(
                 spec.toPredicate(root, query, cb),
                 cb.isNotNull(seriesName),
                 cb.notEqual(seriesName, "")));
         return entityManager.createQuery(query).getSingleResult();
+    }
+
+    private long countDistinctPublishers(Specification<BookEntity> spec) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<BookEntity> root = query.from(BookEntity.class);
+        var publisher = root.join(ATTR_METADATA).get("publisher");
+        query.select(cb.countDistinct(publisher));
+        query.where(cb.and(
+                spec.toPredicate(root, query, cb),
+                cb.isNotNull(publisher),
+                cb.notEqual(publisher, "")));
+        return entityManager.createQuery(query).getSingleResult();
+    }
+
+    long sumBookFileSize(Specification<BookEntity> spec) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<BookEntity> root = query.from(BookEntity.class);
+        Join<BookEntity, BookFileEntity> files = root.join("bookFiles", jakarta.persistence.criteria.JoinType.LEFT);
+        files.on(cb.isTrue(files.get("isBookFormat")));
+        query.select(cb.coalesce(cb.sum(files.get("fileSizeKb")), 0L));
+        query.where(spec.toPredicate(root, query, cb));
+        return entityManager.createQuery(query).getSingleResult();
+    }
+
+    List<AppLibraryStats.MonthlyCount> countBooksByMonth(
+            Specification<BookEntity> spec, String dateField, Long userId, boolean progressDate) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<BookEntity> root = query.from(BookEntity.class);
+        jakarta.persistence.criteria.Expression<Instant> date;
+        jakarta.persistence.criteria.Predicate extra = cb.conjunction();
+
+        if (progressDate) {
+            Join<BookEntity, UserBookProgressEntity> progress = root.join(
+                    "userBookProgress", jakarta.persistence.criteria.JoinType.LEFT);
+            progress.on(cb.equal(progress.get("user").get("id"), userId));
+            date = progress.get(dateField);
+            extra = cb.equal(progress.get(ATTR_READ_STATUS), ReadStatus.READ);
+        } else {
+            date = root.get(dateField);
+        }
+
+        var year = cb.function("YEAR", Integer.class, date);
+        var month = cb.function("MONTH", Integer.class, date);
+        query.multiselect(year, month, cb.countDistinct(root.get("id")));
+        query.where(cb.and(spec.toPredicate(root, query, cb), cb.isNotNull(date), extra));
+        query.groupBy(year, month);
+        query.orderBy(cb.asc(year), cb.asc(month));
+        return entityManager.createQuery(query).getResultList().stream()
+                .map(row -> new AppLibraryStats.MonthlyCount(
+                        row.get(0, Integer.class), row.get(1, Integer.class), row.get(2, Long.class)))
+                .toList();
+    }
+
+    long averageDaysToFinish(Specification<BookEntity> spec, Long userId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Double> query = cb.createQuery(Double.class);
+        Root<BookEntity> root = query.from(BookEntity.class);
+        Join<BookEntity, UserBookProgressEntity> progress = joinUserProgress(root, cb, userId);
+        var finished = progress.<Instant>get("dateFinished");
+        var added = root.<Instant>get(ATTR_ADDED_ON);
+        var days = cb.function("DATEDIFF", Integer.class, finished, added);
+        query.select(cb.avg(days));
+        query.where(cb.and(
+                spec.toPredicate(root, query, cb),
+                cb.equal(progress.get(ATTR_READ_STATUS), ReadStatus.READ),
+                cb.isNotNull(finished),
+                cb.isNotNull(added)));
+        Double result = entityManager.createQuery(query).getSingleResult();
+        return result == null ? 0 : Math.max(0, Math.round(result));
+    }
+
+    List<AppLibraryStats.AuthorStat> aggregateAuthors(Specification<BookEntity> spec, Long userId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<BookEntity> root = query.from(BookEntity.class);
+        Join<Object, Object> metadata = root.join(ATTR_METADATA);
+        Join<Object, Object> author = metadata.join(F_AUTHORS);
+        Join<BookEntity, UserBookProgressEntity> progress = joinUserProgress(root, cb, userId);
+        var authorName = author.<String>get("name");
+        var bookCount = cb.countDistinct(root.get("id"));
+        var totalPages = cb.sumAsLong(metadata.<Integer>get("pageCount"));
+        var averageRating = cb.avg(progress.<Integer>get(ATTR_PERSONAL_RATING));
+        var readCount = cb.sum(cb.<Long>selectCase()
+                .when(cb.equal(progress.get(ATTR_READ_STATUS), ReadStatus.READ), 1L)
+                .otherwise(0L));
+        query.multiselect(authorName, bookCount, totalPages, averageRating, readCount);
+        query.where(cb.and(spec.toPredicate(root, query, cb), cb.isNotNull(authorName)));
+        query.groupBy(author.get("id"), authorName);
+        query.having(cb.greaterThanOrEqualTo(bookCount, 2L));
+        query.orderBy(cb.desc(bookCount), cb.asc(authorName));
+        return entityManager.createQuery(query).setMaxResults(50).getResultList().stream()
+                .map(row -> new AppLibraryStats.AuthorStat(
+                        row.get(0, String.class),
+                        row.get(1, Long.class),
+                        Optional.ofNullable(row.get(2, Long.class)).orElse(0L),
+                        Optional.ofNullable(row.get(3, Double.class)).orElse(0D),
+                        Optional.ofNullable(row.get(4, Long.class)).orElse(0L)))
+                .toList();
+    }
+
+    List<AppLibraryStats.BookFlowCount> aggregateBookFlow(Specification<BookEntity> spec, Long userId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<BookEntity> root = query.from(BookEntity.class);
+        Join<BookEntity, UserBookProgressEntity> progress = joinUserProgress(root, cb, userId);
+        var added = root.<Instant>get(ATTR_ADDED_ON);
+        var year = cb.function("YEAR", Integer.class, added);
+        var quarter = cb.function("QUARTER", Integer.class, added);
+        var status = progress.<ReadStatus>get(ATTR_READ_STATUS);
+        var rating = progress.<Integer>get(ATTR_PERSONAL_RATING);
+        query.multiselect(year, quarter, status, rating, cb.countDistinct(root.get("id")));
+        query.where(cb.and(spec.toPredicate(root, query, cb), cb.isNotNull(added)));
+        query.groupBy(year, quarter, status, rating);
+        query.orderBy(cb.asc(year), cb.asc(quarter));
+        return entityManager.createQuery(query).getResultList().stream()
+                .map(row -> new AppLibraryStats.BookFlowCount(
+                        row.get(0, Integer.class),
+                        row.get(1, Integer.class),
+                        Optional.ofNullable(row.get(2, ReadStatus.class)).orElse(ReadStatus.UNSET).name(),
+                        row.get(3, Integer.class),
+                        row.get(4, Long.class)))
+                .toList();
+    }
+
+    List<AppLibraryStats.PublicationRatingCount> aggregatePublicationRatings(
+            Specification<BookEntity> spec, Long userId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<BookEntity> root = query.from(BookEntity.class);
+        Join<Object, Object> metadata = root.join(ATTR_METADATA);
+        Join<BookEntity, UserBookProgressEntity> progress = joinUserProgress(root, cb, userId);
+        var publishedDate = metadata.<java.time.LocalDate>get("publishedDate");
+        var year = cb.function("YEAR", Integer.class, publishedDate);
+        var rating = progress.<Integer>get(ATTR_PERSONAL_RATING);
+        query.multiselect(year, rating, cb.countDistinct(root.get("id")));
+        query.where(cb.and(
+                spec.toPredicate(root, query, cb),
+                cb.isNotNull(publishedDate),
+                cb.isNotNull(rating),
+                cb.greaterThan(rating, 0)));
+        query.groupBy(year, rating);
+        query.orderBy(cb.asc(year), cb.asc(rating));
+        return entityManager.createQuery(query).getResultList().stream()
+                .map(row -> new AppLibraryStats.PublicationRatingCount(
+                        row.get(0, Integer.class), row.get(1, Integer.class), row.get(2, Long.class)))
+                .toList();
+    }
+
+    List<AppLibraryStats.PageRatingCount> aggregatePageRatings(Specification<BookEntity> spec, Long userId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<BookEntity> root = query.from(BookEntity.class);
+        Join<Object, Object> metadata = root.join(ATTR_METADATA);
+        Join<BookEntity, UserBookProgressEntity> progress = joinUserProgress(root, cb, userId);
+        var pages = metadata.<Integer>get("pageCount");
+        var rating = progress.<Integer>get(ATTR_PERSONAL_RATING);
+        var status = progress.<ReadStatus>get(ATTR_READ_STATUS);
+        query.multiselect(pages, rating, status, cb.countDistinct(root.get("id")));
+        query.where(cb.and(
+                spec.toPredicate(root, query, cb),
+                cb.isNotNull(pages),
+                cb.greaterThan(pages, 0),
+                cb.isNotNull(rating),
+                cb.greaterThan(rating, 0)));
+        query.groupBy(pages, rating, status);
+        query.orderBy(cb.asc(pages), cb.asc(rating));
+        return entityManager.createQuery(query).getResultList().stream()
+                .map(row -> new AppLibraryStats.PageRatingCount(
+                        row.get(0, Integer.class),
+                        row.get(1, Integer.class),
+                        Optional.ofNullable(row.get(2, ReadStatus.class)).orElse(ReadStatus.UNSET).name(),
+                        row.get(3, Long.class)))
+                .toList();
+    }
+
+    List<AppLibraryStats.RatingTasteCount> aggregateRatingTaste(Specification<BookEntity> spec, Long userId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<BookEntity> root = query.from(BookEntity.class);
+        Join<Object, Object> metadata = root.join(ATTR_METADATA);
+        Join<BookEntity, UserBookProgressEntity> progress = joinUserProgress(root, cb, userId);
+        var personal = progress.<Integer>get(ATTR_PERSONAL_RATING);
+        var metadataRating = metadata.<Double>get("rating");
+        var goodreads = metadata.<Double>get("goodreadsRating");
+        var amazon = metadata.<Double>get("amazonRating");
+        var hardcover = metadata.<Double>get("hardcoverRating");
+        var lubimyczytac = metadata.<Double>get("lubimyczytacRating");
+        var ranobedb = metadata.<Double>get("ranobedbRating");
+        query.multiselect(personal, metadataRating, goodreads, amazon, hardcover, lubimyczytac, ranobedb,
+                cb.countDistinct(root.get("id")));
+        query.where(cb.and(
+                spec.toPredicate(root, query, cb),
+                cb.isNotNull(personal),
+                cb.greaterThan(personal, 0),
+                cb.or(
+                        cb.greaterThan(metadataRating, 0D),
+                        cb.greaterThan(goodreads, 0D),
+                        cb.greaterThan(amazon, 0D),
+                        cb.greaterThan(hardcover, 0D),
+                        cb.greaterThan(lubimyczytac, 0D),
+                        cb.greaterThan(ranobedb, 0D))));
+        query.groupBy(personal, metadataRating, goodreads, amazon, hardcover, lubimyczytac, ranobedb);
+        return entityManager.createQuery(query).getResultList().stream()
+                .map(row -> new AppLibraryStats.RatingTasteCount(
+                        row.get(0, Integer.class),
+                        row.get(1, Double.class),
+                        row.get(2, Double.class),
+                        row.get(3, Double.class),
+                        row.get(4, Double.class),
+                        row.get(5, Double.class),
+                        row.get(6, Double.class),
+                        row.get(7, Long.class)))
+                .toList();
+    }
+
+    private Join<BookEntity, UserBookProgressEntity> joinUserProgress(
+            Root<BookEntity> root, CriteriaBuilder cb, Long userId) {
+        Join<BookEntity, UserBookProgressEntity> progress = root.join(
+                "userBookProgress", jakarta.persistence.criteria.JoinType.LEFT);
+        progress.on(cb.equal(progress.get("user").get("id"), userId));
+        return progress;
     }
 
     private Map<Long, Long> countBooksByLibrary(Specification<BookEntity> spec) {
@@ -347,7 +624,7 @@ public class AppBookService {
                               AND (REPLACE(REPLACE(UPPER(m.isbn13), '-', ''), ' ', '') IN :isbns
                                    OR REPLACE(REPLACE(UPPER(m.isbn10), '-', ''), ' ', '') IN :isbns)
                             """, Tuple.class)
-                    .setParameter("libraryId", libraryId)
+                    .setParameter(PARAM_LIBRARY_ID, libraryId)
                     .setParameter("isbns", batch)
                     .getResultList();
             Set<Long> visibleBookIds = findVisibleBookIds(user, rows.stream()
@@ -676,7 +953,7 @@ public class AppBookService {
     private AppFilterOptions loadFilterOptions(BookLoreUser user, Long userId,
                                                Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
         if (shelfId == null && isUnrestricted(user, userId)) {
-            AppFilterOptions materialized = materializedFilterOptionsOrNull(user, userId, accessibleLibraryIds, libraryId);
+            AppFilterOptions materialized = materializedFilterOptionsOrNull(userId, accessibleLibraryIds, libraryId);
             if (materialized != null) {
                 return materialized;
             }
@@ -693,7 +970,7 @@ public class AppBookService {
             shelfClause = "AND b.id IN (SELECT sb.id FROM ShelfEntity s JOIN s.bookEntities sb WHERE s.id = :shelfId)";
         }
         if (libraryId != null) {
-            libraryClause = "AND b.library.id = :libraryId";
+            libraryClause = LIBRARY_ID_CLAUSE;
         } else if (accessibleLibraryIds != null) {
             libraryClause = "AND b.library.id IN :libraryIds";
         }
@@ -720,11 +997,11 @@ public class AppBookService {
                 .toList();
 
         List<AppFilterOptions.CountedOption> fileTypes = queryCountedOptions(
-                "bf.bookType", "JOIN b.bookFiles bf", "AND bf.isBookFormat = true",
+                "bf.bookType", BOOK_FILES_JOIN, BOOK_FORMAT_CLAUSE,
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> categories = queryCountedOptions(
-                "c.name", "JOIN b.metadata m JOIN m.categories c", "",
+                COL_C_NAME, "JOIN b.metadata m JOIN m.categories c", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> publishers = queryCountedOptions(
@@ -738,7 +1015,7 @@ public class AppBookService {
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> tags = queryCountedOptions(
-                "t.name", "JOIN b.metadata m JOIN m.tags t", "",
+                COL_T_NAME, "JOIN b.metadata m JOIN m.tags t", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> moods = queryCountedOptions(
@@ -800,7 +1077,7 @@ public class AppBookService {
                 "  WHEN bf.fileSizeKb < 2097152 THEN '6' " +
                 "  ELSE '7' " +
                 "END",
-                "JOIN b.bookFiles bf", "AND bf.isBookFormat = true",
+                BOOK_FILES_JOIN, BOOK_FORMAT_CLAUSE,
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         String personalRatingQuery = "SELECT CAST(ubp.personalRating AS string), COUNT(DISTINCT ubp.book.id) " +
@@ -842,11 +1119,11 @@ public class AppBookService {
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> comicCharacters = queryCountedOptions(
-                "c.name", "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.characters c", "",
+                COL_C_NAME, "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.characters c", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> comicTeams = queryCountedOptions(
-                "t.name", "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.teams t", "",
+                COL_T_NAME, "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.teams t", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId);
 
         List<AppFilterOptions.CountedOption> comicLocations = queryCountedOptions(
@@ -971,9 +1248,9 @@ public class AppBookService {
         f.put(F_LANGUAGES, queryCountedOptions("m.language", METADATA_JOIN_CLAUSE,
                 "AND m.language IS NOT NULL AND m.language <> ''",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId));
-        f.put(F_FILE_TYPES, queryCountedOptions("bf.bookType", "JOIN b.bookFiles bf",
-                "AND bf.isBookFormat = true", scopeClause, accessibleLibraryIds, libraryId, shelfId));
-        f.put(F_CATEGORIES, queryCountedOptions("c.name", "JOIN b.metadata m JOIN m.categories c", "",
+        f.put(F_FILE_TYPES, queryCountedOptions("bf.bookType", BOOK_FILES_JOIN,
+                BOOK_FORMAT_CLAUSE, scopeClause, accessibleLibraryIds, libraryId, shelfId));
+        f.put(F_CATEGORIES, queryCountedOptions(COL_C_NAME, "JOIN b.metadata m JOIN m.categories c", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId));
         f.put(F_PUBLISHERS, queryCountedOptions("m.publisher", METADATA_JOIN_CLAUSE,
                 "AND m.publisher IS NOT NULL AND m.publisher <> ''",
@@ -981,7 +1258,7 @@ public class AppBookService {
         f.put(F_SERIES, queryCountedOptions("m.seriesName", METADATA_JOIN_CLAUSE,
                 "AND m.seriesName IS NOT NULL AND m.seriesName <> ''",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId));
-        f.put(F_TAGS, queryCountedOptions("t.name", "JOIN b.metadata m JOIN m.tags t", "",
+        f.put(F_TAGS, queryCountedOptions(COL_T_NAME, "JOIN b.metadata m JOIN m.tags t", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId));
         f.put(F_MOODS, queryCountedOptions("mo.name", "JOIN b.metadata m JOIN m.moods mo", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId));
@@ -1029,7 +1306,7 @@ public class AppBookService {
                 "  WHEN bf.fileSizeKb < 2097152 THEN '6' " +
                 "  ELSE '7' " +
                 "END",
-                "JOIN b.bookFiles bf", "AND bf.isBookFormat = true",
+                BOOK_FILES_JOIN, BOOK_FORMAT_CLAUSE,
                 scopeClause, accessibleLibraryIds, libraryId, shelfId));
         f.put(F_AMAZON_RATINGS, queryRatingBuckets("m.amazonRating", scopeClause, accessibleLibraryIds, libraryId, shelfId));
         f.put(F_GOODREADS_RATINGS, queryRatingBuckets("m.goodreadsRating", scopeClause, accessibleLibraryIds, libraryId, shelfId));
@@ -1052,10 +1329,10 @@ public class AppBookService {
         f.put(F_SHELF_STATUSES, queryGroupedCount(
                 "CASE WHEN (SELECT COUNT(s) FROM b.shelves s) > 0 THEN 'shelved' ELSE 'unshelved' END",
                 "", "", scopeClause, accessibleLibraryIds, libraryId, shelfId));
-        f.put(F_COMIC_CHARACTERS, queryCountedOptions("c.name",
+        f.put(F_COMIC_CHARACTERS, queryCountedOptions(COL_C_NAME,
                 "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.characters c", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId));
-        f.put(F_COMIC_TEAMS, queryCountedOptions("t.name",
+        f.put(F_COMIC_TEAMS, queryCountedOptions(COL_T_NAME,
                 "JOIN b.metadata m JOIN m.comicMetadata cm JOIN cm.teams t", "",
                 scopeClause, accessibleLibraryIds, libraryId, shelfId));
         f.put(F_COMIC_LOCATIONS, queryCountedOptions("l.name",
@@ -1069,6 +1346,9 @@ public class AppBookService {
         return f;
     }
 
+    // Safe: the JPQL is assembled from internally-defined clause fragments only; every user-supplied
+    // value (library/shelf ids) is bound as a named parameter via setFilterQueryParams, never concatenated.
+    @SuppressWarnings("java:S2077")
     private List<AppFilterOptions.CountedOption> queryComicCreators(
             String scopeClause, Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
         String creatorJpql = "SELECT cr.name, mapping.role, COUNT(DISTINCT b.id) FROM BookEntity b"
@@ -1086,6 +1366,9 @@ public class AppBookService {
                 .toList();
     }
 
+    // Safe: the JPQL is assembled from internally-defined clause fragments only; every user-supplied
+    // value (user/library/shelf ids) is bound as a named parameter, never concatenated.
+    @SuppressWarnings("java:S2077")
     private List<AppFilterOptions.CountedOption> queryPersonalRatingCounts(
             Long userId, String scopeClause, Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
         String jpql = "SELECT CAST(ubp.personalRating AS string), COUNT(DISTINCT ubp.book.id) "
@@ -1154,7 +1437,7 @@ public class AppBookService {
         return user.getPermissions().isAdmin() || restrictionQueryScope(userId).clause().isEmpty();
     }
 
-    private AppFilterOptions materializedFilterOptionsOrNull(BookLoreUser user, Long userId,
+    private AppFilterOptions materializedFilterOptionsOrNull(Long userId,
                                                              Set<Long> accessibleLibraryIds, Long libraryId) {
         List<Long> targetLibraryIds = resolveTargetLibraryIds(accessibleLibraryIds, libraryId);
         if (targetLibraryIds.isEmpty()) {
@@ -1194,7 +1477,7 @@ public class AppBookService {
     private String unrestrictedFacetScope(Set<Long> accessibleLibraryIds, Long libraryId) {
         String libraryClause = "";
         if (libraryId != null) {
-            libraryClause = "AND b.library.id = :libraryId";
+            libraryClause = LIBRARY_ID_CLAUSE;
         } else if (accessibleLibraryIds != null) {
             libraryClause = "AND b.library.id IN :libraryIds";
         }
@@ -1227,7 +1510,7 @@ public class AppBookService {
      */
     @Transactional
     public void recomputeLibraryFacetCounts(Long libraryId) {
-        String scopeClause = "AND b.library.id = :libraryId" + visibilityClause(findShellBookIds());
+        String scopeClause = LIBRARY_ID_CLAUSE + visibilityClause(findShellBookIds());
         Map<String, List<AppFilterOptions.CountedOption>> global =
                 buildGlobalFacets(scopeClause, null, libraryId, null);
         libraryFacetCountRepository.deleteByLibraryId(libraryId);
@@ -1274,7 +1557,7 @@ public class AppBookService {
         Tuple t = entityManager.createQuery(
                         "SELECT MAX(b.addedOn), MAX(b.scannedOn), MAX(b.metadataUpdatedAt), MAX(b.deletedAt) "
                                 + "FROM BookEntity b WHERE b.library.id = :libraryId", Tuple.class)
-                .setParameter("libraryId", libraryId)
+                .setParameter(PARAM_LIBRARY_ID, libraryId)
                 .getSingleResult();
         return Stream.of(t.get(0, Instant.class), t.get(1, Instant.class),
                         t.get(2, Instant.class), t.get(3, Instant.class))
@@ -1523,12 +1806,24 @@ public class AppBookService {
      */
     private Specification<BookEntity> buildAggregateSpecification(
             Set<Long> accessibleLibraryIds, Long userId, boolean isAdmin) {
+        return buildAggregateSpecification(accessibleLibraryIds, null, userId, isAdmin);
+    }
+
+    private Specification<BookEntity> buildAggregateSpecification(
+            Set<Long> accessibleLibraryIds, Long libraryId, Long userId, boolean isAdmin) {
         List<Specification<BookEntity>> specs = new ArrayList<>();
         specs.add(BookSpecifications.notDeleted());
         specs.add(BookSpecifications.notShellBook(findShellBookIds(), MAX_SHELL_IDS_IN_CLAUSE));
         specs.add(contentRestrictions(userId, isAdmin));
         if (accessibleLibraryIds != null) {
-            specs.add(BookSpecifications.inLibraries(accessibleLibraryIds));
+            if (libraryId != null && !accessibleLibraryIds.contains(libraryId)) {
+                throw ApiError.FORBIDDEN.createException(ACCESS_DENIED_TO_LIBRARY_MESSAGE + libraryId);
+            }
+            specs.add(libraryId != null
+                    ? BookSpecifications.inLibrary(libraryId)
+                    : BookSpecifications.inLibraries(accessibleLibraryIds));
+        } else if (libraryId != null) {
+            specs.add(BookSpecifications.inLibrary(libraryId));
         }
         return BookSpecifications.combine(specs.toArray(Specification[]::new));
     }
@@ -1641,7 +1936,7 @@ public class AppBookService {
 
     private void setFilterQueryParams(Query query, Set<Long> accessibleLibraryIds, Long libraryId, Long shelfId) {
         if (libraryId != null) {
-            query.setParameter("libraryId", libraryId);
+            query.setParameter(PARAM_LIBRARY_ID, libraryId);
         } else if (accessibleLibraryIds != null) {
             query.setParameter("libraryIds", accessibleLibraryIds);
         }

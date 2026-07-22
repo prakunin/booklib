@@ -97,6 +97,7 @@ describe('MetadataViewerComponent', () => {
     return `${key}:${Object.entries(params).map(([paramKey, value]) => `${paramKey}=${value}`).join(',')}`;
   });
   const getCoverUrl = vi.fn((bookId: number, updatedOn?: string) => `cover:${bookId}:${updatedOn ?? 'none'}`);
+  const getDirectCoverUrl = vi.fn((bookId: number) => `direct-cover:${bookId}`);
   const getAudiobookCoverUrl = vi.fn((bookId: number, updatedOn?: string) => `audio:${bookId}:${updatedOn ?? 'none'}`);
   const getThumbnailUrl = vi.fn((bookId: number, updatedOn?: string) => `thumb:${bookId}:${updatedOn ?? 'none'}`);
 
@@ -237,7 +238,7 @@ describe('MetadataViewerComponent', () => {
         {provide: BookFileService, useValue: {downloadFile, downloadAdditionalFile, downloadAllFiles, deleteAdditionalFile, deleteBookFile, detachBookFile}},
         {provide: TaskHelperService, useValue: {refreshMetadataTask}},
         {provide: AuthorService, useValue: {getAuthorByName}},
-        {provide: UrlHelperService, useValue: {getCoverUrl, getAudiobookCoverUrl, getThumbnailUrl}},
+        {provide: UrlHelperService, useValue: {getCoverUrl, getDirectCoverUrl: vi.fn(() => 'direct-cover'), getAudiobookCoverUrl, getThumbnailUrl}},
         {provide: UserService, useValue: {currentUser}},
         {provide: AppSettingsService, useValue: {appSettings}},
         {provide: ConfirmationService, useValue: {confirm}},
@@ -394,13 +395,15 @@ describe('MetadataViewerComponent', () => {
   it('opens cover search for the primary book format', async () => {
     const component = createComponent();
 
-    await component.openCoverSearch(createBook());
-    expect(openCoverSearchDialog).toHaveBeenLastCalledWith(21, 'ebook');
+    const ebook = createBook();
+    await component.openCoverSearch(ebook);
+    expect(openCoverSearchDialog).toHaveBeenLastCalledWith(ebook, 'ebook');
 
-    await component.openCoverSearch(createBook({
+    const audiobook = createBook({
       primaryFile: createFile(2, {bookId: 21, bookType: 'AUDIOBOOK'}),
-    }));
-    expect(openCoverSearchDialog).toHaveBeenLastCalledWith(21, 'audiobook');
+    });
+    await component.openCoverSearch(audiobook);
+    expect(openCoverSearchDialog).toHaveBeenLastCalledWith(audiobook, 'audiobook');
   });
 
   it('chooses confirmation copy for file deletion branches and runs the accept callbacks', () => {

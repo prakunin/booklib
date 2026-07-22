@@ -2,9 +2,9 @@ import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {ChartConfiguration, ChartData} from 'chart.js';
 import {Tooltip} from 'primeng/tooltip';
-import {BookService} from '../../../../../book/service/book.service';
 import {Book, ReadStatus} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {UserBookStatsService} from '../../service/user-book-stats.service';
 
 interface ReadingDNAProfile {
   adventurous: number;
@@ -34,15 +34,9 @@ type ReadingDNAChartData = ChartData<'radar', number[], string>;
   styleUrls: ['./reading-dna-chart.component.scss']
 })
 export class ReadingDNAChartComponent {
-  private readonly bookService = inject(BookService);
+  private readonly userBookStats = inject(UserBookStatsService);
   private readonly t = inject(TranslocoService);
-  private readonly profile = computed(() => {
-    if (this.bookService.isBooksLoading()) {
-      return null;
-    }
-
-    return this.calculateReadingDNAData(this.bookService.books());
-  });
+  private readonly profile = computed(() => this.calculateAggregatedProfile());
 
   public readonly chartType = 'radar' as const;
 
@@ -179,6 +173,37 @@ export class ReadingDNAChartComponent {
     const profile = this.profile();
     return profile ? this.buildPersonalityInsights(profile) : [];
   });
+
+  private calculateAggregatedProfile(): ReadingDNAProfile | null {
+    const snapshot = this.userBookStats.data();
+    if (!snapshot || snapshot.totalBooks === 0) return null;
+    const facets = snapshot.facets;
+    const total = snapshot.totalBooks;
+    const count = (items: {name: string; count: number}[], predicate: (name: string) => boolean) =>
+      items.filter(item => predicate(item.name)).reduce((sum, item) => sum + item.count, 0);
+    const status = (value: ReadStatus) => facets.readStatuses.find(item => item.name === value)?.count ?? 0;
+    const rated = facets.personalRatings.reduce((sum, item) => sum + item.count, 0);
+    const highRated = count(facets.personalRatings, name => Number(name) >= 8);
+    const longBooks = count(facets.pageCounts, name => Number(name) >= 4);
+    const oldBooks = count(facets.publishedYears, name => Number(name) < 2000);
+    const externalRated = Math.max(
+      ...[facets.goodreadsRatings, facets.amazonRatings, facets.hardcoverRatings]
+        .map(items => items.reduce((sum, item) => sum + item.count, 0)),
+      0
+    );
+    const read = status(ReadStatus.READ);
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
+    return {
+      adventurous: clamp(facets.categories.length * 3 + Math.max(0, facets.languages.length - 1) * 12),
+      perfectionist: clamp(read / total * 60 + (rated ? highRated / rated * 40 : 0)),
+      intellectual: clamp(longBooks / total * 70 + facets.categories.length),
+      emotional: clamp(rated / total * 100),
+      patient: clamp(longBooks / total * 60 + facets.series.length / Math.max(1, total) * 100),
+      social: clamp(externalRated / total * 100),
+      nostalgic: clamp(oldBooks / total * 100),
+      ambitious: clamp(read / total * 50 + longBooks / total * 50)
+    };
+  }
 
   private calculateReadingDNAData(books: Book[]): ReadingDNAProfile | null {
     if (books.length === 0) {

@@ -12,7 +12,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class AuthorLocalResolverTest {
@@ -52,7 +51,7 @@ class AuthorLocalResolverTest {
         @Test
         void cleansNameBeforeLookup() {
             when(repo.findByName("James M. Ward")).thenReturn(Optional.empty());
-            when(creator.createInNewTransaction(eq("James M. Ward"), eq("james m ward")))
+            when(creator.createInNewTransaction("James M. Ward", "james m ward"))
                     .thenReturn(AuthorEntity.builder().id(1L).name("James M. Ward").build());
 
             AuthorEntity result = resolver.resolve("  James   M. Ward  ").orElseThrow();

@@ -1111,7 +1111,7 @@ export class MetadataEditorComponent implements OnInit {
   }
 
   async openCoverSearch() {
-    const ref = await this.bookDialogHelperService.openCoverSearchDialog(this.currentBookId, 'ebook');
+    const ref = await this.bookDialogHelperService.openCoverSearchDialog(this.currentBook ?? this.currentBookId, 'ebook');
     ref?.onClose.pipe(
       take(1),
       filter(result => !!result),
@@ -1201,7 +1201,7 @@ export class MetadataEditorComponent implements OnInit {
   }
 
   async openAudiobookCoverSearch() {
-    const ref = await this.bookDialogHelperService.openCoverSearchDialog(this.currentBookId, 'audiobook');
+    const ref = await this.bookDialogHelperService.openCoverSearchDialog(this.currentBook ?? this.currentBookId, 'audiobook');
     ref?.onClose.pipe(
       take(1),
       filter(result => !!result),

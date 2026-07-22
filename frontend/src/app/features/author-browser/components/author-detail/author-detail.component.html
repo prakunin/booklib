@@ -97,14 +97,24 @@
 
             @if (authorBooks(); as books) {
               <div class="books-section">
-                <h3 class="section-title">{{ t('booksBy', {name: author.name}) }} ({{ books.length }})</h3>
-                @if (books.length === 0) {
+                <h3 class="section-title">{{ t('booksBy', {name: author.name}) }} ({{ authorBookCount() }})</h3>
+                @if (booksLoading()) {
+                  <div class="books-loading">
+                    <p-progressSpinner strokeWidth="4" fill="transparent" animationDuration=".8s">
+                    </p-progressSpinner>
+                  </div>
+                } @else if (booksLoadError()) {
+                  <div class="empty-books">
+                    <i class="pi pi-exclamation-circle"></i>
+                    <p>{{ 'common.error' | transloco }}</p>
+                  </div>
+                } @else if (books.length === 0) {
                   <div class="empty-books">
                     <i class="pi pi-book"></i>
                     <p>{{ t('noBooksFound') }}</p>
                   </div>
                 } @else {
-                  <div #scrollElement class="author-books-scroller virtual-scroller">
+                  <div #scrollElement class="author-books-scroller virtual-scroller" (scroll)="onBooksScroll()">
                     <div class="virtual-content" [style.height.px]="virtualGrid.virtualizer.getTotalSize()">
                       @for (virtualItem of virtualGrid.virtualizer.getVirtualItems(); track virtualItem.key) {
                         @if (books[virtualItem.index]; as book) {
@@ -127,6 +137,16 @@
                         }
                       }
                     </div>
+                    @if (isFetchingNextPage()) {
+                      <div class="loading-more">
+                        <p-progressSpinner
+                          [style]="{'width': '28px', 'height': '28px'}"
+                          strokeWidth="3"
+                          fill="transparent"
+                          animationDuration="1.5s">
+                        </p-progressSpinner>
+                      </div>
+                    }
                   </div>
                 }
               </div>

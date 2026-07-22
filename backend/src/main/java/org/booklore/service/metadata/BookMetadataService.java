@@ -27,6 +27,7 @@ import org.booklore.service.metadata.extractor.CbxMetadataExtractor;
 import org.booklore.service.metadata.extractor.MetadataExtractorFactory;
 import org.booklore.service.metadata.parser.BookParser;
 import org.booklore.service.metadata.parser.DetailedMetadataProvider;
+import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.model.dto.request.MetadataRefreshOptions;
 import org.booklore.util.FileUtils;
@@ -38,6 +39,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
+import java.io.File;
 import org.booklore.model.dto.request.IsbnLookupRequest;
 
 import java.lang.reflect.Method;
@@ -63,6 +65,7 @@ public class BookMetadataService {
     private final MetadataClearFlagsMapper metadataClearFlagsMapper;
     private final PlatformTransactionManager transactionManager;
     private final AppSettingService appSettingService;
+    private final ArchivedBookContentService archivedBookContentService;
 
     @Transactional
     public BookMetadata updateBookMetadata(long bookId, MetadataUpdateWrapper metadataUpdateWrapper,
@@ -223,7 +226,13 @@ public class BookMetadataService {
         if (primaryFile == null) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Book has no file to extract metadata from");
         }
-        return metadataExtractorFactory.extractMetadata(primaryFile.getBookType(), FileUtils.getBookFullPath(bookEntity).toFile());
+        // INPX books are represented by the source ZIP in the library, while the
+        // extractor expects the actual FB2 entry. Resolve the archived entry first;
+        // passing the ZIP directly makes extraction silently return null.
+        File file = (primaryFile.isArchivedSource()
+                ? archivedBookContentService.resolve(primaryFile)
+                : FileUtils.getBookFullPath(bookEntity)).toFile();
+        return metadataExtractorFactory.extractMetadata(primaryFile.getBookType(), file);
     }
 
     @Transactional

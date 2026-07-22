@@ -114,11 +114,9 @@ export class BookMetadataManageService {
     return this.url + '/' + bookId + '/metadata/cover/upload';
   }
 
-  uploadCoverFromUrl(bookId: number, url: string): Observable<BookMetadata> {
-    return this.http.post<BookMetadata>(`${this.url}/${bookId}/metadata/cover/from-url`, {url}).pipe(
-      tap(updatedMetadata => {
-        patchBookMetadataInCache(this.queryClient, bookId, updatedMetadata);
-      })
+  uploadCoverFromUrl(bookId: number, url: string): Observable<void> {
+    return this.http.post<void>(`${this.url}/${bookId}/metadata/cover/from-url`, {url}).pipe(
+      tap(() => invalidateBookQueries(this.queryClient, [bookId]))
     );
   }
 
@@ -166,11 +164,9 @@ export class BookMetadataManageService {
     );
   }
 
-  uploadAudiobookCoverFromUrl(bookId: number, url: string): Observable<BookMetadata> {
-    return this.http.post<BookMetadata>(`${this.url}/${bookId}/metadata/audiobook-cover/from-url`, {url}).pipe(
-      tap(updatedMetadata => {
-        patchBookMetadataInCache(this.queryClient, bookId, updatedMetadata);
-      })
+  uploadAudiobookCoverFromUrl(bookId: number, url: string): Observable<void> {
+    return this.http.post<void>(`${this.url}/${bookId}/metadata/audiobook-cover/from-url`, {url}).pipe(
+      tap(() => invalidateBookQueries(this.queryClient, [bookId]))
     );
   }
 

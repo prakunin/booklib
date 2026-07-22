@@ -29,7 +29,7 @@ describe('MetadataTabsComponent default tab selection', () => {
         getTranslocoModule({translocoConfig: {reRenderOnLangChange: false}}),
       ],
       providers: [
-        {provide: UrlHelperService, useValue: {getCoverUrl: () => null, getAudiobookCoverUrl: () => null}},
+        {provide: UrlHelperService, useValue: {getCoverUrl: () => null, getDirectCoverUrl: () => 'direct-cover', getAudiobookCoverUrl: () => null}},
         {provide: BookMetadataManageService, useValue: {supportsDualCovers: () => false}},
         {provide: AudiobookService, useValue: {getAudiobookInfo: () => undefined}},
       ],

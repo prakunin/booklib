@@ -1,8 +1,5 @@
 <ng-container *transloco="let t; prefix: 'statsUser'">
 <div class="user-stats-container">
-  @if (catalogTooLarge()) {
-    <app-message color="amber">{{ t('main.catalogTooLarge') }}</app-message>
-  } @else {
   <div class="header-section">
     <div class="header-content">
       <div class="greeting">
@@ -146,6 +143,5 @@
       </div>
     }
   </div>
-  }
 </div>
 </ng-container>

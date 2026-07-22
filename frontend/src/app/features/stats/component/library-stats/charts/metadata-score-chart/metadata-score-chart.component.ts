@@ -1,10 +1,8 @@
 import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {LibraryFilterService} from '../../service/library-filter.service';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {LibraryStatsApiService} from '../../service/library-stats-api.service';
 
 interface ScoreStats {
   range: string;
@@ -32,22 +30,19 @@ const SCORE_RANGE_DEFS: { key: ScoreRangeKey; min: number; max: number; color: s
   styleUrls: ['./metadata-score-chart.component.scss']
 })
 export class MetadataScoreChartComponent {
-  private readonly bookService = inject(BookService);
-  private readonly libraryFilterService = inject(LibraryFilterService);
+  private readonly libraryStats = inject(LibraryStatsApiService);
   private readonly t = inject(TranslocoService);
-  private readonly booksWithScore = computed(() => {
-    if (this.bookService.isBooksLoading()) {
-      return [];
-    }
-
-    const filteredBooks = this.filterBooksByLibrary(this.bookService.books(), this.libraryFilterService.selectedLibrary());
-    return filteredBooks.filter(b => b.metadataMatchScore != null && b.metadataMatchScore >= 0);
-  });
 
   public readonly chartType = 'doughnut' as const;
-  public readonly scoreStats = computed(() => this.calculateScoreStats(this.booksWithScore()));
-  public readonly totalBooks = computed(() => this.booksWithScore().length);
-  public readonly averageScore = computed(() => this.calculateAverageScore(this.booksWithScore()));
+  public readonly scoreStats = computed(() => this.calculateScoreStats());
+  public readonly totalBooks = computed(() => this.scoreStats().reduce((sum, item) => sum + item.count, 0));
+  public readonly averageScore = computed(() => {
+    const midpoints = [98, 92, 85, 75, 60, 40, 15];
+    const options = this.libraryStats.facets()?.matchScores ?? [];
+    const total = options.reduce((sum, item) => sum + item.count, 0);
+    if (total === 0) return 0;
+    return Math.round(options.reduce((sum, item) => sum + (midpoints[Number(item.name)] ?? 0) * item.count, 0) / total);
+  });
 
   public readonly chartOptions: ChartConfiguration<'doughnut'>['options'] = {
     responsive: true,
@@ -113,50 +108,23 @@ export class MetadataScoreChartComponent {
     };
   });
 
-  private filterBooksByLibrary(books: Book[], selectedLibraryId: number | null): Book[] {
-    return selectedLibraryId
-      ? books.filter(book => book.libraryId === selectedLibraryId)
-      : books;
-  }
-
-  private calculateScoreStats(books: Book[]): ScoreStats[] {
-    const rangeCounts = new Map<string, { count: number, color: string }>();
-
-    SCORE_RANGE_DEFS.forEach(range => {
-      rangeCounts.set(range.key, {count: 0, color: range.color});
-    });
-
-    books.forEach(book => {
-      const score = book.metadataMatchScore!;
-      for (const range of SCORE_RANGE_DEFS) {
-        if (score >= range.min && score <= range.max) {
-          const data = rangeCounts.get(range.key)!;
-          data.count++;
-          break;
-        }
-      }
-    });
-
-    const total = books.length;
+  private calculateScoreStats(): ScoreStats[] {
+    const source = new Map((this.libraryStats.facets()?.matchScores ?? []).map(item => [Number(item.name), item.count]));
+    const counts = [
+      (source.get(0) ?? 0) + (source.get(1) ?? 0),
+      (source.get(2) ?? 0) + (source.get(3) ?? 0),
+      source.get(4) ?? 0,
+      source.get(5) ?? 0,
+      source.get(6) ?? 0
+    ];
+    const total = counts.reduce((sum, count) => sum + count, 0);
     return SCORE_RANGE_DEFS
-      .map(range => {
-        const data = rangeCounts.get(range.key)!;
-        return {
-          range: this.t.translate(`statsLibrary.metadataScore.${range.key}`),
-          count: data.count,
-          percentage: (data.count / total) * 100,
-          color: data.color
-        };
-      })
+      .map((range, index) => ({
+        range: this.t.translate(`statsLibrary.metadataScore.${range.key}`),
+        count: counts[index],
+        percentage: total > 0 ? counts[index] / total * 100 : 0,
+        color: range.color
+      }))
       .filter(stat => stat.count > 0);
-  }
-
-  private calculateAverageScore(books: Book[]): number {
-    if (books.length === 0) {
-      return 0;
-    }
-
-    const total = books.reduce((sum, book) => sum + (book.metadataMatchScore || 0), 0);
-    return Math.round(total / books.length);
   }
 }

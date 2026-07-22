@@ -4,11 +4,11 @@ import {BaseChartDirective} from 'ng2-charts';
 import {ChartConfiguration, ChartData, TooltipItem} from 'chart.js';
 import {BehaviorSubject, Observable} from 'rxjs';
 import {Select} from 'primeng/select';
-import {LibraryFilterService} from '../../service/library-filter.service';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book, ReadStatus} from '../../../../../book/model/book.model';
+import {ReadStatus} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {NgClass, AsyncPipe} from '@angular/common';
+import {LibraryStatsApiService} from '../../service/library-stats-api.service';
+import {CountedOption} from '../../../../../book/model/app-book.model';
 
 interface ItemStats {
   name: string;
@@ -35,42 +35,6 @@ const DATA_TYPE_DEFS: { key: string; value: DataType; icon: string; color: strin
   {key: 'moods', value: 'moods', icon: 'pi-heart', color: '#EA580C'}
 ];
 
-const READ_STATUS_KEYS: Record<ReadStatus, string> = {
-  [ReadStatus.READ]: 'read',
-  [ReadStatus.READING]: 'reading',
-  [ReadStatus.RE_READING]: 'reReading',
-  [ReadStatus.UNREAD]: 'unread',
-  [ReadStatus.PARTIALLY_READ]: 'partiallyRead',
-  [ReadStatus.PAUSED]: 'paused',
-  [ReadStatus.WONT_READ]: 'wontRead',
-  [ReadStatus.ABANDONED]: 'abandoned',
-  [ReadStatus.UNSET]: 'notSet'
-};
-
-const READ_STATUS_COLORS: Record<ReadStatus, string> = {
-  [ReadStatus.READ]: '#22c55e',
-  [ReadStatus.READING]: '#3b82f6',
-  [ReadStatus.RE_READING]: '#8b5cf6',
-  [ReadStatus.UNREAD]: '#6b7280',
-  [ReadStatus.PARTIALLY_READ]: '#f59e0b',
-  [ReadStatus.PAUSED]: '#eab308',
-  [ReadStatus.WONT_READ]: '#ef4444',
-  [ReadStatus.ABANDONED]: '#dc2626',
-  [ReadStatus.UNSET]: '#9ca3af'
-};
-
-const READ_STATUS_ORDER: ReadStatus[] = [
-  ReadStatus.READ,
-  ReadStatus.READING,
-  ReadStatus.RE_READING,
-  ReadStatus.PARTIALLY_READ,
-  ReadStatus.PAUSED,
-  ReadStatus.UNREAD,
-  ReadStatus.WONT_READ,
-  ReadStatus.ABANDONED,
-  ReadStatus.UNSET
-];
-
 @Component({
   selector: 'app-top-items-chart',
   standalone: true,
@@ -93,19 +57,14 @@ export class TopItemsChartComponent implements OnInit {
   public totalBooks = 0;
   public insights: { icon: string; label: string; value: string }[] = [];
 
-  private readonly bookService = inject(BookService);
-  private readonly libraryFilterService = inject(LibraryFilterService);
+  private readonly libraryStats = inject(LibraryStatsApiService);
   private readonly t = inject(TranslocoService);
   private readonly syncChartEffect = effect(() => {
-    if (this.bookService.isBooksLoading()) {
-      return;
-    }
-
-    this.loadAndProcessData(this.bookService.books(), this.libraryFilterService.selectedLibrary());
+    this.libraryStats.data();
+    this.processData();
   });
   private readonly chartDataSubject: BehaviorSubject<ItemChartData>;
   private lastCalculatedStats: ItemStats[] = [];
-  private allBooks: Book[] = [];
 
   constructor() {
     this.dataTypeOptions = DATA_TYPE_DEFS.map(def => ({
@@ -230,19 +189,8 @@ export class TopItemsChartComponent implements OnInit {
     };
   }
 
-  private loadAndProcessData(books: Book[], selectedLibraryId: number | null): void {
-    if (books.length === 0) {
-      this.allBooks = [];
-      this.updateChartData([]);
-      return;
-    }
-
-    this.allBooks = this.filterBooksByLibrary(books, selectedLibraryId);
-    this.processData();
-  }
-
   private processData(): void {
-    const stats = this.calculateStats(this.allBooks);
+    const stats = this.calculateStats(this.optionsForSelectedType());
     this.updateChartData(stats);
   }
 
@@ -254,23 +202,17 @@ export class TopItemsChartComponent implements OnInit {
 
       const labels = stats.map(s => this.truncateTitle(s.name, 30));
 
-      const datasets = READ_STATUS_ORDER
-        .filter(status => stats.some(s => s.statusBreakdown[status] > 0))
-        .map(status => {
-          const statusKey = READ_STATUS_KEYS[status];
-          const color = READ_STATUS_COLORS[status];
-          return {
-            label: this.t.translate(`statsLibrary.topItems.readStatus.${statusKey}`),
-            data: stats.map(s => s.statusBreakdown[status]),
-            backgroundColor: color,
-            borderColor: color,
-            borderWidth: 1,
-            borderRadius: 4,
-            barPercentage: 0.85,
-            categoryPercentage: 0.8,
-            hoverBorderWidth: 2,
-          };
-        });
+      const datasets = [{
+        label: this.selectedDataType.label,
+        data: stats.map(item => item.count),
+        backgroundColor: this.selectedDataType.color,
+        borderColor: this.selectedDataType.color,
+        borderWidth: 1,
+        borderRadius: 4,
+        barPercentage: 0.85,
+        categoryPercentage: 0.8,
+        hoverBorderWidth: 2,
+      }];
 
       this.chartDataSubject.next({
         labels,
@@ -297,28 +239,10 @@ export class TopItemsChartComponent implements OnInit {
       value: this.t.translate('statsLibrary.topItems.insightTopValue', {name: top.name, count: top.count})
     });
 
-    // 2. Most completed - highest read percentage
-    const withReads = stats.filter(s => s.count >= 2);
-    if (withReads.length > 0) {
-      const mostRead = withReads.reduce((best, curr) => {
-        const bestPct = best.statusBreakdown[ReadStatus.READ] / best.count;
-        const currPct = curr.statusBreakdown[ReadStatus.READ] / curr.count;
-        return currPct > bestPct ? curr : best;
-      }, withReads[0]);
-      const readPct = Math.round((mostRead.statusBreakdown[ReadStatus.READ] / mostRead.count) * 100);
-      if (readPct > 0) {
-        this.insights.push({
-          icon: 'pi-check-circle',
-          label: this.t.translate('statsLibrary.topItems.insightMostCompleted'),
-          value: this.t.translate('statsLibrary.topItems.insightMostCompletedValue', {name: mostRead.name, percent: readPct})
-        });
-      }
-    }
-
-    // 3. Top 5 concentration
+    // 2. Top 5 concentration
     if (stats.length >= 5) {
       const top5Books = stats.slice(0, 5).reduce((sum, s) => sum + s.count, 0);
-      const totalAllBooks = this.allBooks.length;
+      const totalAllBooks = this.libraryStats.data()?.totalBooks ?? 0;
       if (totalAllBooks > 0) {
         const concentration = Math.round((top5Books / totalAllBooks) * 100);
         this.insights.push({
@@ -329,7 +253,7 @@ export class TopItemsChartComponent implements OnInit {
       }
     }
 
-    // 4. Average books per item
+    // 3. Average books per item
     if (stats.length > 0) {
       const avgBooks = (this.totalBooks / stats.length).toFixed(1);
       this.insights.push({
@@ -340,41 +264,20 @@ export class TopItemsChartComponent implements OnInit {
     }
   }
 
-  private calculateStats(books: Book[]): ItemStats[] {
-    if (books.length === 0) {
-      return [];
-    }
-
-    const itemMap = new Map<string, { count: number; statusBreakdown: Record<ReadStatus, number> }>();
-    const dataType = this.selectedDataType.value;
-
-    for (const book of books) {
-      const items = this.getItemsFromBook(book, dataType);
-      const bookStatus = book.readStatus || ReadStatus.UNSET;
-
-      for (const item of items) {
-        if (item?.trim()) {
-          const normalizedName = item.trim();
-          let entry = itemMap.get(normalizedName);
-
-          if (!entry) {
-            entry = {
-              count: 0,
-              statusBreakdown: this.createEmptyStatusBreakdown()
-            };
-            itemMap.set(normalizedName, entry);
-          }
-
-          entry.count++;
-          entry.statusBreakdown[bookStatus]++;
-        }
-      }
-    }
-
-    return Array.from(itemMap.entries())
-      .map(([name, data]) => ({name, count: data.count, statusBreakdown: data.statusBreakdown}))
-      .sort((a, b) => b.count - a.count)
+  private calculateStats(options: CountedOption[]): ItemStats[] {
+    return options
+      .filter(item => item.name?.trim())
+      .map(item => {
+        const statusBreakdown = this.createEmptyStatusBreakdown();
+        statusBreakdown[ReadStatus.UNSET] = item.count;
+        return {name: item.name.trim(), count: item.count, statusBreakdown};
+      })
       .slice(0, 15);
+  }
+
+  private optionsForSelectedType(): CountedOption[] {
+    const facets = this.libraryStats.facets();
+    return facets?.[this.selectedDataType.value] ?? [];
   }
 
   private createEmptyStatusBreakdown(): Record<ReadStatus, number> {
@@ -389,34 +292,6 @@ export class TopItemsChartComponent implements OnInit {
       [ReadStatus.ABANDONED]: 0,
       [ReadStatus.UNSET]: 0
     };
-  }
-
-  private getItemsFromBook(book: Book, dataType: DataType): string[] {
-    const metadata = book.metadata;
-    if (!metadata) return [];
-
-    switch (dataType) {
-      case 'authors':
-        return metadata.authors || [];
-      case 'categories':
-        return metadata.categories || [];
-      case 'publishers':
-        return metadata.publisher ? [metadata.publisher] : [];
-      case 'tags':
-        return metadata.tags || [];
-      case 'moods':
-        return metadata.moods || [];
-      case 'series':
-        return metadata.seriesName ? [metadata.seriesName] : [];
-      default:
-        return [];
-    }
-  }
-
-  private filterBooksByLibrary(books: Book[], selectedLibraryId: number | null): Book[] {
-    return selectedLibraryId
-      ? books.filter(book => book.libraryId === selectedLibraryId)
-      : books;
   }
 
   private formatTooltipLabel(context: TooltipItem<'bar'>): string {

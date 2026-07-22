@@ -3,6 +3,7 @@
   (mouseenter)="hoverChange.emit(true)" (mouseleave)="hoverChange.emit(false)">
   <div class="progress-slider-wrapper">
     <input
+      id="reader-progress-slider"
       type="range"
       class="progress-slider"
       [min]="0"
@@ -10,6 +11,7 @@
       [step]="0.1"
       [value]="progressPercentage"
       (input)="onProgressChange($event)"
+      [attr.aria-label]="t('progress')"
       [title]="t('progress')"/>
     <div class="progress-track" aria-hidden="true">
       <span class="progress-fill" [style.width.%]="progressPercentage"></span>

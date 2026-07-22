@@ -10,6 +10,8 @@ import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @AllArgsConstructor
 @RestController
 @RequestMapping("/api/v1/app/authors")
@@ -31,9 +33,26 @@ public class AppAuthorController {
             @RequestParam(required = false, defaultValue = "asc") String dir,
             @RequestParam(required = false) Long libraryId,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Boolean hasPhoto) {
+            @RequestParam(required = false) Boolean hasPhoto,
+            @RequestParam(required = false) String matchStatus,
+            @RequestParam(required = false) String readStatus,
+            @RequestParam(required = false) String bookCount,
+            @RequestParam(required = false) String genre) {
 
-        return ResponseEntity.ok(mobileAuthorService.getAuthors(page, size, sort, dir, libraryId, search, hasPhoto));
+        return ResponseEntity.ok(mobileAuthorService.getAuthors(
+                page, size, sort, dir, libraryId, search, hasPhoto,
+                matchStatus, readStatus, bookCount, genre));
+    }
+
+    @Operation(
+            summary = "List app author categories",
+            description = "Retrieve categories available to the current user for author browsing.",
+            operationId = "appGetAuthorCategories"
+    )
+    @GetMapping("/categories")
+    public ResponseEntity<List<String>> getAuthorCategories(
+            @RequestParam(required = false) Long libraryId) {
+        return ResponseEntity.ok(mobileAuthorService.getCategories(libraryId));
     }
 
     @Operation(

@@ -163,7 +163,7 @@ public class JwtUtils {
     }
 
     public boolean validateMediaToken(String token) {
-        return validateTokenType(token, TOKEN_TYPE_MEDIA, false);
+        return validateTokenType(token, TOKEN_TYPE_MEDIA, true);
     }
 
     /**
@@ -184,7 +184,11 @@ public class JwtUtils {
             JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
             validateClaims(claims);
             Object tokenType = claims.getClaim(TOKEN_TYPE_CLAIM);
-            if (tokenType == null && allowLegacyAccessToken) {
+            // Browser media URLs currently carry the normal access token because an <img>
+            // request cannot attach the Authorization header. Accept that token type here in
+            // addition to legacy tokens without a type; media endpoints still validate the
+            // signature, expiry, issuer, and user id before authenticating the request.
+            if (allowLegacyAccessToken && (tokenType == null || TOKEN_TYPE_ACCESS.equals(tokenType))) {
                 return true;
             }
             return expectedTokenType.equals(tokenType);

@@ -3,6 +3,8 @@ import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {Book} from '../../../book/model/book.model';
 import {UrlHelperService} from '../../../../shared/service/url-helper.service';
 import {CoverComponent} from '../../../../shared/components/cover/cover.component';
+import {AuthorService} from '../../../author-browser/service/author.service';
+import {Router} from '@angular/router';
 
 @Component({
   selector: 'app-reader-book-metadata-dialog',
@@ -22,6 +24,8 @@ export class ReaderBookMetadataDialogComponent {
   }
 
   private readonly urlHelperService = inject(UrlHelperService);
+  private readonly authorService = inject(AuthorService);
+  private readonly router = inject(Router);
   private readonly t = inject(TranslocoService);
 
   get metadata() {
@@ -47,9 +51,25 @@ export class ReaderBookMetadataDialogComponent {
     }
   }
 
-  formatAuthors(authors: string[] | undefined): string {
-    if (!authors || authors.length === 0) return this.t.translate('readerEbook.metadataDialog.unknown');
-    return authors.join(', ');
+  goToAuthorBooks(author: string): void {
+    this.authorService.getAuthorByName(author).subscribe({
+      next: authorDetails => {
+        this.closed.emit();
+        void this.router.navigate(['/author', authorDetails.id]);
+      },
+      error: () => {
+        this.closed.emit();
+        void this.router.navigate(['/all-books'], {
+          queryParams: {
+            view: 'grid',
+            sort: 'title',
+            direction: 'asc',
+            sidebar: true,
+            filter: `author:${encodeURIComponent(author)}`
+          }
+        });
+      }
+    });
   }
 
   formatFileSize(sizeKb: number | undefined): string {

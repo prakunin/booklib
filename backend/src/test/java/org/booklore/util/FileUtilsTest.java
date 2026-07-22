@@ -139,6 +139,12 @@ class FileUtilsTest {
         assertTrue(FileUtils.shouldIgnore(hiddenFile));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"._book.epub", ".DS_Store"})
+    void testShouldIgnore_macOsMetadataFiles_returnsTrue(String fileName) {
+        assertTrue(FileUtils.shouldIgnore(tempDir.resolve(fileName)));
+    }
+
     @Test
     void testShouldIgnore_hiddenDirectory_returnsTrue() {
         Path hiddenDir = tempDir.resolve(".git");
@@ -182,6 +188,12 @@ class FileUtilsTest {
     }
 
     @Test
+    void testShouldIgnore_macOsMetadataDirectory_returnsTrue() {
+        Path metadataPath = tempDir.resolve("__MACOSX").resolve("._book.epub");
+        assertTrue(FileUtils.shouldIgnore(metadataPath));
+    }
+
+    @Test
     void testShouldIgnore_emptyFileName_returnsFalse() {
         Path emptyPath = tempDir.resolve("");
         assertFalse(FileUtils.shouldIgnore(emptyPath));
@@ -216,6 +228,12 @@ class FileUtilsTest {
         assertFalse(FileUtils.shouldIgnore(tempDir.resolve("book.epub")));
         assertFalse(FileUtils.shouldIgnore(tempDir.resolve("book.pdf")));
         assertFalse(FileUtils.shouldIgnore(tempDir.resolve("audiobook.m4b")));
+    }
+
+    @Test
+    void testShouldIgnore_regularUnderscorePrefixedBook_returnsFalse() {
+        // A regular book whose name starts with an underscore is not AppleDouble metadata.
+        assertFalse(FileUtils.shouldIgnore(tempDir.resolve("_book.epub")));
     }
 
     @Test

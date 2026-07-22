@@ -645,16 +645,36 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
     this.taskHelperService.refreshMetadataTask({
       refreshType: MetadataRefreshType.BOOKS,
       bookIds: [bookId],
-    }).subscribe();
+    }).subscribe({
+      next: () => this.refreshBookAfterMetadataTask(bookId, Date.now()),
+      error: () => this.isAutoFetching = false,
+    });
+  }
 
-    setTimeout(() => {
-      this.isAutoFetching = false;
-    }, 15000);
+  /**
+   * Metadata refresh is asynchronous (the start endpoint returns 202). Keep the
+   * detail query in sync while the worker applies the result instead of leaving
+   * the old book object rendered in the metadata center.
+   */
+  private refreshBookAfterMetadataTask(bookId: number, startedAt: number): void {
+    const maxWaitMs = 60_000;
+    const poll = () => {
+      this.bookService.fetchFreshBookDetail(bookId, true)
+        .catch(() => undefined)
+        .finally(() => {
+          if (Date.now() - startedAt >= maxWaitMs) {
+            this.isAutoFetching = false;
+            return;
+          }
+          setTimeout(poll, 5_000);
+        });
+    };
+    poll();
   }
 
   async openCoverSearch(book: Book): Promise<void> {
     const coverType = book.primaryFile?.bookType === 'AUDIOBOOK' ? 'audiobook' : 'ebook';
-    await this.bookDialogHelperService.openCoverSearchDialog(book.id, coverType);
+    await this.bookDialogHelperService.openCoverSearchDialog(book, coverType);
   }
 
   quickSend(book: Book) {
@@ -1304,7 +1324,8 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
     const isAudiobook = book.primaryFile?.bookType === 'AUDIOBOOK';
     return isAudiobook
       ? this.urlHelper.getAudiobookCoverUrl(book.id, book.metadata?.audiobookCoverUpdatedOn)
-      : this.urlHelper.getCoverUrl(book.id, book.metadata?.coverUpdatedOn);
+      : (this.urlHelper.getCoverUrl(book.id, book.metadata?.coverUpdatedOn)
+        ?? this.urlHelper.getDirectCoverUrl(book.id));
   }
 
   // Comic metadata helpers

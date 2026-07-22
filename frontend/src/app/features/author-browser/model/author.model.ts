@@ -25,7 +25,7 @@ export interface AuthorFilters {
   photoStatus: 'all' | 'has-photo' | 'no-photo';
   readStatus: 'all' | 'all-read' | 'some-read' | 'in-progress' | 'unread';
   bookCount: 'all' | '0' | '1' | '2' | '3' | '4' | '5' | '6-10' | '11-20' | '21-35' | '36+';
-  library: string;
+  library: number | 'all';
   genre: string;
 }
 

@@ -152,15 +152,17 @@ export class BookDialogHelperService {
     });
   }
 
-  async openCoverSearchDialog(bookId: number, coverType?: 'ebook' | 'audiobook'): Promise<DynamicDialogRef | null> {
+  async openCoverSearchDialog(book: Book | number, coverType?: 'ebook' | 'audiobook'): Promise<DynamicDialogRef | null> {
     return this.dialogLauncherService.launchLazyDialog(async () => {
       const {CoverSearchComponent} = await import('../../../metadata/component/cover-search/cover-search.component');
+      const bookId = typeof book === 'number' ? book : book.id;
       return this.openDialog(CoverSearchComponent, {
         showHeader: false,
         styleClass: `${DialogSize.FULL} ${DialogStyle.MINIMAL}`,
         data: {
           bookId: bookId,
           coverType: coverType,
+          ...(typeof book === 'number' ? {} : {book}),
         },
       });
     });

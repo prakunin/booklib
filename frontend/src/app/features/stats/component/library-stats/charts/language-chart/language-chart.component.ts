@@ -1,10 +1,8 @@
 import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {LibraryFilterService} from '../../service/library-filter.service';
-import {BookService} from '../../../../../book/service/book.service';
-import {Book} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
+import {LibraryStatsApiService} from '../../service/library-stats-api.service';
 
 interface LanguageStats {
   language: string;
@@ -133,20 +131,21 @@ const LANGUAGE_NAMES: Record<string, string> = {
   styleUrls: ['./language-chart.component.scss']
 })
 export class LanguageChartComponent {
-  private readonly bookService = inject(BookService);
-  private readonly libraryFilterService = inject(LibraryFilterService);
+  private readonly libraryStats = inject(LibraryStatsApiService);
   private readonly t = inject(TranslocoService);
-  private readonly filteredBooks = computed(() => {
-    if (this.bookService.isBooksLoading()) {
-      return [];
-    }
-
-    return this.filterBooksByLibrary(this.bookService.books(), this.libraryFilterService.selectedLibrary());
-  });
 
   public readonly chartType = 'pie' as const;
-  public readonly languageStats = computed(() => this.calculateLanguageStats(this.filteredBooks()));
-  public readonly totalBooks = computed(() => this.filteredBooks().length);
+  public readonly languageStats = computed<LanguageStats[]>(() => {
+    const languages = this.libraryStats.facets()?.languages ?? [];
+    const total = languages.reduce((sum, item) => sum + item.count, 0);
+    return languages.slice(0, 15).map(item => ({
+      language: item.code,
+      displayName: item.label || this.getDisplayName(item.code),
+      count: item.count,
+      percentage: total > 0 ? item.count / total * 100 : 0
+    }));
+  });
+  public readonly totalBooks = computed(() => this.libraryStats.data()?.totalBooks ?? 0);
   public readonly booksWithLanguage = computed(() => this.languageStats().reduce((sum, s) => sum + s.count, 0));
 
   public readonly chartOptions: ChartConfiguration<'pie'>['options'] = {
@@ -210,46 +209,6 @@ export class LanguageChartComponent {
       }]
     };
   });
-
-  private filterBooksByLibrary(books: Book[], selectedLibraryId: number | null): Book[] {
-    return selectedLibraryId
-      ? books.filter(book => book.libraryId === selectedLibraryId)
-      : books;
-  }
-
-  private calculateLanguageStats(books: Book[]): LanguageStats[] {
-    const languageCounts = new Map<string, number>();
-
-    books.forEach(book => {
-      const language = book.metadata?.language?.trim().toLowerCase();
-      if (language) {
-        // Normalize the language to a display name
-        const normalizedKey = this.normalizeLanguage(language);
-        languageCounts.set(normalizedKey, (languageCounts.get(normalizedKey) || 0) + 1);
-      }
-    });
-
-    const total = Array.from(languageCounts.values()).reduce((a, b) => a + b, 0);
-
-    return Array.from(languageCounts.entries())
-      .map(([language, count]) => ({
-        language,
-        displayName: this.getDisplayName(language),
-        count,
-        percentage: (count / total) * 100
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 15); // Show top 15 languages
-  }
-
-  private normalizeLanguage(language: string): string {
-    const lower = language.toLowerCase().trim();
-    // Check if it maps to a known language
-    if (LANGUAGE_NAMES[lower]) {
-      return lower;
-    }
-    return lower;
-  }
 
   private getDisplayName(language: string): string {
     const lower = language.toLowerCase();

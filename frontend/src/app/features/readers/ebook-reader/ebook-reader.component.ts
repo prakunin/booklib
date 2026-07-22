@@ -80,6 +80,7 @@ interface PendingInitialChapterRestore {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class EbookReaderComponent implements AfterViewInit, OnInit {
+  private static readonly HEADER_PINNED_STORAGE_KEY = 'ebookReader.headerPinned';
   private readonly destroyRef = inject(DestroyRef);
   private static readonly MAX_CHAPTER_PROGRESS_PERCENT = 99.9;
   private static readonly INITIAL_CHAPTER_RESTORE_RETRY_MS = 100;
@@ -205,10 +206,15 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   }
 
   ngOnInit() {
-    this.visibilityManager = new ReaderHeaderFooterVisibilityManager(window.innerHeight);
+    this.visibilityManager = new ReaderHeaderFooterVisibilityManager(
+      window.innerHeight,
+      this.restoreHeaderPinnedPreference()
+    );
     this.visibilityManager.onStateChange((state) => {
       this.applyChromeVisibility(state.headerVisible, state.footerVisible);
     });
+    this.headerService.setHeaderPinned(this.visibilityManager.isPinned());
+    this.refreshChromeVisibility();
 
     this.sidebarService.showMetadata$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -283,7 +289,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
         const useStreaming = this.route.snapshot.queryParamMap.get('streaming') !== 'false';
         const loadBook$ = bookType === 'EPUB' && useStreaming
           ? this.viewManager.loadEpubStreaming(this.bookId, this.altBookType)
-          : this.loadBookBlob();
+          : this.loadBookBlob(bookType);
 
         return loadBook$.pipe(
           tap(() => {
@@ -328,12 +334,12 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
     this.viewManager.createView(container);
     return of(undefined);
   }
-  private loadBookBlob(): Observable<void> {
+  private loadBookBlob(bookType: BookType): Observable<void> {
     return this.bookFileService.getFileContent(this.bookId, this.altBookType).pipe(
       switchMap(fileBlob => {
         const fileUrl = URL.createObjectURL(fileBlob);
         this._fileUrl = fileUrl;
-        return this.viewManager.loadEpub(fileUrl);
+        return this.viewManager.loadEpub(fileUrl, bookType);
       })
     );
   }
@@ -371,7 +377,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
             if (this.immersiveMode()) {
               this.immersiveTemporaryShow();
             } else {
-              this.toggleHeaderNavbarPinned();
+              this.visibilityManager.toggleTemporary();
             }
             break;
           case 'text-selected':
@@ -944,7 +950,25 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
 
   private toggleHeaderNavbarPinned(): void {
     this.visibilityManager.togglePinned();
-    this.headerService.setHeaderPinned(this.visibilityManager.isPinned());
+    const pinned = this.visibilityManager.isPinned();
+    this.headerService.setHeaderPinned(pinned);
+    this.persistHeaderPinnedPreference(pinned);
+  }
+
+  private restoreHeaderPinnedPreference(): boolean {
+    try {
+      return localStorage.getItem(EbookReaderComponent.HEADER_PINNED_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  private persistHeaderPinnedPreference(pinned: boolean): void {
+    try {
+      localStorage.setItem(EbookReaderComponent.HEADER_PINNED_STORAGE_KEY, String(pinned));
+    } catch {
+      // The pin still works for the current reader session when storage is unavailable.
+    }
   }
 
   @HostListener('document:mousemove', ['$event'])

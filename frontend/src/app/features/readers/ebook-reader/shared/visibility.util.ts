@@ -19,7 +19,9 @@ export class ReaderHeaderFooterVisibilityManager {
 
   private onStateChangeCallback?: (state: HeaderFooterVisibilityState) => void;
 
-  constructor(private windowHeight: number) {
+  constructor(private windowHeight: number, headerPinned = false) {
+    this.headerPinned = headerPinned;
+    this.headerVisible = headerPinned;
     this.mouseY = windowHeight / 2;
   }
 
@@ -81,6 +83,17 @@ export class ReaderHeaderFooterVisibilityManager {
     this.updateVisibility();
   }
 
+  toggleTemporary(): void {
+    if (this.isImmersive || this.headerPinned) {
+      return;
+    }
+
+    const visible = !this.headerVisible;
+    this.setHeaderVisible(visible);
+    this.setFooterVisible(visible);
+    this.notifyStateChange();
+  }
+
   unpinIfPinned(): void {
     if (this.headerPinned) {
       this.headerPinned = false;
@@ -95,12 +108,13 @@ export class ReaderHeaderFooterVisibilityManager {
   setImmersive(immersive: boolean): void {
     this.isImmersive = immersive;
     if (immersive) {
-      this.headerPinned = false;
       this.headerHovered = false;
       this.footerHovered = false;
       this.setHeaderVisible(false);
       this.setFooterVisible(false);
       this.notifyStateChange();
+    } else {
+      this.updateVisibility();
     }
   }
 

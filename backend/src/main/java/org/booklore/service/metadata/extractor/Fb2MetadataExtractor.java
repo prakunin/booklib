@@ -21,6 +21,7 @@ import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
@@ -213,6 +214,9 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
             BookMetadata.BookMetadataBuilder metadataBuilder = BookMetadata.builder();
             List<String> authors = new ArrayList<>();
             Set<String> categories = new HashSet<>();
+            List<String> bodyParagraphs = new ArrayList<>();
+            boolean inBody = false;
+            boolean afterDescription = false;
 
             XMLStreamReader reader = createXmlStreamReader(inputStream);
             try {
@@ -220,7 +224,20 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                     int event = reader.next();
                     if (event == XMLStreamConstants.START_ELEMENT && "description".equals(reader.getLocalName())) {
                         extractDescription(reader, metadataBuilder, authors, categories);
+                        afterDescription = true;
+                    } else if (event == XMLStreamConstants.START_ELEMENT && "body".equals(reader.getLocalName())) {
+                        inBody = true;
+                    } else if (event == XMLStreamConstants.START_ELEMENT && afterDescription && !inBody) {
+                        // Do not scan arbitrary trailing payloads (especially large or
+                        // truncated <binary> elements). Only a document body is useful
+                        // for the fallback title-page recovery.
                         break;
+                    } else if (event == XMLStreamConstants.START_ELEMENT && inBody
+                            && "p".equals(reader.getLocalName()) && bodyParagraphs.size() < 40) {
+                        String paragraph = readElementText(reader);
+                        if (StringUtils.isNotBlank(paragraph)) {
+                            bodyParagraphs.add(paragraph.trim());
+                        }
                     }
                 }
             } finally {
@@ -229,11 +246,98 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
 
             metadataBuilder.authors(authors);
             metadataBuilder.categories(categories);
-            return metadataBuilder.build();
+            BookMetadata metadata = metadataBuilder.build();
+            applyBodyMetadataFallback(metadata, bodyParagraphs);
+            return metadata;
         } catch (Exception e) {
             log.warn("Failed to extract metadata from FB2: {}", sourceName, e);
             return null;
         }
+    }
+
+    /**
+     * A number of older FB2 files have broken title-info values (for example a
+     * conversion filename and a converter name), while the actual title page in
+     * the body is correct. Recover only when the structured values are clearly
+     * placeholders; normal, well-formed FB2 metadata remains untouched.
+     */
+    private void applyBodyMetadataFallback(BookMetadata metadata, List<String> paragraphs) {
+        if (paragraphs.isEmpty()) {
+            return;
+        }
+
+        if (isPlaceholderTitle(metadata.getTitle())) {
+            paragraphs.stream()
+                    .map(this::quotedText)
+                    .filter(StringUtils::isNotBlank)
+                    .findFirst()
+                    .ifPresent(metadata::setTitle);
+        }
+
+        if (hasPlaceholderAuthor(metadata.getAuthors())) {
+            paragraphs.stream()
+                    .filter(this::looksLikePersonName)
+                    .findFirst()
+                    .ifPresent(name -> metadata.setAuthors(List.of(name)));
+        }
+
+        if (StringUtils.isBlank(metadata.getSubtitle())) {
+            for (int i = 0; i + 1 < paragraphs.size(); i++) {
+                if (paragraphs.get(i).toLowerCase(Locale.ROOT).contains("оригинальное название")) {
+                    paragraphs.subList(i + 1, paragraphs.size()).stream()
+                            .filter(this::looksLikeOriginalTitle)
+                            .findFirst()
+                            .map(this::normalizeParagraph)
+                            .ifPresent(metadata::setSubtitle);
+                    break;
+                }
+            }
+            if (StringUtils.isBlank(metadata.getSubtitle())) {
+                paragraphs.stream()
+                        .filter(this::looksLikeOriginalTitle)
+                        .findFirst()
+                        .map(this::normalizeParagraph)
+                        .ifPresent(metadata::setSubtitle);
+            }
+        }
+    }
+
+    private boolean isPlaceholderTitle(String title) {
+        return StringUtils.isBlank(title)
+                || title.matches("(?i)^_?\\d+\\.(docx|fb2|epub|txt)$")
+                || title.toLowerCase(Locale.ROOT).contains("convertstandard.com");
+    }
+
+    private boolean hasPlaceholderAuthor(List<String> authors) {
+        return authors == null || authors.isEmpty()
+                || authors.stream().anyMatch(author -> author.toLowerCase(Locale.ROOT).contains("convertstandard.com"));
+    }
+
+    private boolean looksLikePersonName(String value) {
+        return value.length() <= 100
+                && value.matches("^[\\p{L}][\\p{L} .'-]*$")
+                && value.chars().filter(Character::isLetter).count() >= 4;
+    }
+
+    private boolean looksLikeOriginalTitle(String value) {
+        long latinLetters = value.chars()
+                .filter(ch -> (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z'))
+                .count();
+        return latinLetters >= 3 && (value.matches(".*\\d{4}.*") || value.contains("«") || value.contains("\""));
+    }
+
+    private String normalizeParagraph(String value) {
+        return value.replaceFirst("(?i)^.*?оригинальное\\s+название\\s*:\\s*", "")
+                .replaceAll("\\s+", " ").trim();
+    }
+
+    private String quotedText(String value) {
+        String text = value.trim();
+        if ((text.startsWith("«") && text.endsWith("»"))
+                || (text.startsWith("\"") && text.endsWith("\""))) {
+            return text.substring(1, text.length() - 1).trim();
+        }
+        return null;
     }
 
     private void extractDescription(XMLStreamReader reader, BookMetadata.BookMetadataBuilder builder,

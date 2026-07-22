@@ -15,10 +15,9 @@ import {ReadingJourneyChartComponent} from './charts/reading-journey-chart/readi
 import {LibrariesSummaryService} from './service/libraries-summary.service';
 import {LibraryFilterService, LibraryOption} from './service/library-filter.service';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
-import {BookService} from '../../../book/service/book.service';
-import {AppMessageComponent} from '../../../../shared/ui/message/app-message.component';
 import {LibraryService} from '../../../book/service/library.service';
 import {StatsChartThemeService} from '../shared/stats-chart-theme.service';
+import {LibraryStatsApiService} from './service/library-stats-api.service';
 
 interface ChartConfig {
   id: string;
@@ -38,7 +37,6 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
     Select,
     DragDropModule,
     Button,
-    AppMessageComponent,
     BookFormatsChartComponent,
     LanguageChartComponent,
     MetadataScoreChartComponent,
@@ -57,17 +55,14 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
 export class LibraryStatsComponent {
   private readonly libraryFilterService = inject(LibraryFilterService);
   private readonly librariesSummaryService = inject(LibrariesSummaryService);
-  private readonly bookService = inject(BookService);
+  private readonly libraryStats = inject(LibraryStatsApiService);
   private readonly libraryService = inject(LibraryService);
   private readonly t = inject(TranslocoService);
   private readonly chartTheme = inject(StatsChartThemeService);
 
   public readonly isLoading = computed(() =>
-    this.bookService.isBooksLoading() || this.libraryService.isLibrariesLoading()
+    this.libraryStats.isLoading() || this.libraryService.isLibrariesLoading()
   );
-  // These charts aggregate the whole catalog client-side and have no paginated equivalent yet,
-  // so on an oversized catalog they must say so instead of rendering as an empty library.
-  public readonly catalogTooLarge = this.bookService.legacyCatalogTooLarge;
   public readonly hasData = computed(() => this.booksSummary().totalBooks > 0);
   public readonly libraryOptions = this.libraryFilterService.libraryOptions;
   public readonly booksSummary = this.librariesSummaryService.booksSummary;
