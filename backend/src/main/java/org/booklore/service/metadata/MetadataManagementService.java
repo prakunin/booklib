@@ -1,6 +1,7 @@
 package org.booklore.service.metadata;
 
 import org.booklore.config.AppProperties;
+import org.booklore.exception.ApiError;
 import org.booklore.model.dto.FileMoveResult;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.*;
@@ -119,6 +120,10 @@ public class MetadataManagementService {
                         .or(() -> authorLocalResolver.resolve(name))
                         .stream())
                 .toList();
+
+        if (!targetValues.isEmpty() && targetAuthors.isEmpty()) {
+            throw ApiError.INVALID_INPUT.createException("No valid target author(s) to consolidate into");
+        }
 
         List<AuthorEntity> authorsToMerge = valuesToMerge.stream()
                 .map(authorRepository::findByNameIgnoreCase)

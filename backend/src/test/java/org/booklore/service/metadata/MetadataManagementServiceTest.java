@@ -1,6 +1,7 @@
 package org.booklore.service.metadata;
 
 import org.booklore.config.AppProperties;
+import org.booklore.exception.APIException;
 import org.booklore.model.dto.FileMoveResult;
 import org.booklore.model.dto.settings.AppSettings;
 import org.booklore.model.dto.settings.MetadataPersistenceSettings;
@@ -104,22 +105,41 @@ class MetadataManagementServiceTest {
     }
 
     @Test
-    void consolidateAuthors_skipsTargetWhenResolverReturnsEmpty() {
+    void consolidateAuthors_throwsWhenAllTargetsResolveEmpty() {
+        when(authorRepository.findByNameIgnoreCase("   ")).thenReturn(Optional.empty());
+        when(authorLocalResolver.resolve("   ")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, List.of("   "), List.of("Old"))
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No valid target author(s) to consolidate into");
+
+        verify(authorLocalResolver).resolve("   ");
+        verify(authorRepository, never()).save(any());
+        verify(authorRepository, never()).delete(any());
+        verify(bookMetadataRepository, never()).saveAll(anyList());
+        verify(bookMetadataRepository, never()).findAllByAuthorsContaining(any());
+    }
+
+    @Test
+    void consolidateAuthors_partiallyEmptyTargetsStillMergeIntoValidTarget() {
         AuthorEntity oldAuthor = AuthorEntity.builder().id(1L).name("Old").build();
+        AuthorEntity validTarget = AuthorEntity.builder().id(2L).name("Valid Target").build();
 
         when(authorRepository.findByNameIgnoreCase("   ")).thenReturn(Optional.empty());
         when(authorLocalResolver.resolve("   ")).thenReturn(Optional.empty());
+        when(authorRepository.findByNameIgnoreCase("Valid Target")).thenReturn(Optional.empty());
+        when(authorLocalResolver.resolve("Valid Target")).thenReturn(Optional.of(validTarget));
         when(authorRepository.findByNameIgnoreCase("Old")).thenReturn(Optional.of(oldAuthor));
 
         List<AuthorEntity> authors = new ArrayList<>(List.of(oldAuthor));
         BookMetadataEntity metadata = BookMetadataEntity.builder().authors(authors).build();
         when(bookMetadataRepository.findAllByAuthorsContaining(oldAuthor)).thenReturn(List.of(metadata));
 
-        service.consolidateMetadata(MergeMetadataType.authors, List.of("   "), List.of("Old"));
+        service.consolidateMetadata(MergeMetadataType.authors, List.of("   ", "Valid Target"), List.of("Old"));
 
-        verify(authorLocalResolver).resolve("   ");
-        verify(authorRepository, never()).save(any());
-        assertThat(metadata.getAuthors()).isEmpty();
+        assertThat(metadata.getAuthors()).contains(validTarget);
+        assertThat(metadata.getAuthors()).doesNotContain(oldAuthor);
         verify(authorRepository).delete(oldAuthor);
     }
 
