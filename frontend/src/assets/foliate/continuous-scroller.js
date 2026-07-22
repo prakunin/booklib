@@ -340,6 +340,7 @@ export class ContinuousScroller extends HTMLElement {
     #resizeTimer
     #currentIndex = 0
     #locked = false
+    #pendingMounts = new Map()
     constructor() {
         super()
         this.#root.innerHTML = `<style>
@@ -402,45 +403,80 @@ export class ContinuousScroller extends HTMLElement {
         await this.#openPromise
     }
     async #loadSections(book) {
-        const spine = this.#root.getElementById('spine')
         const linearSections = book.sections
             .map((section, index) => ({ section, index }))
             .filter(({ section }) => section.linear !== 'no')
 
         for (const { section, index } of linearSections) {
-            const item = new ContinuousSection({
-                index,
-                section,
-                container: this.#container,
-                onResize: () => this.#scheduleRelocate('resize'),
-            })
-            this.#sections.push(item)
-            spine.append(item.element)
-
-            try {
-                const src = await section.load()
-                await item.load(src, this.#styles, this.#layout())
-                if (!this.#background.style.background)
-                    this.#background.style.background = getBackground(item.document)
-                this.dispatchEvent(new CustomEvent('load', {
-                    detail: { doc: item.document, index },
-                }))
-                this.dispatchEvent(new CustomEvent('create-overlayer', {
-                    detail: {
-                        doc: item.document,
-                        index,
-                        attach: overlayer => item.overlayer = overlayer,
-                    },
-                }))
-            } catch (e) {
-                console.warn(e)
-                console.warn(new Error(`Failed to load section ${index}`))
-            }
-
+            await this.#mountSection(index, section)
             await wait(0)
         }
         this.#render()
         this.#scheduleRelocate('load')
+    }
+    // sections with `linear="no"` — notes bodies, above all — are left out of
+    // the reading flow, so they have to be mounted on demand when something
+    // navigates into them
+    #mountSection(index, section = this.sections?.[index]) {
+        if (!section) {
+            console.warn(`continuous-scroller: no section at index ${index}`)
+            return Promise.resolve(null)
+        }
+        const existing = this.#sections.find(item => item.index === index)
+        if (existing) return Promise.resolve(existing)
+        const pending = this.#pendingMounts.get(index)
+        if (pending) return pending
+        const promise = this.#insertSection(index, section)
+            .finally(() => this.#pendingMounts.delete(index))
+        this.#pendingMounts.set(index, promise)
+        return promise
+    }
+    async #insertSection(index, section) {
+        const item = new ContinuousSection({
+            index,
+            section,
+            container: this.#container,
+            onResize: () => this.#scheduleRelocate('resize'),
+        })
+
+        // keep both the DOM and #sections ordered by spine index, so a section
+        // mounted later still lands where the book puts it
+        const at = this.#sections.findIndex(other => other.index > index)
+        const spine = this.#root.getElementById('spine')
+        if (at === -1) {
+            this.#sections.push(item)
+            spine.append(item.element)
+        } else {
+            this.#sections.splice(at, 0, item)
+            spine.insertBefore(item.element, this.#sections[at + 1].element)
+        }
+
+        try {
+            const src = await section.load()
+            await item.load(src, this.#styles, this.#layout())
+        } catch (e) {
+            console.warn(`continuous-scroller: failed to load section ${index}`, e)
+            const position = this.#sections.indexOf(item)
+            if (position !== -1) this.#sections.splice(position, 1)
+            item.destroy()
+            item.element.remove()
+            return null
+        }
+
+        if (!this.#background.style.background)
+            this.#background.style.background = getBackground(item.document)
+
+        this.dispatchEvent(new CustomEvent('load', {
+            detail: { doc: item.document, index },
+        }))
+        this.dispatchEvent(new CustomEvent('create-overlayer', {
+            detail: {
+                doc: item.document,
+                index,
+                attach: overlayer => item.overlayer = overlayer,
+            },
+        }))
+        return item
     }
     #layout() {
         const style = getComputedStyle(this)
@@ -476,7 +512,12 @@ export class ContinuousScroller extends HTMLElement {
     async goTo(target) {
         await this.#openPromise
         const resolved = await target
+        if (!resolved) {
+            console.warn('continuous-scroller: goTo called without a resolvable target')
+            return
+        }
         const item = this.#sections.find(section => section.index === resolved.index)
+            ?? await this.#mountSection(resolved.index)
         if (!item) return
         const anchor = typeof resolved.anchor === 'function'
             ? resolved.anchor(item.document)
@@ -534,6 +575,7 @@ export class ContinuousScroller extends HTMLElement {
     destroy() {
         if (this.#scrollTimer) clearTimeout(this.#scrollTimer)
         if (this.#resizeTimer) clearTimeout(this.#resizeTimer)
+        this.#pendingMounts.clear()
         for (const item of this.#sections) item.destroy()
         this.#sections = []
     }
