@@ -20,11 +20,25 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Backfills {@code normalized_name} and seeds a PENDING reconcile-state row for legacy authors
- * that predate {@link AuthorEntity#computeDerivedFields()} (which now populates normalized_name
- * on every create/update). Only rows with {@code normalized_name IS NULL} are ever touched, which
- * makes this migration idempotent: a row drops out of the work set the moment it is processed,
- * so a restart (or a re-run after a crash) simply resumes on the remaining legacy rows.
+ * Backfills {@code normalized_name} and seeds a PENDING reconcile-state row for every author that
+ * still needs one. The work set is {@code normalized_name IS NULL OR missing reconcile-state row}:
+ * {@link AuthorEntity#computeDerivedFields()} (@PrePersist/@PreUpdate) populates normalized_name on
+ * ANY create/update, including a plain user edit of a legacy author, but it does not create a
+ * reconcile-state sidecar. Without the "missing sidecar" half of the predicate, such an author would
+ * have a non-null normalized_name and would silently and permanently drop out of the work set without
+ * ever getting a sidecar. Both halves of the predicate re-query on every page, so the migration
+ * remains idempotent and restart-safe: a row drops out of the work set only once it has both a
+ * normalized_name and a sidecar.
+ *
+ * <p>Updates are field-only and conditional: {@link AuthorRepository#backfillNormalizedName} is a
+ * bulk {@code UPDATE ... SET normalized_name = :nn WHERE id = :id AND normalized_name IS NULL} that
+ * touches exactly one column and only writes it when still null. This runs on {@code
+ * ApplicationReadyEvent} while the app is already serving requests, so a naive
+ * load-full-entity-then-saveAll would let Hibernate UPDATE every column from a stale in-memory
+ * snapshot, clobbering a concurrent user edit (name/description/asin/lock flags) made between the
+ * SELECT and the flush. The conditional, field-only UPDATE never overwrites a row a concurrent
+ * request has already normalized (its WHERE clause simply matches zero rows), and never touches any
+ * other column.
  *
  * <p>Runs OUTSIDE a single wrapping transaction ({@link #runsInSingleTransaction()} is {@code
  * false}) and commits one page at a time via {@link TransactionTemplate}, so ~204k rows do not
@@ -81,18 +95,22 @@ public class PopulateAuthorNormalizedNameMigration implements Migration {
      * caller's {@link TransactionTemplate}), which is committed as soon as this method returns.
      */
     private PageResult processPage(long lastId) {
-        List<AuthorEntity> authors = authorRepository.findUnnormalizedAfter(lastId, PageRequest.of(0, PAGE_SIZE));
-        if (authors.isEmpty()) {
+        List<AuthorRepository.AuthorBackfillView> page =
+                authorRepository.findAuthorsNeedingBackfillAfter(lastId, PageRequest.of(0, PAGE_SIZE));
+        if (page.isEmpty()) {
             return new PageResult(0, lastId);
         }
 
-        List<Long> ids = authors.stream().map(AuthorEntity::getId).toList();
+        List<Long> ids = page.stream().map(AuthorRepository.AuthorBackfillView::getId).toList();
         Set<Long> alreadyHaveState = reconcileStateRepository.findExistingAuthorIds(ids);
 
         List<AuthorReconcileStateEntity> newStates = new ArrayList<>();
         long maxId = lastId;
-        for (AuthorEntity author : authors) {
-            author.setNormalizedName(AuthorNames.normalizeKey(AuthorNames.cleanDisplayName(author.getName())));
+        for (AuthorRepository.AuthorBackfillView author : page) {
+            String nn = AuthorNames.normalizeKey(AuthorNames.cleanDisplayName(author.getName()));
+            // Field-only, conditional: only writes normalized_name, and only if still null, so a
+            // concurrent user edit (which may have set normalized_name via @PreUpdate) is never clobbered.
+            authorRepository.backfillNormalizedName(author.getId(), nn);
             if (!alreadyHaveState.contains(author.getId())) {
                 newStates.add(AuthorReconcileStateEntity.builder()
                         .authorId(author.getId())
@@ -104,15 +122,13 @@ public class PopulateAuthorNormalizedNameMigration implements Migration {
                 maxId = author.getId();
             }
         }
-
-        authorRepository.saveAll(authors);
         if (!newStates.isEmpty()) {
             reconcileStateRepository.saveAll(newStates);
         }
         entityManager.flush();
         entityManager.clear();
 
-        return new PageResult(authors.size(), maxId);
+        return new PageResult(page.size(), maxId);
     }
 
     private record PageResult(int processed, long lastId) {

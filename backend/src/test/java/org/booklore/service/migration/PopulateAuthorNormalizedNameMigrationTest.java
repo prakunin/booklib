@@ -19,14 +19,13 @@ class PopulateAuthorNormalizedNameMigrationTest extends AbstractAuthorPersistenc
     @Autowired private PopulateAuthorNormalizedNameMigration migration;
 
     @Test
-    void backfillsNormalizedNameAndPendingState() {
+    void backfillsNormalizedNameAndCreatesSidecar_forLegacyNullNormalizedName() {
         // @PrePersist populates normalized_name on every save, so simulate a LEGACY pre-existing
         // row by nulling it out via a bulk JPQL update, which bypasses lifecycle callbacks.
         AuthorEntity legacy = authorRepository.saveAndFlush(AuthorEntity.builder().name("J.K. Rowling").build());
         entityManager.createQuery("UPDATE AuthorEntity a SET a.normalizedName = null WHERE a.id = :id")
                 .setParameter("id", legacy.getId()).executeUpdate();
-        entityManager.flush();
-        entityManager.clear();
+        flushAndClear();
 
         migration.execute();
 
@@ -38,13 +37,29 @@ class PopulateAuthorNormalizedNameMigrationTest extends AbstractAuthorPersistenc
     }
 
     @Test
-    void isRestartSafeAndDoesNotReprocessOrDuplicateExistingState() {
-        // Author saved normally already has normalized_name set by @PrePersist and must be left
-        // completely untouched by the migration (it is not in the normalized_name IS NULL work set).
-        AuthorEntity alreadyNormalized = authorRepository.saveAndFlush(AuthorEntity.builder().name("Neil Gaiman").build());
-        String originalNormalizedName = alreadyNormalized.getNormalizedName();
+    void createsSidecar_whenNormalizedNameAlreadySetButNoSidecarExists() {
+        // F10: a plain save already sets normalized_name via @PrePersist (e.g. a legacy author
+        // edited by a user before this migration ran), but does NOT create a reconcile-state
+        // sidecar. The old workset (normalized_name IS NULL only) would let this author drop out
+        // permanently without ever getting a sidecar. The fix is to also include "missing sidecar"
+        // in the workset, so a PENDING state row must be created here.
+        AuthorEntity author = authorRepository.saveAndFlush(AuthorEntity.builder().name("Neil Gaiman").build());
+        String originalNormalizedName = author.getNormalizedName();
         assertThat(originalNormalizedName).isNotNull();
+        assertThat(stateRepository.findById(author.getId())).isEmpty();
+        flushAndClear();
 
+        migration.execute();
+
+        flushAndClear();
+        AuthorEntity reloaded = authorRepository.findById(author.getId()).orElseThrow();
+        assertThat(reloaded.getNormalizedName()).isEqualTo(originalNormalizedName);
+        assertThat(stateRepository.findById(author.getId()).orElseThrow().getState())
+                .isEqualTo(AuthorReconcileState.PENDING);
+    }
+
+    @Test
+    void doesNotDuplicateOrOverwriteExistingSidecar() {
         // Legacy null-normalized_name author that ALREADY has a reconcile-state row, simulating a
         // prior partial/interrupted run. The migration must backfill normalized_name but must NOT
         // insert a duplicate (or overwrite the existing) state row.
@@ -56,16 +71,11 @@ class PopulateAuthorNormalizedNameMigrationTest extends AbstractAuthorPersistenc
                 .state(AuthorReconcileState.DONE)
                 .attemptCount(3)
                 .build());
-        entityManager.flush();
-        entityManager.clear();
+        flushAndClear();
 
         migration.execute();
 
         flushAndClear();
-
-        AuthorEntity reloadedNormalized = authorRepository.findById(alreadyNormalized.getId()).orElseThrow();
-        assertThat(reloadedNormalized.getNormalizedName()).isEqualTo(originalNormalizedName);
-        assertThat(stateRepository.findById(alreadyNormalized.getId())).isEmpty();
 
         AuthorEntity reloadedLegacy = authorRepository.findById(legacyWithState.getId()).orElseThrow();
         assertThat(reloadedLegacy.getNormalizedName()).isEqualTo("terry pratchett");
@@ -73,5 +83,27 @@ class PopulateAuthorNormalizedNameMigrationTest extends AbstractAuthorPersistenc
         AuthorReconcileStateEntity state = stateRepository.findById(legacyWithState.getId()).orElseThrow();
         assertThat(state.getState()).isEqualTo(AuthorReconcileState.DONE);
         assertThat(state.getAttemptCount()).isEqualTo(3);
+    }
+
+    @Test
+    void neverOverwritesAnAlreadySetNormalizedName_fieldOnlyConditionalUpdate() {
+        // F11: the backfill update must be field-only and conditional (WHERE normalized_name IS
+        // NULL) so it can never clobber a concurrent user edit that set normalized_name between the
+        // workset SELECT and this page's update. Simulate that by forcing a sentinel non-null value
+        // via a bulk JPQL update (bypassing lifecycle callbacks) while the author still has no
+        // sidecar, so it remains in the workset via the "missing sidecar" predicate.
+        AuthorEntity author = authorRepository.saveAndFlush(AuthorEntity.builder().name("Ursula K. Le Guin").build());
+        entityManager.createQuery("UPDATE AuthorEntity a SET a.normalizedName = :nn WHERE a.id = :id")
+                .setParameter("nn", "stale-value")
+                .setParameter("id", author.getId()).executeUpdate();
+        flushAndClear();
+
+        migration.execute();
+
+        flushAndClear();
+        AuthorEntity reloaded = authorRepository.findById(author.getId()).orElseThrow();
+        assertThat(reloaded.getNormalizedName()).isEqualTo("stale-value");
+        assertThat(stateRepository.findById(author.getId()).orElseThrow().getState())
+                .isEqualTo(AuthorReconcileState.PENDING);
     }
 }
