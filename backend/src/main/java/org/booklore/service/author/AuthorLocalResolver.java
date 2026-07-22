@@ -21,12 +21,17 @@ import java.util.Set;
 public class AuthorLocalResolver {
 
     private static final int MAX_NAME_CODE_POINTS = 255;
+    private static final int MAX_RAW_CHARS = 2000; // generous bound (255 code points -> <=510 UTF-16 units); rejects pathological untrusted input before NFC normalization
 
     private final AuthorRepository authorRepository;
     private final AuthorAliasRepository authorAliasRepository;
     private final AuthorCreationService authorCreationService;
 
     public Optional<AuthorEntity> resolve(String rawName) {
+        if (rawName != null && rawName.length() > MAX_RAW_CHARS) {
+            log.warn("Skipping oversized raw author name ({} chars) before normalization", rawName.length());
+            return Optional.empty();
+        }
         String cleaned = AuthorNames.cleanDisplayName(rawName);
         if (cleaned.isEmpty()) {
             return Optional.empty();

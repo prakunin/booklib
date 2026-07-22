@@ -18,7 +18,9 @@ class AuthorNamesTest {
             arguments("Джеймс", "Джеймс"),                        // Unicode preserved
             arguments("Café", "Café"),                            // NFC compose
             arguments("   ", ""),                                 // blank -> empty
-            arguments(null, "")                                   // null -> empty
+            arguments(null, ""),                                  // null -> empty
+            arguments("James Ward", "James Ward"),            // NBSP collapses to plain space
+            arguments("A B", "A B")                           // NNBSP collapses to plain space
         );
     }
 

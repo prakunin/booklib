@@ -23,13 +23,14 @@ public final class AuthorNames {
         StringBuilder sb = new StringBuilder(nfc.length());
         nfc.codePoints().forEach(cp -> {
             int type = Character.getType(cp);
-            if (type == Character.CONTROL || type == Character.FORMAT) {
-                sb.append(' '); // drop control/format, keep a boundary so tokens don't fuse
+            if (type == Character.CONTROL || type == Character.FORMAT
+                    || Character.isWhitespace(cp) || Character.isSpaceChar(cp)) {
+                sb.append(' '); // normalize control/format and ALL Unicode whitespace/separators (incl. NBSP/NNBSP) to a plain space
             } else {
                 sb.appendCodePoint(cp);
             }
         });
-        return sb.toString().trim().replaceAll("\\s+", " ");
+        return sb.toString().trim().replaceAll(" +", " ");
     }
 
     /**

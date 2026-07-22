@@ -39,6 +39,17 @@ class AuthorLocalResolverTest {
         }
 
         @Test
+        void rejectsOversizedRawInputBeforeNormalization() {
+            String pathological = "a".repeat(2001);
+
+            assertThat(resolver.resolve(pathological)).isEmpty();
+
+            verifyNoInteractions(repo);
+            verifyNoInteractions(aliasRepo);
+            verifyNoInteractions(creator);
+        }
+
+        @Test
         void cleansNameBeforeLookup() {
             when(repo.findByName("James M. Ward")).thenReturn(Optional.empty());
             when(creator.createInNewTransaction(eq("James M. Ward"), eq("james m ward")))
