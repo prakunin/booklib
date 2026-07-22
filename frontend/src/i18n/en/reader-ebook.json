@@ -4,6 +4,11 @@
     "previousChapter": "Previous chapter",
     "nextChapter": "Next chapter"
   },
+  "footnote": {
+    "title": "Note",
+    "openFull": "Open in full",
+    "close": "Close"
+  },
   "metadataDialog": {
     "title": "Book Information",
     "basicInformation": "Basic Information",

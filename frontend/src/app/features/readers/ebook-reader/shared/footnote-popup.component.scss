@@ -1,0 +1,81 @@
+@use '../../shared/styles/reader-chrome' as *;
+
+.footnote-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background: transparent;
+}
+
+.footnote-popup {
+  @include surface;
+
+  position: fixed;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 32px));
+  max-height: 40vh;
+  padding: 12px 14px;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 30%), 0 0 1px rgb(0 0 0 / 20%);
+  transform: translate(-50%, -100%);
+
+  &.show-below {
+    transform: translate(-50%, 0);
+  }
+}
+
+.footnote-body {
+  overflow-y: auto;
+  font-size: 0.9rem;
+  line-height: 1.5;
+
+  :first-child {
+    margin-top: 0;
+  }
+
+  :last-child {
+    margin-bottom: 0;
+  }
+}
+
+.footnote-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  justify-content: flex-end;
+
+  button {
+    padding: 4px 10px;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid currentcolor;
+    border-radius: 6px;
+    opacity: 0.85;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+// the reader has no shared breakpoints yet; on a phone a note must never cover
+// the sentence it belongs to, so the card becomes a bottom sheet
+@media (width <= 640px) {
+  .footnote-popup {
+    inset: auto 0 0;
+    max-width: none;
+    max-height: 50vh;
+    border-radius: 12px 12px 0 0;
+    transform: none;
+
+    &.show-below {
+      transform: none;
+    }
+  }
+}

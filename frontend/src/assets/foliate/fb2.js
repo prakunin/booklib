@@ -341,13 +341,21 @@ export const makeFB2 = async blob => {
         }
     }).filter(item => item)
 
+    // FB2 has no notion of a package document, so every href is either a TOC
+    // index or an in-book anchor; anything with a scheme points outside the book
+    book.isExternal = uri => /^(?!blob)\w+:/i.test(uri)
+
     book.resolveHref = href => {
         const [a, b] = href.split('#')
+        const index = a ? Number(a) : idMap.get(b)
+        // an unresolvable href must not silently produce `{ index: NaN }`,
+        // which renderers quietly ignore
+        if (!Number.isInteger(index)) return null
         return a
             // the link is from the TOC
-            ? { index: Number(a), anchor: doc => doc.querySelector(`[${dataID}="${b}"]`) }
+            ? { index, anchor: doc => doc.querySelector(`[${dataID}="${b}"]`) }
             // link from within the page
-            : { index: idMap.get(b), anchor: doc => doc.getElementById(b) }
+            : { index, anchor: doc => doc.getElementById(b) }
     }
     book.splitTOCHref = href => href?.split('#')?.map(x => Number(x)) ?? []
     book.getTOCFragment = (doc, id) => doc.querySelector(`[${dataID}="${id}"]`)

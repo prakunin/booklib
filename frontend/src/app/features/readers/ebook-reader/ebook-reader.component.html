@@ -101,6 +101,15 @@
     (action)="handleSelectionAction($event)"
   ></app-text-selection-popup>
 
+  <app-footnote-popup
+    [visible]="footnoteState().visible"
+    [position]="footnoteState().position"
+    [showBelow]="footnoteState().showBelow"
+    [html]="footnoteState().html"
+    (dismissed)="onFootnoteDismissed()"
+    (openFullRequested)="onFootnoteOpenFull()"
+  ></app-footnote-popup>
+
   @if (noteDialogState().visible) {
     <app-reader-note-dialog
       [data]="noteDialogState().data"

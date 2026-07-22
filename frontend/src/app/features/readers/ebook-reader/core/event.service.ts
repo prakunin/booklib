@@ -80,6 +80,7 @@ interface ViewCallbacks {
   next: (distance?: number) => void;
   getCFI: (index: number, range: Range) => string | null;
   getContents: () => { index: number; doc: Document }[] | null;
+  onLink?: (anchor: HTMLAnchorElement, href: string) => boolean;
 }
 
 @Injectable({
@@ -210,6 +211,15 @@ export class ReaderEventService {
         draw(overlayerStyle, {color: storedStyle.color});
       }
       this.eventSubject.next({type: 'draw-annotation', detail: {draw, annotation, doc, range}});
+    });
+
+    this.view.addEventListener('link', (event: Event) => {
+      const e = event as CustomEvent<{ a: HTMLAnchorElement; href: string }>;
+      if (!e.detail?.a || !e.detail.href) return;
+      // foliate navigates unless this dispatch is cancelled in the same tick
+      if (this.viewCallbacks?.onLink?.(e.detail.a, e.detail.href)) {
+        e.preventDefault();
+      }
     });
 
     this.view.addEventListener('show-annotation', (event: Event) => {

@@ -48,10 +48,27 @@ export interface FoliateRenderer {
   setStyles?(css: string): void;
 }
 
+export interface FoliateResolvedTarget {
+  index: number;
+  anchor?: (doc: Document) => Element | null;
+}
+
+export interface FoliateSection {
+  linear?: string;
+
+  createDocument?(): Document | Promise<Document>;
+}
+
+export type ReaderLinkHandler = (anchor: HTMLAnchorElement, href: string) => boolean;
+
 interface FoliateBook {
   toc?: FoliateTocItem[];
   metadata?: BookMetadata;
+  sections?: FoliateSection[];
+
   getCover?(): Promise<Blob | null> | null;
+
+  resolveHref?(href: string): FoliateResolvedTarget | null;
 }
 
 interface FoliateSearchSubitem {
@@ -110,6 +127,7 @@ export class ReaderViewManagerService {
   private readonly eventService = inject(ReaderEventService);
   private readonly epubStreamingService = inject(EpubStreamingService);
   private view: FoliateViewElement | null = null;
+  private linkHandler: ReaderLinkHandler | null = null;
 
   public get events$(): Observable<ViewEvent> {
     return this.eventService.events$;
@@ -126,8 +144,27 @@ export class ReaderViewManagerService {
       prev: () => this.prev(),
       next: () => this.next(),
       getCFI: (index: number, range: Range) => this.view?.getCFI(index, range) ?? null,
-      getContents: () => this.view?.renderer?.getContents() ?? null
+      getContents: () => this.view?.renderer?.getContents() ?? null,
+      onLink: (anchor: HTMLAnchorElement, href: string) => this.linkHandler?.(anchor, href) ?? false
     });
+  }
+
+  setLinkHandler(handler: ReaderLinkHandler | null): void {
+    this.linkHandler = handler;
+  }
+
+  resolveHref(href: string): FoliateResolvedTarget | null {
+    const book = this.view?.book;
+    if (!book?.resolveHref) return null;
+    try {
+      return book.resolveHref(href) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  getSection(index: number): FoliateSection | null {
+    return this.view?.book?.sections?.[index] ?? null;
   }
 
   loadEpub(epubPath: string, bookType: string = 'EPUB'): Observable<void> {
@@ -184,6 +221,7 @@ export class ReaderViewManagerService {
   }
 
   destroy(): void {
+    this.linkHandler = null;
     this.eventService.destroy();
     this.view?.remove();
     this.view = null;
