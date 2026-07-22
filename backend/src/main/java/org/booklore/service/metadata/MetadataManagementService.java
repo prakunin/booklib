@@ -8,6 +8,7 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.MergeMetadataType;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.booklore.service.file.FileFingerprint;
 import org.booklore.service.file.FileMoveService;
 import org.booklore.service.metadata.writer.MetadataWriter;
@@ -28,6 +29,7 @@ public class MetadataManagementService {
 
     private final AppProperties appProperties;
     private final AuthorRepository authorRepository;
+    private final AuthorLocalResolver authorLocalResolver;
     private final CategoryRepository categoryRepository;
     private final MoodRepository moodRepository;
     private final TagRepository tagRepository;
@@ -109,16 +111,13 @@ public class MetadataManagementService {
 
     private void consolidateAuthors(List<String> targetValues, List<String> valuesToMerge, boolean moveFile) {
         List<AuthorEntity> targetAuthors = targetValues.stream()
-                .map(name -> authorRepository.findByNameIgnoreCase(name)
+                .flatMap(name -> authorRepository.findByNameIgnoreCase(name)
                         .map(existing -> {
                             existing.setName(name);
                             return authorRepository.save(existing);
                         })
-                        .orElseGet(() -> {
-                            AuthorEntity author = new AuthorEntity();
-                            author.setName(name);
-                            return authorRepository.save(author);
-                        }))
+                        .or(() -> authorLocalResolver.resolve(name))
+                        .stream())
                 .toList();
 
         List<AuthorEntity> authorsToMerge = valuesToMerge.stream()

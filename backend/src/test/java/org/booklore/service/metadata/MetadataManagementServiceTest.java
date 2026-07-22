@@ -9,6 +9,7 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.MergeMetadataType;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
+import org.booklore.service.author.AuthorLocalResolver;
 import org.booklore.service.file.FileMoveService;
 import org.booklore.service.metadata.writer.MetadataWriter;
 import org.booklore.service.metadata.writer.MetadataWriterFactory;
@@ -36,6 +37,7 @@ class MetadataManagementServiceTest {
 
     @Mock private AppProperties appProperties;
     @Mock private AuthorRepository authorRepository;
+    @Mock private AuthorLocalResolver authorLocalResolver;
     @Mock private CategoryRepository categoryRepository;
     @Mock private MoodRepository moodRepository;
     @Mock private TagRepository tagRepository;
@@ -87,7 +89,7 @@ class MetadataManagementServiceTest {
         AuthorEntity newAuthor = AuthorEntity.builder().id(3L).name("New Author").build();
 
         when(authorRepository.findByNameIgnoreCase("New Author")).thenReturn(Optional.empty());
-        when(authorRepository.save(any(AuthorEntity.class))).thenReturn(newAuthor);
+        when(authorLocalResolver.resolve("New Author")).thenReturn(Optional.of(newAuthor));
         when(authorRepository.findByNameIgnoreCase("Old")).thenReturn(Optional.of(oldAuthor));
 
         List<AuthorEntity> authors = new ArrayList<>(List.of(oldAuthor));
@@ -96,6 +98,28 @@ class MetadataManagementServiceTest {
 
         service.consolidateMetadata(MergeMetadataType.authors, List.of("New Author"), List.of("Old"));
 
+        verify(authorLocalResolver).resolve("New Author");
+        assertThat(metadata.getAuthors()).contains(newAuthor);
+        verify(authorRepository).delete(oldAuthor);
+    }
+
+    @Test
+    void consolidateAuthors_skipsTargetWhenResolverReturnsEmpty() {
+        AuthorEntity oldAuthor = AuthorEntity.builder().id(1L).name("Old").build();
+
+        when(authorRepository.findByNameIgnoreCase("   ")).thenReturn(Optional.empty());
+        when(authorLocalResolver.resolve("   ")).thenReturn(Optional.empty());
+        when(authorRepository.findByNameIgnoreCase("Old")).thenReturn(Optional.of(oldAuthor));
+
+        List<AuthorEntity> authors = new ArrayList<>(List.of(oldAuthor));
+        BookMetadataEntity metadata = BookMetadataEntity.builder().authors(authors).build();
+        when(bookMetadataRepository.findAllByAuthorsContaining(oldAuthor)).thenReturn(List.of(metadata));
+
+        service.consolidateMetadata(MergeMetadataType.authors, List.of("   "), List.of("Old"));
+
+        verify(authorLocalResolver).resolve("   ");
+        verify(authorRepository, never()).save(any());
+        assertThat(metadata.getAuthors()).isEmpty();
         verify(authorRepository).delete(oldAuthor);
     }
 
