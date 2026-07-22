@@ -21,13 +21,20 @@ import java.util.Arrays;
  * Serves {@code @CacheUserStats} methods from {@link UserStatsCache} and drops a user's cached
  * analytics after an {@code @InvalidateUserStats} method returns.
  *
- * <p>Ordered {@link Ordered#HIGHEST_PRECEDENCE} so the cache wraps <em>outside</em> Spring's
- * transaction advice: a cache hit skips the transaction entirely, and invalidation runs only after
- * the recording transaction has committed.
+ * <p>Ordered just below {@link Ordered#HIGHEST_PRECEDENCE} so the cache wraps <em>outside</em>
+ * Spring's transaction advice: a cache hit skips the transaction entirely, and invalidation runs
+ * only after the recording transaction has committed.
+ *
+ * <p>The order is {@code HIGHEST_PRECEDENCE + 1} rather than {@code HIGHEST_PRECEDENCE} on purpose:
+ * {@code ExposeInvocationInterceptor} (which exposes the current {@code MethodInvocation} that
+ * {@code @AfterReturning} needs to resolve its join point) sits at {@code HIGHEST_PRECEDENCE + 1}
+ * too and must precede this aspect in the chain. Ordering this aspect at {@code HIGHEST_PRECEDENCE}
+ * sorts {@link #invalidate()} ahead of it, so the after-returning advice fails with
+ * "No MethodInvocation found".
  */
 @Aspect
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 @RequiredArgsConstructor
 public class UserStatsCacheAspect {
 
