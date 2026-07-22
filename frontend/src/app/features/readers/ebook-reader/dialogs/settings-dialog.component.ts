@@ -1,7 +1,7 @@
 import {Component, EventEmitter, inject, Input, OnInit, Output, Renderer2} from '@angular/core';
 import {DecimalPipe, DOCUMENT} from '@angular/common';
 import {TranslocoDirective} from '@jsverse/transloco';
-import {ReaderFlow, ReaderStateService} from '../state/reader-state.service';
+import {ReaderFlow, ReaderState, ReaderStateService} from '../state/reader-state.service';
 import {ReaderViewManagerService} from '../core/view-manager.service';
 import {EpubCustomFontService} from '../features/fonts/custom-font.service';
 
@@ -25,9 +25,14 @@ export class ReaderSettingsDialogComponent implements OnInit {
 
   @Output() closed = new EventEmitter<void>();
 
+  private initialState!: ReaderState;
+  private initialAnnotationColor = '#FFFF00';
+  private initialUsesGlobalSettings = false;
+  private pendingUsesGlobalSettings = false;
+
   onOverlayClick(event: Event): void {
     if ((event.target as HTMLElement).classList.contains('dialog-overlay')) {
-      this.closed.emit();
+      this.cancel();
     }
   }
 
@@ -50,6 +55,10 @@ export class ReaderSettingsDialogComponent implements OnInit {
   ngOnInit() {
     this.customFontService.injectCustomFontsStylesheet(this.renderer, this.document);
     this.selectedAnnotationColor = this.getSelectedAnnotationColor();
+    this.initialAnnotationColor = this.selectedAnnotationColor;
+    this.initialState = this.stateService.getStateSnapshot();
+    this.initialUsesGlobalSettings = this.stateService.usesGlobalSettings();
+    this.pendingUsesGlobalSettings = this.initialUsesGlobalSettings;
   }
 
   getFontFamilyForPreview(fontValue: string): string {
@@ -69,132 +78,122 @@ export class ReaderSettingsDialogComponent implements OnInit {
   }
 
   get usesGlobalSettings(): boolean {
-    return this.stateService.usesGlobalSettings();
-  }
-
-  private syncSettingsToBackend() {
-    this.stateService.persistSettings(this.bookId);
+    return this.pendingUsesGlobalSettings;
   }
 
   toggleGlobalSettings(): void {
-    this.stateService.setGlobalSettings(!this.usesGlobalSettings, this.bookId);
+    this.pendingUsesGlobalSettings = !this.pendingUsesGlobalSettings;
   }
 
   setFontFamily(value: string | null) {
     this.stateService.setFontFamily(value);
-    this.syncSettingsToBackend();
   }
 
   increaseFontSize() {
     this.stateService.updateFontSize(1);
-    this.syncSettingsToBackend();
   }
 
   decreaseFontSize() {
     this.stateService.updateFontSize(-1);
-    this.syncSettingsToBackend();
   }
 
   increaseLineHeight() {
     this.stateService.updateLineHeight(0.1);
-    this.syncSettingsToBackend();
   }
 
   decreaseLineHeight() {
     this.stateService.updateLineHeight(-0.1);
-    this.syncSettingsToBackend();
   }
 
   increaseMaxColumnCount() {
     this.stateService.updateMaxColumnCount(1);
-    this.syncSettingsToBackend();
   }
 
   decreaseMaxColumnCount() {
     this.stateService.updateMaxColumnCount(-1);
-    this.syncSettingsToBackend();
   }
 
   setGap(value: number) {
     const delta = value - this.state.gap;
     this.stateService.updateGap(delta);
-    this.syncSettingsToBackend();
   }
 
   setBackgroundSaturation(value: number) {
     this.stateService.setBackgroundSaturation(value);
-    this.syncSettingsToBackend();
   }
 
   setBackgroundTransparency(value: number) {
     this.stateService.setBackgroundTransparency(value);
-    this.syncSettingsToBackend();
   }
 
   toggleJustify() {
     this.stateService.toggleJustify();
-    this.syncSettingsToBackend();
   }
 
   toggleHyphenate() {
     this.stateService.toggleHyphenate();
-    this.syncSettingsToBackend();
   }
 
   increaseMaxInlineSize() {
     this.stateService.updateMaxInlineSize(40);
-    this.syncSettingsToBackend();
   }
 
   decreaseMaxInlineSize() {
     this.stateService.updateMaxInlineSize(-40);
-    this.syncSettingsToBackend();
   }
 
   increaseMaxBlockSize() {
     this.stateService.updateMaxBlockSize(60);
-    this.syncSettingsToBackend();
   }
 
   decreaseMaxBlockSize() {
     this.stateService.updateMaxBlockSize(-60);
-    this.syncSettingsToBackend();
   }
 
   increasePageMargin() {
     this.stateService.updatePageMargin(8);
-    this.syncSettingsToBackend();
   }
 
   decreasePageMargin() {
     this.stateService.updatePageMargin(-8);
-    this.syncSettingsToBackend();
   }
 
   toggleFullWidth() {
     this.stateService.toggleFullWidth();
-    this.syncSettingsToBackend();
   }
 
   toggleDarkMode() {
     this.stateService.toggleDarkMode();
-    this.syncSettingsToBackend();
   }
 
   onThemeChange(themeName: string) {
     this.stateService.setThemeByName(themeName);
-    this.syncSettingsToBackend();
   }
 
   setFlow(flow: ReaderFlow) {
     this.stateService.setFlow(flow);
     this.viewManager.setFlow(flow);
-    this.syncSettingsToBackend();
   }
 
   setAnnotationColor(color: string): void {
     this.selectedAnnotationColor = color;
-    localStorage.setItem('selectedAnnotationColor', color);
+  }
+
+  cancel(): void {
+    this.stateService.restoreState(this.initialState);
+    this.viewManager.setFlow(this.initialState.flow);
+    this.selectedAnnotationColor = this.initialAnnotationColor;
+    this.closed.emit();
+  }
+
+  save(): void {
+    localStorage.setItem('selectedAnnotationColor', this.selectedAnnotationColor);
+    if (this.pendingUsesGlobalSettings !== this.initialUsesGlobalSettings) {
+      this.stateService.setGlobalSettings(this.pendingUsesGlobalSettings, this.bookId);
+    } else {
+      this.stateService.persistSettings(this.bookId);
+    }
+    this.closed.emit();
   }
 
   getSelectedAnnotationColor(): string {

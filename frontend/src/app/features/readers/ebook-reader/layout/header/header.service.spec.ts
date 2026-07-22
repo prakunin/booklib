@@ -75,15 +75,11 @@ describe('ReaderHeaderService', () => {
     TestBed.resetTestingModule();
   });
 
-  it('tracks title, visibility, bookmarks, fullscreen, and resets cleanly', () => {
-    service.setForceVisible(true);
-    service.setHeaderPinned(true);
+  it('tracks title, bookmarks, fullscreen, and resets cleanly', () => {
     service.setCurrentCfiBookmarked(true);
     service.setFullscreen(true);
 
     expect(service.bookTitle()).toBe('Book Title');
-    expect(service.forceVisible()).toBe(true);
-    expect(service.headerPinned()).toBe(true);
     expect(service.isCurrentCfiBookmarked()).toBe(true);
     expect(service.isFullscreen()).toBe(true);
     expect(service.theme()).toMatchObject({name: 'default'});
@@ -91,8 +87,6 @@ describe('ReaderHeaderService', () => {
     service.reset();
 
     expect(service.bookTitle()).toBe('');
-    expect(service.forceVisible()).toBe(false);
-    expect(service.headerPinned()).toBe(false);
     expect(service.isCurrentCfiBookmarked()).toBe(false);
     expect(service.isFullscreen()).toBe(false);
   });
@@ -102,13 +96,11 @@ describe('ReaderHeaderService', () => {
     const metadataEvents: void[] = [];
     const fullscreenEvents: void[] = [];
     const shortcutsEvents: void[] = [];
-    const pinEvents: void[] = [];
 
     service.showControls$.subscribe(() => controlsEvents.push(undefined));
     service.showMetadata$.subscribe(() => metadataEvents.push(undefined));
     service.toggleFullscreen$.subscribe(() => fullscreenEvents.push(undefined));
     service.showShortcutsHelp$.subscribe(() => shortcutsEvents.push(undefined));
-    service.toggleHeaderPinned$.subscribe(() => pinEvents.push(undefined));
 
     service.openSidebar();
     service.openLeftSidebar('notes');
@@ -117,7 +109,6 @@ describe('ReaderHeaderService', () => {
     service.openMetadata();
     service.toggleFullscreen();
     service.showShortcutsHelp();
-    service.toggleHeaderPinned();
     service.close();
 
     expect(sidebarService.open).toHaveBeenCalledOnce();
@@ -127,7 +118,6 @@ describe('ReaderHeaderService', () => {
     expect(metadataEvents).toHaveLength(1);
     expect(fullscreenEvents).toHaveLength(1);
     expect(shortcutsEvents).toHaveLength(1);
-    expect(pinEvents).toHaveLength(1);
     expect(location.back).toHaveBeenCalledOnce();
   });
 

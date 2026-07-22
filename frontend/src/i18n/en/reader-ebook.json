@@ -67,6 +67,8 @@
     "textOptions": "Text Options",
     "justifyText": "Justify Text",
     "hyphenate": "Hyphenate",
+    "cancel": "Cancel",
+    "save": "Save",
     "useForAllBooks": "Use for all books",
     "useForAllBooksDescription": "Save the current appearance as the default for every eBook."
   },
@@ -96,8 +98,6 @@
     "fullscreen": "Fullscreen",
     "exitFullscreen": "Exit Fullscreen",
     "keyboardShortcuts": "Keyboard Shortcuts",
-    "pinHeader": "Keep toolbar visible",
-    "unpinHeader": "Auto-hide toolbar",
     "decreaseFontSize": "Decrease Font Size",
     "increaseFontSize": "Increase Font Size",
     "enableJustify": "Justify Text",

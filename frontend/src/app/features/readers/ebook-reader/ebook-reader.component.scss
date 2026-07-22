@@ -1,4 +1,5 @@
 .reader {
+  --ebook-reader-header-height: 24px;
   --ebook-reader-footer-height: 24px;
 
   width: 100vw;
@@ -12,20 +13,6 @@
   display: flex;
   flex-direction: column;
   overscroll-behavior: none;
-}
-
-.header-trigger-zone {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 20px;
-  z-index: 9998;
-  pointer-events: auto;
-
-  &.inactive {
-    pointer-events: none;
-  }
 }
 
 .reader-content {
@@ -211,6 +198,10 @@ foliate-view::part(foot) {
 }
 
 .reader.immersive {
+  app-reader-header {
+    display: none;
+  }
+
   ::ng-deep foliate-view::part(head),
   ::ng-deep foliate-view::part(foot) {
     display: none !important;

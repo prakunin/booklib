@@ -1,6 +1,5 @@
 <ng-container *transloco="let t; prefix: 'readerEbook.header'">
-<div class="reader-header" [class.is-visible]="forceVisible()" [style.background]="theme().bg" [style.color]="theme().fg"
-  (mouseenter)="hoverChange.emit(true)" (mouseleave)="hoverChange.emit(false)">
+<div class="reader-header" [style.background]="theme().bg" [style.color]="theme().fg">
   <div class="header-left">
     <button class="icon-btn" (click)="onShowChapters()" [title]="t('chapters')">
       <app-reader-icon name="menu" [size]="20"></app-reader-icon>
@@ -34,9 +33,6 @@
     <button class="icon-btn desktop-only" (click)="onShowHelp()" [title]="t('keyboardShortcuts')">
       <app-reader-icon name="help" [size]="20"></app-reader-icon>
     </button>
-    <button class="icon-btn pin-btn desktop-only" [class.active]="headerPinned()" (click)="onToggleHeaderPinned()" [title]="headerPinned() ? t('unpinHeader') : t('pinHeader')">
-      <app-reader-icon [name]="headerPinned() ? 'pin-off' : 'pin'" [size]="18"></app-reader-icon>
-    </button>
     <div class="overflow-menu mobile-only">
       <button class="icon-btn" (click)="overflowOpen = !overflowOpen; $event.stopPropagation()" [title]="t('more')">
         <app-reader-icon name="dots-vertical" [size]="20"></app-reader-icon>
@@ -55,10 +51,6 @@
           <button class="overflow-item" (click)="onShowHelp(); overflowOpen = false">
             <app-reader-icon name="help" [size]="18"></app-reader-icon>
             <span>{{ t('keyboardShortcuts') }}</span>
-          </button>
-          <button class="overflow-item" (click)="onToggleHeaderPinned(); overflowOpen = false">
-            <app-reader-icon [name]="headerPinned() ? 'pin-off' : 'pin'" [size]="18"></app-reader-icon>
-            <span>{{ headerPinned() ? t('unpinHeader') : t('pinHeader') }}</span>
           </button>
         </div>
       }

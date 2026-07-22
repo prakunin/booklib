@@ -18,9 +18,10 @@
   @include surface;
 
   position: absolute;
-  top: 52px;
-  right: 60px;
+  inset: calc(var(--ebook-reader-header-height, 24px) + 8px) 60px auto auto;
   width: 280px;
+  max-width: calc(100vw - 16px);
+  margin: 0;
   border: 1px solid var(--reader-chrome-border);
   border-radius: 12px;
   box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
@@ -53,6 +54,17 @@
   border-top: 1px solid var(--reader-chrome-border);
   transform: rotate(45deg);
   border-radius: 3px 0 0;
+}
+
+@media (width <= 600px) {
+  .quick-settings-panel {
+    right: 8px;
+    width: min(280px, calc(100vw - 16px));
+  }
+
+  .pointer {
+    right: 40px;
+  }
 }
 
 .panel-body {

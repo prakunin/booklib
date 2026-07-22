@@ -4,9 +4,6 @@
   [class.immersive]="immersiveMode()"
   [style.background-color]="readerBackground()">
 
-  <div class="header-trigger-zone"
-       [class.inactive]="headerVisible() || immersiveMode()"
-       (mouseenter)="onHeaderTriggerZoneEnter()"></div>
   @if (isLoading()) {
     <div class="loader-overlay">
       <div class="loader-content">
@@ -16,8 +13,7 @@
     </div>
   }
 
-  <app-reader-header
-    (hoverChange)="onHeaderHovered($event)"></app-reader-header>
+  <app-reader-header></app-reader-header>
 
   <div class="reader-content">
     @if (isCurrentCfiBookmarked()) {

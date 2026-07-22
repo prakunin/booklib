@@ -67,6 +67,8 @@
         "textOptions": "Настройки текста",
         "justifyText": "Выравнивание по ширине",
         "hyphenate": "Переносы",
+        "cancel": "Отмена",
+        "save": "Сохранить",
         "useForAllBooks": "Для всех книг",
         "useForAllBooksDescription": "Сохранить текущее оформление по умолчанию для всех электронных книг."
     },
@@ -96,8 +98,6 @@
         "fullscreen": "Полноэкранный режим",
         "exitFullscreen": "Выйти из полноэкранного режима",
         "keyboardShortcuts": "Горячие клавиши",
-        "pinHeader": "Закрепить панель",
-        "unpinHeader": "Автоскрытие панели",
         "decreaseFontSize": "Уменьшить шрифт",
         "increaseFontSize": "Увеличить шрифт",
         "enableJustify": "Выровнять по ширине",

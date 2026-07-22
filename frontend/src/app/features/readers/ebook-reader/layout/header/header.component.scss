@@ -1,10 +1,15 @@
+:host {
+  display: block;
+  flex: 0 0 var(--ebook-reader-header-height, 24px);
+  min-height: var(--ebook-reader-header-height, 24px);
+}
+
 .reader-header {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 36px;
-  padding: 0 10px;
+  position: relative;
+  width: 100%;
+  height: var(--ebook-reader-header-height, 24px);
+  padding: 0 6px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -13,16 +18,8 @@
   background: inherit;
   border-bottom: 1px solid rgb(0 0 0 / 13%);
   box-shadow: 0 2px 8px 0 rgb(0 0 0 / 13%);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-100%);
-  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
-
-  &.is-visible {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
+  opacity: 1;
+  pointer-events: auto;
 
   .header-left,
   .header-right {
@@ -34,8 +31,8 @@
   .reader-tools {
     display: flex;
     align-items: center;
-    margin-right: 6px;
-    padding-right: 6px;
+    margin-right: 3px;
+    padding-right: 3px;
     border-right: 1px solid color-mix(in srgb, currentcolor 22%, transparent);
 
     .icon-btn.active {
@@ -49,13 +46,14 @@
     border: none;
     color: inherit;
     cursor: pointer;
-    padding: 8px;
+    height: 23px;
+    padding: 1px 6px;
     border-radius: 4px;
     transition: color 0.15s, opacity 0.15s;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-right: 4px;
+    margin-right: 2px;
     opacity: 0.85;
 
     &:hover {
@@ -71,10 +69,6 @@
       opacity: 1;
     }
 
-    &.pin-btn.active {
-      color: var(--color-primary-500, #f97316);
-    }
-
     .pi {
       font-size: 16px;
     }
@@ -84,7 +78,7 @@
     flex: 1;
     min-width: 0;
     text-align: center;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
     color: inherit;
     pointer-events: none;
@@ -148,8 +142,8 @@
     padding: 0 2px;
 
     .icon-btn {
-      padding: 10px;
-      margin-right: 2px;
+      padding: 1px 5px;
+      margin-right: 1px;
     }
 
     .desktop-only {

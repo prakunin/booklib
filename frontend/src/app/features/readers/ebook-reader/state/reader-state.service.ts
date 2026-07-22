@@ -282,6 +282,29 @@ export class ReaderStateService {
     this.updateState({flow: this.normalizeFlow(flow)});
   }
 
+  getStateSnapshot(): ReaderState {
+    const state = this._state();
+    return {
+      ...state,
+      theme: {
+        ...state.theme,
+        light: {...state.theme.light},
+        dark: {...state.theme.dark},
+      }
+    };
+  }
+
+  restoreState(snapshot: ReaderState): void {
+    this._state.set({
+      ...snapshot,
+      theme: {
+        ...snapshot.theme,
+        light: {...snapshot.theme.light},
+        dark: {...snapshot.theme.dark},
+      }
+    });
+  }
+
   private normalizeFlow(flow: ReaderFlow | string): ReaderFlow {
     if (flow === 'continuous' || flow === 'scrolled') return 'scrolled';
     return 'paginated';

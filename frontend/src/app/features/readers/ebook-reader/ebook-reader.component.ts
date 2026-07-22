@@ -80,7 +80,6 @@ interface PendingInitialChapterRestore {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class EbookReaderComponent implements AfterViewInit, OnInit {
-  private static readonly HEADER_PINNED_STORAGE_KEY = 'ebookReader.headerPinned';
   private readonly destroyRef = inject(DestroyRef);
   private static readonly MAX_CHAPTER_PROGRESS_PERCENT = 99.9;
   private static readonly INITIAL_CHAPTER_RESTORE_RETRY_MS = 100;
@@ -107,6 +106,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   public stateService = inject(ReaderStateService);
 
   @ViewChild('readerRoot', {static: true}) private readonly readerRoot?: ElementRef<HTMLElement>;
+  @ViewChild(ReaderSettingsDialogComponent) private settingsDialog?: ReaderSettingsDialogComponent;
 
   protected bookId!: number;
   protected altBookType?: string;
@@ -138,7 +138,6 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   showControls = signal(false);
   showMetadata = signal(false);
   forceNavbarVisible = signal(false);
-  headerVisible = signal(false);
   private readonly sectionBoundaryControlsVisible = signal(false);
   book = signal<Book | null>(null);
   sectionFractions = signal<number[]>([]);
@@ -206,14 +205,10 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   }
 
   ngOnInit() {
-    this.visibilityManager = new ReaderHeaderFooterVisibilityManager(
-      window.innerHeight,
-      this.restoreHeaderPinnedPreference()
-    );
+    this.visibilityManager = new ReaderHeaderFooterVisibilityManager(window.innerHeight);
     this.visibilityManager.onStateChange((state) => {
-      this.applyChromeVisibility(state.headerVisible, state.footerVisible);
+      this.applyChromeVisibility(state.footerVisible);
     });
-    this.headerService.setHeaderPinned(this.visibilityManager.isPinned());
     this.refreshChromeVisibility();
 
     this.sidebarService.showMetadata$
@@ -235,10 +230,6 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
     this.headerService.showShortcutsHelp$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.showShortcutsHelp.set(true));
-
-    this.headerService.toggleHeaderPinned$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.toggleHeaderNavbarPinned());
 
     // Enable wake lock after a short delay
     setTimeout(() => this.wakeLockService.enable(), 1000);
@@ -376,8 +367,6 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
           case 'middle-single-tap':
             if (this.immersiveMode()) {
               this.immersiveTemporaryShow();
-            } else {
-              this.visibilityManager.toggleTemporary();
             }
             break;
           case 'text-selected':
@@ -420,7 +409,11 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
             } else if (this.noteDialogState().visible) {
               this.noteService.closeDialog();
             } else if (this.showControls()) {
-              this.showControls.set(false);
+              if (this.settingsDialog) {
+                this.settingsDialog.cancel();
+              } else {
+                this.showControls.set(false);
+              }
             } else if (this.showQuickSettings()) {
               this.showQuickSettings.set(false);
             } else if (this.showMetadata()) {
@@ -579,13 +572,11 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
 
   private refreshChromeVisibility(): void {
     const state = this.visibilityManager.getVisibilityState();
-    this.applyChromeVisibility(state.headerVisible, state.footerVisible);
+    this.applyChromeVisibility(state.footerVisible);
   }
 
-  private applyChromeVisibility(headerVisible: boolean, footerVisible: boolean): void {
+  private applyChromeVisibility(footerVisible: boolean): void {
     const visible = this.sectionBoundaryControlsVisible();
-    this.headerVisible.set(headerVisible || visible);
-    this.headerService.setForceVisible(headerVisible || visible);
     this.forceNavbarVisible.set(footerVisible || visible);
   }
 
@@ -948,29 +939,6 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
     return !!section && section.current < section.total - 1;
   }
 
-  private toggleHeaderNavbarPinned(): void {
-    this.visibilityManager.togglePinned();
-    const pinned = this.visibilityManager.isPinned();
-    this.headerService.setHeaderPinned(pinned);
-    this.persistHeaderPinnedPreference(pinned);
-  }
-
-  private restoreHeaderPinnedPreference(): boolean {
-    try {
-      return localStorage.getItem(EbookReaderComponent.HEADER_PINNED_STORAGE_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  }
-
-  private persistHeaderPinnedPreference(pinned: boolean): void {
-    try {
-      localStorage.setItem(EbookReaderComponent.HEADER_PINNED_STORAGE_KEY, String(pinned));
-    } catch {
-      // The pin still works for the current reader session when storage is unavailable.
-    }
-  }
-
   @HostListener('document:mousemove', ['$event'])
   onMouseMove(event: MouseEvent): void {
     this.visibilityManager.handleMouseMove(event.clientY);
@@ -987,16 +955,8 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
     this.applyStyles();
   }
 
-  onHeaderTriggerZoneEnter(): void {
-    this.visibilityManager.handleHeaderZoneEnter();
-  }
-
   onFooterTriggerZoneEnter(): void {
     this.visibilityManager.handleFooterZoneEnter();
-  }
-
-  onHeaderHovered(hovered: boolean): void {
-    this.visibilityManager.setHeaderHovered(hovered);
   }
 
   onFooterHovered(hovered: boolean): void {
@@ -1007,7 +967,6 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
     const newValue = !this.immersiveMode();
     this.immersiveMode.set(newValue);
     this.visibilityManager.setImmersive(newValue);
-    this.headerService.setHeaderPinned(this.visibilityManager.isPinned());
   }
 
   private immersiveTemporaryShow(): void {

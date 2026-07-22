@@ -333,4 +333,17 @@ describe('ReaderStateService', () => {
 
     expect(service.state().theme).toEqual(initialTheme);
   });
+
+  it('restores an independent snapshot of the reader state', () => {
+    const snapshot = service.getStateSnapshot();
+
+    service.updateFontSize(5);
+    service.toggleDarkMode();
+    service.setFlow('scrolled');
+    service.restoreState(snapshot);
+
+    expect(service.state()).toEqual(snapshot);
+    expect(service.state()).not.toBe(snapshot);
+    expect(service.state().theme).not.toBe(snapshot.theme);
+  });
 });
