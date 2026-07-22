@@ -42,6 +42,7 @@ export class SeriesDataService {
     initialPageParam: 0,
     getNextPageParam: (lastPage: AppPageResponse<AppSeriesSummary>) =>
       lastPage.hasNext ? lastPage.page + 1 : undefined,
+    placeholderData: previousData => previousData,
     enabled: !!this.token() && this.enabled(),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,

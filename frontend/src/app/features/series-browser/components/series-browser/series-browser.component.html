@@ -1,19 +1,5 @@
 <ng-container *transloco="let t; prefix: 'seriesBrowser'">
 <div class="series-browser-page">
-  @if (isSeriesError()) {
-    <app-message color="red">{{ 'common.error' | transloco }}</app-message>
-  } @else if (isSeriesLoading()) {
-    <div class="loading-state">
-      <p-progressSpinner
-        [style]="{'width': '60px', 'height': '60px'}"
-        strokeWidth="3"
-        fill="transparent"
-        animationDuration="1.5s">
-      </p-progressSpinner>
-    </div>
-  }
-
-  @if (!isSeriesLoading() && !isSeriesError()) {
     <div class="browse-header">
       <h2 class="browse-title">{{ t('browseAllSeries') }}</h2>
 
@@ -70,44 +56,56 @@
       </p-popover>
     </div>
 
-    @if (filteredSeries(); as seriesList) {
-      @if (seriesList.length === 0) {
-        <div class="empty-state">
-          <i class="pi pi-list empty-icon"></i>
-          <p>{{ t('noSeriesFound') }}</p>
-        </div>
-      } @else {
-        <div #scrollElement class="virtual-scroller" (scroll)="onSeriesScroll()">
-          <div class="virtual-content" [style.height.px]="virtualGrid.virtualizer.getTotalSize()">
-            @for (virtualItem of virtualGrid.virtualizer.getVirtualItems(); track virtualItem.key) {
-              @if (seriesList[virtualItem.index]; as series) {
-                <div
-                  class="virtual-cell"
-                  [style.width.px]="virtualGrid.itemWidth()"
-                  [style.height.px]="virtualItem.size"
-                  [style.transform]="virtualGrid.itemTransform(virtualItem)">
-                  <app-series-card
-                    [series]="series"
-                    [style.--card-scale]="currentCardScale()"
-                    (cardClick)="navigateToSeries($event)">
-                  </app-series-card>
-                </div>
+    @if (isSeriesError()) {
+      <app-message color="red">{{ 'common.error' | transloco }}</app-message>
+    } @else if (isSeriesLoading()) {
+      <div class="loading-state">
+        <p-progressSpinner
+          [style]="{'width': '60px', 'height': '60px'}"
+          strokeWidth="3"
+          fill="transparent"
+          animationDuration="1.5s">
+        </p-progressSpinner>
+      </div>
+    } @else {
+      @if (filteredSeries(); as seriesList) {
+        @if (seriesList.length === 0) {
+          <div class="empty-state">
+            <i class="pi pi-list empty-icon"></i>
+            <p>{{ t('noSeriesFound') }}</p>
+          </div>
+        } @else {
+          <div #scrollElement class="virtual-scroller" (scroll)="onSeriesScroll()">
+            <div class="virtual-content" [style.height.px]="virtualGrid.virtualizer.getTotalSize()">
+              @for (virtualItem of virtualGrid.virtualizer.getVirtualItems(); track virtualItem.key) {
+                @if (seriesList[virtualItem.index]; as series) {
+                  <div
+                    class="virtual-cell"
+                    [style.width.px]="virtualGrid.itemWidth()"
+                    [style.height.px]="virtualItem.size"
+                    [style.transform]="virtualGrid.itemTransform(virtualItem)">
+                    <app-series-card
+                      [series]="series"
+                      [style.--card-scale]="currentCardScale()"
+                      (cardClick)="navigateToSeries($event)">
+                    </app-series-card>
+                  </div>
+                }
               }
+            </div>
+            @if (isFetchingNextPage()) {
+              <div class="loading-more">
+                <p-progressSpinner
+                  [style]="{'width': '28px', 'height': '28px'}"
+                  strokeWidth="3"
+                  fill="transparent"
+                  animationDuration="1.5s">
+                </p-progressSpinner>
+              </div>
             }
           </div>
-          @if (isFetchingNextPage()) {
-            <div class="loading-more">
-              <p-progressSpinner
-                [style]="{'width': '28px', 'height': '28px'}"
-                strokeWidth="3"
-                fill="transparent"
-                animationDuration="1.5s">
-              </p-progressSpinner>
-            </div>
-          }
-        </div>
+        }
       }
     }
-  }
 </div>
 </ng-container>

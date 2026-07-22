@@ -1,19 +1,5 @@
 <ng-container *transloco="let t; prefix: 'authorBrowser'">
 <div class="author-browser-page">
-  @if (loadError()) {
-    <app-message color="red">{{ 'common.error' | transloco }}</app-message>
-  } @else if (loading()) {
-    <div class="loading-state">
-      <p-progressSpinner
-        [style]="{'width': '60px', 'height': '60px'}"
-        strokeWidth="3"
-        fill="transparent"
-        animationDuration="1.5s">
-      </p-progressSpinner>
-    </div>
-  }
-
-  @if (!loading() && !loadError()) {
     <div class="browse-header">
       <h2 class="browse-title">{{ t('browseAllAuthors') }}</h2>
 
@@ -187,7 +173,18 @@
       </p-popover>
     </div>
 
-    @if (filteredAuthors(); as authorList) {
+    @if (loadError()) {
+      <app-message color="red">{{ 'common.error' | transloco }}</app-message>
+    } @else if (loading()) {
+      <div class="loading-state">
+        <p-progressSpinner
+          [style]="{'width': '60px', 'height': '60px'}"
+          strokeWidth="3"
+          fill="transparent"
+          animationDuration="1.5s">
+        </p-progressSpinner>
+      </div>
+    } @else if (filteredAuthors(); as authorList) {
       @if (authorList.length === 0) {
         <div class="empty-state">
           <i class="pi pi-users empty-icon"></i>
@@ -291,6 +288,5 @@
         </div>
       </div>
     }
-  }
 </div>
 </ng-container>

@@ -79,6 +79,14 @@ class AppSeriesServiceTest {
             assertEquals("The Expanse", result.getContent().getFirst().getSeriesName());
             assertEquals(9, result.getContent().getFirst().getBookCount());
             assertEquals(3, result.getContent().getFirst().getBooksRead());
+            verify(entityManager).createQuery(
+                    argThat((String query) -> query.startsWith("SELECT m.seriesName, COUNT(b.id)")
+                            && !query.contains("userBookProgress")),
+                    eq(Tuple.class));
+            verify(entityManager).createQuery(
+                    argThat((String query) -> query.startsWith("SELECT m.seriesName, SUM(")
+                            && query.contains("m.seriesName IN :seriesNames")),
+                    eq(Tuple.class));
         }
 
         @Test
@@ -92,6 +100,23 @@ class AppSeriesServiceTest {
             assertNotNull(result);
             assertTrue(result.getContent().isEmpty());
             assertEquals(0, result.getTotalElements());
+        }
+
+        @Test
+        void getSeries_excludesSeriesWithOnlyOneBookFromResultsAndCount() {
+            mockAdminUser();
+            mockAggregateQuery(Collections.emptyList());
+            mockCountQuery(0L);
+
+            service.getSeries(0, 20, null, null, null, null, null);
+
+            verify(entityManager).createQuery(
+                    argThat((String query) -> query.contains("GROUP BY m.seriesName HAVING COUNT(b.id) > 1 ORDER BY")),
+                    eq(Tuple.class));
+            verify(entityManager).createQuery(
+                    argThat((String query) -> query.startsWith("SELECT COUNT(*) FROM (")
+                            && query.contains("GROUP BY m.seriesName HAVING COUNT(b.id) > 1) groupedSeries")),
+                    eq(Long.class));
         }
 
         @Test
@@ -207,6 +232,20 @@ class AppSeriesServiceTest {
             AppPageResponse<AppSeriesSummary> result = service.getSeries(0, 20, sortField, sortDir, null, null, null);
 
             assertNotNull(result);
+        }
+
+        @Test
+        void getSeries_progressSort_keepsProgressJoinBeforePagination() {
+            mockAdminUser();
+            mockAggregateQuery(Collections.emptyList());
+            mockCountQuery(0L);
+
+            service.getSeries(0, 20, "readProgress", "desc", null, null, null);
+
+            verify(entityManager).createQuery(
+                    argThat((String query) -> query.contains("LEFT JOIN b.userBookProgress p")
+                            && query.contains("ORDER BY (SUM(")),
+                    eq(Tuple.class));
         }
 
         @Test
@@ -537,22 +576,41 @@ class AppSeriesServiceTest {
         when(aggregateQ.setMaxResults(anyInt())).thenReturn(aggregateQ);
         when(aggregateQ.getResultList()).thenReturn(results);
 
+        List<Tuple> progressResults = results.stream()
+                .map(this::mockProgressTuple)
+                .toList();
+        TypedQuery<Tuple> progressQ = mock(TypedQuery.class);
+        when(progressQ.setParameter(anyString(), any())).thenReturn(progressQ);
+        when(progressQ.getResultList()).thenReturn(progressResults);
+
         TypedQuery<BookEntity> booksQ = mock(TypedQuery.class);
         when(booksQ.setParameter(anyString(), any())).thenReturn(booksQ);
         when(booksQ.getResultList()).thenReturn(Collections.emptyList());
 
-        when(entityManager.createQuery(anyString(), eq(Tuple.class))).thenReturn(aggregateQ);
+        when(entityManager.createQuery(anyString(), eq(Tuple.class))).thenReturn(aggregateQ, progressQ);
         when(entityManager.createQuery(anyString(), eq(BookEntity.class))).thenReturn(booksQ);
+    }
+
+    private Tuple mockProgressTuple(Tuple aggregateTuple) {
+        String seriesName = aggregateTuple.get(0, String.class);
+        Long booksRead = aggregateTuple.get(4, Long.class);
+        Instant lastReadTime = aggregateTuple.get(5, Instant.class);
+        Long readingCount = aggregateTuple.get(6, Long.class);
+        Long abandonedCount = aggregateTuple.get(7, Long.class);
+        Long wontReadCount = aggregateTuple.get(8, Long.class);
+
+        Tuple tuple = mock(Tuple.class);
+        when(tuple.get(0, String.class)).thenReturn(seriesName);
+        when(tuple.get(1, Long.class)).thenReturn(booksRead);
+        when(tuple.get(2, Instant.class)).thenReturn(lastReadTime);
+        when(tuple.get(3, Long.class)).thenReturn(readingCount);
+        when(tuple.get(4, Long.class)).thenReturn(abandonedCount);
+        when(tuple.get(5, Long.class)).thenReturn(wontReadCount);
+        return tuple;
     }
 
     @SuppressWarnings("unchecked")
     private void mockAggregateQueryInProgress(List<Tuple> results) {
-        // Pre-compute series names before setting up mocks to avoid calling .get() on mock Tuples during stubbing
-        List<String> seriesNames = new ArrayList<>();
-        for (Tuple t : results) {
-            seriesNames.add(t.get(0, String.class));
-        }
-
         TypedQuery<Tuple> aggregateQ = mock(TypedQuery.class);
         when(aggregateQ.setParameter(anyString(), any())).thenReturn(aggregateQ);
         when(aggregateQ.setFirstResult(anyInt())).thenReturn(aggregateQ);
@@ -563,14 +621,8 @@ class AppSeriesServiceTest {
         when(booksQ.setParameter(anyString(), any())).thenReturn(booksQ);
         when(booksQ.getResultList()).thenReturn(Collections.emptyList());
 
-        // In-progress count uses String.class query
-        TypedQuery<String> countQ = mock(TypedQuery.class);
-        when(countQ.setParameter(anyString(), any())).thenReturn(countQ);
-        when(countQ.getResultList()).thenReturn(seriesNames);
-
         when(entityManager.createQuery(anyString(), eq(Tuple.class))).thenReturn(aggregateQ);
         when(entityManager.createQuery(anyString(), eq(BookEntity.class))).thenReturn(booksQ);
-        when(entityManager.createQuery(anyString(), eq(String.class))).thenReturn(countQ);
     }
 
     @SuppressWarnings("unchecked")
@@ -583,12 +635,10 @@ class AppSeriesServiceTest {
 
     @SuppressWarnings("unchecked")
     private void mockCountQueryInProgress(long count) {
-        TypedQuery<String> countQ = mock(TypedQuery.class);
+        TypedQuery<Long> countQ = mock(TypedQuery.class);
         when(countQ.setParameter(anyString(), any())).thenReturn(countQ);
-        List<String> names = new ArrayList<>();
-        for (int i = 0; i < count; i++) names.add("series" + i);
-        when(countQ.getResultList()).thenReturn(names);
-        when(entityManager.createQuery(anyString(), eq(String.class))).thenReturn(countQ);
+        when(countQ.getSingleResult()).thenReturn(count);
+        when(entityManager.createQuery(anyString(), eq(Long.class))).thenReturn(countQ);
     }
 
     @SuppressWarnings("unchecked")

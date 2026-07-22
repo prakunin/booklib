@@ -59,6 +59,7 @@ export class AuthorService {
     initialPageParam: 0,
     getNextPageParam: (lastPage: AppPageResponse<AuthorSummary>) =>
       lastPage.hasNext ? lastPage.page + 1 : undefined,
+    placeholderData: previousData => previousData,
     enabled: !!this.token() && this.browserEnabled(),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,

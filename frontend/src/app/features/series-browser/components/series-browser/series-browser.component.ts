@@ -1,5 +1,7 @@
 import {Component, DestroyRef, ElementRef, HostListener, computed, effect, inject, OnInit, signal, viewChild} from '@angular/core';
+import {toObservable, toSignal} from '@angular/core/rxjs-interop';
 import {FormsModule} from '@angular/forms';
+import {debounceTime, distinctUntilChanged} from 'rxjs';
 import {ProgressSpinner} from 'primeng/progressspinner';
 import {InputText} from 'primeng/inputtext';
 import {Select} from 'primeng/select';
@@ -76,6 +78,13 @@ export class SeriesBrowserComponent implements OnInit {
   readonly isSeriesError = this.seriesDataService.isError;
   readonly isFetchingNextPage = this.seriesDataService.isFetchingNextPage;
   private readonly searchTerm = signal('');
+  private readonly debouncedSearchTerm = toSignal(
+    toObservable(this.searchTerm).pipe(
+      debounceTime(500),
+      distinctUntilChanged()
+    ),
+    {initialValue: this.searchTerm()}
+  );
   private readonly statusFilter = signal<SeriesBrowserStatusFilter>('all');
   private readonly sortBy = signal<SeriesBrowserSort>('name-asc');
   readonly filteredSeries = this.seriesDataService.allSeries;
@@ -143,6 +152,11 @@ export class SeriesBrowserComponent implements OnInit {
 
   constructor() {
     effect(() => {
+      this.seriesDataService.setSearch(this.debouncedSearchTerm());
+      this.scrollToTop();
+    });
+
+    effect(() => {
       this.fetchNextPageIfNearLoadedEnd();
     });
   }
@@ -188,8 +202,6 @@ export class SeriesBrowserComponent implements OnInit {
 
   onSearchChange(value: string): void {
     this.searchTerm.set(value);
-    this.seriesDataService.setSearch(value);
-    this.scrollToTop();
   }
 
   onStatusFilterChange(value: SeriesBrowserStatusFilter): void {

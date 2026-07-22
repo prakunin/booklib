@@ -84,7 +84,7 @@ export class AuthorBrowserComponent implements OnInit {
   private static readonly MOBILE_COLUMNS_STORAGE_KEY = 'authorMobileColumnsPreference';
   private static readonly MIN_SCALE = 0.7;
   private static readonly MAX_SCALE = 1.3;
-  private static readonly SEARCH_DEBOUNCE_MS = 300;
+  private static readonly SEARCH_DEBOUNCE_MS = 500;
 
   private readonly authorService = inject(AuthorService);
   private readonly libraryService = inject(LibraryService);
