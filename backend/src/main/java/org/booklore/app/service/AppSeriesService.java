@@ -1,8 +1,11 @@
 package org.booklore.app.service;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
-import lombok.AllArgsConstructor;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import lombok.RequiredArgsConstructor;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.exception.ApiError;
 import org.booklore.app.dto.*;
@@ -22,14 +25,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import jakarta.persistence.Query;
 
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class AppSeriesService {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
@@ -42,12 +45,17 @@ public class AppSeriesService {
     private static final String READING_COUNT_EXPR = "SUM(CASE WHEN p.readStatus IN (org.booklore.model.enums.ReadStatus.READING, org.booklore.model.enums.ReadStatus.RE_READING, org.booklore.model.enums.ReadStatus.PAUSED) THEN 1 ELSE 0 END)";
     private static final String ABANDONED_COUNT_EXPR = "SUM(CASE WHEN p.readStatus = org.booklore.model.enums.ReadStatus.ABANDONED THEN 1 ELSE 0 END)";
     private static final String WONT_READ_COUNT_EXPR = "SUM(CASE WHEN p.readStatus = org.booklore.model.enums.ReadStatus.WONT_READ THEN 1 ELSE 0 END)";
+    private static final Duration SERIES_COUNT_CACHE_TTL = Duration.ofMinutes(5);
 
     private final EntityManager entityManager;
     private final AuthenticationService authenticationService;
     private final BookRepository bookRepository;
     private final UserBookProgressRepository userBookProgressRepository;
     private final AppBookMapper mobileBookMapper;
+    private final Cache<SeriesCountKey, Long> seriesCountCache = Caffeine.newBuilder()
+            .expireAfterWrite(SERIES_COUNT_CACHE_TTL)
+            .maximumSize(500)
+            .build();
 
     @Transactional(readOnly = true)
     public AppPageResponse<AppSeriesSummary> getSeries(
@@ -129,6 +137,24 @@ public class AppSeriesService {
 
     private long countSeries(String statusFilter, LibraryAccessScope libraryAccessScope, Long libraryId, Long userId,
                              String searchPattern, String searchClause, String libraryClause) {
+        SeriesCountKey cacheKey = new SeriesCountKey(
+                statusFilter,
+                libraryAccessScope.allLibraries(),
+                Set.copyOf(libraryAccessScope.libraryIds()),
+                libraryId,
+                statusFilter == null ? null : userId,
+                searchPattern);
+        return seriesCountCache.get(cacheKey, ignored -> computeSeriesCount(
+                statusFilter, libraryAccessScope, libraryId, userId,
+                searchPattern, searchClause, libraryClause));
+    }
+
+    private long computeSeriesCount(String statusFilter, LibraryAccessScope libraryAccessScope, Long libraryId, Long userId,
+                                    String searchPattern, String searchClause, String libraryClause) {
+        if (statusFilter == null && libraryId == null && libraryAccessScope.allLibraries()) {
+            return countAllVisibleSeries(searchPattern, searchClause);
+        }
+
         final String searchParam = "searchPattern";
         String havingClause = buildSeriesStatusHavingClause(statusFilter);
         String progressJoin = statusFilter != null
@@ -153,6 +179,24 @@ public class AppSeriesService {
         setLibraryParams(countQ, libraryAccessScope, libraryId);
         if (searchPattern != null) {
             countQ.setParameter(searchParam, searchPattern);
+        }
+        return countQ.getSingleResult();
+    }
+
+    private long countAllVisibleSeries(String searchPattern, String searchClause) {
+        String countQuery = "SELECT COUNT(*) FROM ("
+                + "SELECT m.seriesName AS seriesName FROM BookMetadataEntity m"
+                + " WHERE m.seriesName IS NOT NULL"
+                + " AND m.id NOT IN (SELECT b.id FROM BookEntity b"
+                + " WHERE b.deleted = true"
+                + " OR (b.hasFiles = false AND (b.isPhysical IS NULL OR b.isPhysical = false)))"
+                + searchClause
+                + " GROUP BY m.seriesName HAVING COUNT(m.id) > 1"
+                + ") groupedSeries";
+
+        var countQ = entityManager.createQuery(countQuery, Long.class);
+        if (searchPattern != null) {
+            countQ.setParameter("searchPattern", searchPattern);
         }
         return countQ.getSingleResult();
     }
@@ -329,6 +373,29 @@ public class AppSeriesService {
         return AppPageResponse.of(summaries, pageNum, pageSize, bookPage.getTotalElements());
     }
 
+    @Transactional(readOnly = true)
+    public List<AppBookSummary> getAllSeriesBooks(String seriesName, Long libraryId) {
+        BookLoreUser user = authenticationService.getAuthenticatedUser();
+        Long userId = user.getId();
+        LibraryAccessScope libraryAccessScope = getLibraryAccessScope(user);
+
+        if (libraryId != null) {
+            validateLibraryAccess(libraryAccessScope, libraryId);
+        }
+
+        Specification<BookEntity> spec = buildSeriesBooksSpec(libraryAccessScope, libraryId, seriesName);
+        List<BookEntity> books = bookRepository.findAll(spec, buildBookSort("seriesNumber", "asc"));
+
+        Set<Long> bookIds = books.stream()
+                .map(BookEntity::getId)
+                .collect(Collectors.toSet());
+        Map<Long, UserBookProgressEntity> progressMap = getProgressMap(userId, bookIds);
+
+        return books.stream()
+                .map(book -> mobileBookMapper.toSummary(book, progressMap.get(book.getId())))
+                .toList();
+    }
+
     // --- Access control helpers (duplicated from AppBookService to minimize blast radius) ---
 
     private LibraryAccessScope getLibraryAccessScope(BookLoreUser user) {
@@ -489,6 +556,15 @@ public class AppSeriesService {
     }
 
     private record LibraryAccessScope(boolean allLibraries, Set<Long> libraryIds) {
+    }
+
+    private record SeriesCountKey(
+            String statusFilter,
+            boolean allLibraries,
+            Set<Long> libraryIds,
+            Long libraryId,
+            Long userId,
+            String searchPattern) {
     }
 
     private record SeriesProgressCounts(

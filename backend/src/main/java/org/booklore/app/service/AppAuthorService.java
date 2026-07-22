@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import jakarta.persistence.TypedQuery;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -137,23 +138,46 @@ public class AppAuthorService {
         return AppPageResponse.of(summaries, pageNum, pageSize, totalElements);
     }
 
+    // MariaDB FORCE INDEX is required for the category-first semijoin; all dynamic values remain
+    // bound parameters.
     @Transactional(readOnly = true)
+    @SuppressWarnings("java:S2077")
     public List<String> getCategories(Long libraryId) {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
         Set<Long> accessibleLibraryIds = getAccessibleLibraryIds(user);
         validateLibraryAccess(accessibleLibraryIds, libraryId);
 
-        StringBuilder jpql = new StringBuilder(
-                "SELECT DISTINCT category.name FROM BookEntity b JOIN b.metadata m"
-                        + " JOIN m.authors a JOIN m.categories category"
-                        + " WHERE (b.deleted IS NULL OR b.deleted = false)"
-                        + " AND (b.hasFiles = true OR b.isPhysical = true)");
-        appendLibraryFilter(jpql, accessibleLibraryIds, libraryId);
-        jpql.append(" ORDER BY category.name");
+        StringBuilder sql = new StringBuilder(
+                "SELECT c.name FROM category c WHERE EXISTS ("
+                        + "SELECT 1 FROM book_metadata_category_mapping cm "
+                        + "FORCE INDEX (fk_book_metadata_category_mapping_category) "
+                        + "JOIN book b ON b.id = cm.book_id "
+                        + "WHERE cm.category_id = c.id "
+                        + "AND (b.deleted IS NULL OR b.deleted = false) "
+                        + "AND (b.has_files = true OR b.is_physical = true) "
+                        + "AND EXISTS (SELECT 1 FROM book_metadata_author_mapping am WHERE am.book_id = b.id)");
+        appendNativeLibraryFilter(sql, accessibleLibraryIds, libraryId);
+        sql.append(" LIMIT 1) ORDER BY c.name");
 
-        TypedQuery<String> query = entityManager.createQuery(jpql.toString(), String.class);
-        setLibraryParams(query, accessibleLibraryIds, libraryId);
+        Query query = entityManager.createNativeQuery(sql.toString(), String.class);
+        setNativeLibraryParams(query, accessibleLibraryIds, libraryId);
         return query.getResultList();
+    }
+
+    private void appendNativeLibraryFilter(StringBuilder sql, Set<Long> accessibleLibraryIds, Long libraryId) {
+        if (libraryId != null) {
+            sql.append(" AND b.library_id = :libraryId");
+        } else if (accessibleLibraryIds != null) {
+            sql.append(" AND b.library_id IN (:libraryIds)");
+        }
+    }
+
+    private void setNativeLibraryParams(Query query, Set<Long> accessibleLibraryIds, Long libraryId) {
+        if (libraryId != null) {
+            query.setParameter("libraryId", libraryId);
+        } else if (accessibleLibraryIds != null) {
+            query.setParameter("libraryIds", accessibleLibraryIds);
+        }
     }
 
     @Transactional(readOnly = true)

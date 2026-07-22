@@ -31,6 +31,7 @@ export class AppBooksApiService {
   private readonly queryClient = inject(QueryClient);
 
   private readonly booksUrl = `${API_CONFIG.BASE_URL}/api/v1/app/books`;
+  private readonly seriesUrl = `${API_CONFIG.BASE_URL}/api/v1/app/series`;
   private readonly filterOptionsUrl = `${API_CONFIG.BASE_URL}/api/v1/app/filter-options`;
   private readonly token = this.authService.token;
 
@@ -272,10 +273,10 @@ export class AppBooksApiService {
   }
 
   getSeriesBooks(seriesName: string): Observable<Book[]> {
-    return from(this.fetchAllPages(
-      {series: [seriesName]},
-      {field: 'seriesNumber', dir: 'asc'},
-    ));
+    const params = new HttpParams().set('name', seriesName);
+    return this.http.get<AppBookSummary[]>(`${this.seriesUrl}/books/all`, {params}).pipe(
+      map(summaries => summaries.map(summaryToBook)),
+    );
   }
 
   getCount(filters: AppBookFilters): Observable<number> {
@@ -434,25 +435,6 @@ export class AppBooksApiService {
     return book;
   }
 
-  private async fetchAllPages(filters: AppBookFilters, sort: AppBookSort): Promise<Book[]> {
-    const books: Book[] = [];
-    let page = 0;
-    let hasNext = true;
-    while (hasNext) {
-      const params = this.buildFilterParamsFor(filters, '')
-        .set('page', page.toString())
-        .set('size', PAGE_SIZE.toString())
-        .set('sort', sort.field)
-        .set('dir', sort.dir);
-      const response = await lastValueFrom(
-        this.http.get<AppPageResponse<AppBookSummary>>(this.booksUrl, {params}),
-      );
-      books.push(...response.content.map(summaryToBook));
-      hasNext = response.hasNext;
-      page++;
-    }
-    return books;
-  }
 }
 
 function summaryFingerprint(summary: AppBookSummary): string {

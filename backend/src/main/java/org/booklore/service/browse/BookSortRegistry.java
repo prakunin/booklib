@@ -88,7 +88,7 @@ public class BookSortRegistry {
     @SuppressWarnings("unchecked")
     private static <Y> Join<BookEntity, Y> metadataJoin(Root<BookEntity> root) {
         for (Join<BookEntity, ?> join : root.getJoins()) {
-            if (join.getAttribute().getName().equals("metadata") && join.getJoinType() == JoinType.LEFT) {
+            if (join.getAttribute().getName().equals("metadata")) {
                 return (Join<BookEntity, Y>) join;
             }
         }

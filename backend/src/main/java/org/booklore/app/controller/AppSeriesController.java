@@ -10,6 +10,8 @@ import org.booklore.app.service.AppSeriesService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @AllArgsConstructor
 @RestController
 @RequestMapping("/api/v1/app/series")
@@ -57,5 +59,18 @@ public class AppSeriesController {
                 seriesName, page, size, sort, dir, libraryId);
 
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+            summary = "List all books in app series",
+            description = "Retrieve all books belonging to a specific series without page counts.",
+            operationId = "appGetAllSeriesBooks"
+    )
+    @GetMapping("/books/all")
+    public ResponseEntity<List<AppBookSummary>> getAllSeriesBooks(
+            @RequestParam String name,
+            @RequestParam(required = false) Long libraryId) {
+
+        return ResponseEntity.ok(mobileSeriesService.getAllSeriesBooks(name, libraryId));
     }
 }

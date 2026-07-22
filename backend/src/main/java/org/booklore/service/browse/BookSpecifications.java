@@ -964,7 +964,10 @@ public class BookSpecifications {
             List<String> values, String mode, String fieldName) {
 
         Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, ATTR_METADATA, JoinType.INNER);
-        Expression<String> fieldExpr = cb.lower(metadataJoin.get(fieldName));
+        // These columns use MariaDB's case-insensitive utf8mb4_unicode_ci collation. Applying
+        // LOWER() here prevents the existing B-tree indexes from being used and turns exact
+        // facet matches into a full scan of book_metadata.
+        Expression<String> fieldExpr = metadataJoin.get(fieldName);
 
         if ("not".equals(mode)) {
             return fieldExpr.in(values).not();

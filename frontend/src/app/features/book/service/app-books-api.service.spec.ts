@@ -148,6 +148,20 @@ describe('AppBooksApiService', () => {
     expect(titles).toEqual(['Dune']);
   });
 
+  it('loads all series books with one count-free request', () => {
+    let result: number[] = [];
+
+    service.getSeriesBooks('A/B Series').subscribe(books => {
+      result = books.map(book => book.id);
+    });
+
+    const request = http.expectOne(req => req.url.endsWith('/api/v1/app/series/books/all'));
+    expect(request.request.params.get('name')).toBe('A/B Series');
+    request.flush([summary(1), summary(2)]);
+
+    expect(result).toEqual([1, 2]);
+  });
+
   it('windows the loaded range from the first retained page so callers can offset virtual indices', () => {
     // With maxPages, earlier pages are evicted as the user scrolls down, so the accumulated
     // books() array is a sliding window rather than a prefix from index 0. Simulate a window

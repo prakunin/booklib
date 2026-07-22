@@ -2,6 +2,7 @@ package org.booklore.service.browse;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import org.booklore.exception.APIException;
@@ -357,6 +358,7 @@ class BookSpecificationsTest {
             Predicate result = BookSpecifications.inSeries("Mistborn").toPredicate(root, query, cb);
 
             assertThat(result).isNotNull();
+            verify(cb, never()).lower(any(Expression.class));
         }
 
         @Test

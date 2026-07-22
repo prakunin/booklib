@@ -26,6 +26,8 @@ import java.util.Set;
 @BatchSize(size = 20)
 public class BookMetadataEntity {
 
+    private static final int SERIES_NAME_MAX_LENGTH = 767;
+
     @Id
     @Column(name = "book_id")
     private Long bookId;
@@ -45,7 +47,7 @@ public class BookMetadataEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "series_name")
+    @Column(name = "series_name", length = SERIES_NAME_MAX_LENGTH)
     private String seriesName;
 
     @Column(name = "series_number")
@@ -339,7 +341,7 @@ public class BookMetadataEntity {
         this.title = trimOrNull(this.title);
         this.subtitle = trimOrNull(this.subtitle);
         this.publisher = trimOrNull(this.publisher);
-        this.seriesName = trimOrNull(this.seriesName);
+        this.seriesName = trimToCodePoints(this.seriesName, SERIES_NAME_MAX_LENGTH);
         this.language = trimOrNull(this.language);
         this.isbn13 = trimOrNull(this.isbn13);
         this.isbn10 = trimOrNull(this.isbn10);
@@ -354,6 +356,14 @@ public class BookMetadataEntity {
         this.audibleId = trimOrNull(this.audibleId);
         this.contentRating = trimOrNull(this.contentRating);
         this.narrator = trimOrNull(this.narrator);
+    }
+
+    private static String trimToCodePoints(String value, int maxCodePoints) {
+        String trimmed = trimOrNull(value);
+        if (trimmed == null || trimmed.codePointCount(0, trimmed.length()) <= maxCodePoints) {
+            return trimmed;
+        }
+        return trimmed.substring(0, trimmed.offsetByCodePoints(0, maxCodePoints));
     }
 
     private static String trimOrNull(String value) {

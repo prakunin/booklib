@@ -130,6 +130,18 @@ class AppSeriesControllerTest {
         verify(mobileSeriesService).getSeriesBooks("A Song of Ice and Fire", 0, 20, "seriesNumber", "asc", null);
     }
 
+    @Test
+    void getAllSeriesBooks_delegatesWithoutPagination() {
+        List<AppBookSummary> expected = buildBookPage().getContent();
+        when(mobileSeriesService.getAllSeriesBooks("Dune", 5L)).thenReturn(expected);
+
+        ResponseEntity<List<AppBookSummary>> response = controller.getAllSeriesBooks("Dune", 5L);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(expected, response.getBody());
+        verify(mobileSeriesService).getAllSeriesBooks("Dune", 5L);
+    }
+
     // ---- Helpers ----
 
     private AppPageResponse<AppSeriesSummary> buildSeriesPage() {

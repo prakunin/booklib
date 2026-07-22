@@ -3,9 +3,22 @@ package org.booklore.model.entity;
 import org.booklore.util.BookUtils;
 import org.junit.jupiter.api.Test;
 import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BookMetadataEntityTest {
+
+    @Test
+    void updateSearchText_limitsSeriesNameByUnicodeCodePoints() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setSeriesName("📚".repeat(800));
+
+        metadata.updateSearchText();
+
+        assertThat(metadata.getSeriesName().codePointCount(0, metadata.getSeriesName().length())).isEqualTo(767);
+        assertThat(metadata.getSeriesName()).endsWith("📚");
+    }
 
     @Test
     void updateSearchText_populatesSearchText() {

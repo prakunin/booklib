@@ -1,6 +1,7 @@
 package org.booklore.app.service;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import jakarta.persistence.TypedQuery;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.exception.APIException;
@@ -246,6 +247,40 @@ class AppAuthorServiceTest {
             AppPageResponse<AppAuthorSummary> result = service.getAuthors(0, 30, sortField, sortDir, null, null, null);
 
             assertNotNull(result);
+        }
+    }
+
+    @Nested
+    class GetCategoriesTests {
+
+        @Test
+        void getCategories_usesIndexedExistsWithoutAuthorFanout() {
+            mockAdminUser();
+            Query query = mock(Query.class);
+            when(entityManager.createNativeQuery(anyString(), eq(String.class))).thenReturn(query);
+            when(query.getResultList()).thenReturn(List.of("Fantasy", "Science Fiction"));
+
+            List<String> result = service.getCategories(null);
+
+            assertEquals(List.of("Fantasy", "Science Fiction"), result);
+            verify(entityManager).createNativeQuery(argThat(sql ->
+                    sql.contains("FORCE INDEX (fk_book_metadata_category_mapping_category)")
+                            && sql.contains("EXISTS (SELECT 1 FROM book_metadata_author_mapping")
+                            && !sql.contains("JOIN book_metadata_author_mapping am")), eq(String.class));
+        }
+
+        @Test
+        void getCategories_bindsAccessibleLibraries() {
+            mockNonAdminUser(Set.of(5L, 10L));
+            Query query = mock(Query.class);
+            when(query.setParameter(anyString(), any())).thenReturn(query);
+            when(query.getResultList()).thenReturn(Collections.emptyList());
+            when(entityManager.createNativeQuery(anyString(), eq(String.class))).thenReturn(query);
+
+            service.getCategories(null);
+
+            verify(entityManager).createNativeQuery(argThat(sql -> sql.contains("b.library_id IN (:libraryIds)")), eq(String.class));
+            verify(query).setParameter("libraryIds", Set.of(5L, 10L));
         }
     }
 

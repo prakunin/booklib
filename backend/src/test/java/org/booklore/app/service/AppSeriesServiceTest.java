@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;
@@ -103,6 +104,32 @@ class AppSeriesServiceTest {
         }
 
         @Test
+        void getSeries_reusesCountForIdenticalScope() {
+            mockAdminUser();
+            mockAggregateQuery(Collections.emptyList());
+            TypedQuery<Long> countQuery = mockCountQuery(42L);
+
+            service.getSeries(0, 20, "name", "asc", null, null, null);
+            service.getSeries(1, 20, "name", "asc", null, null, null);
+
+            verify(countQuery).getSingleResult();
+        }
+
+        @Test
+        void getSeries_adminCountAvoidsJoiningEveryVisibleBook() {
+            mockAdminUser();
+            mockAggregateQuery(Collections.emptyList());
+            mockCountQuery(42L);
+
+            service.getSeries(0, 20, "name", "asc", null, null, null);
+
+            verify(entityManager).createQuery(argThat(query ->
+                    query.contains("FROM BookMetadataEntity m")
+                            && query.contains("m.id NOT IN")
+                            && !query.contains("FROM BookEntity b JOIN b.metadata m")), eq(Long.class));
+        }
+
+        @Test
         void getSeries_excludesSeriesWithOnlyOneBookFromResultsAndCount() {
             mockAdminUser();
             mockAggregateQuery(Collections.emptyList());
@@ -115,7 +142,7 @@ class AppSeriesServiceTest {
                     eq(Tuple.class));
             verify(entityManager).createQuery(
                     argThat((String query) -> query.startsWith("SELECT COUNT(*) FROM (")
-                            && query.contains("GROUP BY m.seriesName HAVING COUNT(b.id) > 1) groupedSeries")),
+                            && query.contains("GROUP BY m.seriesName HAVING COUNT(m.id) > 1) groupedSeries")),
                     eq(Long.class));
         }
 
@@ -511,6 +538,23 @@ class AppSeriesServiceTest {
 
             assertNotNull(result);
         }
+
+        @Test
+        void getAllSeriesBooks_usesSingleCountFreeQuery() {
+            mockAdminUser();
+            BookEntity first = buildBook(1L, "Dune", 1.0f, "Frank Herbert");
+            BookEntity second = buildBook(2L, "Dune", 2.0f, "Frank Herbert");
+            when(bookRepository.findAll(any(Specification.class), any(Sort.class)))
+                    .thenReturn(List.of(first, second));
+            mockProgress(Collections.emptyList());
+            mockMapperSummary();
+
+            List<AppBookSummary> result = service.getAllSeriesBooks("Dune", null);
+
+            assertEquals(2, result.size());
+            verify(bookRepository).findAll(any(Specification.class), any(Sort.class));
+            verify(bookRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+        }
     }
 
     // ---- Helpers ----
@@ -626,11 +670,12 @@ class AppSeriesServiceTest {
     }
 
     @SuppressWarnings("unchecked")
-    private void mockCountQuery(long count) {
+    private TypedQuery<Long> mockCountQuery(long count) {
         TypedQuery<Long> countQ = mock(TypedQuery.class);
         when(countQ.setParameter(anyString(), any())).thenReturn(countQ);
         when(countQ.getSingleResult()).thenReturn(count);
         when(entityManager.createQuery(anyString(), eq(Long.class))).thenReturn(countQ);
+        return countQ;
     }
 
     @SuppressWarnings("unchecked")
