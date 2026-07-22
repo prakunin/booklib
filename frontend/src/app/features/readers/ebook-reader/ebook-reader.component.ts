@@ -30,6 +30,8 @@ import {ReaderHeaderFooterVisibilityManager} from './shared/visibility.util';
 import {EpubCustomFontService} from './features/fonts/custom-font.service';
 import {TextSelectionAction, TextSelectionPopupComponent} from './shared/selection-popup.component';
 import {NoteDialogResult, ReaderNoteDialogComponent} from './dialogs/note-dialog.component';
+import {ReaderFootnoteService} from './features/footnotes/footnote.service';
+import {FootnotePopupComponent} from './shared/footnote-popup.component';
 import {EbookShortcutsHelpComponent} from './dialogs/shortcuts-help.component';
 import {TranslocoPipe} from '@jsverse/transloco';
 import {RelocateProgressData} from './state/progress.service';
@@ -55,6 +57,7 @@ interface PendingInitialChapterRestore {
     ReaderLeftSidebarComponent,
     ReaderNavbarComponent,
     TextSelectionPopupComponent,
+    FootnotePopupComponent,
     ReaderNoteDialogComponent,
     EbookShortcutsHelpComponent,
     TranslocoPipe
@@ -73,7 +76,8 @@ interface PendingInitialChapterRestore {
     ReaderSidebarService,
     ReaderLeftSidebarService,
     ReaderHeaderService,
-    ReaderNoteService
+    ReaderNoteService,
+    ReaderFootnoteService
   ],
   templateUrl: './ebook-reader.component.html',
   styleUrls: ['./ebook-reader.component.scss'],
@@ -96,6 +100,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   private readonly selectionService = inject(ReaderSelectionService);
   private readonly headerService = inject(ReaderHeaderService);
   private readonly noteService = inject(ReaderNoteService);
+  private readonly footnoteService = inject(ReaderFootnoteService);
   private readonly wakeLockService = inject(WakeLockService);
   private readonly messageService = inject(MessageService);
   private readonly fullscreenService = inject(ReaderFullscreenService);
@@ -153,6 +158,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   readonly readerState = this.stateService.state;
   readonly readerBackground = computed(() => this.styleService.getAdjustedBackgroundColor(this.readerState()));
   readonly selectionState = this.selectionService.state;
+  readonly footnoteState = this.footnoteService.state;
   readonly noteDialogState = this.noteService.dialogState;
   readonly isCurrentCfiBookmarked = this.headerService.isCurrentCfiBookmarked;
 
@@ -323,6 +329,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
     }
     container.setAttribute('tabindex', '0');
     this.viewManager.createView(container);
+    this.footnoteService.register();
     return of(undefined);
   }
   private loadBookBlob(bookType: BookType): Observable<void> {
@@ -404,7 +411,9 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
             this.leftSidebarService.toggle('notes');
             break;
           case 'escape-pressed':
-            if (this.showShortcutsHelp()) {
+            if (this.footnoteState().visible) {
+              this.footnoteService.close();
+            } else if (this.showShortcutsHelp()) {
               this.showShortcutsHelp.set(false);
             } else if (this.noteDialogState().visible) {
               this.noteService.closeDialog();
@@ -976,6 +985,14 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
     this.immersiveAutoHideTimer = setTimeout(() => {
       this.visibilityManager.hideTemporary();
     }, 3000);
+  }
+
+  onFootnoteDismissed(): void {
+    this.footnoteService.close();
+  }
+
+  onFootnoteOpenFull(): void {
+    this.footnoteService.openFull();
   }
 
   handleSelectionAction(action: TextSelectionAction): void {
