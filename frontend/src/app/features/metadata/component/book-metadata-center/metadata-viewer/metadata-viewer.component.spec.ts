@@ -97,7 +97,6 @@ describe('MetadataViewerComponent', () => {
     return `${key}:${Object.entries(params).map(([paramKey, value]) => `${paramKey}=${value}`).join(',')}`;
   });
   const getCoverUrl = vi.fn((bookId: number, updatedOn?: string) => `cover:${bookId}:${updatedOn ?? 'none'}`);
-  const getDirectCoverUrl = vi.fn((bookId: number) => `direct-cover:${bookId}`);
   const getAudiobookCoverUrl = vi.fn((bookId: number, updatedOn?: string) => `audio:${bookId}:${updatedOn ?? 'none'}`);
   const getThumbnailUrl = vi.fn((bookId: number, updatedOn?: string) => `thumb:${bookId}:${updatedOn ?? 'none'}`);
 
