@@ -48,11 +48,10 @@ public final class AuthorNames {
             return "";
         }
         String lower = cleaned.toLowerCase(Locale.ROOT);
-        String stripped = Normalizer.normalize(lower, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "");         // combining marks -> diacritics gone
-        return stripped.replaceAll("[\\p{Punct}]", "")
-                .trim()
-                .replaceAll("\\s+", " ");
+        String noMarks = Normalizer.normalize(lower, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
+        // Replace ALL Unicode punctuation (incl. em/en dashes) and separators (incl. NBSP) with a
+        // single space so initials collapse consistently: "J.K." and "J. K." both -> "j k".
+        return noMarks.replaceAll("[\\p{P}\\p{Z}\\s]+", " ").trim();
     }
 
     public static String clampByCodePoints(String value, int maxCodePoints) {

@@ -57,7 +57,15 @@ public class AuthorLocalResolver {
         try {
             return Optional.of(authorCreationService.createInNewTransaction(cleaned, normalized));
         } catch (DataIntegrityViolationException race) {
-            return authorRepository.findByName(cleaned).map(this::resolveToActiveRoot);
+            // Re-read in a FRESH transaction: a REPEATABLE READ snapshot opened by the first lookup
+            // would not see the row a concurrent transaction just committed.
+            Optional<AuthorEntity> winner = authorCreationService.findActiveByNameInNewTransaction(cleaned);
+            if (winner.isPresent()) {
+                return winner.map(this::resolveToActiveRoot);
+            }
+            // No winner => this was NOT a unique-name race (e.g. a length/constraint failure). Surface it
+            // instead of silently dropping the author.
+            throw race;
         }
     }
 

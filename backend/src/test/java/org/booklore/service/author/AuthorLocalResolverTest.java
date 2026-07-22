@@ -10,6 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -73,14 +74,27 @@ class AuthorLocalResolverTest {
         @Test
         void reReadsWinnerWhenConcurrentInsertLosesUniqueRace() {
             AuthorEntity winner = AuthorEntity.builder().id(5L).name("Race Author").build();
-            when(repo.findByName("Race Author"))
-                    .thenReturn(Optional.empty())     // first check: absent
-                    .thenReturn(Optional.of(winner)); // re-read after failed insert
+            when(repo.findByName("Race Author")).thenReturn(Optional.empty()); // first check: absent
             when(creator.createInNewTransaction("Race Author", "race author"))
                     .thenThrow(new DataIntegrityViolationException("unique_name"));
+            when(creator.findActiveByNameInNewTransaction("Race Author"))
+                    .thenReturn(Optional.of(winner)); // fresh-tx re-read after failed insert
 
             assertThat(resolver.resolve("Race Author")).contains(winner);
-            verify(repo, times(2)).findByName("Race Author");
+            verify(repo).findByName("Race Author");
+            verify(creator).findActiveByNameInNewTransaction("Race Author");
+        }
+
+        @Test
+        void rethrowsRaceExceptionWhenFreshReReadFindsNoWinner() {
+            when(repo.findByName("Ghost Author")).thenReturn(Optional.empty());
+            DataIntegrityViolationException race = new DataIntegrityViolationException("some_other_constraint");
+            when(creator.createInNewTransaction("Ghost Author", "ghost author")).thenThrow(race);
+            when(creator.findActiveByNameInNewTransaction("Ghost Author")).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> resolver.resolve("Ghost Author"))
+                    .isInstanceOf(DataIntegrityViolationException.class)
+                    .isSameAs(race);
         }
     }
 }

@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 public class AuthorCreationService {
@@ -27,5 +29,10 @@ public class AuthorCreationService {
                 .attemptCount(0)
                 .build());
         return saved;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Optional<AuthorEntity> findActiveByNameInNewTransaction(String name) {
+        return authorRepository.findByName(name);
     }
 }

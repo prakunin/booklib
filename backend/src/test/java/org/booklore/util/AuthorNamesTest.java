@@ -31,7 +31,7 @@ class AuthorNamesTest {
     private static Stream<Arguments> keys() {
         return Stream.of(
             arguments("J. K. Rowling", "j k rowling"),
-            arguments("J.K. Rowling", "jk rowling"),
+            arguments("J.K. Rowling", "j k rowling"),
             arguments("Café", "cafe"),                              // diacritics folded
             arguments("Ursula K. Le Guin", "ursula k le guin")
         );
@@ -41,6 +41,19 @@ class AuthorNamesTest {
     @MethodSource("keys")
     void normalizesKey(String cleaned, String expected) {
         assertThat(AuthorNames.normalizeKey(cleaned)).isEqualTo(expected);
+    }
+
+    @Test
+    void normalizeKeyCollapsesInitialsPunctuationConsistently() {
+        assertThat(AuthorNames.normalizeKey("J.K. Rowling"))
+                .isEqualTo(AuthorNames.normalizeKey("J. K. Rowling"));
+    }
+
+    @Test
+    void normalizeKeyCollapsesUnicodeDashAndNbspToSingleSpace() {
+        // em-dash (U+2014) and NBSP (U+00A0) are Unicode punctuation/separator, not ASCII \p{Punct}
+        assertThat(AuthorNames.normalizeKey("Anne—Marie Smith"))
+                .isEqualTo("anne marie smith");
     }
 
     @Test

@@ -24,7 +24,7 @@ class PopulateAuthorNormalizedNameMigrationTest extends AbstractAuthorPersistenc
         migration.execute();
 
         AuthorEntity reloaded = authorRepository.findById(a.getId()).orElseThrow();
-        assertThat(reloaded.getNormalizedName()).isEqualTo("jk rowling");
+        assertThat(reloaded.getNormalizedName()).isEqualTo("j k rowling");
         assertThat(stateRepository.findById(a.getId()).orElseThrow().getState())
                 .isEqualTo(AuthorReconcileState.PENDING);
     }
