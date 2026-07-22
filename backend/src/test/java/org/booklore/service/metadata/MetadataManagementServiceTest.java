@@ -125,6 +125,45 @@ class MetadataManagementServiceTest {
     }
 
     @Test
+    void consolidateAuthors_throwsWhenValuesToMergeNull() {
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, List.of("Target"), null)
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No author(s) provided to merge");
+
+        verifyNoInteractions(authorRepository, authorLocalResolver, bookMetadataRepository);
+    }
+
+    @Test
+    void consolidateAuthors_throwsWhenValuesToMergeEmpty() {
+        assertThatThrownBy(() ->
+                service.consolidateMetadata(MergeMetadataType.authors, List.of("Target"), List.of())
+        ).isInstanceOf(APIException.class)
+                .hasMessageContaining("No author(s) provided to merge");
+
+        verifyNoInteractions(authorRepository, authorLocalResolver, bookMetadataRepository);
+    }
+
+    @Test
+    void consolidateAuthors_doesNotDeleteTargetWhenMergeValueResolvesToSameAuthorDifferentCase() {
+        AuthorEntity targetAuthor = AuthorEntity.builder().id(2L).name("Stephen King").build();
+
+        when(authorRepository.findByNameIgnoreCase("Stephen King")).thenReturn(Optional.of(targetAuthor));
+        when(authorRepository.save(targetAuthor)).thenReturn(targetAuthor);
+        when(authorRepository.findByNameIgnoreCase("stephen king")).thenReturn(Optional.of(targetAuthor));
+
+        List<AuthorEntity> authors = new ArrayList<>(List.of(targetAuthor));
+        BookMetadataEntity metadata = BookMetadataEntity.builder().authors(authors).build();
+
+        service.consolidateMetadata(MergeMetadataType.authors, List.of("Stephen King"), List.of("stephen king"));
+
+        assertThat(metadata.getAuthors()).containsExactly(targetAuthor);
+        verify(authorRepository, never()).delete(any());
+        verify(bookMetadataRepository, never()).findAllByAuthorsContaining(any());
+        verify(bookMetadataRepository, never()).saveAll(anyList());
+    }
+
+    @Test
     void consolidateAuthors_dedupesWhenBookAlreadyHasTargetAuthor() {
         AuthorEntity oldAuthor = AuthorEntity.builder().id(1L).name("Old Author").build();
         AuthorEntity targetAuthor = AuthorEntity.builder().id(2L).name("Target Author").build();

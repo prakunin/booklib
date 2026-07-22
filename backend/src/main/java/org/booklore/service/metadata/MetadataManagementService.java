@@ -115,6 +115,10 @@ public class MetadataManagementService {
             throw ApiError.INVALID_INPUT.createException("No target author(s) provided to consolidate into");
         }
 
+        if (valuesToMerge == null || valuesToMerge.isEmpty()) {
+            throw ApiError.INVALID_INPUT.createException("No author(s) provided to merge");
+        }
+
         List<AuthorEntity> targetAuthors = targetValues.stream()
                 .flatMap(name -> authorRepository.findByNameIgnoreCase(name)
                         .map(existing -> {
@@ -134,6 +138,8 @@ public class MetadataManagementService {
                 .map(authorRepository::findByNameIgnoreCase)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
+                .filter(author -> !targetAuthors.contains(author))
+                .distinct()
                 .toList();
 
         for (AuthorEntity oldAuthor : authorsToMerge) {
