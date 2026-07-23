@@ -79,7 +79,9 @@ describe('ReaderFootnoteService', () => {
   describe('open', () => {
     it('publishes sanitized note content', async () => {
       const doc = noteDocument(
-        '<section id="n_3"><p>Note <a href="#ref">back</a></p><img src="x.png" alt=""></section>'
+        '<section id="n_3" class="notes" style="color:#999">'
+        + '<p style="color:#aaa" class="fn">Note <a href="#ref">back</a></p>'
+        + '<img src="x.png" alt=""></section>'
       );
       viewManager.resolveHref.mockReturnValue({
         index: 13,
@@ -98,6 +100,11 @@ describe('ReaderFootnoteService', () => {
       expect(state.html).toContain('Note');
       expect(state.html).not.toContain('<img');
       expect(state.html).not.toContain('href=');
+      // the book's own colours and classes are stripped so the note reads in
+      // the popover theme rather than an invisible book colour
+      expect(state.html).not.toContain('style=');
+      expect(state.html).not.toContain('color');
+      expect(state.html).not.toContain('class=');
       expect(viewManager.goTo).not.toHaveBeenCalled();
     });
 

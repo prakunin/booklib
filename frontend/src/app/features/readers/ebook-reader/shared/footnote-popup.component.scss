@@ -32,10 +32,6 @@
     color-scheme: dark;
   }
 
-  :is(h1, h2, h3, h4, h5, h6, p) {
-    color: inherit;
-  }
-
   &.show-below {
     transform: translate(-50%, 0);
   }
@@ -45,6 +41,12 @@
   overflow-y: auto;
   font-size: 0.9rem;
   line-height: 1.5;
+
+  // the note fragment carries no colour of its own (stripped on extraction),
+  // so every element reads in the popover's themed foreground
+  * {
+    color: inherit;
+  }
 
   :first-child {
     margin-top: 0;

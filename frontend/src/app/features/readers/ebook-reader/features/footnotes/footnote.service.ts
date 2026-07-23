@@ -108,8 +108,18 @@ export class ReaderFootnoteService {
   private extractHtml(element: Element): string {
     const clone = element.cloneNode(true) as Element;
     clone.querySelectorAll(STRIPPED_TAGS).forEach(node => node.remove());
-    // a note's back-reference must not navigate out of the popover
-    clone.querySelectorAll('a[href]').forEach(node => node.removeAttribute('href'));
+    const elements: Element[] = [clone, ...Array.from(clone.querySelectorAll('*'))];
+    for (const node of elements) {
+      // a note's back-reference must not navigate out of the popover
+      node.removeAttribute('href');
+      // the book's own colours (inline styles, class rules from a stylesheet we
+      // do not load, legacy color attributes) would override the popover theme
+      // and can leave the note invisible on the reader's page background
+      node.removeAttribute('style');
+      node.removeAttribute('class');
+      node.removeAttribute('color');
+      node.removeAttribute('bgcolor');
+    }
     return clone.innerHTML.trim();
   }
 
