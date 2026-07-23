@@ -5,6 +5,7 @@ import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.enums.PermissionType;
 import org.booklore.model.websocket.Topic;
 import org.booklore.service.event.BookCatalogChangedEvent;
+import org.booklore.service.event.LibraryScanCompletedEvent;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -33,6 +34,7 @@ public class NotificationService {
 
     public void sendMessage(Topic topic, Object message) {
         publishCatalogChangedEvent(topic);
+        publishScanCompletedEvent(topic, message);
         try {
             var user = authenticationService.getAuthenticatedUser();
             if (user == null) {
@@ -91,6 +93,14 @@ public class NotificationService {
                 || topic == Topic.BOOK_METADATA_UPDATE
                 || topic == Topic.BOOK_METADATA_BATCH_UPDATE) {
             eventPublisher.publishEvent(new BookCatalogChangedEvent(topic));
+        }
+    }
+
+    // A library scan/import completion carries the library id as its payload; re-emit it as a domain
+    // event so derived per-library data (materialized statistics) can be recomputed at import time.
+    private void publishScanCompletedEvent(Topic topic, Object message) {
+        if (topic == Topic.LIBRARY_SCAN_COMPLETE && message instanceof Long libraryId) {
+            eventPublisher.publishEvent(new LibraryScanCompletedEvent(libraryId));
         }
     }
 }

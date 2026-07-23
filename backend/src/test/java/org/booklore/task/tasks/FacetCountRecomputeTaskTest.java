@@ -1,6 +1,7 @@
 package org.booklore.task.tasks;
 
 import org.booklore.app.service.AppBookService;
+import org.booklore.app.service.LibraryStatsRecomputeCoordinator;
 import org.booklore.exception.APIException;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.request.TaskCreateRequest;
@@ -28,6 +29,9 @@ class FacetCountRecomputeTaskTest {
     @Mock
     private AppBookService appBookService;
 
+    @Mock
+    private LibraryStatsRecomputeCoordinator statsRecomputeCoordinator;
+
     @InjectMocks
     private FacetCountRecomputeTask task;
 
@@ -45,6 +49,33 @@ class FacetCountRecomputeTaskTest {
         assertThat(response.getStatus()).isEqualTo(TaskStatus.COMPLETED);
         assertThat(response.getTaskType()).isEqualTo(TaskType.RECOMPUTE_FACET_COUNTS);
         assertThat(response.getTaskId()).isNotBlank();
+    }
+
+    @Test
+    void sweepsDirtyStatisticsLibrariesThenCatalogAndInvalidates() {
+        when(appBookService.findDirtyLibraryIds()).thenReturn(List.of());
+        when(appBookService.findDirtyStatLibraryIds()).thenReturn(List.of(4L, 5L));
+        when(statsRecomputeCoordinator.recomputeLibrary(4L)).thenReturn(true);
+        when(statsRecomputeCoordinator.recomputeLibrary(5L)).thenReturn(true);
+
+        TaskCreateResponse response = task.execute(request);
+
+        verify(statsRecomputeCoordinator).recomputeLibrary(4L);
+        verify(statsRecomputeCoordinator).recomputeLibrary(5L);
+        verify(statsRecomputeCoordinator).recomputeCatalog();
+        verify(appBookService).invalidateStatsCaches();
+        assertThat(response.getStatus()).isEqualTo(TaskStatus.COMPLETED);
+    }
+
+    @Test
+    void skipsCatalogStatsRecomputeWhenNoLibraryChanged() {
+        when(appBookService.findDirtyLibraryIds()).thenReturn(List.of());
+        when(appBookService.findDirtyStatLibraryIds()).thenReturn(List.of());
+
+        task.execute(request);
+
+        verify(statsRecomputeCoordinator, org.mockito.Mockito.never()).recomputeCatalog();
+        verify(appBookService, org.mockito.Mockito.never()).invalidateStatsCaches();
     }
 
     @Test

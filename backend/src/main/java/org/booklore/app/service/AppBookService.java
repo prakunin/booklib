@@ -30,8 +30,15 @@ import org.booklore.model.enums.ComicCreatorRole;
 import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.model.enums.ReadStatus;
 import org.booklore.repository.BookRepository;
+import org.booklore.repository.CatalogAuthorStatRepository;
+import org.booklore.repository.CatalogStatRepository;
+import org.booklore.repository.CatalogStatStateRepository;
+import org.booklore.repository.LibraryAuthorStatRepository;
 import org.booklore.repository.LibraryFacetCountRepository;
 import org.booklore.repository.LibraryFacetStateRepository;
+import org.booklore.repository.LibraryStatMonthRepository;
+import org.booklore.repository.LibraryStatRepository;
+import org.booklore.repository.LibraryStatStateRepository;
 import org.booklore.repository.ShelfRepository;
 import org.booklore.repository.UserBookFileProgressRepository;
 import org.booklore.repository.UserBookProgressRepository;
@@ -82,6 +89,13 @@ public class AppBookService {
     private static final String ATTR_READ_STATUS = "readStatus";
     private static final String ATTR_PERSONAL_RATING = "personalRating";
     private static final String ATTR_ADDED_ON = "addedOn";
+
+    private static final String STAT_TOTAL_BOOKS = "TOTAL_BOOKS";
+    private static final String STAT_TOTAL_SIZE_KB = "TOTAL_SIZE_KB";
+    private static final String STAT_TOTAL_AUTHORS = "TOTAL_AUTHORS";
+    private static final String STAT_TOTAL_SERIES = "TOTAL_SERIES";
+    private static final String STAT_TOTAL_PUBLISHERS = "TOTAL_PUBLISHERS";
+    private static final int AUTHOR_STAT_TOP_N = 50;
     private static final String LIBRARY_ID_CLAUSE = "AND b.library.id = :libraryId";
     private static final String BOOK_FILES_JOIN = "JOIN b.bookFiles bf";
     private static final String BOOK_FORMAT_CLAUSE = "AND bf.isBookFormat = true";
@@ -107,6 +121,13 @@ public class AppBookService {
     private final ShellBookIdsCache shellBookIdsCache;
     private final LibraryFacetCountRepository libraryFacetCountRepository;
     private final LibraryFacetStateRepository libraryFacetStateRepository;
+    private final LibraryStatRepository libraryStatRepository;
+    private final LibraryStatMonthRepository libraryStatMonthRepository;
+    private final LibraryAuthorStatRepository libraryAuthorStatRepository;
+    private final LibraryStatStateRepository libraryStatStateRepository;
+    private final CatalogStatRepository catalogStatRepository;
+    private final CatalogAuthorStatRepository catalogAuthorStatRepository;
+    private final CatalogStatStateRepository catalogStatStateRepository;
     private final Cache<String, AppLibraryStats> libraryStatsCache = Caffeine.newBuilder()
             .expireAfterWrite(LIBRARY_STATS_CACHE_TTL)
             .maximumSize(10_000)
@@ -129,7 +150,14 @@ public class AppBookService {
                           FilterOptionsCache filterOptionsCache,
                           ShellBookIdsCache shellBookIdsCache,
                           LibraryFacetCountRepository libraryFacetCountRepository,
-                          LibraryFacetStateRepository libraryFacetStateRepository) {
+                          LibraryFacetStateRepository libraryFacetStateRepository,
+                          LibraryStatRepository libraryStatRepository,
+                          LibraryStatMonthRepository libraryStatMonthRepository,
+                          LibraryAuthorStatRepository libraryAuthorStatRepository,
+                          LibraryStatStateRepository libraryStatStateRepository,
+                          CatalogStatRepository catalogStatRepository,
+                          CatalogAuthorStatRepository catalogAuthorStatRepository,
+                          CatalogStatStateRepository catalogStatStateRepository) {
         this.bookRepository = bookRepository;
         this.userBookProgressRepository = userBookProgressRepository;
         this.userBookFileProgressRepository = userBookFileProgressRepository;
@@ -148,6 +176,13 @@ public class AppBookService {
         this.shellBookIdsCache = shellBookIdsCache;
         this.libraryFacetCountRepository = libraryFacetCountRepository;
         this.libraryFacetStateRepository = libraryFacetStateRepository;
+        this.libraryStatRepository = libraryStatRepository;
+        this.libraryStatMonthRepository = libraryStatMonthRepository;
+        this.libraryAuthorStatRepository = libraryAuthorStatRepository;
+        this.libraryStatStateRepository = libraryStatStateRepository;
+        this.catalogStatRepository = catalogStatRepository;
+        this.catalogAuthorStatRepository = catalogAuthorStatRepository;
+        this.catalogStatStateRepository = catalogStatStateRepository;
     }
 
     public AppPageResponse<AppBookSummary> getBooks(BookListRequest req) {
@@ -244,26 +279,320 @@ public class AppBookService {
 
     private AppLibraryStats computeLibraryStats(
             BookLoreUser user, Set<Long> accessibleLibraryIds, boolean admin, Long libraryId) {
+        Long userId = user.getId();
         Specification<BookEntity> visibleBooks = buildAggregateSpecification(
-                accessibleLibraryIds, libraryId, user.getId(), admin);
-        boolean simpleVisibility = admin || !userHasContentRestrictions(user.getId());
+                accessibleLibraryIds, libraryId, userId, admin);
+        boolean simpleVisibility = admin || !userHasContentRestrictions(userId);
         AppFilterOptions facets = getFilterOptions(libraryId, null, null);
 
+        StatScope scope = resolveStatScope(simpleVisibility, accessibleLibraryIds, libraryId);
+        // Additive counters (books, size, monthly) can be summed over any set of materialized
+        // libraries; distinct counts and author rankings are not additive, so only the exact
+        // single-library and whole-catalog scopes read them materialized, everything else lives.
+        Map<String, Long> scalarSums = scope.additiveMaterialized()
+                ? materializedScalarSums(scope.libraryIds())
+                : Map.of();
+
+        long totalBooks;
+        long totalSizeKb;
+        List<AppLibraryStats.MonthlyCount> booksAddedByMonth;
+        if (scope.additiveMaterialized()) {
+            totalBooks = scalarSums.getOrDefault(STAT_TOTAL_BOOKS, 0L);
+            totalSizeKb = scalarSums.getOrDefault(STAT_TOTAL_SIZE_KB, 0L);
+            booksAddedByMonth = materializedMonths(scope.libraryIds());
+        } else {
+            totalBooks = bookRepository.count(visibleBooks);
+            totalSizeKb = sumBookFileSize(visibleBooks);
+            booksAddedByMonth = countBooksByMonth(visibleBooks, ATTR_ADDED_ON, userId, false);
+        }
+
+        long totalAuthors;
+        long totalSeries;
+        long totalPublishers;
+        List<AppLibraryStats.AuthorStat> authorStats;
+        if (scope.distinctMaterialized()) {
+            Map<String, Long> distinct = scope.catalogWide() ? catalogScalarMap() : scalarSums;
+            totalAuthors = distinct.getOrDefault(STAT_TOTAL_AUTHORS, 0L);
+            totalSeries = distinct.getOrDefault(STAT_TOTAL_SERIES, 0L);
+            totalPublishers = distinct.getOrDefault(STAT_TOTAL_PUBLISHERS, 0L);
+            authorStats = materializedAuthorStats(
+                    scope.catalogWide(), scope.libraryIds(), visibleBooks, userId);
+        } else {
+            totalAuthors = countDistinctAuthors(visibleBooks, simpleVisibility);
+            totalSeries = countDistinctSeries(visibleBooks);
+            totalPublishers = countDistinctPublishers(visibleBooks);
+            authorStats = aggregateAuthors(visibleBooks, userId);
+        }
+
         return new AppLibraryStats(
-                bookRepository.count(visibleBooks),
-                sumBookFileSize(visibleBooks),
-                countDistinctAuthors(visibleBooks, simpleVisibility),
-                countDistinctSeries(visibleBooks),
-                countDistinctPublishers(visibleBooks),
-                averageDaysToFinish(visibleBooks, user.getId()),
+                totalBooks,
+                totalSizeKb,
+                totalAuthors,
+                totalSeries,
+                totalPublishers,
+                averageDaysToFinish(visibleBooks, userId),
                 facets,
-                countBooksByMonth(visibleBooks, ATTR_ADDED_ON, user.getId(), false),
-                countBooksByMonth(visibleBooks, "dateFinished", user.getId(), true),
-                aggregateAuthors(visibleBooks, user.getId()),
-                aggregateBookFlow(visibleBooks, user.getId()),
-                aggregatePublicationRatings(visibleBooks, user.getId()),
-                aggregatePageRatings(visibleBooks, user.getId()),
-                aggregateRatingTaste(visibleBooks, user.getId()));
+                booksAddedByMonth,
+                countBooksByMonth(visibleBooks, "dateFinished", userId, true),
+                authorStats,
+                aggregateBookFlow(visibleBooks, userId),
+                aggregatePublicationRatings(visibleBooks, userId),
+                aggregatePageRatings(visibleBooks, userId),
+                aggregateRatingTaste(visibleBooks, userId));
+    }
+
+    /**
+     * Which materialized statistics may serve this request. Only unrestricted users (no content
+     * restrictions) are eligible; a restricted user's visible set differs from the unrestricted
+     * materialization, so all of their statistics stay live. Additive values may be summed over any
+     * set of materialized libraries; distinct counts and author rankings are exact only for the
+     * single-library and whole-catalog scopes.
+     */
+    record StatScope(
+            List<Long> libraryIds,
+            boolean additiveMaterialized,
+            boolean distinctMaterialized,
+            boolean catalogWide) {
+    }
+
+    // Package-private for AppBookServiceMaterializedStatsTest, which characterizes the fallback rules
+    // (restricted users and un-materialized scopes must read live, never serve empty rows as zeros).
+    StatScope resolveStatScope(boolean simpleVisibility, Set<Long> accessibleLibraryIds, Long libraryId) {
+        if (!simpleVisibility) {
+            return new StatScope(List.of(), false, false, false);
+        }
+        List<Long> targets;
+        boolean catalogWide;
+        if (libraryId != null) {
+            targets = List.of(libraryId);
+            catalogWide = false;
+        } else if (accessibleLibraryIds == null) {
+            targets = allLibraryIds();
+            catalogWide = true;
+        } else {
+            targets = new ArrayList<>(accessibleLibraryIds);
+            catalogWide = false;
+        }
+        if (targets.isEmpty()) {
+            return new StatScope(targets, false, false, catalogWide);
+        }
+        boolean additive = libraryStatStateRepository.countByLibraryIdIn(targets) == targets.size();
+        boolean distinct;
+        if (!additive) {
+            distinct = false;
+        } else if (libraryId != null) {
+            distinct = true;
+        } else if (catalogWide) {
+            distinct = catalogStatStateRepository.existsById(CatalogStatStateEntity.SINGLETON_ID);
+        } else {
+            distinct = false;
+        }
+        return new StatScope(targets, additive, distinct, catalogWide);
+    }
+
+    // Package-private for AppBookServiceMaterializedStatsTest, which characterizes that these
+    // materialized reads equal the live aggregates the recompute is built from.
+    Map<String, Long> materializedScalarSums(List<Long> libraryIds) {
+        return libraryStatRepository.sumByLibraryIds(libraryIds).stream()
+                .collect(Collectors.toMap(
+                        LibraryStatRepository.StatSum::getStatKey,
+                        s -> s.getStatValue() == null ? 0L : s.getStatValue()));
+    }
+
+    Map<String, Long> catalogScalarMap() {
+        return catalogStatRepository.findAll().stream()
+                .collect(Collectors.toMap(CatalogStatEntity::getStatKey, CatalogStatEntity::getStatValue));
+    }
+
+    List<AppLibraryStats.MonthlyCount> materializedMonths(List<Long> libraryIds) {
+        return libraryStatMonthRepository.sumByLibraryIds(libraryIds).stream()
+                .map(m -> new AppLibraryStats.MonthlyCount(
+                        m.getYear(), m.getMonth(), m.getBookCount() == null ? 0L : m.getBookCount()))
+                .toList();
+    }
+
+    /**
+     * Builds the author statistics from the materialized top-N global rows of the exact scope, then
+     * enriches them with the current user's average rating and read count in one narrow query
+     * restricted to those authors. The global book count and total pages come from the materialized
+     * rows; only the per-user part is computed live, matching {@link #aggregateAuthors}.
+     */
+    List<AppLibraryStats.AuthorStat> materializedAuthorStats(
+            boolean catalogWide, List<Long> libraryIds, Specification<BookEntity> visibleBooks, Long userId) {
+        List<Long> authorIds = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        List<Long> bookCounts = new ArrayList<>();
+        List<Long> totalPages = new ArrayList<>();
+        if (catalogWide) {
+            for (var row : catalogAuthorStatRepository.topAuthors(PageRequest.of(0, AUTHOR_STAT_TOP_N))) {
+                authorIds.add(row.getAuthorId());
+                names.add(row.getAuthorName());
+                bookCounts.add(row.getBookCount());
+                totalPages.add(row.getTotalPages() == null ? 0L : row.getTotalPages());
+            }
+        } else {
+            for (var row : libraryAuthorStatRepository.topAuthorsByLibraryIds(
+                    libraryIds, PageRequest.of(0, AUTHOR_STAT_TOP_N))) {
+                authorIds.add(row.getAuthorId());
+                names.add(row.getAuthorName());
+                bookCounts.add(row.getBookCount());
+                totalPages.add(row.getTotalPages() == null ? 0L : row.getTotalPages());
+            }
+        }
+        if (authorIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, double[]> perUser = authorRatingAggregates(visibleBooks, authorIds, userId);
+        List<AppLibraryStats.AuthorStat> result = new ArrayList<>(authorIds.size());
+        for (int i = 0; i < authorIds.size(); i++) {
+            double[] agg = perUser.getOrDefault(authorIds.get(i), new double[]{0D, 0D});
+            result.add(new AppLibraryStats.AuthorStat(
+                    names.get(i), bookCounts.get(i), totalPages.get(i), agg[0], (long) agg[1]));
+        }
+        return result;
+    }
+
+    /**
+     * Per-author average personal rating and read count for the given authors over the visible books,
+     * reproducing the joins of {@link #aggregateAuthors} so the materialized path matches the live one.
+     * Returns author id -> {averageRating, readCount}.
+     */
+    private Map<Long, double[]> authorRatingAggregates(
+            Specification<BookEntity> spec, List<Long> authorIds, Long userId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<BookEntity> root = query.from(BookEntity.class);
+        Join<Object, Object> metadata = root.join(ATTR_METADATA);
+        Join<Object, Object> author = metadata.join(F_AUTHORS);
+        Join<BookEntity, UserBookProgressEntity> progress = joinUserProgress(root, cb, userId);
+        var averageRating = cb.avg(progress.<Integer>get(ATTR_PERSONAL_RATING));
+        var readCount = cb.sum(cb.<Long>selectCase()
+                .when(cb.equal(progress.get(ATTR_READ_STATUS), ReadStatus.READ), 1L)
+                .otherwise(0L));
+        query.multiselect(author.get("id"), averageRating, readCount);
+        query.where(cb.and(spec.toPredicate(root, query, cb), author.get("id").in(authorIds)));
+        query.groupBy(author.get("id"));
+        Map<Long, double[]> result = new HashMap<>();
+        for (Tuple row : entityManager.createQuery(query).getResultList()) {
+            double avg = row.get(1, Double.class) == null ? 0D : row.get(1, Double.class);
+            Long read = row.get(2, Long.class);
+            result.put(row.get(0, Long.class), new double[]{avg, read == null ? 0D : read});
+        }
+        return result;
+    }
+
+    /**
+     * Recomputes the materialized statistics for one library from the current book data, unrestricted
+     * and shell-excluded (matching the live statistics visibility). Delete-then-insert replaces the
+     * library's rows atomically within the transaction. Runs per library so each commits independently.
+     */
+    @Transactional
+    public void recomputeLibraryStats(Long libraryId) {
+        Specification<BookEntity> spec = unrestrictedLibraryScope(libraryId);
+
+        libraryStatRepository.deleteByLibraryId(libraryId);
+        libraryStatMonthRepository.deleteByLibraryId(libraryId);
+        libraryAuthorStatRepository.deleteByLibraryId(libraryId);
+
+        List<LibraryStatEntity> scalars = List.of(
+                statRow(libraryId, STAT_TOTAL_BOOKS, bookRepository.count(spec)),
+                statRow(libraryId, STAT_TOTAL_SIZE_KB, sumBookFileSize(spec)),
+                statRow(libraryId, STAT_TOTAL_AUTHORS, countDistinctAuthors(spec, true)),
+                statRow(libraryId, STAT_TOTAL_SERIES, countDistinctSeries(spec)),
+                statRow(libraryId, STAT_TOTAL_PUBLISHERS, countDistinctPublishers(spec)));
+        libraryStatRepository.saveAll(scalars);
+
+        List<LibraryStatMonthEntity> months = countBooksByMonth(spec, ATTR_ADDED_ON, null, false).stream()
+                .map(m -> LibraryStatMonthEntity.builder()
+                        .libraryId(libraryId).year(m.year()).month(m.month()).bookCount(m.count()).build())
+                .toList();
+        libraryStatMonthRepository.saveAll(months);
+
+        List<LibraryAuthorStatEntity> authors = topAuthorGlobals(spec).stream()
+                .map(a -> LibraryAuthorStatEntity.builder()
+                        .libraryId(libraryId).authorId(a.authorId())
+                        .bookCount(a.bookCount()).totalPages(a.totalPages()).build())
+                .toList();
+        libraryAuthorStatRepository.saveAll(authors);
+
+        libraryStatStateRepository.save(LibraryStatStateEntity.builder()
+                .libraryId(libraryId).computedAt(Instant.now()).build());
+    }
+
+    /**
+     * Recomputes the whole-catalog materialized statistics: the non-additive distinct counts and the
+     * top authors across all libraries. Runs once per sweep (not per library) since it aggregates the
+     * entire catalog. Additive catalog values are summed from the per-library rows and not stored here.
+     */
+    @Transactional
+    public void recomputeCatalogStats() {
+        Specification<BookEntity> spec = unrestrictedCatalogScope();
+
+        catalogStatRepository.deleteAllInBatch();
+        catalogAuthorStatRepository.deleteAllInBatch();
+
+        catalogStatRepository.saveAll(List.of(
+                catalogStatRow(STAT_TOTAL_AUTHORS, countDistinctAuthors(spec, true)),
+                catalogStatRow(STAT_TOTAL_SERIES, countDistinctSeries(spec)),
+                catalogStatRow(STAT_TOTAL_PUBLISHERS, countDistinctPublishers(spec))));
+
+        List<CatalogAuthorStatEntity> authors = topAuthorGlobals(spec).stream()
+                .map(a -> CatalogAuthorStatEntity.builder()
+                        .authorId(a.authorId()).bookCount(a.bookCount()).totalPages(a.totalPages()).build())
+                .toList();
+        catalogAuthorStatRepository.saveAll(authors);
+
+        catalogStatStateRepository.save(CatalogStatStateEntity.builder()
+                .id(CatalogStatStateEntity.SINGLETON_ID).computedAt(Instant.now()).build());
+    }
+
+    /** Clears the in-memory statistics caches after a recompute so the fresh rows are served. */
+    public void invalidateStatsCaches() {
+        libraryStatsCache.invalidateAll();
+        catalogSummaryCache.invalidateAll();
+    }
+
+    private Specification<BookEntity> unrestrictedLibraryScope(Long libraryId) {
+        return BookSpecifications.notDeleted()
+                .and(BookSpecifications.notShellBook(findShellBookIds(), MAX_SHELL_IDS_IN_CLAUSE))
+                .and(BookSpecifications.inLibrary(libraryId));
+    }
+
+    private Specification<BookEntity> unrestrictedCatalogScope() {
+        return BookSpecifications.notDeleted()
+                .and(BookSpecifications.notShellBook(findShellBookIds(), MAX_SHELL_IDS_IN_CLAUSE));
+    }
+
+    private LibraryStatEntity statRow(Long libraryId, String key, long value) {
+        return LibraryStatEntity.builder().libraryId(libraryId).statKey(key).statValue(value).build();
+    }
+
+    private CatalogStatEntity catalogStatRow(String key, long value) {
+        return CatalogStatEntity.builder().statKey(key).statValue(value).build();
+    }
+
+    private record AuthorGlobal(Long authorId, long bookCount, long totalPages) {
+    }
+
+    /** Top {@value #FACET_LIMIT} authors of the scope by book count, with global book/page totals. */
+    private List<AuthorGlobal> topAuthorGlobals(Specification<BookEntity> spec) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<BookEntity> root = query.from(BookEntity.class);
+        Join<Object, Object> metadata = root.join(ATTR_METADATA);
+        Join<Object, Object> author = metadata.join(F_AUTHORS);
+        var bookCount = cb.countDistinct(root.get("id"));
+        var totalPages = cb.sumAsLong(metadata.<Integer>get("pageCount"));
+        query.multiselect(author.get("id"), bookCount, totalPages);
+        query.where(spec.toPredicate(root, query, cb));
+        query.groupBy(author.get("id"));
+        query.orderBy(cb.desc(bookCount), cb.asc(author.get("id")));
+        return entityManager.createQuery(query).setMaxResults(FACET_LIMIT).getResultList().stream()
+                .map(row -> new AuthorGlobal(
+                        row.get(0, Long.class),
+                        row.get(1, Long.class),
+                        Optional.ofNullable(row.get(2, Long.class)).orElse(0L)))
+                .toList();
     }
 
     static String catalogSummaryKey(Long userId, boolean admin, Set<Long> accessibleLibraryIds) {
@@ -347,7 +676,7 @@ public class AppBookService {
         return entityManager.createQuery(query).getSingleResult();
     }
 
-    private long countDistinctSeries(Specification<BookEntity> spec) {
+    long countDistinctSeries(Specification<BookEntity> spec) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Long> query = cb.createQuery(Long.class);
         Root<BookEntity> root = query.from(BookEntity.class);
@@ -360,7 +689,7 @@ public class AppBookService {
         return entityManager.createQuery(query).getSingleResult();
     }
 
-    private long countDistinctPublishers(Specification<BookEntity> spec) {
+    long countDistinctPublishers(Specification<BookEntity> spec) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Long> query = cb.createQuery(Long.class);
         Root<BookEntity> root = query.from(BookEntity.class);
@@ -1536,12 +1865,29 @@ public class AppBookService {
      * to the newest book change in the library.
      */
     public List<Long> findDirtyLibraryIds() {
-        List<Long> libraryIds = allLibraryIds();
         Map<Long, Instant> computedAt = libraryFacetStateRepository.findAll().stream()
                 .collect(Collectors.toMap(LibraryFacetStateEntity::getLibraryId,
                         LibraryFacetStateEntity::getComputedAt));
+        return dirtyLibraries(computedAt);
+    }
+
+    /**
+     * Libraries whose materialized statistics are missing, older than {@value #FACET_STALE_HOURS}h, or
+     * stale relative to the newest book change. Uses its own state so it is independent of the facet
+     * sweep: an existing install with fresh facet state but empty statistics is still recomputed.
+     */
+    public List<Long> findDirtyStatLibraryIds() {
+        Map<Long, Instant> computedAt = libraryStatStateRepository.findAll().stream()
+                .collect(Collectors.toMap(LibraryStatStateEntity::getLibraryId,
+                        LibraryStatStateEntity::getComputedAt));
+        return dirtyLibraries(computedAt);
+    }
+
+    // Missing, stale beyond the safety window (catches hard deletes the timestamp check can't see), or
+    // older than the newest book change in the library.
+    private List<Long> dirtyLibraries(Map<Long, Instant> computedAt) {
         Instant staleBefore = Instant.now().minus(FACET_STALE_HOURS, ChronoUnit.HOURS);
-        return libraryIds.stream()
+        return allLibraryIds().stream()
                 .filter(id -> {
                     Instant computed = computedAt.get(id);
                     if (computed == null || computed.isBefore(staleBefore)) {

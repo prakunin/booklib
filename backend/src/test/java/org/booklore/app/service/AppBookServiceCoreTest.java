@@ -78,7 +78,14 @@ class AppBookServiceCoreTest {
                 magicShelfBookService, entityManager, restrictionRepository,
                 new AppContentRestrictionQueryService(restrictionRepository), bookSortRegistry,
                 eventPublisher, new CatalogSummaryCache(60), new FilterOptionsCache(), new ShellBookIdsCache(),
-                mock(LibraryFacetCountRepository.class), mock(LibraryFacetStateRepository.class));
+                mock(LibraryFacetCountRepository.class), mock(LibraryFacetStateRepository.class),
+                mock(org.booklore.repository.LibraryStatRepository.class),
+                mock(org.booklore.repository.LibraryStatMonthRepository.class),
+                mock(org.booklore.repository.LibraryAuthorStatRepository.class),
+                mock(org.booklore.repository.LibraryStatStateRepository.class),
+                mock(org.booklore.repository.CatalogStatRepository.class),
+                mock(org.booklore.repository.CatalogAuthorStatRepository.class),
+                mock(org.booklore.repository.CatalogStatStateRepository.class));
     }
 
     private BookLoreUser adminUser() {
