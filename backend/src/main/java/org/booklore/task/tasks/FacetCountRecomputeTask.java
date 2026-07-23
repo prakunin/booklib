@@ -1,6 +1,7 @@
 package org.booklore.task.tasks;
 
 import org.booklore.app.service.AppBookService;
+import org.booklore.app.service.LibraryStatsRecomputeCoordinator;
 import org.booklore.exception.ApiError;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.request.TaskCreateRequest;
@@ -28,6 +29,7 @@ import java.util.UUID;
 public class FacetCountRecomputeTask implements Task {
 
     private final AppBookService appBookService;
+    private final LibraryStatsRecomputeCoordinator statsRecomputeCoordinator;
 
     @Override
     public void validatePermissions(BookLoreUser user, TaskCreateRequest request) {
@@ -55,6 +57,7 @@ public class FacetCountRecomputeTask implements Task {
             }
             log.info("{}: Recomputed facet counts for {} of {} dirty librar{}",
                     getTaskType(), recomputed, dirty.size(), dirty.size() == 1 ? "y" : "ies");
+            recomputeStats();
             builder.status(TaskStatus.COMPLETED);
         } catch (Exception e) {
             log.error("{}: Error recomputing facet counts", getTaskType(), e);
@@ -73,6 +76,38 @@ public class FacetCountRecomputeTask implements Task {
             return true;
         } catch (Exception e) {
             log.error("{}: Failed to recompute facet counts for library {}", getTaskType(), libraryId, e);
+            return false;
+        }
+    }
+
+    // Sweeps the materialized statistics alongside the facets: each dirty library is recomputed under
+    // the coordinator's per-library lock, then the whole-catalog scope once, and the caches are
+    // invalidated so the fresh rows are served. Uses its own dirty state, independent of the facets.
+    private void recomputeStats() {
+        List<Long> dirty = appBookService.findDirtyStatLibraryIds();
+        int recomputed = 0;
+        for (Long libraryId : dirty) {
+            if (recomputeStatsQuietly(libraryId)) {
+                recomputed++;
+            }
+        }
+        if (recomputed > 0) {
+            try {
+                statsRecomputeCoordinator.recomputeCatalog();
+            } catch (Exception e) {
+                log.error("{}: Failed to recompute catalog statistics", getTaskType(), e);
+            }
+            appBookService.invalidateStatsCaches();
+        }
+        log.info("{}: Recomputed statistics for {} of {} dirty librar{}",
+                getTaskType(), recomputed, dirty.size(), dirty.size() == 1 ? "y" : "ies");
+    }
+
+    private boolean recomputeStatsQuietly(Long libraryId) {
+        try {
+            return statsRecomputeCoordinator.recomputeLibrary(libraryId);
+        } catch (Exception e) {
+            log.error("{}: Failed to recompute statistics for library {}", getTaskType(), libraryId, e);
             return false;
         }
     }
