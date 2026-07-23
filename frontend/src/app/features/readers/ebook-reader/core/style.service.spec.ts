@@ -160,10 +160,11 @@ describe('ReaderStyleService', () => {
       .toBe(themes[0].dark.bg);
   });
 
-  it('prefers an explicitly resolved theme.fg/bg over the sub-object', () => {
-    const theme = {...themes[2], fg: themes[2].light.fg, bg: themes[2].light.bg, link: themes[2].light.link};
-    expect(service.getForegroundColor(makeState({theme, isDark: true}))).toBe(themes[2].light.fg);
-    expect(service.getBaseBackgroundColor(makeState({theme, isDark: true}))).toBe(themes[2].light.bg);
+  it('keeps foreground and background on the active mode when legacy top-level colours are incomplete', () => {
+    const theme = {...themes[2], fg: themes[2].dark.fg, bg: undefined};
+
+    expect(service.getForegroundColor(makeState({theme, isDark: false}))).toBe(themes[2].light.fg);
+    expect(service.getBaseBackgroundColor(makeState({theme, isDark: false}))).toBe(themes[2].light.bg);
   });
 
   it('applies renderer attributes and reader margins only when a renderer exists', () => {

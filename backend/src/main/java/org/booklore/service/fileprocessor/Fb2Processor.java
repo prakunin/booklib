@@ -20,6 +20,7 @@ import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.util.BookCoverUtils;
 import org.booklore.util.FileService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -102,7 +103,7 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
             // not that there is no cover, so it must not be reported the same way as a clean miss.
             fb2File = archivedBookContentService.resolve(bookFile).toFile();
         } catch (Exception e) {
-            log.error("Error resolving archived FB2 content for '{}': {}", bookFile.getFileName(), e.getMessage(), e);
+            logCoverReadFailure("resolve archived content", bookFile.getFileName(), e);
             return CoverExtraction.readFailed();
         }
 
@@ -113,7 +114,7 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
             // A malformed or unexpectedly-shaped FB2 must not propagate out of here: every caller
             // (the lazy probe and explicit regeneration) would otherwise turn one bad file into a
             // permanent 500, since the old generateCover caught everything and just returned false.
-            log.error("Error extracting cover from FB2 '{}': {}", bookFile.getFileName(), e.getMessage(), e);
+            logCoverReadFailure("extract cover", bookFile.getFileName(), e);
             return CoverExtraction.readFailed();
         }
         if (coverData == null || coverData.length == 0) {
@@ -121,6 +122,21 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
             return CoverExtraction.noCoverFound();
         }
         return CoverExtraction.found(coverData);
+    }
+
+    private void logCoverReadFailure(String action, String fileName, Exception error) {
+        String reason = conciseRootCause(error);
+        log.error("Unable to {} from FB2 '{}': {}", action, fileName, reason);
+        log.debug("Full FB2 cover failure while processing '{}'", fileName, error);
+    }
+
+    private static String conciseRootCause(Throwable error) {
+        Throwable rootCause = error;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+            rootCause = rootCause.getCause();
+        }
+        String message = StringUtils.normalizeSpace(rootCause.getMessage());
+        return StringUtils.defaultIfBlank(message, rootCause.getClass().getSimpleName());
     }
 
     @Override

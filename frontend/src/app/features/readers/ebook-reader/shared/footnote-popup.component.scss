@@ -42,12 +42,6 @@
   font-size: 0.9rem;
   line-height: 1.5;
 
-  // the note fragment carries no colour of its own (stripped on extraction),
-  // so every element reads in the popover's themed foreground
-  * {
-    color: inherit;
-  }
-
   :first-child {
     margin-top: 0;
   }
@@ -55,6 +49,14 @@
   :last-child {
     margin-bottom: 0;
   }
+}
+
+// Elements inserted through innerHTML do not receive Angular's emulated
+// encapsulation attribute. Cross that boundary explicitly so global app/theme
+// rules cannot repaint book markup with the UI foreground colour.
+:host ::ng-deep .footnote-body * {
+  color: inherit !important;
+  background-color: transparent !important;
 }
 
 .footnote-actions {
@@ -65,6 +67,7 @@
 
   button {
     padding: 4px 10px;
+    color: inherit;
     font: inherit;
     font-size: 0.8rem;
     cursor: pointer;

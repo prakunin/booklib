@@ -367,9 +367,7 @@ export class ReaderEventService {
     };
 
     track(doc, 'mousedown', () => {
-      this.longHoldTimeout = setTimeout(() => {
-        this.longHoldTimeout = null;
-      }, this.LONG_HOLD_THRESHOLD_MS);
+      this.startLongHoldTimer();
     }, {capture: true});
 
     track(doc, 'mouseup', () => {
@@ -379,6 +377,11 @@ export class ReaderEventService {
     track(doc, 'click', ((event: MouseEvent) => {
       // Ignore synthesized mouse events that follow touch events
       if (Date.now() - this.lastTouchTime < 500) {
+        return;
+      }
+      // Links and other controls handle their own click. Treating the same
+      // event as a page-zone click can open a footnote and scroll the reader.
+      if (this.isInteractiveTarget(event.target)) {
         return;
       }
 
@@ -472,9 +475,7 @@ export class ReaderEventService {
     this.touchStartTime = Date.now();
     this.isTextSelectionInProgress = false;
 
-    this.longHoldTimeout = setTimeout(() => {
-      this.longHoldTimeout = null;
-    }, this.LONG_HOLD_THRESHOLD_MS);
+    this.startLongHoldTimer();
   }
 
   private handleTouchMove(event: TouchEvent, doc: Document): void {
@@ -540,6 +541,10 @@ export class ReaderEventService {
       }
 
       if (touchDuration < this.LONG_HOLD_THRESHOLD_MS && Math.abs(deltaX) < 10 && deltaY < 10) {
+        if (this.isInteractiveTarget(event.target)) {
+          return;
+        }
+
         const iframe = doc.defaultView?.frameElement as HTMLIFrameElement | null;
         if (!iframe) return;
 
@@ -559,6 +564,29 @@ export class ReaderEventService {
     }
 
     this.isTextSelectionInProgress = false;
+  }
+
+  private startLongHoldTimer(): void {
+    if (this.longHoldTimeout) {
+      clearTimeout(this.longHoldTimeout);
+    }
+    const timeout = setTimeout(() => {
+      if (this.longHoldTimeout === timeout) {
+        this.longHoldTimeout = null;
+      }
+    }, this.LONG_HOLD_THRESHOLD_MS);
+    this.longHoldTimeout = timeout;
+  }
+
+  private isInteractiveTarget(target: EventTarget | null): boolean {
+    const element = target as Element | null;
+    if (typeof element?.closest !== 'function') {
+      return false;
+    }
+    return element.closest(
+      'a[href], button, input, select, textarea, label, summary, audio, video, '
+      + '[role="button"], [role="link"], [contenteditable]:not([contenteditable="false"])'
+    ) !== null;
   }
 
   private tryNavigateAcrossScrolledBoundary(_scrollDelta: number): boolean {

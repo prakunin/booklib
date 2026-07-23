@@ -442,6 +442,42 @@ describe('ReaderEventService', () => {
     expect(emittedEvents.at(-1)?.type).toBe('middle-single-tap');
   });
 
+  it('does not treat footnote links or nested link content as page-zone clicks', () => {
+    view.dispatchEvent(new CustomEvent('load', {detail: {doc}}));
+    const link = doc.createElement('a');
+    link.href = '#note-42';
+    const marker = doc.createElement('sup');
+    marker.textContent = '[42]';
+    link.appendChild(marker);
+    doc.body.appendChild(link);
+
+    marker.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
+    marker.dispatchEvent(new MouseEvent('click', {
+      bubbles: true,
+      clientX: 480,
+      clientY: 100,
+    }));
+    vi.advanceTimersByTime(300);
+
+    expect(postMessageSpy).not.toHaveBeenCalled();
+    expect(prev).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('keeps the newest short-click timer active when clicks overlap', () => {
+    view.dispatchEvent(new CustomEvent('load', {detail: {doc}}));
+
+    doc.body.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
+    vi.advanceTimersByTime(250);
+    doc.body.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
+    vi.advanceTimersByTime(250);
+
+    expect(privateService.longHoldTimeout).not.toBeNull();
+
+    vi.advanceTimersByTime(250);
+    expect(privateService.longHoldTimeout).toBeNull();
+  });
+
   it('processes touch gestures for swipe navigation, short taps, and selected text', () => {
     privateService.longHoldTimeout = setTimeout(() => undefined, 1_000);
     privateService.touchStartX = 150;

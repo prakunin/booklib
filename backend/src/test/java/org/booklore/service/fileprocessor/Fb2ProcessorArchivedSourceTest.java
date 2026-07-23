@@ -1,5 +1,9 @@
 package org.booklore.service.fileprocessor;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.booklore.mapper.BookMapper;
 import org.booklore.model.CoverExtraction;
 import org.booklore.model.entity.BookEntity;
@@ -11,6 +15,7 @@ import org.booklore.repository.BookRepository;
 import org.booklore.service.book.BookCreatorService;
 import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.service.metadata.MetadataMatchService;
+import org.booklore.service.metadata.extractor.CoverExtractionException;
 import org.booklore.service.metadata.extractor.Fb2MetadataExtractor;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.util.FileService;
@@ -20,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -121,6 +127,48 @@ class Fb2ProcessorArchivedSourceTest {
 
             assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.READ_FAILED);
             verifyNoInteractions(fb2MetadataExtractor);
+        }
+
+        @Test
+        void coverReadFailureLogsOneLineAtErrorAndKeepsTheStackAtDebug() {
+            Fb2Processor processor = buildProcessor();
+            BookEntity book = BookEntity.builder().id(42L).build();
+            BookFileEntity bookFile = buildArchivedFile(book);
+            Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
+            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri())))
+                    .thenThrow(new CoverExtractionException(
+                            "Failed to extract cover",
+                            new IllegalArgumentException("Malformed XML\nat line 31")));
+
+            Logger logger = (Logger) LoggerFactory.getLogger(Fb2Processor.class);
+            Level previousLevel = logger.getLevel();
+            ListAppender<ILoggingEvent> appender = new ListAppender<>();
+            appender.start();
+            logger.setLevel(Level.DEBUG);
+            logger.addAppender(appender);
+            try {
+                CoverExtraction extraction = processor.extractCover(book, bookFile);
+
+                assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.READ_FAILED);
+                ILoggingEvent errorEvent = appender.list.stream()
+                        .filter(event -> event.getLevel() == Level.ERROR)
+                        .findFirst()
+                        .orElseThrow();
+                assertThat(errorEvent.getFormattedMessage())
+                        .isEqualTo("Unable to extract cover from FB2 'book.fb2': Malformed XML at line 31");
+                assertThat(errorEvent.getThrowableProxy()).isNull();
+
+                ILoggingEvent debugEvent = appender.list.stream()
+                        .filter(event -> event.getLevel() == Level.DEBUG)
+                        .findFirst()
+                        .orElseThrow();
+                assertThat(debugEvent.getThrowableProxy()).isNotNull();
+            } finally {
+                logger.detachAppender(appender);
+                logger.setLevel(previousLevel);
+                appender.stop();
+            }
         }
 
         @Test

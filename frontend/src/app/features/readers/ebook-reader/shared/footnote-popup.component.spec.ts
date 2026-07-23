@@ -57,7 +57,20 @@ describe('FootnotePopupComponent', () => {
     const popup = fixture.nativeElement.querySelector('.footnote-popup') as HTMLElement;
     expect(popup.style.getPropertyValue('--footnote-bg')).toBe('#f1e8d0');
     expect(popup.style.getPropertyValue('--footnote-fg')).toBe('#5b4636');
+    expect(popup.style.backgroundColor).toBe('rgb(241, 232, 208)');
+    expect(popup.style.color).toBe('rgb(91, 70, 54)');
     expect(popup.classList.contains('is-dark')).toBe(false);
+  });
+
+  it('applies the reader foreground to markup inserted through innerHTML', () => {
+    fixture.componentRef.setInput('visible', true);
+    fixture.componentRef.setInput('html', '<section><p>Nested note</p></section>');
+    fixture.componentRef.setInput('foreground', '#5b4636');
+    fixture.detectChanges();
+
+    const paragraph = fixture.nativeElement.querySelector('.footnote-body p') as HTMLElement;
+
+    expect(getComputedStyle(paragraph).color).toBe('rgb(91, 70, 54)');
   });
 
   it('emits dismissed when the close button is clicked', () => {
