@@ -2,8 +2,18 @@ import {TestBed} from '@angular/core/testing';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {themes} from '../state/themes.constant';
+import {ReaderState} from '../state/reader-state.service';
 import {EpubCustomFontService} from '../features/fonts/custom-font.service';
 import {ReaderStyleService} from './style.service';
+
+function makeState(over: Partial<ReaderState>): ReaderState {
+  return {
+    lineHeight: 1.5, justify: true, hyphenate: true, maxColumnCount: 2, gap: 0.05,
+    fontSize: 16, theme: themes[0], maxInlineSize: 720, maxBlockSize: 1440, pageMargin: 40,
+    fontFamily: null, isDark: true, flow: 'paginated', backgroundSaturation: 100,
+    backgroundTransparency: 0, ...over,
+  };
+}
 
 describe('ReaderStyleService', () => {
   const epubCustomFontService = {
@@ -135,6 +145,25 @@ describe('ReaderStyleService', () => {
       backgroundSaturation: 0,
       backgroundTransparency: 40,
     })).toBe('rgba(225, 225, 225, 0.6)');
+  });
+
+  it('resolves the foreground from the light/dark sub-object when theme.fg is empty', () => {
+    // an unresolved theme (no top-level fg/bg) must still yield a real colour so
+    // the footnote popover never binds an empty custom property
+    expect(service.getForegroundColor(makeState({theme: themes[0], isDark: false})))
+      .toBe(themes[0].light.fg);
+    expect(service.getForegroundColor(makeState({theme: themes[0], isDark: true})))
+      .toBe(themes[0].dark.fg);
+    expect(service.getBaseBackgroundColor(makeState({theme: themes[0], isDark: false})))
+      .toBe(themes[0].light.bg);
+    expect(service.getBaseBackgroundColor(makeState({theme: themes[0], isDark: true})))
+      .toBe(themes[0].dark.bg);
+  });
+
+  it('prefers an explicitly resolved theme.fg/bg over the sub-object', () => {
+    const theme = {...themes[2], fg: themes[2].light.fg, bg: themes[2].light.bg, link: themes[2].light.link};
+    expect(service.getForegroundColor(makeState({theme, isDark: true}))).toBe(themes[2].light.fg);
+    expect(service.getBaseBackgroundColor(makeState({theme, isDark: true}))).toBe(themes[2].light.bg);
   });
 
   it('applies renderer attributes and reader margins only when a renderer exists', () => {

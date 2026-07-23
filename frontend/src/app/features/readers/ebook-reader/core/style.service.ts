@@ -200,8 +200,21 @@ export class ReaderStyleService {
     `;
   }
 
+  // The active theme's resolved colours. `theme.fg`/`theme.bg` are only populated
+  // once a theme is explicitly applied; for many states they are empty and the
+  // real colour lives on the light/dark sub-object. Callers that read the colour
+  // directly (page renderer, headers, the footnote popover) must fall back the
+  // same way, otherwise they render with an empty value.
+  getForegroundColor(state: ReaderState): string {
+    return state.theme.fg || (state.isDark ? state.theme.dark.fg : state.theme.light.fg);
+  }
+
+  getBaseBackgroundColor(state: ReaderState): string {
+    return state.theme.bg || (state.isDark ? state.theme.dark.bg : state.theme.light.bg);
+  }
+
   getAdjustedBackgroundColor(state: ReaderState): string {
-    const baseColor = state.theme.bg || (state.isDark ? state.theme.dark.bg : state.theme.light.bg);
+    const baseColor = this.getBaseBackgroundColor(state);
     const rgb = this.hexToRgb(baseColor);
     if (!rgb) return baseColor;
 

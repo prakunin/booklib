@@ -157,8 +157,8 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
 
   readonly readerState = this.stateService.state;
   readonly readerBackground = computed(() => this.styleService.getAdjustedBackgroundColor(this.readerState()));
-  readonly footnoteBackground = computed(() => this.readerState().theme.bg ?? '');
-  readonly footnoteForeground = computed(() => this.readerState().theme.fg ?? '');
+  readonly footnoteBackground = computed(() => this.styleService.getBaseBackgroundColor(this.readerState()));
+  readonly footnoteForeground = computed(() => this.styleService.getForegroundColor(this.readerState()));
   readonly footnoteIsDark = computed(() => this.readerState().isDark);
   readonly selectionState = this.selectionService.state;
   readonly footnoteState = this.footnoteService.state;
