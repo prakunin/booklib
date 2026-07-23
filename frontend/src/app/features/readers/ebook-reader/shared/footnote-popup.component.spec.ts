@@ -46,6 +46,20 @@ describe('FootnotePopupComponent', () => {
     expect(popup.classList.contains('show-below')).toBe(true);
   });
 
+  it('paints the card in the supplied page theme', () => {
+    fixture.componentRef.setInput('visible', true);
+    fixture.componentRef.setInput('html', '<p>Note</p>');
+    fixture.componentRef.setInput('background', '#f1e8d0');
+    fixture.componentRef.setInput('foreground', '#5b4636');
+    fixture.componentRef.setInput('dark', false);
+    fixture.detectChanges();
+
+    const popup = fixture.nativeElement.querySelector('.footnote-popup') as HTMLElement;
+    expect(popup.style.getPropertyValue('--footnote-bg')).toBe('#f1e8d0');
+    expect(popup.style.getPropertyValue('--footnote-fg')).toBe('#5b4636');
+    expect(popup.classList.contains('is-dark')).toBe(false);
+  });
+
   it('emits dismissed when the close button is clicked', () => {
     render(true);
     const dismissed = vi.fn();

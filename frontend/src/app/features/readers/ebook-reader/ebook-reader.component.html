@@ -106,6 +106,9 @@
     [position]="footnoteState().position"
     [showBelow]="footnoteState().showBelow"
     [html]="footnoteState().html"
+    [background]="footnoteBackground()"
+    [foreground]="footnoteForeground()"
+    [dark]="footnoteIsDark()"
     (dismissed)="onFootnoteDismissed()"
     (openFullRequested)="onFootnoteOpenFull()"
   ></app-footnote-popup>

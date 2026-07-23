@@ -14,6 +14,9 @@ export class FootnotePopupComponent {
   readonly position = input<{ x: number; y: number }>({x: 0, y: 0});
   readonly showBelow = input(false);
   readonly html = input('');
+  readonly background = input('');
+  readonly foreground = input('');
+  readonly dark = input(false);
 
   readonly dismissed = output<void>();
   readonly openFullRequested = output<void>();

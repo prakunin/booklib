@@ -12,6 +12,9 @@
       role="dialog"
       [attr.aria-label]="t('readerEbook.footnote.title')"
       [class.show-below]="showBelow()"
+      [class.is-dark]="dark()"
+      [style.--footnote-bg]="background()"
+      [style.--footnote-fg]="foreground()"
       [style.left.px]="position().x"
       [style.top.px]="position().y">
       <div class="footnote-body" [innerHTML]="html()"></div>

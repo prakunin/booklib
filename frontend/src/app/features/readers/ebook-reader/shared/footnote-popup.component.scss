@@ -1,5 +1,3 @@
-@use '../../shared/styles/reader-chrome' as *;
-
 .footnote-backdrop {
   position: fixed;
   inset: 0;
@@ -7,9 +5,12 @@
   background: transparent;
 }
 
+// a footnote shows book content, so the card follows the reader's page theme
+// (paper + ink the user picked) rather than the always-dark reader chrome;
+// the border and shadow keep it legible when the page and card share a colour
 .footnote-popup {
-  @include surface;
-
+  // --footnote-bg / --footnote-fg come from the host bound to the reader's page
+  // theme; the fallbacks keep a neutral dark card if the host omits them
   position: fixed;
   z-index: 99999;
   display: flex;
@@ -19,9 +20,21 @@
   max-width: min(420px, calc(100vw - 32px));
   max-height: 40vh;
   padding: 12px 14px;
+  color: var(--footnote-fg, #e0e0e0);
+  background: var(--footnote-bg, #222);
+  border: 1px solid color-mix(in srgb, var(--footnote-fg, #e0e0e0) 20%, transparent);
   border-radius: 10px;
   box-shadow: 0 4px 16px rgb(0 0 0 / 30%), 0 0 1px rgb(0 0 0 / 20%);
   transform: translate(-50%, -100%);
+  color-scheme: light;
+
+  &.is-dark {
+    color-scheme: dark;
+  }
+
+  :is(h1, h2, h3, h4, h5, h6, p) {
+    color: inherit;
+  }
 
   &.show-below {
     transform: translate(-50%, 0);
