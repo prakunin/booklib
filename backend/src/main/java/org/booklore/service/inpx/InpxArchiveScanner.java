@@ -2,9 +2,12 @@ package org.booklore.service.inpx;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.booklore.exception.ApiError;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.inpx.InpxBookDto;
+import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.service.metadata.extractor.Fb2MetadataExtractor;
 import org.booklore.util.FileUtils;
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.BooleanSupplier;
@@ -31,12 +35,12 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 /**
- * Finds FB2 books in ZIP archives that are not yet fully represented by an INPX library.
+ * Finds books of any format in ZIP archives that are not yet fully represented by an INPX library.
  * This supplements (rather than replaces) the INPX index, allowing newly downloaded ZIPs
- * to be added without waiting for a new .inpx file.
+ * to be added without waiting for a new .inpx file. Readable formats (FB2, PDF, …) keep their type;
+ * everything else (djvu, doc, …) is ingested as a download-only {@code OTHER} catalog entry.
  * <p>
  * Incremental discovery is <em>additive and count-gated</em>: an archive is only considered when it
  * holds more entries than are persisted for it, and nothing here ever removes a row. Replacing an
@@ -54,6 +58,7 @@ public class InpxArchiveScanner {
 
     private final BookFileRepository bookFileRepository;
     private final Fb2MetadataExtractor fb2MetadataExtractor;
+    private final ArchiveEntryMetadataRecognizer entryMetadataRecognizer;
     private final ConcurrentMap<Path, ArchiveFile> archiveFileCache = new ConcurrentHashMap<>();
 
     public Discovery discover(long libraryId, String archiveRoot) {
@@ -93,7 +98,7 @@ public class InpxArchiveScanner {
                     archives.add(cached);
                 } else {
                     ArchiveFile inspected = new ArchiveFile(path, path.getFileName().toString(), size,
-                            modifiedAt, countFb2Entries(path));
+                            modifiedAt, countIngestableEntries(path));
                     archiveFileCache.put(path, inspected);
                     archives.add(inspected);
                 }
@@ -124,7 +129,7 @@ public class InpxArchiveScanner {
             if (!path.startsWith(root) || !Files.isRegularFile(path) || !Files.isReadable(path)) {
                 throw ApiError.FILE_NOT_FOUND.createException("ZIP archive is unavailable: " + archiveName);
             }
-            return new ArchiveCandidate(path, archiveName, countFb2Entries(path));
+            return new ArchiveCandidate(path, archiveName, countIngestableEntries(path));
         } catch (InvalidPathException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid ZIP archive name");
         }
@@ -141,20 +146,24 @@ public class InpxArchiveScanner {
 
     private void scanArchive(ArchiveCandidate candidate, long libraryId, Consumer<InpxBookDto> consumer,
                              BooleanSupplier cancelled) {
-        try (ZipFile archive = new ZipFile(candidate.path().toFile())) {
-            List<? extends ZipEntry> entries = archive.stream().filter(this::isReadableFb2Entry).toList();
+        // Apache Commons Compress rather than java.util.zip: the JDK reader rejects whole archives
+        // whose CEN headers trip its strict validation ("invalid CEN header"), which is exactly what
+        // the legacy Flibusta usr ZIPs do. Commons Compress reads them.
+        try (ZipFile archive = ZipFile.builder().setFile(candidate.path().toFile()).get()) {
+            List<ZipArchiveEntry> entries = Collections.list(archive.getEntries()).stream()
+                    .filter(this::isIngestableEntry).toList();
             for (int offset = 0; offset < entries.size(); offset += EXISTING_ENTRY_BATCH_SIZE) {
-                List<? extends ZipEntry> entryBatch = entries.subList(
+                List<ZipArchiveEntry> entryBatch = entries.subList(
                         offset, Math.min(offset + EXISTING_ENTRY_BATCH_SIZE, entries.size()));
                 Set<String> existingEntries = findExistingEntries(libraryId, candidate.archiveName(), entryBatch);
-                for (ZipEntry entry : entryBatch) {
+                for (ZipArchiveEntry entry : entryBatch) {
                     if (cancelled.getAsBoolean()) {
                         return;
                     }
                     if (existingEntries.contains(entry.getName())) {
                         continue;
                     }
-                    processFb2Entry(archive, candidate, entry, consumer);
+                    processEntry(archive, candidate, entry, consumer);
                 }
             }
         } catch (IOException e) {
@@ -162,16 +171,27 @@ public class InpxArchiveScanner {
         }
     }
 
-    private void processFb2Entry(ZipFile archive, ArchiveCandidate candidate, ZipEntry entry, Consumer<InpxBookDto> consumer) {
-        try (InputStream input = archive.getInputStream(entry)) {
-            BookMetadata metadata = fb2MetadataExtractor.extractMetadata(
-                    input, candidate.archiveName() + "!" + entry.getName());
-            consumer.accept(toBook(candidate.archiveName(), entry.getName(), entry.getSize(), metadata));
-        } catch (IOException e) {
-            log.warn("Unable to read FB2 entry {} from {}: {}",
-                    entry.getName(), candidate.archiveName(), e.getMessage());
-            consumer.accept(toBook(candidate.archiveName(), entry.getName(), entry.getSize(), null));
+    /**
+     * Discovery is streaming and cheap: FB2 is read straight from the ZIP stream (its opening pages
+     * recover a blank title-info), while every other format is recognised from its filename only. The
+     * per-format extractors that need a real file on disk (PDF, Word, …) run later, in the full-scan
+     * refresh pass, which materialises each entry.
+     */
+    private void processEntry(ZipFile archive, ArchiveCandidate candidate, ZipArchiveEntry entry, Consumer<InpxBookDto> consumer) {
+        String entryName = entry.getName();
+        BookFileType bookType = entryMetadataRecognizer.resolveBookType(entryName);
+        BookMetadata metadata;
+        if (bookType == BookFileType.FB2) {
+            try (InputStream input = archive.getInputStream(entry)) {
+                metadata = fb2MetadataExtractor.extractMetadata(input, candidate.archiveName() + "!" + entryName);
+            } catch (IOException e) {
+                log.warn("Unable to read FB2 entry {} from {}: {}", entryName, candidate.archiveName(), e.getMessage());
+                metadata = null;
+            }
+        } else {
+            metadata = entryMetadataRecognizer.recognize(entryName, null);
         }
+        consumer.accept(toBook(candidate.archiveName(), entryName, entry.getSize(), metadata, bookType));
     }
 
     private Set<String> findExistingEntries(long libraryId, String archiveName,
@@ -186,8 +206,12 @@ public class InpxArchiveScanner {
                 .collect(Collectors.toSet());
     }
 
-    private InpxBookDto toBook(String archiveName, String entryName, long sizeBytes, BookMetadata metadata) {
-        String fileName = entryName.substring(0, entryName.length() - ".fb2".length());
+    private InpxBookDto toBook(String archiveName, String entryName, long sizeBytes,
+                              BookMetadata metadata, BookFileType bookType) {
+        String extension = extension(entryName);
+        String fileName = extension.isEmpty()
+                ? entryName
+                : entryName.substring(0, entryName.length() - extension.length() - 1);
         String title = metadata == null || metadata.getTitle() == null || metadata.getTitle().isBlank()
                 ? fileName
                 : metadata.getTitle();
@@ -199,7 +223,7 @@ public class InpxArchiveScanner {
                 : List.copyOf(metadata.getCategories());
 
         return InpxBookDto.builder()
-                .id(InpxParser.id(archiveName, fileName, "fb2"))
+                .id(InpxParser.id(archiveName, fileName, extension))
                 .authors(authors)
                 .genres(genres)
                 .title(title)
@@ -207,7 +231,8 @@ public class InpxArchiveScanner {
                 .seriesNumber(metadata == null || metadata.getSeriesNumber() == null
                         ? null : metadata.getSeriesNumber().toString())
                 .fileName(fileName)
-                .extension("fb2")
+                .extension(extension)
+                .bookType(bookType)
                 .libraryId("")
                 .date(metadata == null || metadata.getPublishedDate() == null
                         ? null : metadata.getPublishedDate().toString())
@@ -216,6 +241,16 @@ public class InpxArchiveScanner {
                 .archiveName(archiveName)
                 .fileSizeKb(toKilobytes(sizeBytes))
                 .build();
+    }
+
+    private String extension(String entryName) {
+        int lastDot = entryName.lastIndexOf('.');
+        // Original case is preserved on purpose: the stored extension rebuilds the archive entry name
+        // for later reads, and ZIP entry lookup is case-sensitive (".PDF" != ".pdf"). Type detection
+        // lowercases separately in ArchiveEntryMetadataRecognizer.
+        return lastDot > 0 && lastDot < entryName.length() - 1
+                ? entryName.substring(lastDot + 1)
+                : "";
     }
 
     void populateFileSizes(List<InpxBookDto> books, String archiveRoot) {
@@ -235,9 +270,9 @@ public class InpxArchiveScanner {
             if (!archivePath.startsWith(root) || !Files.isRegularFile(archivePath)) {
                 return;
             }
-            try (ZipFile archive = new ZipFile(archivePath.toFile())) {
+            try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
                 for (InpxBookDto book : books) {
-                    ZipEntry entry = archive.getEntry(book.getFileName() + "." + book.getExtension());
+                    ZipArchiveEntry entry = archive.getEntry(book.getFileName() + "." + book.getExtension());
                     if (entry != null) {
                         book.setFileSizeKb(toKilobytes(entry.getSize()));
                     }
@@ -260,24 +295,31 @@ public class InpxArchiveScanner {
         return counts;
     }
 
-    private long countFb2Entries(Path path) {
-        try (ZipFile archive = new ZipFile(path.toFile())) {
-            return archive.stream().filter(this::isReadableFb2Entry).count();
+    private long countIngestableEntries(Path path) {
+        try (ZipFile archive = ZipFile.builder().setFile(path.toFile()).get()) {
+            return Collections.list(archive.getEntries()).stream().filter(this::isIngestableEntry).count();
         } catch (IOException e) {
             log.warn("Unable to inspect ZIP archive {}: {}", path, e.getMessage());
             return 0;
         }
     }
 
-    private boolean isReadableFb2Entry(ZipEntry entry) {
-        if (entry.isDirectory() || !entry.getName().toLowerCase(Locale.ROOT).endsWith(".fb2")) {
+    /**
+     * Any flat, non-junk file with an extension is a catalog candidate — not just FB2. The format
+     * is resolved per entry: readable types (FB2, PDF, …) open in a reader, everything else becomes a
+     * download-only OTHER book. Directory entries, nested paths and ignored files are skipped.
+     */
+    private boolean isIngestableEntry(ZipEntry entry) {
+        if (entry.isDirectory()) {
             return false;
         }
+        String name = entry.getName();
         try {
-            Path entryPath = Path.of(entry.getName());
+            Path entryPath = Path.of(name);
             return entryPath.getNameCount() == 1
-                    && entryPath.getFileName().toString().equals(entry.getName())
-                    && !FileUtils.shouldIgnore(entryPath);
+                    && entryPath.getFileName().toString().equals(name)
+                    && !FileUtils.shouldIgnore(entryPath)
+                    && !extension(name).isEmpty();
         } catch (InvalidPathException _) {
             return false;
         }

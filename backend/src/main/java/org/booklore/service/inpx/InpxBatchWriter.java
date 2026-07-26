@@ -48,6 +48,36 @@ public class InpxBatchWriter {
     private final EntityManager entityManager;
 
     /**
+     * Resolves authors before the book-write transaction starts. Author creation uses
+     * {@code REQUIRES_NEW}; invoking it from inside {@link #persist} would suspend the
+     * batch transaction and then resume a stale MariaDB snapshot.
+     */
+    public void prepareAuthors(List<InpxBookDto> batch, long libraryId, InpxScanCaches caches) {
+        if (batch.isEmpty()) {
+            return;
+        }
+
+        List<String> keys = batch.stream().map(this::archiveKey).toList();
+        Set<String> existing = findExistingKeys(libraryId, batch, keys);
+        Set<String> seenInBatch = new HashSet<>();
+        for (InpxBookDto source : batch) {
+            String archiveKey = archiveKey(source);
+            if (existing.contains(archiveKey) || !seenInBatch.add(archiveKey)) {
+                continue;
+            }
+            for (String name : source.getAuthors()) {
+                String key = AuthorNames.cleanDisplayName(name);
+                if (key.isEmpty() || caches.authors().containsKey(key)) {
+                    continue;
+                }
+                authorLocalResolver.resolve(name)
+                        .map(AuthorEntity::getId)
+                        .ifPresent(id -> caches.authors().put(key, id));
+            }
+        }
+    }
+
+    /**
      * Persists one batch in its own transaction, so neither memory nor transaction
      * duration grows with the size of the index.
      */
@@ -188,7 +218,9 @@ public class InpxBatchWriter {
                 .fileName(entryName)
                 .fileSubPath("")
                 .isBookFormat(true)
-                .bookType(BookFileType.FB2)
+                // Index-sourced books carry no type and are always FB2; archive-scanned books bring
+                // their real format (PDF, OTHER, …).
+                .bookType(source.getBookType() == null ? BookFileType.FB2 : source.getBookType())
                 .sourceArchive(source.getArchiveName())
                 .sourceArchiveEntry(entryName)
                 .fileSizeKb(source.getFileSizeKb())

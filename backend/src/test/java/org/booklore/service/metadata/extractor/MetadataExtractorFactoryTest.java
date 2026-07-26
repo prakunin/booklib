@@ -258,9 +258,15 @@ class MetadataExtractorFactoryTest {
         }
 
         @ParameterizedTest
-        @EnumSource(BookFileType.class)
-        void allFileTypesReturnNonNull(BookFileType type) {
+        // OTHER is the download-only catch-all: it has no reader and, by design, no extractor.
+        @EnumSource(value = BookFileType.class, names = "OTHER", mode = EnumSource.Mode.EXCLUDE)
+        void allReadableFileTypesReturnNonNull(BookFileType type) {
             assertThat(factory.getExtractor(type)).isNotNull();
+        }
+
+        @Test
+        void returnsNoExtractorForTheDownloadOnlyOtherType() {
+            assertThat(factory.getExtractor(BookFileType.OTHER)).isNull();
         }
     }
 }

@@ -2,6 +2,7 @@ package org.booklore.model.dto.inpx;
 
 import lombok.Builder;
 import lombok.Data;
+import org.booklore.model.enums.BookFileType;
 
 import java.util.List;
 
@@ -22,4 +23,8 @@ public class InpxBookDto {
     private Double rating;
     private String archiveName;
     private Long fileSizeKb;
+    // The file type inferred from the entry extension: a readable type (FB2, PDF, …) or the
+    // download-only OTHER. Index-sourced books (InpxParser) are always FB2; archive-scanned books
+    // (InpxArchiveScanner) carry their real format. Null is treated as FB2 for backward compatibility.
+    private BookFileType bookType;
 }

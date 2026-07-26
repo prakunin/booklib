@@ -233,6 +233,10 @@ dependencies {
     // --- MIME Detection ---
     implementation(libs.tika.core)
 
+    // Apache POI: metadata (title/author) from Word documents in INPX archives — .docx via XWPF core
+    // properties, .doc (and other OLE2) via HPSF SummaryInformation.
+    implementation(libs.poi.ooxml)
+
     // --- XML Support (JAXB) ---
     implementation(libs.jakarta.xml.bind.api)
 
