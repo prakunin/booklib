@@ -2,6 +2,7 @@ package org.booklore.app.controller;
 
 import org.booklore.app.service.AppBookService;
 import org.booklore.app.service.AppBookQuickSearchService;
+import org.booklore.app.service.AppBookSemanticSearchService;
 import org.booklore.app.dto.AppBookQuickSearchResult;
 import org.booklore.app.dto.AppCatalogSummary;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,9 @@ class AppBookControllerTest {
 
     private final AppBookService appBookService = mock(AppBookService.class);
     private final AppBookQuickSearchService quickSearchService = mock(AppBookQuickSearchService.class);
-    private final AppBookController controller = new AppBookController(appBookService, quickSearchService);
+    private final AppBookSemanticSearchService semanticSearchService = mock(AppBookSemanticSearchService.class);
+    private final AppBookController controller =
+            new AppBookController(appBookService, quickSearchService, semanticSearchService);
 
     @Test
     void shouldReturnExistingIsbnMatches() {
@@ -51,5 +54,16 @@ class AppBookControllerTest {
 
         assertThat(response.getBody()).containsExactly(result);
         verify(quickSearchService).search("dune", 25);
+    }
+
+    @Test
+    void shouldReturnSemanticSearchResults() {
+        var result = AppBookQuickSearchResult.builder().id(9L).title("Метро 2033").build();
+        when(semanticSearchService.search("люди под землей", 25)).thenReturn(java.util.List.of(result));
+
+        var response = controller.semanticSearchBooks("люди под землей", 25);
+
+        assertThat(response.getBody()).containsExactly(result);
+        verify(semanticSearchService).search("люди под землей", 25);
     }
 }

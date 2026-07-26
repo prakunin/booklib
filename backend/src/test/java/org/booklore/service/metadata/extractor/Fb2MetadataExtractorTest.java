@@ -18,6 +18,7 @@ import java.time.Month;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 
@@ -108,6 +109,27 @@ class Fb2MetadataExtractorTest {
         assertThat(metadata.getTitle()).isEqualTo("Страдание");
         assertThat(metadata.getAuthors()).containsExactly("Лорел К. Гамильтон");
         assertThat(metadata.getSubtitle()).isEqualTo("Laurell K. Hamilton. «Affliction», 2013");
+    }
+
+    @Test
+    void recoversFromDotOnlyPlaceholderTitleInfo() throws IOException {
+        File file = writeFb2("""
+                <description>
+                  <title-info>
+                    <book-title>.</book-title>
+                    <author><last-name>..</last-name></author>
+                  </title-info>
+                </description>
+                <body><section>
+                  <p>Карл Ясперс</p>
+                  <p>«Вопрос о виновности»</p>
+                </section></body>
+                """);
+
+        BookMetadata metadata = extractor.extractMetadata(file);
+
+        assertThat(metadata.getTitle()).isEqualTo("Вопрос о виновности");
+        assertThat(metadata.getAuthors()).containsExactly("Карл Ясперс");
     }
 
     @Test
@@ -805,5 +827,46 @@ class Fb2MetadataExtractorTest {
         assertThat(metadata.getTitle()).isNull();
         assertThat(metadata.getAuthors()).isEmpty();
         assertThat(metadata.getCategories()).isEmpty();
+    }
+
+    @Nested
+    class OpeningText {
+
+        // The title page prints the identifying facts even when title-info is empty — this is the
+        // text the enrichment agent reads to name the book without a web search.
+        @Test
+        void readsBodyProseAndSkipsTheCoverBinary() throws IOException {
+            File file = writeFb2("""
+                    <description><title-info></title-info></description>
+                    <body>
+                      <p>Сергей Хантер</p>
+                      <p>Красные шатры. Книга 1</p>
+                      <p>Рассвет рыцаря</p>
+                      <p>Издательство АСТ, 2007</p>
+                    </body>
+                    <binary id="cover.jpg" content-type="image/jpeg">%s</binary>
+                    """.formatted(Base64.getEncoder().encodeToString(new byte[2048])));
+
+            Optional<String> opening = extractor.extractOpeningText(file, 2500);
+
+            assertThat(opening).isPresent();
+            assertThat(opening.orElseThrow())
+                    .contains("Сергей Хантер")
+                    .contains("Рассвет рыцаря")
+                    .contains("Издательство АСТ, 2007")
+                    .doesNotContain("image/jpeg");
+        }
+
+        @Test
+        void honoursTheCharacterCap() throws IOException {
+            File file = writeFb2("<body><p>" + "я".repeat(500) + "</p></body>");
+
+            assertThat(extractor.extractOpeningText(file, 100).orElseThrow()).hasSize(100);
+        }
+
+        @Test
+        void returnsEmptyForABodylessFile() throws IOException {
+            assertThat(extractor.extractOpeningText(writeFb2("<body/>"), 2500)).isEmpty();
+        }
     }
 }

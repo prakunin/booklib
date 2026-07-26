@@ -84,6 +84,20 @@ export class CommandPaletteService {
     ),
     {initialValue: [] as PaletteItem[]},
   );
+  // Deliberately kept out of `isSearching`: the semantic lookup embeds the query through Ollama and is
+  // an order of magnitude slower than the fulltext one. Gating the spinner on it would stall the whole
+  // palette behind it; instead the group is appended once it resolves.
+  private readonly semanticBookItems = toSignal(
+    toObservable(this.debouncedBookQuery).pipe(
+      switchMap(query => query.length < MIN_BOOK_SEARCH_LENGTH
+        ? of([])
+        : this.appBooksApi.semanticSearchBooks(query, BOOK_RESULT_LIMIT).pipe(
+          map(response => response.map(book => this.toPaletteBookItem(book, 'semanticBook'))),
+          catchError(() => of([])),
+        )),
+    ),
+    {initialValue: [] as PaletteItem[]},
+  );
 
   registerOverlayController(controller: CommandPaletteOverlayController): () => void {
     this.overlayController = controller;
@@ -161,6 +175,13 @@ export class CommandPaletteService {
     const bookItems = this.visibleBookItems();
     if (bookItems.length > 0) {
       groups.push({ kind: 'book', items: bookItems });
+    }
+
+    const lexicalBookIds = new Set(bookItems.map((item) => item.bookMeta?.bookId));
+    const semanticItems = this.visibleSemanticBookItems()
+      .filter((item) => !lexicalBookIds.has(item.bookMeta?.bookId));
+    if (semanticItems.length > 0) {
+      groups.push({ kind: 'semanticBook', items: semanticItems });
     }
 
     const defs: GroupDef[] = [
@@ -277,7 +298,14 @@ export class CommandPaletteService {
     this.trimmedQuery().length >= MIN_BOOK_SEARCH_LENGTH ? this.localBookItems() : []
   );
 
-  private toPaletteBookItem(book: AppBookQuickSearchResult): PaletteItem {
+  private readonly visibleSemanticBookItems = computed<PaletteItem[]>(() =>
+    this.trimmedQuery().length >= MIN_BOOK_SEARCH_LENGTH ? this.semanticBookItems() : []
+  );
+
+  private toPaletteBookItem(
+    book: AppBookQuickSearchResult,
+    kind: Extract<PaletteItemKind, 'book' | 'semanticBook'> = 'book',
+  ): PaletteItem {
     const title = book.title ?? book.primaryFileName ?? '';
     const authors = book.authors ?? [];
     const publishedDate = book.publishedDate ?? '';
@@ -286,14 +314,15 @@ export class CommandPaletteService {
     const isAudiobook = book.primaryFileType === 'AUDIOBOOK';
 
     return {
-      id: `book:${book.id}`,
-      kind: 'book',
+      id: `${kind}:${book.id}`,
+      kind,
       title,
       icon: { type: 'LUCIDE', value: 'book-open' },
       searchText: normalizeSearchTerm(haystack),
       route: ['/book', book.id],
       queryParams: { tab: 'view' },
       bookMeta: {
+        bookId: book.id,
         thumbnailUrl: isAudiobook
           ? this.urlHelper.getAudiobookThumbnailUrl(book.id, book.audiobookCoverUpdatedOn ?? undefined)
           : this.urlHelper.getThumbnailUrl(book.id, book.coverUpdatedOn ?? undefined),

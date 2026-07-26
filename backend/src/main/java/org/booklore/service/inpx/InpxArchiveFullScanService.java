@@ -153,8 +153,10 @@ public class InpxArchiveFullScanService {
         if (batch.isEmpty()) {
             return 0;
         }
+        List<InpxBookDto> immutableBatch = List.copyOf(batch);
+        batchWriter.prepareAuthors(immutableBatch, libraryId, caches);
         InpxBatchWriter.BatchResult result = batchWriter.persist(
-                List.copyOf(batch), libraryId, libraryPathId, caches);
+                immutableBatch, libraryId, libraryPathId, caches);
         batch.clear();
         return result.added();
     }

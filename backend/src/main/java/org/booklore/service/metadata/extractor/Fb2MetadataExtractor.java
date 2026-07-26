@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -256,6 +257,46 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     }
 
     /**
+     * The opening prose of the file — title page and first pages — up to {@code maxChars}. Only the
+     * document body is read (structured metadata and the base64 cover binaries are skipped), because
+     * that is where FB2 files digitised from scans print the author, title, series and publisher when
+     * the {@code title-info} block is empty. Returns empty when nothing readable is found.
+     */
+    public Optional<String> extractOpeningText(File file, int maxChars) {
+        try (InputStream inputStream = getInputStream(file)) {
+            StringBuilder text = new StringBuilder(Math.min(maxChars, 8192));
+            XMLStreamReader reader = createXmlStreamReader(inputStream);
+            try {
+                boolean inBody = false;
+                while (reader.hasNext() && text.length() < maxChars) {
+                    int event = reader.next();
+                    if (event == XMLStreamConstants.START_ELEMENT && "body".equals(reader.getLocalName())) {
+                        inBody = true;
+                    } else if (event == XMLStreamConstants.START_ELEMENT && inBody
+                            && "p".equals(reader.getLocalName())) {
+                        String paragraph = readElementText(reader).trim();
+                        if (!paragraph.isEmpty()) {
+                            if (text.length() > 0) {
+                                text.append('\n');
+                            }
+                            text.append(paragraph);
+                        }
+                    }
+                }
+            } finally {
+                reader.close();
+            }
+            if (text.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(text.length() > maxChars ? text.substring(0, maxChars) : text.toString());
+        } catch (Exception e) {
+            log.warn("Failed to extract opening text from FB2: {}", file.getName(), e);
+            return Optional.empty();
+        }
+    }
+
+    /**
      * A number of older FB2 files have broken title-info values (for example a
      * conversion filename and a converter name), while the actual title page in
      * the body is correct. Recover only when the structured values are clearly
@@ -304,13 +345,28 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
 
     private boolean isPlaceholderTitle(String title) {
         return StringUtils.isBlank(title)
+                || isDotPlaceholder(title)
                 || title.matches("(?i)^_?\\d+\\.(docx|fb2|epub|txt)$")
                 || title.toLowerCase(Locale.ROOT).contains("convertstandard.com");
     }
 
     private boolean hasPlaceholderAuthor(List<String> authors) {
         return authors == null || authors.isEmpty()
-                || authors.stream().anyMatch(author -> author.toLowerCase(Locale.ROOT).contains("convertstandard.com"));
+                || authors.stream().anyMatch(author ->
+                        isDotPlaceholder(author) || author.toLowerCase(Locale.ROOT).contains("convertstandard.com"));
+    }
+
+    /**
+     * Catalog conversions routinely blank a missing title-info field to a bare "." or "..", leaving the
+     * real value only on the body title page. A string made of nothing but dots is such a placeholder;
+     * any letter or digit means it is a real value and is left untouched.
+     */
+    private boolean isDotPlaceholder(String value) {
+        if (StringUtils.isBlank(value)) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return trimmed.chars().allMatch(ch -> ch == '.');
     }
 
     private boolean looksLikePersonName(String value) {

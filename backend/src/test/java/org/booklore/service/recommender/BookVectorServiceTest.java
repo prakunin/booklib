@@ -3,6 +3,7 @@ package org.booklore.service.recommender;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
+import org.booklore.model.entity.CategoryEntity;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +11,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -92,6 +94,49 @@ class BookVectorServiceTest {
         void returnsZeroVectorWhenMetadataMissing() {
             BookEntity book = BookEntity.builder().id(1L).build();
             assertThat(service.generateEmbedding(book)).containsOnly(0.0);
+        }
+
+        @Test
+        void preparesDeterministicMultilingualSemanticText() {
+            BookMetadataEntity metadata = BookMetadataEntity.builder()
+                    .title("Пикник на обочине")
+                    .authors(List.of(
+                            AuthorEntity.builder().name("Борис Стругацкий").build(),
+                            AuthorEntity.builder().name("Аркадий Стругацкий").build()))
+                    .categories(Set.of(CategoryEntity.builder().name("Научная фантастика").build()))
+                    .description("<p>Зона хранит <b>тайны</b>.</p>")
+                    .build();
+            BookEntity book = BookEntity.builder().id(42L).metadata(metadata).build();
+
+            var prepared = service.prepareSemanticEmbedding(book);
+
+            assertThat(prepared.text())
+                    .startsWith("title: Пикник на обочине | text: ")
+                    .contains("Authors: Аркадий Стругацкий, Борис Стругацкий")
+                    .contains("Categories: Научная фантастика")
+                    .contains("Description: Зона хранит тайны.")
+                    .doesNotContain("Represent this book")
+                    .doesNotContain("<p>", "<b>");
+            assertThat(prepared.contentHash()).matches("[0-9a-f]{64}");
+            assertThat(service.prepareSemanticEmbedding(book).contentHash())
+                    .isEqualTo(prepared.contentHash());
+        }
+
+        @Test
+        void usesEmbeddingGemmaDocumentFormatWhenOnlyTitleIsAvailable() {
+            BookEntity book = BookEntity.builder()
+                    .id(43L)
+                    .metadata(BookMetadataEntity.builder().title("Ночной Дозор").build())
+                    .build();
+
+            assertThat(service.prepareSemanticEmbedding(book).text())
+                    .isEqualTo("title: Ночной Дозор | text: Ночной Дозор");
+        }
+
+        @Test
+        void usesEmbeddingGemmaQueryFormatForSearchQueries() {
+            assertThat(service.buildSemanticQueryText("  постапокалипсис, люди под землей  "))
+                    .isEqualTo("task: search result | query: постапокалипсис, люди под землей");
         }
     }
 

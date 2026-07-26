@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.booklore.app.dto.*;
 import org.booklore.app.service.AppBookService;
 import org.booklore.app.service.AppBookQuickSearchService;
+import org.booklore.app.service.AppBookSemanticSearchService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -26,6 +27,7 @@ public class AppBookController {
 
     private final AppBookService mobileBookService;
     private final AppBookQuickSearchService quickSearchService;
+    private final AppBookSemanticSearchService semanticSearchService;
 
     @Operation(
             summary = "List app books",
@@ -137,6 +139,20 @@ public class AppBookController {
             @RequestParam(required = false, defaultValue = "50") @Min(1) @Max(50) Integer limit) {
 
         return ResponseEntity.ok(quickSearchService.search(q, limit));
+    }
+
+    @Operation(
+            summary = "Semantic search app books",
+            description = "Return books ranked by embedding similarity to the query. "
+                    + "Returns an empty list when semantic embeddings are not active or the embedder is unavailable.",
+            operationId = "appSemanticSearchBooks"
+    )
+    @GetMapping("/semantic-search")
+    public ResponseEntity<List<AppBookQuickSearchResult>> semanticSearchBooks(
+            @RequestParam @Size(min = 3, max = 200) String q,
+            @RequestParam(required = false, defaultValue = "50") @Min(1) @Max(50) Integer limit) {
+
+        return ResponseEntity.ok(semanticSearchService.search(q, limit));
     }
 
     @Operation(

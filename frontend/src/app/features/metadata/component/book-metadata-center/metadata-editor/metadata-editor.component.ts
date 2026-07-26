@@ -16,7 +16,7 @@ import {BookMetadataManageService} from "../../../../book/service/book-metadata-
 import {ProgressSpinner} from "primeng/progressspinner";
 import {Tooltip} from "primeng/tooltip";
 import {filter, finalize, take, tap} from "rxjs/operators";
-import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
+import {takeUntilDestroyed, toSignal} from "@angular/core/rxjs-interop";
 import {MetadataRefreshType} from "../../../model/request/metadata-refresh-type.enum";
 import {AutoComplete, AutoCompleteSelectEvent} from "primeng/autocomplete";
 import {DatePicker} from "primeng/datepicker";
@@ -33,6 +33,8 @@ import {MetadataProviderSpecificFields} from '../../../../../shared/model/app-se
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {CdkDragDrop, CdkDropList, CdkDrag, moveItemInArray} from '@angular/cdk/drag-drop';
 import {sortStrings} from '../../../../../shared/util/string-sort.util';
+import {SmartEnrichmentService} from '../../../service/smart-enrichment.service';
+import {MetadataFieldProposal, SmartEnrichmentDialogResult} from '../../../model/smart-enrichment.model';
 
 @Component({
   selector: "app-metadata-editor",
@@ -103,6 +105,7 @@ export class MetadataEditorComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly appSettingsService = inject(AppSettingsService);
   private readonly t = inject(TranslocoService);
+  protected readonly smartEnrichmentAvailable = toSignal(inject(SmartEnrichmentService).available$, {initialValue: false});
   private readonly uniqueMetadata = computed(() => this.bookService.uniqueMetadata());
 
   metadataForm: FormGroup;
@@ -1117,6 +1120,55 @@ export class MetadataEditorComponent implements OnInit {
       filter(result => !!result),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
+  }
+
+  /**
+   * Opens the agent in "form" mode: the accepted proposals come back as values instead of being
+   * written to the book. The editor patches them into the open form, marks it dirty, and leaves the
+   * user to review and Save — the same trust boundary as the Details tab, kept inside the form the
+   * user is already editing.
+   */
+  async openSmartEnrichment(book: Book): Promise<void> {
+    const ref = await this.bookDialogHelperService.openSmartEnrichmentDialog(book, 'form');
+    ref?.onClose.pipe(
+      take(1),
+      filter((result): result is SmartEnrichmentDialogResult => !!result?.proposals?.length),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe((result) => this.applyProposalsToForm(result.proposals));
+  }
+
+  private applyProposalsToForm(proposals: MetadataFieldProposal[]): void {
+    const patch: Record<string, unknown> = {};
+    for (const proposal of proposals) {
+      const control = this.metadataForm.get(proposal.field);
+      if (!control) {
+        // A field the agent proposes but this form has no control for is skipped rather than
+        // silently dropped into a patch the form ignores.
+        continue;
+      }
+      patch[proposal.field] = this.proposalValueForControl(proposal);
+    }
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+    this.metadataForm.patchValue(patch);
+    this.metadataForm.markAsDirty();
+  }
+
+  private proposalValueForControl(proposal: MetadataFieldProposal): unknown {
+    switch (proposal.field) {
+      case 'authors':
+        return [proposal.proposedValue];
+      case 'categories':
+        return sortStrings(proposal.proposedValue.split(',').map((item) => item.trim()).filter(Boolean));
+      case 'pageCount':
+      case 'seriesNumber':
+      case 'seriesTotal':
+      case 'goodreadsRating':
+        return Number(proposal.proposedValue);
+      default:
+        return proposal.proposedValue;
+    }
   }
 
   navigatePrevious(): void {

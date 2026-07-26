@@ -9,6 +9,105 @@
     <p class="settings-description" [innerHTML]="t('description')"></p>
   </div>
 
+  @if (isAdmin()) {
+    <div class="settings-card overview-card">
+      <div class="section-header overview-header">
+        <div>
+          <h3 class="section-title">
+            <i class="pi pi-chart-bar"></i>
+            {{ t('overview.sectionTitle') }}
+          </h3>
+          <p class="section-description">{{ t('overview.sectionDesc') }}</p>
+        </div>
+        <p-button
+          icon="pi pi-refresh"
+          severity="secondary"
+          outlined
+          [loading]="overviewLoading()"
+          [ariaLabel]="t('overview.refresh')"
+          (onClick)="refreshTaskOverview()">
+        </p-button>
+      </div>
+
+      <div class="overview-grid">
+        <section class="overview-panel">
+          <div class="overview-panel-title">
+            <span>
+              <i class="pi pi-spin pi-spinner"></i>
+              {{ t('overview.activeTitle') }}
+            </span>
+            <span class="overview-count">{{ taskOverview().activeTasks.length }}</span>
+          </div>
+
+          @if (taskOverview().activeTasks.length === 0) {
+            <div class="overview-empty">
+              <i class="pi pi-check-circle"></i>
+              {{ t('overview.noActive') }}
+            </div>
+          } @else {
+            <div class="overview-list">
+              @for (task of taskOverview().activeTasks; track task.taskId) {
+                <div class="overview-item active">
+                  <div class="overview-item-main">
+                    <span class="overview-item-name">{{ getTaskDisplayName(task.taskType) }}</span>
+                    <span class="status-badge running">{{ t('status.running') }}</span>
+                  </div>
+                  <div class="overview-item-detail">{{ getActiveTaskMessage(task) }}</div>
+                  @if (getActiveTaskProcessedCounts(task); as counts) {
+                    <div class="overview-item-processed">
+                      {{ t('overview.processed', counts) }}
+                    </div>
+                  }
+                  @if (getActiveTaskProgress(task) !== null) {
+                    <div class="overview-progress">
+                      <p-progressbar [value]="getActiveTaskProgress(task)!"></p-progressbar>
+                      <span>{{ getActiveTaskProgress(task) }}%</span>
+                    </div>
+                  }
+                  <div class="overview-item-meta">
+                    <span>{{ t('overview.startedAt') }} {{ formatDate(task.startedAt) }}</span>
+                    <code>{{ task.taskId }}</code>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </section>
+
+        <section class="overview-panel">
+          <div class="overview-panel-title">
+            <span>
+              <i class="pi pi-calendar-clock"></i>
+              {{ t('overview.scheduledTitle') }}
+            </span>
+            <span class="overview-count">{{ taskOverview().scheduledTasks.length }}</span>
+          </div>
+
+          @if (taskOverview().scheduledTasks.length === 0) {
+            <div class="overview-empty">
+              <i class="pi pi-calendar-times"></i>
+              {{ t('overview.noScheduled') }}
+            </div>
+          } @else {
+            <div class="overview-list">
+              @for (task of taskOverview().scheduledTasks; track task.taskType) {
+                <div class="overview-item scheduled">
+                  <div class="overview-item-main">
+                    <span class="overview-item-name">{{ getTaskDisplayName(task.taskType) }}</span>
+                    <code class="cron-value">{{ task.cronExpression }}</code>
+                  </div>
+                  <div class="overview-item-meta">
+                    <span>{{ t('overview.nextRun') }} {{ formatDate(task.nextRunAt) }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </section>
+      </div>
+    </div>
+  }
+
   <div class="settings-card">
     <div class="section-header">
       <h3 class="section-title">

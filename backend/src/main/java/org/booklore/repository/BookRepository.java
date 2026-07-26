@@ -873,6 +873,19 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     @Query("SELECT b FROM BookEntity b WHERE (b.deleted IS NULL OR b.deleted = false) ORDER BY b.id")
     List<BookEntity> findAllFullBooksBatch(Pageable pageable);
 
+    @EntityGraph(attributePaths = {"metadata", "metadata.comicMetadata"})
+    @Query("""
+            SELECT b FROM BookEntity b
+            WHERE (b.deleted IS NULL OR b.deleted = false)
+              AND b.id > :afterId
+            ORDER BY b.id
+            """)
+    List<BookEntity> findAllFullBooksAfterId(@Param("afterId") long afterId, Pageable pageable);
+
+    @Modifying
+    @Query("UPDATE BookEntity b SET b.similarBooksJson = null WHERE (b.deleted IS NULL OR b.deleted = false)")
+    int clearAllRecommendations();
+
     /**
      * Keyset-paginated candidates for bounded-memory on-demand recommendation generation.
      */

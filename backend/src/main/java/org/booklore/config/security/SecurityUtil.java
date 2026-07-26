@@ -25,6 +25,11 @@ public class SecurityUtil {
         return user != null && user.getPermissions().isAdmin();
     }
 
+    public boolean canManageGlobalPreferences() {
+        var user = getCurrentUser();
+        return user != null && user.getPermissions().isCanManageGlobalPreferences();
+    }
+
     public boolean isSelf(Long userId) {
         var user = getCurrentUser();
         return user != null && user.getId().equals(userId);

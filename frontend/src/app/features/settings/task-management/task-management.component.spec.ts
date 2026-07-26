@@ -17,6 +17,7 @@ import {
   TaskType,
 } from './task.service';
 import {TaskManagementComponent} from './task-management.component';
+import {UserService} from '../user-management/user.service';
 
 describe('TaskManagementComponent', () => {
   let fixture: ComponentFixture<TaskManagementComponent>;
@@ -24,6 +25,7 @@ describe('TaskManagementComponent', () => {
   let taskService: {
     getAvailableTasks: ReturnType<typeof vi.fn>;
     getLatestTasksForEachType: ReturnType<typeof vi.fn>;
+    getTaskOverview: ReturnType<typeof vi.fn>;
     taskProgress$: Observable<TaskProgressPayload | null>;
     startTask: ReturnType<typeof vi.fn>;
     cancelTask: ReturnType<typeof vi.fn>;
@@ -105,6 +107,14 @@ describe('TaskManagementComponent', () => {
       getLatestTasksForEachType: vi.fn(() => of({
         taskHistories: [pendingHistory],
       })),
+      getTaskOverview: vi.fn(() => of({
+        activeTasks: [{
+          taskId: 'task-1',
+          taskType: TaskType.CLEAR_PDF_CACHE,
+          startedAt: '2026-03-27T03:00:00Z',
+        }],
+        scheduledTasks: [],
+      })),
       taskProgress$: taskProgressSubject.asObservable(),
       startTask: vi.fn(() => of({
         type: TaskType.CLEAR_PDF_CACHE,
@@ -133,6 +143,12 @@ describe('TaskManagementComponent', () => {
         provideZonelessChangeDetection(),
         {provide: TaskService, useValue: taskService},
         {provide: MessageService, useValue: messageService},
+        {
+          provide: UserService,
+          useValue: {
+            currentUser: () => ({permissions: {admin: true}}),
+          },
+        },
       ],
     });
 
@@ -218,6 +234,67 @@ describe('TaskManagementComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('halfway there');
     expect(text).toContain('45%');
+  });
+
+  it('shows persisted progress in the administrator overview after page load', async () => {
+    vi.useRealTimers();
+    taskService.getLatestTasksForEachType.mockReturnValue(of({
+      taskHistories: [{
+        ...pendingHistory,
+        message: 'Generated semantic embeddings: 44416/701579 books',
+      }],
+    }));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const overview = (fixture.nativeElement as HTMLElement).querySelector('.overview-card');
+    expect(overview?.textContent).toContain('Generated semantic embeddings: 44416/701579 books');
+    expect(overview?.textContent).toContain('10%');
+    expect(overview?.textContent).toContain('settingsTasks.overview.processed:{"processed":"44,416","total":"701,579"}');
+  });
+
+  it('refreshes both task overview and persisted progress when requested', () => {
+    component.ngOnInit();
+    taskService.getLatestTasksForEachType.mockReturnValue(of({
+      taskHistories: [{
+        ...pendingHistory,
+        progressPercentage: 55,
+        message: 'Generated semantic embeddings: 385868/701579 books',
+      }],
+    }));
+
+    component.refreshTaskOverview();
+
+    expect(taskService.getTaskOverview).toHaveBeenCalledTimes(2);
+    expect(taskService.getLatestTasksForEachType).toHaveBeenCalledTimes(2);
+    expect(component.getActiveTaskProgress(component.taskOverview().activeTasks[0])).toBe(55);
+    expect(component.getActiveTaskProcessedCounts(component.taskOverview().activeTasks[0])).toEqual({
+      processed: '385,868',
+      total: '701,579',
+    });
+    expect(component.overviewLoading()).toBe(false);
+  });
+
+  it('polls persisted progress while an administrator task is active', () => {
+    component.ngOnInit();
+    const overviewCallsBeforePolling = taskService.getTaskOverview.mock.calls.length;
+    const latestCallsBeforePolling = taskService.getLatestTasksForEachType.mock.calls.length;
+    taskService.getLatestTasksForEachType.mockReturnValue(of({
+      taskHistories: [{
+        ...pendingHistory,
+        progressPercentage: 61,
+        message: 'Generated semantic embeddings: 427984/701579 books',
+      }],
+    }));
+
+    vi.advanceTimersByTime(5000);
+
+    expect(taskService.getTaskOverview.mock.calls.length).toBeGreaterThan(overviewCallsBeforePolling);
+    expect(taskService.getLatestTasksForEachType.mock.calls.length).toBeGreaterThan(latestCallsBeforePolling);
+    expect(component.getActiveTaskProgress(component.taskOverview().activeTasks[0])).toBe(61);
+    expect(component.getActiveTaskMessage(component.taskOverview().activeTasks[0]))
+      .toBe('Generated semantic embeddings: 427984/701579 books');
   });
 
   it('distinguishes running, stale, and cancellable tasks', () => {

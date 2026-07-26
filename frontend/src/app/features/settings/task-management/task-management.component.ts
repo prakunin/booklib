@@ -1,4 +1,4 @@
-import {Component, DestroyRef, inject, OnInit, signal} from '@angular/core';
+import {Component, computed, DestroyRef, inject, OnInit, signal} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Button} from 'primeng/button';
 import {ProgressBar} from 'primeng/progressbar';
@@ -6,6 +6,7 @@ import {MessageService} from 'primeng/api';
 import {Select} from 'primeng/select';
 import {FormsModule} from '@angular/forms';
 import {
+  ActiveTaskOverview,
   LibraryRescanOptions,
   MetadataReplaceMode,
   TASK_TYPE_CONFIG,
@@ -13,18 +14,20 @@ import {
   TaskCronConfigRequest,
   TaskHistory,
   TaskInfo,
+  TaskOverview,
   TaskProgressPayload,
   TaskService,
   TaskStatus,
   TaskType
 } from './task.service';
 import {MetadataRefreshRequest} from '../../metadata/model/request/metadata-refresh-request.model';
-import {finalize, forkJoin} from 'rxjs';
+import {catchError, EMPTY, exhaustMap, finalize, forkJoin, of, timer} from 'rxjs';
 import {ExternalDocLinkComponent} from '../../../shared/components/external-doc-link/external-doc-link.component';
 import {ToggleSwitch} from 'primeng/toggleswitch';
 import {Tooltip} from 'primeng/tooltip';
 import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
 import {NgClass} from '@angular/common';
+import {UserService} from '../user-management/user.service';
 
 @Component({
   selector: 'app-task-management',
@@ -48,13 +51,17 @@ export class TaskManagementComponent implements OnInit {
   // Services
   private readonly messageService = inject(MessageService);
   private readonly taskService = inject(TaskService);
+  private readonly userService = inject(UserService);
   private readonly t = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
 
   // State
   taskInfos: TaskInfo[] = [];
   private readonly taskHistoriesByType = signal(new Map<string, TaskHistory>());
+  readonly taskOverview = signal<TaskOverview>({activeTasks: [], scheduledTasks: []});
   readonly loading = signal(false);
+  readonly overviewLoading = signal(false);
+  readonly isAdmin = computed(() => !!this.userService.currentUser()?.permissions.admin);
   private readonly executingTaskTypes = signal(new Set<string>());
 
   // Metadata Replace Options
@@ -91,6 +98,7 @@ export class TaskManagementComponent implements OnInit {
   ngOnInit(): void {
     this.loadTasks();
     this.subscribeToTaskProgress();
+    this.subscribeToTaskOverviewPolling();
   }
 
   // ============================================================================
@@ -102,19 +110,75 @@ export class TaskManagementComponent implements OnInit {
 
     forkJoin({
       available: this.taskService.getAvailableTasks(),
-      latest: this.taskService.getLatestTasksForEachType()
+      latest: this.taskService.getLatestTasksForEachType(),
+      overview: this.isAdmin()
+        ? this.taskService.getTaskOverview()
+        : of({activeTasks: [], scheduledTasks: []})
     })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: ({available, latest}) => {
+        next: ({available, latest, overview}) => {
           this.taskInfos = this.sortTasksByDisplayOrder(available);
           this.taskHistoriesByType.set(new Map<string, TaskHistory>(latest.taskHistories.map(history => [history.type, history])));
+          this.taskOverview.set(overview);
         },
         error: (error) => {
           console.error('Error loading tasks:', error);
           this.showMessage('error', this.t.translate('common.error'), this.t.translate('settingsTasks.toast.loadError'));
         }
       });
+  }
+
+  refreshTaskOverview(): void {
+    if (!this.isAdmin()) {
+      return;
+    }
+    this.overviewLoading.set(true);
+    this.loadTaskOverview()
+      .pipe(finalize(() => this.overviewLoading.set(false)))
+      .subscribe({
+        next: ({overview, latest}) => {
+          this.taskOverview.set(overview);
+          this.setTaskHistories(latest.taskHistories);
+        },
+        error: error => {
+          console.error('Error loading task overview:', error);
+          this.showMessage('error', this.t.translate('common.error'), this.t.translate('settingsTasks.toast.overviewLoadError'));
+        }
+      });
+  }
+
+  private subscribeToTaskOverviewPolling(): void {
+    timer(5000, 5000).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      exhaustMap(() => {
+        if (!this.isAdmin() || this.taskOverview().activeTasks.length === 0) {
+          return EMPTY;
+        }
+        return this.loadTaskOverview().pipe(
+          catchError(error => {
+            console.error('Error polling task overview:', error);
+            return EMPTY;
+          })
+        );
+      })
+    ).subscribe(({overview, latest}) => {
+      this.taskOverview.set(overview);
+      this.setTaskHistories(latest.taskHistories);
+    });
+  }
+
+  private loadTaskOverview() {
+    return forkJoin({
+      overview: this.taskService.getTaskOverview(),
+      latest: this.taskService.getLatestTasksForEachType()
+    });
+  }
+
+  private setTaskHistories(histories: TaskHistory[]): void {
+    this.taskHistoriesByType.set(new Map<string, TaskHistory>(
+      histories.map(history => [history.type, history])
+    ));
   }
 
   private subscribeToTaskProgress(): void {
@@ -365,6 +429,7 @@ export class TaskManagementComponent implements OnInit {
           if (taskInfoIndex !== -1) {
             this.taskInfos[taskInfoIndex].cronConfig = updatedConfig;
           }
+          this.refreshTaskOverview();
           this.showMessage('success', this.t.translate('common.success'), this.t.translate('settingsTasks.cron.updateSuccess'));
         },
         error: (error) => {
@@ -503,6 +568,34 @@ export class TaskManagementComponent implements OnInit {
 
   getTaskHistory(taskType: string): TaskHistory | undefined {
     return this.taskHistoriesByType().get(taskType);
+  }
+
+  getActiveTaskProgress(task: ActiveTaskOverview): number | null {
+    const history = this.getTaskHistory(task.taskType);
+    return history?.id === task.taskId ? history.progressPercentage : null;
+  }
+
+  getActiveTaskMessage(task: ActiveTaskOverview): string {
+    const history = this.getTaskHistory(task.taskType);
+    return history?.id === task.taskId && history.message
+      ? history.message
+      : this.t.translate('settingsTasks.progress.processing');
+  }
+
+  getActiveTaskProcessedCounts(task: ActiveTaskOverview): {processed: string; total: string} | null {
+    const history = this.getTaskHistory(task.taskType);
+    if (history?.id !== task.taskId || !history.message) {
+      return null;
+    }
+    const match = history.message.match(/(\d+)\s*\/\s*(\d+)/);
+    if (!match) {
+      return null;
+    }
+    const formatter = new Intl.NumberFormat();
+    return {
+      processed: formatter.format(Number(match[1])),
+      total: formatter.format(Number(match[2]))
+    };
   }
 
   getTaskProgressPercentage(taskType: string): number | null {

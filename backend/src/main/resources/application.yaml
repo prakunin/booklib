@@ -22,6 +22,22 @@ app:
   force-disable-oidc: ${FORCE_DISABLE_OIDC:false}
   disk-type: ${DISK_TYPE:LOCAL}
 
+recommendations:
+  embedding:
+    ollama-base-url: ${RECOMMENDATION_OLLAMA_BASE_URL:http://host.docker.internal:11434}
+    model: ${RECOMMENDATION_EMBEDDING_MODEL:embeddinggemma:300m}
+    dimensions: ${RECOMMENDATION_EMBEDDING_DIMENSIONS:512}
+    batch-size: ${RECOMMENDATION_EMBEDDING_BATCH_SIZE:64}
+
+smart-enrichment:
+  enabled: ${SMART_ENRICHMENT_ENABLED:false}
+  binary-path: ${SMART_ENRICHMENT_BINARY:agy}
+  model: ${SMART_ENRICHMENT_MODEL:}
+  effort: ${SMART_ENRICHMENT_EFFORT:}
+  timeout: ${SMART_ENRICHMENT_TIMEOUT:4m}
+  working-directory: ${SMART_ENRICHMENT_WORKDIR:/tmp}
+  auth-token-path: ${SMART_ENRICHMENT_AUTH_TOKEN_PATH:${user.home}/.gemini/antigravity-cli/antigravity-oauth-token}
+
 server:
   forward-headers-strategy: native
   port: ${BOOKLORE_PORT:6060}

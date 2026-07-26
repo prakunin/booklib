@@ -241,6 +241,14 @@ export class AppBooksApiService {
     return this.http.get<AppBookQuickSearchResult[]>(`${this.booksUrl}/quick-search`, {params});
   }
 
+  semanticSearchBooks(query: string, limit = 50): Observable<AppBookQuickSearchResult[]> {
+    const params = new HttpParams()
+      .set('q', query.trim())
+      .set('limit', Math.max(1, Math.min(limit, 50)).toString());
+
+    return this.http.get<AppBookQuickSearchResult[]>(`${this.booksUrl}/semantic-search`, {params});
+  }
+
   getContinueReading(limit = 10): Observable<Book[]> {
     return this.getSummaryList('continue-reading', limit);
   }

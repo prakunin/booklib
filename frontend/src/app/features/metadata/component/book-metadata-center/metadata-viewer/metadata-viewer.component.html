@@ -705,6 +705,18 @@
                     tooltipPosition="top"
                     class="mobile-icon-only">
                   </p-button>
+                  @if (smartEnrichmentAvailable()) {
+                    <p-button
+                      [label]="t('smartEnrichBtn')"
+                      icon="pi pi-sparkles"
+                      [outlined]="true"
+                      severity="help"
+                      (onClick)="openSmartEnrichment(book!)"
+                      [pTooltip]="t('smartEnrichTooltip')"
+                      tooltipPosition="top"
+                      class="mobile-icon-only">
+                    </p-button>
+                  }
                 }
                 @if (otherItems().length > 0) {
                   <p-button icon="pi pi-ellipsis-v" severity="info" outlined (click)="entitymenu.toggle($event)"></p-button>

@@ -5,10 +5,7 @@ import org.booklore.app.dto.AppBookQuickSearchResult;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.Library;
-import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
-import org.booklore.model.entity.BookFileEntity;
-import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.UserContentRestrictionEntity;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.UserContentRestrictionRepository;
@@ -102,7 +99,7 @@ public class AppBookQuickSearchService {
         return visibleIds.stream()
                 .map(books::get)
                 .filter(Objects::nonNull)
-                .map(this::toResult)
+                .map(AppBookSearchResultMapper::toResult)
                 .toList();
     }
 
@@ -143,22 +140,4 @@ public class AppBookQuickSearchService {
         return user.getAssignedLibraries().stream().map(Library::getId).collect(Collectors.toSet());
     }
 
-    private AppBookQuickSearchResult toResult(BookEntity book) {
-        BookMetadataEntity metadata = book.getMetadata();
-        BookFileEntity primaryFile = book.getPrimaryBookFile();
-        return AppBookQuickSearchResult.builder()
-                .id(book.getId())
-                .title(metadata == null ? null : metadata.getTitle())
-                .authors(metadata == null || metadata.getAuthors() == null
-                        ? List.of()
-                        : metadata.getAuthors().stream().map(AuthorEntity::getName).toList())
-                .seriesName(metadata == null ? null : metadata.getSeriesName())
-                .seriesNumber(metadata == null ? null : metadata.getSeriesNumber())
-                .publishedDate(metadata == null ? null : metadata.getPublishedDate())
-                .primaryFileType(primaryFile == null ? null : primaryFile.getBookType().name())
-                .primaryFileName(primaryFile == null ? null : primaryFile.getFileName())
-                .coverUpdatedOn(metadata == null ? null : metadata.getCoverUpdatedOn())
-                .audiobookCoverUpdatedOn(metadata == null ? null : metadata.getAudiobookCoverUpdatedOn())
-                .build();
-    }
 }

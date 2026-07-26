@@ -7,8 +7,9 @@ import org.booklore.model.dto.BookRecommendationLite;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
+import org.booklore.repository.BookEmbeddingVectorRepository;
 import org.booklore.repository.BookRepository;
-import org.booklore.repository.projection.BookEmbeddingProjection;
+import org.booklore.repository.projection.BookEmbeddingCandidate;
 import org.booklore.service.book.BookQueryService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,8 @@ public class BookRecommendationComputationService {
     private final BookVectorService vectorService;
     private final BookRepository bookRepository;
     private final BookQueryService bookQueryService;
+    private final BookEmbeddingVectorRepository embeddingVectorRepository;
+    private final BookSemanticEmbeddingService semanticEmbeddingService;
 
     public void computeAndStore(long bookId, int limit) {
         BookEntity target = bookRepository.findByIdWithMetadata(bookId)
@@ -36,13 +39,25 @@ public class BookRecommendationComputationService {
         int candidateLimit = Math.max(limit, limit * CANDIDATE_MULTIPLIER);
         PriorityQueue<ScoredCandidate> topCandidates = new PriorityQueue<>(Comparator.comparingDouble(ScoredCandidate::score));
 
-        String targetVectorJson = Optional.ofNullable(target.getMetadata())
-                .map(BookMetadataEntity::getEmbeddingVector)
-                .orElse(null);
-        double[] targetVector = vectorService.deserializeVector(targetVectorJson);
+        String activeModel = embeddingVectorRepository.activeModel();
+        boolean semantic = activeModel != null
+                && !BookEmbeddingVectorRepository.MODEL_VERSION.equals(activeModel);
+        String targetVectorJson = semantic
+                ? activeSemanticVector(target, activeModel)
+                : Optional.ofNullable(target.getMetadata())
+                        .map(BookMetadataEntity::getEmbeddingVector)
+                        .orElse(null);
 
-        if (targetVector != null) {
-            scoreEmbeddingCandidates(bookId, target, targetVector, candidateLimit, topCandidates);
+        if (targetVectorJson != null && (!semantic
+                ? vectorService.deserializeVector(targetVectorJson) != null
+                : true)) {
+            scoreEmbeddingCandidates(
+                    bookId,
+                    target,
+                    targetVectorJson,
+                    candidateLimit,
+                    semantic ? activeModel : null,
+                    topCandidates);
         } else {
             scoreEntityCandidates(bookId, target, candidateLimit, topCandidates);
         }
@@ -50,6 +65,13 @@ public class BookRecommendationComputationService {
         Set<BookRecommendationLite> recommendations = selectRecommendations(topCandidates, limit);
         bookQueryService.saveRecommendations(bookId, recommendations);
         log.info("Computed {} recommendations for book {} using bounded batches", recommendations.size(), bookId);
+    }
+
+    private String activeSemanticVector(BookEntity target, String activeModel) {
+        if (semanticEmbeddingService.modelVersion().equals(activeModel)) {
+            return semanticEmbeddingService.ensureEmbedding(target).orElse(null);
+        }
+        return embeddingVectorRepository.findSemanticVectorJson(target.getId(), activeModel).orElse(null);
     }
 
     private void scoreEntityCandidates(long bookId, BookEntity target, int candidateLimit,
@@ -77,30 +99,21 @@ public class BookRecommendationComputationService {
         }
     }
 
-    private void scoreEmbeddingCandidates(long bookId, BookEntity target, double[] targetVector, int candidateLimit,
+    private void scoreEmbeddingCandidates(long bookId, BookEntity target, String targetVectorJson, int candidateLimit,
+                                          String semanticModelVersion,
                                           PriorityQueue<ScoredCandidate> topCandidates) {
         String targetSeries = normalizedSeries(target);
-        long afterId = 0;
-        while (true) {
-            List<BookEmbeddingProjection> batch = bookQueryService.getEmbeddingCandidatesAfterId(
-                    bookId, afterId, PageRequest.of(0, BATCH_SIZE));
-            if (batch.isEmpty()) {
-                return;
+        int annLimit = Math.max(candidateLimit, candidateLimit * 2);
+        List<BookEmbeddingCandidate> candidates = embeddingVectorRepository.findNearestCandidates(
+                bookId, targetVectorJson, annLimit, semanticModelVersion);
+        for (BookEmbeddingCandidate candidate : candidates) {
+            String candidateSeries = Optional.ofNullable(candidate.seriesName()).map(String::toLowerCase).orElse(null);
+            if (targetSeries != null && targetSeries.equals(candidateSeries)) {
+                continue;
             }
-
-            for (BookEmbeddingProjection candidate : batch) {
-                afterId = Math.max(afterId, candidate.getBookId());
-                String candidateSeries = Optional.ofNullable(candidate.getSeriesName()).map(String::toLowerCase).orElse(null);
-                if (targetSeries != null && targetSeries.equals(candidateSeries)) {
-                    continue;
-                }
-                double[] candidateVector = vectorService.deserializeVector(candidate.getEmbeddingVector());
-                double score = vectorService.cosineSimilarity(targetVector, candidateVector);
-                if (score > 0.1) {
-                    retainCandidate(topCandidates, new ScoredCandidate(candidate.getBookId(), score), candidateLimit);
-                }
+            if (candidate.score() > 0.1) {
+                retainCandidate(topCandidates, new ScoredCandidate(candidate.bookId(), candidate.score()), candidateLimit);
             }
-
         }
     }
 

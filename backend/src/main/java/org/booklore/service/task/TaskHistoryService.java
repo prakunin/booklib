@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -92,6 +93,22 @@ public class TaskHistoryService {
             if (status == TaskStatus.COMPLETED || status == TaskStatus.FAILED) {
                 task.setCompletedAt(LocalDateTime.now(ZoneId.systemDefault()));
                 task.setProgressPercentage(100);
+            }
+
+            taskHistoryRepository.save(task);
+        });
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateTaskProgress(String taskId, TaskStatus status, int progressPercentage, String message) {
+        taskHistoryRepository.findById(taskId).ifPresent(task -> {
+            task.setStatus(status);
+            task.setProgressPercentage(Math.max(0, Math.min(100, progressPercentage)));
+            task.setMessage(message);
+            task.setUpdatedAt(LocalDateTime.now(ZoneId.systemDefault()));
+
+            if (status == TaskStatus.COMPLETED || status == TaskStatus.FAILED) {
+                task.setCompletedAt(LocalDateTime.now(ZoneId.systemDefault()));
             }
 
             taskHistoryRepository.save(task);

@@ -2,32 +2,38 @@ package org.booklore.task.tasks;
 
 import org.booklore.exception.APIException;
 import org.booklore.model.dto.BookLoreUser;
-import org.booklore.model.dto.BookRecommendationLite;
 import org.booklore.model.dto.request.TaskCreateRequest;
 import org.booklore.model.dto.response.TaskCreateResponse;
 import org.booklore.model.entity.BookEntity;
-import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.enums.TaskType;
 import org.booklore.model.websocket.Topic;
+import org.booklore.repository.BookEmbeddingVectorRepository;
 import org.booklore.service.NotificationService;
 import org.booklore.service.book.BookQueryService;
-import org.booklore.service.recommender.BookVectorService;
+import org.booklore.service.recommender.BookSemanticEmbeddingService;
 import org.booklore.task.TaskCancellationManager;
 import org.booklore.task.TaskStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class BookRecommendationUpdaterTaskTest {
@@ -35,17 +41,15 @@ class BookRecommendationUpdaterTaskTest {
     @Mock
     private BookQueryService bookQueryService;
     @Mock
-    private BookVectorService vectorService;
+    private BookSemanticEmbeddingService semanticEmbeddingService;
+    @Mock
+    private BookEmbeddingVectorRepository embeddingRepository;
     @Mock
     private NotificationService notificationService;
     @Mock
     private TaskCancellationManager cancellationManager;
-
     @InjectMocks
     private BookRecommendationUpdaterTask task;
-
-    @Captor
-    private ArgumentCaptor<Map<Long, Set<BookRecommendationLite>>> recommendationsCaptor;
 
     private BookLoreUser user;
     private TaskCreateRequest request;
@@ -60,120 +64,90 @@ class BookRecommendationUpdaterTaskTest {
     }
 
     @Test
-    void validatePermissions_shouldThrowException_whenUserCannotAccessTaskManager() {
+    void validatePermissionsThrowsWhenUserCannotAccessTaskManager() {
         user.getPermissions().setCanAccessTaskManager(false);
         assertThrows(APIException.class, () -> task.validatePermissions(user, request));
     }
 
     @Test
-    void execute_shouldHandleEmptyBookList() {
-        when(bookQueryService.countAllNonDeleted()).thenReturn(0L);
-        when(bookQueryService.getAllFullBookEntitiesBatch(any())).thenReturn(Collections.emptyList());
+    void stagesInKeysetBatchesAndActivatesOnlyAfterFullCoverage() {
+        BookEntity first = BookEntity.builder().id(10L).build();
+        BookEntity second = BookEntity.builder().id(20L).build();
+        when(bookQueryService.countAllNonDeleted()).thenReturn(2L);
+        when(bookQueryService.getAllFullBookEntitiesAfterId(eq(0L), any(Pageable.class)))
+                .thenReturn(List.of(first, second));
+        when(bookQueryService.getAllFullBookEntitiesAfterId(eq(20L), any(Pageable.class)))
+                .thenReturn(Collections.emptyList());
+        when(semanticEmbeddingService.updateEmbeddings(List.of(first, second))).thenReturn(Set.of(10L, 20L));
+        when(semanticEmbeddingService.modelVersion()).thenReturn("qwen3-128-v1");
+        when(embeddingRepository.countSemanticEmbeddingsForActiveBooks("qwen3-128-v1")).thenReturn(2L);
+        when(embeddingRepository.activateSemantic("qwen3-128-v1")).thenReturn(true);
 
         TaskCreateResponse response = task.execute(request);
 
-        assertEquals(TaskType.UPDATE_BOOK_RECOMMENDATIONS, response.getTaskType());
-        verify(bookQueryService).countAllNonDeleted();
-        verify(bookQueryService).getAllFullBookEntitiesBatch(any());
-        verify(bookQueryService).saveRecommendationsInBatches(eq(Collections.emptyMap()), anyInt());
+        assertEquals(TaskStatus.COMPLETED, response.getStatus());
+        verify(bookQueryService).clearAllRecommendations();
         verify(notificationService, atLeastOnce()).sendMessage(eq(Topic.TASK_PROGRESS), any());
     }
 
     @Test
-    void execute_shouldProcessBooks() {
-        BookEntity book1 = BookEntity.builder().id(1L).metadata(BookMetadataEntity.builder().title("B1").build()).build();
-        BookEntity book2 = BookEntity.builder().id(2L).metadata(BookMetadataEntity.builder().title("B2").build()).build();
-        List<BookEntity> books = List.of(book1, book2);
-
-        when(bookQueryService.countAllNonDeleted()).thenReturn(2L);
-        when(bookQueryService.getAllFullBookEntitiesBatch(any())).thenReturn(books).thenReturn(Collections.emptyList());
-        when(vectorService.generateEmbedding(any())).thenReturn(new double[]{0.1, 0.2});
-        when(vectorService.serializeVector(any())).thenReturn("[0.1, 0.2]");
-        when(vectorService.cosineSimilarity(any(), any())).thenReturn(0.9);
-        when(vectorService.findTopKSimilar(any(), anyList(), anyInt())).thenAnswer(invocation -> {
-            List<BookVectorService.ScoredBook> candidates = invocation.getArgument(1);
-            return candidates.isEmpty() ? new ArrayList<>() : List.of(candidates.getFirst());
-        });
-
-        TaskCreateResponse response = task.execute(request);
-
-        assertEquals("task-123", response.getTaskId());
-        assertEquals(TaskStatus.COMPLETED, response.getStatus());
-
-        verify(bookQueryService).compareAndSaveEmbeddings(any());
-        verify(vectorService, times(2)).generateEmbedding(any());
-        verify(bookQueryService).saveRecommendationsInBatches(recommendationsCaptor.capture(), anyInt());
-
-        Map<Long, Set<BookRecommendationLite>> recommendations = recommendationsCaptor.getValue();
-        assertNotNull(recommendations);
-        assertEquals(2, recommendations.size(), "Should have recommendations for both books");
-        assertTrue(recommendations.containsKey(1L), "Should have recommendations for book 1");
-        assertTrue(recommendations.containsKey(2L), "Should have recommendations for book 2");
-        // Each book should recommend the other
-        recommendations.values().forEach(recs ->
-                assertFalse(recs.isEmpty(), "Each book should have at least one recommendation"));
-    }
-
-    @Test
-    void execute_shouldFail_whenEmbeddingGenerationThrows() {
-        BookEntity book1 = BookEntity.builder().id(1L).metadata(BookMetadataEntity.builder().title("B1").build()).build();
-
+    void invalidatesRecommendationCacheWhenActiveEmbeddingsChange() {
+        BookEntity book = BookEntity.builder().id(10L).build();
         when(bookQueryService.countAllNonDeleted()).thenReturn(1L);
-        when(bookQueryService.getAllFullBookEntitiesBatch(any())).thenReturn(List.of(book1));
-        when(vectorService.generateEmbedding(any())).thenThrow(new RuntimeException("Embedding failed"));
+        when(semanticEmbeddingService.modelVersion()).thenReturn("qwen3-128-v1");
+        when(embeddingRepository.activeModel()).thenReturn("qwen3-128-v1");
+        when(bookQueryService.getAllFullBookEntitiesAfterId(eq(0L), any(Pageable.class)))
+                .thenReturn(List.of(book));
+        when(bookQueryService.getAllFullBookEntitiesAfterId(eq(10L), any(Pageable.class)))
+                .thenReturn(Collections.emptyList());
+        when(semanticEmbeddingService.updateEmbeddings(List.of(book))).thenReturn(Set.of(10L));
+        when(embeddingRepository.countSemanticEmbeddingsForActiveBooks("qwen3-128-v1")).thenReturn(1L);
 
-        assertThrows(RuntimeException.class, () -> task.execute(request));
+        task.execute(request);
+
+        verify(bookQueryService).clearAllRecommendations();
     }
 
     @Test
-    void execute_shouldStopWithoutWork_whenTaskCancelledBeforeStart() {
+    void cancellationLeavesStagingUntouchedAndDoesNotActivate() {
         when(bookQueryService.countAllNonDeleted()).thenReturn(5L);
+        when(semanticEmbeddingService.modelVersion()).thenReturn("qwen3-128-v1");
         when(cancellationManager.isTaskCancelled("task-123")).thenReturn(true);
 
         TaskCreateResponse response = task.execute(request);
 
         assertEquals(TaskStatus.CANCELLED, response.getStatus());
-        verify(bookQueryService, never()).getAllFullBookEntitiesBatch(any());
-        verify(bookQueryService, never()).saveRecommendationsInBatches(any(), anyInt());
+        verify(bookQueryService, never()).getAllFullBookEntitiesAfterId(anyLong(), any(Pageable.class));
+        verify(embeddingRepository, never()).activateSemantic(any());
+        verify(bookQueryService, never()).clearAllRecommendations();
     }
 
     @Test
-    void execute_shouldPersistEmbeddingsButNotRecommendations_whenCancelledAfterEmbeddingPhase() {
-        BookEntity book1 = BookEntity.builder().id(1L).metadata(BookMetadataEntity.builder().title("B1").build()).build();
-
-        when(bookQueryService.countAllNonDeleted()).thenReturn(1L);
-        when(bookQueryService.getAllFullBookEntitiesBatch(any())).thenReturn(List.of(book1)).thenReturn(Collections.emptyList());
-        when(vectorService.generateEmbedding(any())).thenReturn(new double[]{0.1});
-        when(vectorService.serializeVector(any())).thenReturn("[0.1]");
-        when(vectorService.findTopKSimilar(any(), anyList(), anyInt())).thenReturn(List.of());
-        // The single small batch breaks the embedding loop after one check; false for that and the
-        // similarity-loop check, then true at the pre-save checkpoint.
-        when(cancellationManager.isTaskCancelled("task-123")).thenReturn(false, false, true);
-
-        TaskCreateResponse response = task.execute(request);
-
-        assertEquals(TaskStatus.CANCELLED, response.getStatus());
-        // Per-batch embeddings are idempotent and already persisted...
-        verify(bookQueryService).compareAndSaveEmbeddings(any());
-        // ...but the final recommendation set is not published on cancellation.
-        verify(bookQueryService, never()).saveRecommendationsInBatches(any(), anyInt());
-    }
-
-    @Test
-    void execute_shouldContinue_whenSimilarityCalculationThrows() {
-        BookEntity book1 = BookEntity.builder().id(1L).metadata(BookMetadataEntity.builder().title("B1").build()).build();
-        BookEntity book2 = BookEntity.builder().id(2L).metadata(BookMetadataEntity.builder().title("B2").build()).build();
-        List<BookEntity> books = List.of(book1, book2);
-
+    void refusesActivationWhenCoverageIsIncomplete() {
         when(bookQueryService.countAllNonDeleted()).thenReturn(2L);
-        when(bookQueryService.getAllFullBookEntitiesBatch(any())).thenReturn(books).thenReturn(Collections.emptyList());
-        when(vectorService.generateEmbedding(any())).thenReturn(new double[]{0.1});
-        when(vectorService.serializeVector(any())).thenReturn("[0.1]");
-        when(vectorService.cosineSimilarity(any(), any())).thenThrow(new RuntimeException("Math error"));
+        when(semanticEmbeddingService.modelVersion()).thenReturn("qwen3-128-v1");
+        when(bookQueryService.getAllFullBookEntitiesAfterId(eq(0L), any(Pageable.class)))
+                .thenReturn(Collections.emptyList());
+        when(embeddingRepository.countSemanticEmbeddingsForActiveBooks("qwen3-128-v1")).thenReturn(1L);
+
+        assertThrows(IllegalStateException.class, () -> task.execute(request));
+
+        verify(embeddingRepository, never()).activateSemantic(any());
+        verify(bookQueryService, never()).clearAllRecommendations();
+    }
+
+    @Test
+    void handlesEmptyLibrary() {
+        when(bookQueryService.countAllNonDeleted()).thenReturn(0L);
+        when(bookQueryService.getAllFullBookEntitiesAfterId(eq(0L), any(Pageable.class)))
+                .thenReturn(Collections.emptyList());
+        when(semanticEmbeddingService.modelVersion()).thenReturn("qwen3-128-v1");
+        when(embeddingRepository.countSemanticEmbeddingsForActiveBooks("qwen3-128-v1")).thenReturn(0L);
+        when(embeddingRepository.activateSemantic("qwen3-128-v1")).thenReturn(true);
 
         TaskCreateResponse response = task.execute(request);
 
+        assertEquals(TaskType.UPDATE_BOOK_RECOMMENDATIONS, response.getTaskType());
         assertEquals(TaskStatus.COMPLETED, response.getStatus());
-        verify(bookQueryService).saveRecommendationsInBatches(any(Map.class), anyInt());
     }
 }

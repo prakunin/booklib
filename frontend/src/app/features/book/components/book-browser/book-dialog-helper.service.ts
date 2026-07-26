@@ -2,6 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {DynamicDialogRef} from 'primeng/dynamicdialog';
 import {DialogLauncherService, DialogSize, DialogStyle} from '../../../../shared/services/dialog-launcher.service';
 import {MetadataRefreshType} from '../../../metadata/model/request/metadata-refresh-type.enum';
+import {SmartEnrichmentApplyMode} from '../../../metadata/model/smart-enrichment.model';
 import {Book} from '../../model/book.model';
 
 interface MetadataRefreshDialogContext {
@@ -163,6 +164,20 @@ export class BookDialogHelperService {
           bookId: bookId,
           coverType: coverType,
           ...(typeof book === 'number' ? {} : {book}),
+        },
+      });
+    });
+  }
+
+  async openSmartEnrichmentDialog(book: Book, applyMode: SmartEnrichmentApplyMode = 'save'): Promise<DynamicDialogRef | null> {
+    return this.dialogLauncherService.launchLazyDialog(async () => {
+      const {SmartEnrichmentComponent} = await import('../../../metadata/component/smart-enrichment/smart-enrichment.component');
+      return this.openDialog(SmartEnrichmentComponent, {
+        showHeader: false,
+        styleClass: `${DialogSize.LG} ${DialogStyle.MINIMAL}`,
+        data: {
+          bookId: book.id,
+          applyMode,
         },
       });
     });

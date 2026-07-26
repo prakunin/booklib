@@ -39,6 +39,7 @@ import {AuthorService} from '../../../../author-browser/service/author.service';
 import {Dialog} from 'primeng/dialog';
 import {Checkbox} from 'primeng/checkbox';
 import DOMPurify from 'dompurify';
+import {SmartEnrichmentService} from '../../../service/smart-enrichment.service';
 
 
 @Component({
@@ -101,6 +102,9 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
   private readonly t = inject(TranslocoService);
   private readonly libraryService = inject(LibraryService);
   private readonly bookDialogHelperService = inject(BookDialogHelperService)
+  // Hidden unless the instance actually has the agent binary, so the action never appears as a
+  // button that can only fail.
+  protected readonly smartEnrichmentAvailable = toSignal(inject(SmartEnrichmentService).available$, {initialValue: false});
   private readonly emailService = inject(EmailService);
   private readonly messageService = inject(MessageService);
   private readonly bookFileService = inject(BookFileService);
@@ -675,6 +679,10 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
   async openCoverSearch(book: Book): Promise<void> {
     const coverType = book.primaryFile?.bookType === 'AUDIOBOOK' ? 'audiobook' : 'ebook';
     await this.bookDialogHelperService.openCoverSearchDialog(book, coverType);
+  }
+
+  async openSmartEnrichment(book: Book): Promise<void> {
+    await this.bookDialogHelperService.openSmartEnrichmentDialog(book);
   }
 
   quickSend(book: Book) {

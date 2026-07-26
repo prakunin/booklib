@@ -3,7 +3,14 @@ import {HttpClient} from '@angular/common/http';
 import {lastValueFrom, Observable} from 'rxjs';
 import {map, switchMap} from 'rxjs/operators';
 import {API_CONFIG} from '../../core/config/api-config';
-import {AppSettings, OidcProviderDetails, OidcTestResult, PasswordPolicy} from '../model/app-settings.model';
+import {
+  AppSettings,
+  OidcProviderDetails,
+  OidcTestResult,
+  PasswordPolicy,
+  SmartEnrichmentStatus,
+  SmartEnrichmentTestResult
+} from '../model/app-settings.model';
 import {AuthService} from './auth.service';
 import {injectQuery, queryOptions, QueryClient} from '@tanstack/angular-query-experimental';
 import {APP_SETTINGS_QUERY_KEY, PUBLIC_SETTINGS_QUERY_KEY} from './app-settings-query-keys';
@@ -71,6 +78,19 @@ export class AppSettingsService {
 
   testOidcConnection(providerDetails: OidcProviderDetails): Observable<OidcTestResult> {
     return this.http.post<OidcTestResult>(`${this.apiUrl}/oidc/test`, providerDetails);
+  }
+
+  getRecommendationEmbeddingModels(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/recommendation-embedding/models`);
+  }
+
+  getSmartEnrichmentStatus(): Observable<SmartEnrichmentStatus> {
+    return this.http.get<SmartEnrichmentStatus>(`${this.apiUrl}/smart-enrichment/status`);
+  }
+
+  /** Runs a real prompt through the agent. Slow by nature — the caller must show progress. */
+  testSmartEnrichment(): Observable<SmartEnrichmentTestResult> {
+    return this.http.post<SmartEnrichmentTestResult>(`${this.apiUrl}/smart-enrichment/test`, {});
   }
 
   private syncPublicSettings(appSettings: AppSettings): void {

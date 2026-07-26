@@ -48,6 +48,7 @@ describe('CommandPaletteService', () => {
     getAudiobookThumbnailUrl: ReturnType<typeof vi.fn>;
   };
   let quickSearchBooks: ReturnType<typeof vi.fn>;
+  let semanticSearchBooks: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -68,12 +69,13 @@ describe('CommandPaletteService', () => {
       return of(books()
         .filter(book => `${book.title} ${book.authors.join(' ')}`.toLowerCase().includes(normalized)));
     });
+    semanticSearchBooks = vi.fn(() => of([] as AppBookQuickSearchResult[]));
 
     TestBed.configureTestingModule({
       imports: [getTranslocoModule()],
       providers: [
         { provide: Router, useValue: { navigate: vi.fn(() => Promise.resolve(true)) } },
-        { provide: AppBooksApiService, useValue: { quickSearchBooks } },
+        { provide: AppBooksApiService, useValue: { quickSearchBooks, semanticSearchBooks } },
         { provide: ShelfService, useValue: { shelves: signal([]) } },
         { provide: MagicShelfService, useValue: { shelves: signal([]) } },
         { provide: LibraryService, useValue: { libraries: signal([]) } },
@@ -155,6 +157,60 @@ describe('CommandPaletteService', () => {
     TestBed.flushEffects();
 
     expect(service.isSearching()).toBe(false);
+  });
+
+  it('shows semantic matches in their own group directly after the lexical book group', async () => {
+    semanticSearchBooks.mockReturnValue(of([makeBook(3, 'Dune', ['Frank Herbert'])]));
+
+    service.query.set('tolkien');
+    TestBed.flushEffects();
+    await vi.advanceTimersByTimeAsync(350);
+    TestBed.flushEffects();
+
+    expect(semanticSearchBooks).toHaveBeenCalledWith('tolkien', 50);
+    expect(service.groups().map((group) => group.kind).slice(0, 2)).toEqual(['book', 'semanticBook']);
+    expect(service.groups().find((group) => group.kind === 'semanticBook')?.items.map((item) => item.title))
+      .toEqual(['Dune']);
+  });
+
+  it('drops semantic matches that the lexical group already shows', async () => {
+    semanticSearchBooks.mockReturnValue(of([
+      makeBook(1, 'The Hobbit', ['J.R.R. Tolkien']),
+      makeBook(3, 'Dune', ['Frank Herbert']),
+    ]));
+
+    service.query.set('tolkien');
+    TestBed.flushEffects();
+    await vi.advanceTimersByTimeAsync(350);
+    TestBed.flushEffects();
+
+    expect(service.groups().find((group) => group.kind === 'semanticBook')?.items.map((item) => item.title))
+      .toEqual(['Dune']);
+  });
+
+  it('does not hold the spinner while only the semantic request is still in flight', async () => {
+    const semanticResponse = new Subject<AppBookQuickSearchResult[]>();
+    semanticSearchBooks.mockReturnValue(semanticResponse.asObservable());
+
+    service.query.set('tolkien');
+    TestBed.flushEffects();
+    await vi.advanceTimersByTimeAsync(350);
+    TestBed.flushEffects();
+
+    expect(service.isSearching()).toBe(false);
+    expect(service.groups().find((group) => group.kind === 'book')).toBeDefined();
+
+    semanticResponse.next([]);
+    semanticResponse.complete();
+  });
+
+  it('does not run a semantic search for queries shorter than three characters', async () => {
+    service.query.set('du');
+    TestBed.flushEffects();
+    await vi.advanceTimersByTimeAsync(350);
+    TestBed.flushEffects();
+
+    expect(semanticSearchBooks).not.toHaveBeenCalled();
   });
 
   it('returns no groups when the query is empty', () => {
