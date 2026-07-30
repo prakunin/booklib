@@ -70,6 +70,31 @@ class ArchivedBookContentServiceTest {
     }
 
     @Test
+    void extractsANonFb2ArchiveEntry() throws IOException {
+        Path archiveRoot = Files.createDirectory(tempDir.resolve("archives"));
+        Path archive = archiveRoot.resolve("usr-1.zip");
+        writeArchive(archive, "paper.doc", "doc-bytes");
+        AppProperties properties = new AppProperties();
+        properties.setPathConfig(tempDir.resolve("data").toString());
+        ArchivedBookContentService service = new ArchivedBookContentService(properties);
+        LibraryEntity library = LibraryEntity.builder().id(7L).inpxArchivePath(archiveRoot.toString()).build();
+        BookEntity book = BookEntity.builder().library(library).build();
+        BookFileEntity file = BookFileEntity.builder()
+                .id(11L)
+                .book(book)
+                .fileName("paper.doc")
+                .fileSubPath("")
+                .sourceArchive("usr-1.zip")
+                .sourceArchiveEntry("paper.doc")
+                .build();
+
+        Path resolved = service.resolve(file);
+
+        assertThat(resolved).hasContent("doc-bytes");
+        assertThat(resolved.getFileName()).hasToString("paper.doc");
+    }
+
+    @Test
     void revalidatedResolveReportsAVanishedEntryEvenWhenTheCacheLooksFresh() throws IOException {
         Path archiveRoot = Files.createDirectory(tempDir.resolve("archives"));
         Path archive = archiveRoot.resolve("fb2-1-100.zip");

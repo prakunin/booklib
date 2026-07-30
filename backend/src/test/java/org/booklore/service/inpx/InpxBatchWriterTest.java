@@ -107,6 +107,26 @@ class InpxBatchWriterTest {
     }
 
     @Test
+    void storesThePerEntryFileTypeForNonFb2Books() {
+        when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
+        InpxBookDto doc = InpxBookDto.builder()
+                .id(InpxParser.id("usr.zip", "paper", "doc"))
+                .archiveName("usr.zip").fileName("paper").extension("doc")
+                .bookType(BookFileType.OTHER)
+                .title("Paper").authors(List.of()).genres(List.of())
+                .series("").seriesNumber("").libraryId("1").date("").language("ru")
+                .build();
+
+        writer.persist(List.of(doc), 7L, 3L, caches);
+
+        ArgumentCaptor<List<BookEntity>> captor = ArgumentCaptor.forClass(List.class);
+        verify(bookRepository).saveAll(captor.capture());
+        BookFileEntity file = captor.getValue().getFirst().getBookFiles().getFirst();
+        assertThat(file.getBookType()).isEqualTo(BookFileType.OTHER);
+        assertThat(file.getSourceArchiveEntry()).isEqualTo("paper.doc");
+    }
+
+    @Test
     void storesTheRatingFromTheIndex() {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
 

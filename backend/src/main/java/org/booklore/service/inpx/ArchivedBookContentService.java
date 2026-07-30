@@ -1,6 +1,8 @@
 package org.booklore.service.inpx;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.booklore.config.AppProperties;
 import org.booklore.exception.ApiError;
 import org.booklore.exception.ArchiveEntryMissingException;
@@ -18,9 +20,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
-
 @Service
 @RequiredArgsConstructor
 public class ArchivedBookContentService {
@@ -99,7 +98,7 @@ public class ArchivedBookContentService {
         var library = bookFile.getBook().getLibrary();
         Path archiveRoot = Path.of(library.getInpxArchivePath()).toAbsolutePath().normalize();
         String archiveName = safeLeaf(bookFile.getSourceArchive(), ".zip");
-        String entryName = safeLeaf(bookFile.getSourceArchiveEntry(), ".fb2");
+        String entryName = safeEntryLeaf(bookFile.getSourceArchiveEntry());
         Path archivePath = archiveRoot.resolve(archiveName).normalize();
         if (!archivePath.startsWith(archiveRoot) || !Files.isRegularFile(archivePath) || !Files.isReadable(archivePath)) {
             throw ApiError.FILE_NOT_FOUND.createException("INPX archive is unavailable: " + archiveName);
@@ -124,8 +123,10 @@ public class ArchivedBookContentService {
     }
 
     private void extract(Path archivePath, String entryName, Path target) throws IOException {
-        try (ZipFile archive = new ZipFile(archivePath.toFile())) {
-            ZipEntry entry = archive.getEntry(entryName);
+        // Commons Compress, not java.util.zip: the JDK reader rejects the legacy Flibusta usr ZIPs
+        // outright with "invalid CEN header", so the extraction must use the lenient reader too.
+        try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
+            ZipArchiveEntry entry = archive.getEntry(entryName);
             if (entry == null || entry.isDirectory()) {
                 throw new MissingEntryException(entryName);
             }
@@ -164,6 +165,21 @@ public class ArchivedBookContentService {
         if (value == null || value.isBlank() || value.indexOf('\0') >= 0
                 || !Path.of(value).getFileName().toString().equals(value)
                 || !value.toLowerCase(Locale.ROOT).endsWith(suffix)) {
+            throw ApiError.FILE_NOT_FOUND.createException("Unsafe archived book path");
+        }
+        return value;
+    }
+
+    /**
+     * The archive entry, validated as a safe single-segment filename with an extension. Unlike
+     * {@link #safeLeaf} it fixes no particular suffix: multi-format archives hold pdf, doc, djvu …,
+     * not only fb2. The extension is still required so the cached copy keeps a real file name.
+     */
+    private String safeEntryLeaf(String value) {
+        int dot = value == null ? -1 : value.lastIndexOf('.');
+        if (value == null || value.isBlank() || value.indexOf('\0') >= 0
+                || !Path.of(value).getFileName().toString().equals(value)
+                || dot <= 0 || dot >= value.length() - 1) {
             throw ApiError.FILE_NOT_FOUND.createException("Unsafe archived book path");
         }
         return value;

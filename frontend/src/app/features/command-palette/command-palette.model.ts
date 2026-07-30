@@ -4,6 +4,7 @@ export type PaletteItemKind =
   | 'action'
   | 'page'
   | 'book'
+  | 'semanticBook'
   | 'author'
   | 'series'
   | 'shelf'
@@ -11,6 +12,7 @@ export type PaletteItemKind =
   | 'library';
 
 export interface PaletteBookMeta {
+  bookId: number;
   thumbnailUrl: string | null;
   authors: string[];
   seriesName: string | null;

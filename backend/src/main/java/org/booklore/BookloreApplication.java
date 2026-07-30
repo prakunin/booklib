@@ -8,9 +8,16 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.booklore.config.AppProperties;
 import org.booklore.config.BookmarkProperties;
 import org.booklore.config.ImageIoConfig;
+import org.booklore.config.RecommendationEmbeddingProperties;
+import org.booklore.config.SmartEnrichmentProperties;
 
 @EnableScheduling
-@EnableConfigurationProperties({AppProperties.class, BookmarkProperties.class})
+@EnableConfigurationProperties({
+        AppProperties.class,
+        BookmarkProperties.class,
+        RecommendationEmbeddingProperties.class,
+        SmartEnrichmentProperties.class
+})
 @SpringBootApplication
 public class BookloreApplication {
 

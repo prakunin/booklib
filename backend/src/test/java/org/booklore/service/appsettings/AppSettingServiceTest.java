@@ -1,6 +1,8 @@
 package org.booklore.service.appsettings;
 
 import org.booklore.config.AppProperties;
+import org.booklore.config.RecommendationEmbeddingProperties;
+import org.booklore.config.SmartEnrichmentProperties;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.settings.AppSettingKey;
@@ -23,6 +25,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,11 +45,21 @@ class AppSettingServiceTest {
     private SettingPersistenceHelper settingPersistenceHelper;
 
     private AppSettingService appSettingService;
+    private RecommendationEmbeddingProperties recommendationEmbeddingProperties;
+    private SmartEnrichmentProperties smartEnrichmentProperties;
 
     @BeforeEach
     void setUp() {
         settingPersistenceHelper = new SettingPersistenceHelper(appSettingsRepository, new ObjectMapper());
-        appSettingService = new AppSettingService(appProperties, settingPersistenceHelper, authenticationService, auditService);
+        recommendationEmbeddingProperties = new RecommendationEmbeddingProperties();
+        smartEnrichmentProperties = new SmartEnrichmentProperties();
+        appSettingService = new AppSettingService(
+                appProperties,
+                recommendationEmbeddingProperties,
+                smartEnrichmentProperties,
+                settingPersistenceHelper,
+                authenticationService,
+                auditService);
 
         var permissions = new BookLoreUser.UserPermissions();
         permissions.setAdmin(true);
@@ -56,7 +69,8 @@ class AppSettingServiceTest {
                 .permissions(permissions)
                 .build();
 
-        when(authenticationService.getAuthenticatedUser()).thenReturn(user);
+        // Lenient: reading settings needs no authenticated user, only the update paths do.
+        lenient().when(authenticationService.getAuthenticatedUser()).thenReturn(user);
     }
 
     @Test
@@ -185,6 +199,91 @@ class AppSettingServiceTest {
                 List.of("oauth2-callback")
         ))
                 .hasMessageContaining("Redirect URI must include a scheme");
+
+        verify(appSettingsRepository, never()).save(any());
+    }
+
+    @Test
+    void updateSetting_acceptsValidRecommendationEmbeddingSettings() throws Exception {
+        appSettingService.updateSetting(AppSettingKey.RECOMMENDATION_EMBEDDING_SETTINGS, Map.of(
+                "ollamaBaseUrl", "http://ollama.internal:11434/",
+                "model", "embeddinggemma:300m",
+                "dimensions", 512,
+                "batchSize", 64,
+                "minSearchSimilarity", 0.55
+        ));
+
+        ArgumentCaptor<AppSettingEntity> settingCaptor = ArgumentCaptor.forClass(AppSettingEntity.class);
+        verify(appSettingsRepository).save(settingCaptor.capture());
+
+        AppSettingEntity savedSetting = settingCaptor.getValue();
+        assertThat(savedSetting.getName()).isEqualTo(AppSettingKey.RECOMMENDATION_EMBEDDING_SETTINGS.toString());
+        assertThat(savedSetting.getVal()).contains("\"ollamaBaseUrl\":\"http://ollama.internal:11434\"");
+        assertThat(savedSetting.getVal()).contains("\"model\":\"embeddinggemma:300m\"");
+        assertThat(savedSetting.getVal()).contains("\"dimensions\":512");
+        assertThat(savedSetting.getVal()).contains("\"batchSize\":64");
+        assertThat(savedSetting.getVal()).contains("\"minSearchSimilarity\":0.55");
+    }
+
+    // Settings rows written before semantic search existed have no minSearchSimilarity key. The API
+    // must still hand the UI a concrete number, otherwise the settings input renders empty.
+    @Test
+    void getAppSettings_fillsMissingMinSearchSimilarityFromConfiguredDefault() {
+        AppSettingEntity stored = new AppSettingEntity();
+        stored.setName(AppSettingKey.RECOMMENDATION_EMBEDDING_SETTINGS.toString());
+        stored.setVal("{\"ollamaBaseUrl\":\"http://ollama:11434\",\"model\":\"embeddinggemma:300m\","
+                + "\"dimensions\":512,\"batchSize\":64}");
+        when(appSettingsRepository.findAll()).thenReturn(List.of(stored));
+        when(appProperties.getRemoteAuth()).thenReturn(new AppProperties.RemoteAuth());
+
+        var settings = appSettingService.getAppSettings().getRecommendationEmbeddingSettings();
+
+        assertThat(settings.getMinSearchSimilarity())
+                .isEqualTo(recommendationEmbeddingProperties.getMinSearchSimilarity());
+    }
+
+    @Test
+    void updateSetting_rejectsMinSearchSimilarityAboveOne() {
+        assertThatThrownBy(() -> appSettingService.updateSetting(
+                AppSettingKey.RECOMMENDATION_EMBEDDING_SETTINGS,
+                Map.of(
+                        "ollamaBaseUrl", "http://ollama.internal:11434",
+                        "model", "embeddinggemma:300m",
+                        "dimensions", 512,
+                        "batchSize", 64,
+                        "minSearchSimilarity", 1.5
+                )
+        )).hasMessageContaining("Minimum search similarity must be between 0 and 1");
+
+        verify(appSettingsRepository, never()).save(any());
+    }
+
+    @Test
+    void updateSetting_rejectsRecommendationEmbeddingUrlWithoutHost() {
+        assertThatThrownBy(() -> appSettingService.updateSetting(
+                AppSettingKey.RECOMMENDATION_EMBEDDING_SETTINGS,
+                Map.of(
+                        "ollamaBaseUrl", "http://",
+                        "model", "qwen3-embedding:0.6b",
+                        "dimensions", 512,
+                        "batchSize", 64
+                )
+        )).hasMessageContaining("Ollama base URL is invalid");
+
+        verify(appSettingsRepository, never()).save(any());
+    }
+
+    @Test
+    void updateSetting_rejectsUnsupportedRecommendationEmbeddingDimensions() {
+        assertThatThrownBy(() -> appSettingService.updateSetting(
+                AppSettingKey.RECOMMENDATION_EMBEDDING_SETTINGS,
+                Map.of(
+                        "ollamaBaseUrl", "http://ollama.internal:11434",
+                        "model", "qwen3-embedding:0.6b",
+                        "dimensions", 384,
+                        "batchSize", 64
+                )
+        )).hasMessageContaining("requires 512 dimensions");
 
         verify(appSettingsRepository, never()).save(any());
     }

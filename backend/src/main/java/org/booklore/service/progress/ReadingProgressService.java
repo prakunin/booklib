@@ -430,6 +430,8 @@ public class ReadingProgressService {
             case PDF -> updatePdfProgress(progress, request.getPdfProgress());
             case CBX -> updateCbxProgress(progress, request.getCbxProgress());
             case AUDIOBOOK -> updateAudiobookProgress(request.getAudiobookProgress());
+            // Download-only formats have no reader and therefore no reading progress.
+            case OTHER -> null;
         };
     }
 

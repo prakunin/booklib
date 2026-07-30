@@ -8,6 +8,7 @@ import org.booklore.model.dto.request.TaskCronConfigRequest;
 import org.booklore.model.dto.response.CronConfig;
 import org.booklore.model.dto.response.TaskCancelResponse;
 import org.booklore.model.dto.response.TaskCreateResponse;
+import org.booklore.model.dto.response.TaskOverviewResponse;
 import org.booklore.model.dto.response.TasksHistoryResponse;
 import org.booklore.model.enums.TaskType;
 import org.booklore.service.task.TaskCronService;
@@ -81,6 +82,17 @@ public class TaskController {
     public ResponseEntity<TasksHistoryResponse> getLatestTasksForEachType() {
         TasksHistoryResponse response = taskHistoryService.getLatestTasksForEachType();
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+            summary = "Get task runtime overview",
+            description = "Retrieve tasks currently running in this application instance and enabled schedules.",
+            operationId = "taskGetOverview"
+    )
+    @GetMapping("/overview")
+    @PreAuthorize("@securityUtil.isAdmin()")
+    public ResponseEntity<TaskOverviewResponse> getTaskOverview() {
+        return ResponseEntity.ok(service.getTaskOverview());
     }
 
     @Operation(

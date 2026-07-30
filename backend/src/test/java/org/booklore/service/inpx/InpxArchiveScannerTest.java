@@ -2,8 +2,11 @@ package org.booklore.service.inpx;
 
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.inpx.InpxBookDto;
+import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookFileRepository;
+import org.booklore.service.metadata.extractor.DocMetadataExtractor;
 import org.booklore.service.metadata.extractor.Fb2MetadataExtractor;
+import org.booklore.service.metadata.extractor.MetadataExtractorFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,12 +41,18 @@ class InpxArchiveScannerTest {
     private BookFileRepository bookFileRepository;
     @Mock
     private Fb2MetadataExtractor fb2MetadataExtractor;
+    @Mock
+    private MetadataExtractorFactory metadataExtractorFactory;
+    @Mock
+    private DocMetadataExtractor docMetadataExtractor;
 
     private InpxArchiveScanner scanner;
 
     @BeforeEach
     void setUp() {
-        scanner = new InpxArchiveScanner(bookFileRepository, fb2MetadataExtractor);
+        ArchiveEntryMetadataRecognizer recognizer = new ArchiveEntryMetadataRecognizer(
+                metadataExtractorFactory, docMetadataExtractor, new InpxFilenameMetadataParser());
+        scanner = new InpxArchiveScanner(bookFileRepository, fb2MetadataExtractor, recognizer);
     }
 
     @Test
@@ -106,6 +115,59 @@ class InpxArchiveScannerTest {
         assertThat(books.getFirst().getDate()).isEqualTo("2026-07-15");
         assertThat(books.get(1).getTitle()).isEqualTo("43");
         assertThat(books).extracting(InpxBookDto::getArchiveName).containsOnly("new.zip");
+        assertThat(books).extracting(InpxBookDto::getBookType).containsOnly(BookFileType.FB2);
+    }
+
+    @Test
+    void discoversNonFb2EntriesWithTypeAndFilenameMetadata(@TempDir Path root) throws IOException {
+        createArchive(root.resolve("usr.zip"),
+                "Megan_Lindholm_Silver_Lady.pdf",
+                "Mark_Semyonovich_Solonin_Den_M.doc",
+                "_zhurnal_Radio_1972_10.djvu");
+        when(bookFileRepository.countArchiveEntriesByLibraryId(7L)).thenReturn(List.of());
+
+        InpxArchiveScanner.Discovery discovery = scanner.discover(7L, root.toString());
+        List<InpxBookDto> books = new ArrayList<>();
+        scanner.forEach(discovery, books::add, () -> false);
+
+        assertThat(books).hasSize(3);
+
+        InpxBookDto pdf = byExtension(books, "pdf");
+        assertThat(pdf.getBookType()).isEqualTo(BookFileType.PDF);
+        assertThat(pdf.getFileName()).isEqualTo("Megan_Lindholm_Silver_Lady");
+        assertThat(pdf.getTitle()).isEqualTo("Silver Lady");
+        assertThat(pdf.getAuthors()).containsExactly("Megan Lindholm");
+
+        InpxBookDto doc = byExtension(books, "doc");
+        assertThat(doc.getBookType()).isEqualTo(BookFileType.OTHER);
+        assertThat(doc.getTitle()).isEqualTo("Den M");
+        assertThat(doc.getAuthors()).containsExactly("Mark Semyonovich Solonin");
+
+        InpxBookDto djvu = byExtension(books, "djvu");
+        assertThat(djvu.getBookType()).isEqualTo(BookFileType.OTHER);
+        assertThat(djvu.getTitle()).isEqualTo("zhurnal Radio 1972 10");
+        assertThat(djvu.getAuthors()).isEmpty();
+    }
+
+    @Test
+    void preservesTheOriginalExtensionCaseSoTheArchiveEntryRoundTrips(@TempDir Path root) throws IOException {
+        // The stored extension is reused to rebuild the archive entry name for later reads; a ZIP
+        // entry named ".PDF" must not be lowercased to ".pdf" or the entry lookup misses it.
+        createArchive(root.resolve("usr.zip"), "SoftLayn_Simulink__Toolboxes.PDF");
+        when(bookFileRepository.countArchiveEntriesByLibraryId(7L)).thenReturn(List.of());
+
+        InpxArchiveScanner.Discovery discovery = scanner.discover(7L, root.toString());
+        List<InpxBookDto> books = new ArrayList<>();
+        scanner.forEach(discovery, books::add, () -> false);
+
+        InpxBookDto book = books.getFirst();
+        assertThat(book.getExtension()).isEqualTo("PDF");
+        assertThat(book.getFileName()).isEqualTo("SoftLayn_Simulink__Toolboxes");
+        assertThat(book.getBookType()).isEqualTo(BookFileType.PDF);
+    }
+
+    private InpxBookDto byExtension(List<InpxBookDto> books, String extension) {
+        return books.stream().filter(book -> extension.equals(book.getExtension())).findFirst().orElseThrow();
     }
 
     @Test

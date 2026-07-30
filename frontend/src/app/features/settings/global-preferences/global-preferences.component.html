@@ -152,6 +152,224 @@
             </p>
           </div>
         </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <div class="setting-label">{{ t('recommendations.embeddingTitle') }}</div>
+            <p class="setting-description">
+              <i class="pi pi-info-circle"></i>
+              {{ t('recommendations.embeddingDesc') }}
+            </p>
+
+            <div class="embedding-grid">
+              <label for="ollama-base-url">{{ t('recommendations.ollamaUrl') }}</label>
+              <input
+                id="ollama-base-url"
+                type="text"
+                pInputText
+                [(ngModel)]="recommendationEmbeddingSettings.ollamaBaseUrl"/>
+
+              <label for="embedding-model">{{ t('recommendations.model') }}</label>
+              <div class="model-input-row">
+                <input
+                  id="embedding-model"
+                  type="text"
+                  pInputText
+                  list="embedding-model-list"
+                  [(ngModel)]="recommendationEmbeddingSettings.model"/>
+                <datalist id="embedding-model-list">
+                  @for (model of availableEmbeddingModels(); track model) {
+                    <option [value]="model"></option>
+                  }
+                </datalist>
+                <p-button
+                  icon="pi pi-refresh"
+                  outlined
+                  severity="secondary"
+                  [loading]="loadingEmbeddingModels()"
+                  [ariaLabel]="t('recommendations.refreshModels')"
+                  (onClick)="refreshEmbeddingModels()">
+                </p-button>
+              </div>
+
+              <label for="embedding-dimensions">{{ t('recommendations.dimensions') }}</label>
+              <input
+                id="embedding-dimensions"
+                type="number"
+                pInputText
+                [ngModel]="recommendationEmbeddingSettings.dimensions"
+                disabled/>
+
+              <label for="embedding-batch-size">{{ t('recommendations.batchSize') }}</label>
+              <input
+                id="embedding-batch-size"
+                type="number"
+                pInputText
+                min="1"
+                max="256"
+                [(ngModel)]="recommendationEmbeddingSettings.batchSize"/>
+
+              <label for="embedding-min-search-similarity">{{ t('recommendations.minSearchSimilarity') }}</label>
+              <input
+                id="embedding-min-search-similarity"
+                type="number"
+                pInputText
+                min="0"
+                max="1"
+                step="0.01"
+                [(ngModel)]="recommendationEmbeddingSettings.minSearchSimilarity"/>
+            </div>
+
+            <div class="embedding-actions">
+              <p-button
+                [label]="'common.save' | transloco"
+                icon="pi pi-save"
+                severity="success"
+                outlined
+                (onClick)="saveRecommendationEmbeddingSettings()">
+              </p-button>
+            </div>
+
+            <div class="warning-message">
+              <i class="pi pi-exclamation-triangle"></i>
+              <span>{{ t('recommendations.backfillWarning') }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="preferences-section">
+      <div class="section-header">
+        <h3 class="section-title">
+          <i class="pi pi-sparkles"></i>
+          {{ t('smartEnrichment.sectionTitle') }}
+        </h3>
+      </div>
+
+      <div class="settings-card">
+        <div class="setting-item">
+          <div class="setting-info">
+            <div class="setting-label-row">
+              <span class="setting-label">{{ t('smartEnrichment.enabled') }}</span>
+              <p-toggleswitch
+                [ngModel]="smartEnrichmentEnabled()"
+                [disabled]="!smartEnrichmentStatus()?.installed"
+                (onChange)="smartEnrichmentEnabled.set($event.checked); saveSmartEnrichmentSettings()">
+              </p-toggleswitch>
+            </div>
+            <p class="setting-description">
+              <i class="pi pi-info-circle"></i>
+              {{ t('smartEnrichment.enabledDesc') }}
+            </p>
+
+            <div class="agent-status">
+              @if (loadingSmartEnrichmentStatus()) {
+                <span class="agent-status-line">
+                  <i class="pi pi-spin pi-spinner"></i>
+                  {{ t('smartEnrichment.statusLoading') }}
+                </span>
+              } @else if (!smartEnrichmentStatus()?.installed) {
+                <span class="agent-status-line agent-status-error">
+                  <i class="pi pi-times-circle"></i>
+                  {{ t('smartEnrichment.notInstalled') }}
+                </span>
+              } @else {
+                <span class="agent-status-line agent-status-ok">
+                  <i class="pi pi-check-circle"></i>
+                  {{ t('smartEnrichment.installed', {version: smartEnrichmentStatus()!.version}) }}
+                </span>
+                @if (smartEnrichmentStatus()!.authenticated) {
+                  <span class="agent-status-line agent-status-ok">
+                    <i class="pi pi-check-circle"></i>
+                    {{ t('smartEnrichment.authenticated') }}
+                  </span>
+                } @else {
+                  <span class="agent-status-line agent-status-warn">
+                    <i class="pi pi-exclamation-triangle"></i>
+                    {{ t('smartEnrichment.notAuthenticated') }}
+                  </span>
+                }
+              }
+            </div>
+
+            @if (smartEnrichmentStatus()?.installed) {
+              <div class="embedding-grid">
+                <label for="agent-model">{{ t('smartEnrichment.model') }}</label>
+                <div class="model-input-row">
+                  <select id="agent-model" class="agent-effort-select"
+                    [ngModel]="smartEnrichmentModel()"
+                    (ngModelChange)="onAgentModelChange($event)">
+                    <option value="">{{ t('smartEnrichment.modelPlaceholder') }}</option>
+                    @for (model of agentBaseModels(); track model) {
+                      <option [value]="model">{{ model }}</option>
+                    }
+                  </select>
+                  <p-button
+                    icon="pi pi-refresh"
+                    outlined
+                    severity="secondary"
+                    [loading]="loadingSmartEnrichmentStatus()"
+                    [ariaLabel]="t('smartEnrichment.refreshStatus')"
+                    (onClick)="refreshSmartEnrichmentStatus()">
+                  </p-button>
+                </div>
+
+                @if (agentEffortOptions().length > 0) {
+                  <label for="agent-effort">{{ t('smartEnrichment.effort') }}</label>
+                  <select id="agent-effort" class="agent-effort-select"
+                    [ngModel]="smartEnrichmentEffort()"
+                    (ngModelChange)="smartEnrichmentEffort.set($event)">
+                    @for (effort of agentEffortOptions(); track effort) {
+                      <option [value]="effort">{{ effortLabel(effort) }}</option>
+                    }
+                  </select>
+                }
+              </div>
+
+              <div class="setting-item agent-deep-search">
+                <div class="setting-info">
+                  <div class="setting-label-row">
+                    <span class="setting-label">{{ t('smartEnrichment.deepSearch') }}</span>
+                    <p-toggleswitch
+                      [ngModel]="smartEnrichmentDeepSearch()"
+                      (onChange)="smartEnrichmentDeepSearch.set($event.checked)">
+                    </p-toggleswitch>
+                  </div>
+                  <p class="setting-description">
+                    <i class="pi pi-info-circle"></i>
+                    {{ t('smartEnrichment.deepSearchDesc') }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="embedding-actions">
+                <p-button
+                  [label]="'common.save' | transloco"
+                  icon="pi pi-save"
+                  severity="success"
+                  outlined
+                  (onClick)="saveSmartEnrichmentSettings()">
+                </p-button>
+                <p-button
+                  [label]="t('smartEnrichment.testBtn')"
+                  icon="pi pi-bolt"
+                  severity="info"
+                  outlined
+                  [loading]="testingSmartEnrichment()"
+                  (onClick)="testSmartEnrichment()">
+                </p-button>
+              </div>
+
+              @if (smartEnrichmentTestMessage()) {
+                <div class="agent-test-result" [class.agent-status-error]="!smartEnrichmentTestPassed()">
+                  <i [class]="smartEnrichmentTestPassed() ? 'pi pi-check-circle' : 'pi pi-times-circle'"></i>
+                  <span>{{ smartEnrichmentTestMessage() }}</span>
+                </div>
+              }
+            }
+          </div>
+        </div>
       </div>
     </div>
 

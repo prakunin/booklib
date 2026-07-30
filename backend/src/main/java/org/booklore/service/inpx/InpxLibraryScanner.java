@@ -145,7 +145,9 @@ public class InpxLibraryScanner {
                        InpxScanCaches caches, Counters counters) {
         int size = batch.size();
         archiveScanner.populateFileSizes(batch, archiveRoot);
-        InpxBatchWriter.BatchResult result = batchWriter.persist(List.copyOf(batch), libraryId, libraryPathId, caches);
+        List<InpxBookDto> immutableBatch = List.copyOf(batch);
+        batchWriter.prepareAuthors(immutableBatch, libraryId, caches);
+        InpxBatchWriter.BatchResult result = batchWriter.persist(immutableBatch, libraryId, libraryPathId, caches);
         batch.clear();
         counters.processed += size;
         counters.added += result.added();

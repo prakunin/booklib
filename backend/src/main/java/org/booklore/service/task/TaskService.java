@@ -6,8 +6,10 @@ import org.booklore.exception.APIException;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.TaskInfo;
 import org.booklore.model.dto.request.TaskCreateRequest;
+import org.booklore.model.dto.response.CronConfig;
 import org.booklore.model.dto.response.TaskCancelResponse;
 import org.booklore.model.dto.response.TaskCreateResponse;
+import org.booklore.model.dto.response.TaskOverviewResponse;
 import org.booklore.model.entity.TaskCronConfigurationEntity;
 import org.booklore.model.enums.TaskType;
 import org.booklore.task.TaskCancellationManager;
@@ -23,6 +25,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -43,6 +47,7 @@ public class TaskService {
     private final TaskCronService taskCronService;
     private final Map<TaskType, Task> taskRegistry;
     private final ConcurrentMap<TaskType, String> runningTasks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ActiveTaskRuntime> activeTasks = new ConcurrentHashMap<>();
     private final TaskCancellationManager cancellationManager;
     private final Executor taskExecutor;
     private final ObjectMapper objectMapper;
@@ -132,6 +137,32 @@ public class TaskService {
                 .toList();
     }
 
+    public TaskOverviewResponse getTaskOverview() {
+        List<TaskOverviewResponse.ActiveTask> active = activeTasks.entrySet().stream()
+                .map(entry -> new TaskOverviewResponse.ActiveTask(
+                        entry.getKey(),
+                        entry.getValue().taskType(),
+                        entry.getValue().startedAt()))
+                .sorted(java.util.Comparator.comparing(TaskOverviewResponse.ActiveTask::startedAt))
+                .toList();
+
+        Instant now = Instant.now();
+        List<TaskOverviewResponse.ScheduledTask> scheduled = scheduledTasks.entrySet().stream()
+                .filter(entry -> !entry.getValue().isCancelled() && !entry.getValue().isDone())
+                .map(entry -> {
+                    CronConfig config = taskCronService.getCronConfigOrDefault(entry.getKey());
+                    long delayMillis = Math.max(0, entry.getValue().getDelay(TimeUnit.MILLISECONDS));
+                    return new TaskOverviewResponse.ScheduledTask(
+                            entry.getKey(),
+                            config.getCronExpression(),
+                            now.plusMillis(delayMillis));
+                })
+                .sorted(java.util.Comparator.comparing(TaskOverviewResponse.ScheduledTask::nextRunAt))
+                .toList();
+
+        return new TaskOverviewResponse(active, scheduled);
+    }
+
     public void executeCronTask(TaskType taskType) {
         log.info("Executing cron-scheduled task: {}", taskType);
         try {
@@ -195,7 +226,7 @@ public class TaskService {
 
     public TaskCancelResponse cancelTask(String taskId) {
         BookLoreUser user = authenticationService.getAuthenticatedUser();
-        boolean isRunning = runningTasks.containsValue(taskId);
+        boolean isRunning = activeTasks.containsKey(taskId);
         if (!isRunning) {
             throw new APIException("Task not found or not running: " + taskId, HttpStatus.NOT_FOUND);
         }
@@ -232,6 +263,7 @@ public class TaskService {
             if (!taskType.isParallel()) {
                 runningTasks.remove(taskType);
             }
+            activeTasks.remove(taskId);
             cancellationManager.clearCancellation(taskId);
         }
     }
@@ -253,6 +285,7 @@ public class TaskService {
             if (!taskType.isParallel()) {
                 runningTasks.remove(taskType);
             }
+            activeTasks.remove(taskId);
         }
     }
 
@@ -275,6 +308,7 @@ public class TaskService {
         }
         Map<String, Object> options = convertOptionsToMap(request.getOptions());
         taskHistoryService.createTask(taskId, taskType, user.getId(), options);
+        activeTasks.put(taskId, new ActiveTaskRuntime(taskType, Instant.now()));
         return taskId;
     }
 
@@ -302,5 +336,8 @@ public class TaskService {
             throw new UnsupportedOperationException("Task type not implemented: " + taskType);
         }
         return task.execute(request);
+    }
+
+    private record ActiveTaskRuntime(TaskType taskType, Instant startedAt) {
     }
 }

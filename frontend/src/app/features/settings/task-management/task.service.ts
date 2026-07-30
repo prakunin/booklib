@@ -53,6 +53,23 @@ export interface TaskStatusResponse {
   taskHistories: TaskHistory[];
 }
 
+export interface ActiveTaskOverview {
+  taskId: string;
+  taskType: string;
+  startedAt: string;
+}
+
+export interface ScheduledTaskOverview {
+  taskType: string;
+  cronExpression: string;
+  nextRunAt: string;
+}
+
+export interface TaskOverview {
+  activeTasks: ActiveTaskOverview[];
+  scheduledTasks: ScheduledTaskOverview[];
+}
+
 export enum TaskStatus {
   ACCEPTED = 'ACCEPTED',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -133,6 +150,10 @@ export class TaskService {
 
   getLatestTasksForEachType(): Observable<TaskStatusResponse> {
     return this.http.get<TaskStatusResponse>(`${this.baseUrl}/last`);
+  }
+
+  getTaskOverview(): Observable<TaskOverview> {
+    return this.http.get<TaskOverview>(`${this.baseUrl}/overview`);
   }
 
   cancelTask(taskId: string): Observable<TaskCancelResponse> {

@@ -2,8 +2,16 @@ import {Shelf} from './shelf.model';
 import {CbxBackgroundColor, CbxFitMode, CbxPageSpread, CbxPageSplitOption, CbxPageViewMode, CbxScrollMode, NewPdfReaderSetting} from '../../settings/user-management/user.service';
 import {BookReview} from '../components/book-reviews/book-review-service';
 
-export const BOOK_TYPES = ['PDF', 'EPUB', 'CBX', 'FB2', 'MOBI', 'AZW3', 'AUDIOBOOK'] as const;
+export const BOOK_TYPES = ['PDF', 'EPUB', 'CBX', 'FB2', 'MOBI', 'AZW3', 'AUDIOBOOK', 'OTHER'] as const;
 export type BookType = typeof BOOK_TYPES[number];
+
+// Formats with a reader. OTHER (djvu, doc, … ingested from INPX archives) is a download-only
+// catalog entry: it can be listed and downloaded, but there is nothing to open.
+export const READABLE_BOOK_TYPES: readonly BookType[] = ['PDF', 'EPUB', 'CBX', 'FB2', 'MOBI', 'AZW3', 'AUDIOBOOK'];
+
+export function isReadableBookType(bookType: BookType | string | undefined | null): boolean {
+  return !!bookType && (READABLE_BOOK_TYPES as readonly string[]).includes(bookType);
+}
 
 export enum AdditionalFileType {
   ALTERNATIVE_FORMAT = 'ALTERNATIVE_FORMAT',

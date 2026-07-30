@@ -3,7 +3,9 @@ package org.booklore.service.recommender;
 import org.booklore.model.dto.BookRecommendationLite;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
+import org.booklore.repository.BookEmbeddingVectorRepository;
 import org.booklore.repository.BookRepository;
+import org.booklore.repository.projection.BookEmbeddingCandidate;
 import org.booklore.service.book.BookQueryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,13 +36,18 @@ class BookRecommendationComputationServiceTest {
     private BookRepository bookRepository;
     @Mock
     private BookQueryService bookQueryService;
+    @Mock
+    private BookEmbeddingVectorRepository embeddingVectorRepository;
+    @Mock
+    private BookSemanticEmbeddingService semanticEmbeddingService;
 
     private BookRecommendationComputationService service;
 
     @BeforeEach
     void setUp() {
         service = new BookRecommendationComputationService(
-                similarityService, vectorService, bookRepository, bookQueryService);
+                similarityService, vectorService, bookRepository, bookQueryService, embeddingVectorRepository,
+                semanticEmbeddingService);
     }
 
     @Test
@@ -52,7 +59,6 @@ class BookRecommendationComputationServiceTest {
         }
 
         when(bookRepository.findByIdWithMetadata(1L)).thenReturn(Optional.of(target));
-        when(vectorService.deserializeVector(null)).thenReturn(null);
         when(bookQueryService.getRecommendationCandidatesAfterId(eq(1L), eq(0L), any(Pageable.class)))
                 .thenReturn(firstBatch);
         when(bookQueryService.getRecommendationCandidatesAfterId(eq(1L), eq(501L), any(Pageable.class)))
@@ -72,6 +78,54 @@ class BookRecommendationComputationServiceTest {
         verify(bookQueryService).saveRecommendations(eq(1L), recommendations.capture());
         assertThat(recommendations.getValue()).hasSize(25);
         assertThat(recommendations.getValue()).extracting(BookRecommendationLite::getB).contains(501L, 500L);
+    }
+
+    @Test
+    void usesAnnCandidatesForStoredEmbeddingAndKeepsExistingReranking() {
+        BookEntity target = book(1L, "Target");
+        target.getMetadata().setEmbeddingVector("[1.0,0.0]");
+        target.getMetadata().setSeriesName("Shared Series");
+        BookEntity allowed = book(2L, "Allowed");
+        BookEntity sameSeries = book(3L, "Same Series");
+        sameSeries.getMetadata().setSeriesName("Shared Series");
+
+        when(bookRepository.findByIdWithMetadata(1L)).thenReturn(Optional.of(target));
+        when(vectorService.deserializeVector("[1.0,0.0]")).thenReturn(new double[]{1.0, 0.0});
+        when(embeddingVectorRepository.findNearestCandidates(1L, "[1.0,0.0]", 1000, null))
+                .thenReturn(List.of(
+                        new BookEmbeddingCandidate(3L, 0.99, "shared series"),
+                        new BookEmbeddingCandidate(2L, 0.90, null)));
+        when(bookQueryService.findAllWithMetadataByIds(Set.of(2L))).thenReturn(List.of(allowed));
+
+        service.computeAndStore(1L, 25);
+
+        verify(embeddingVectorRepository).findNearestCandidates(1L, "[1.0,0.0]", 1000, null);
+        verify(bookQueryService, never()).getEmbeddingCandidatesAfterId(anyLong(), anyLong(), any(Pageable.class));
+        ArgumentCaptor<Set<BookRecommendationLite>> recommendations = ArgumentCaptor.forClass(Set.class);
+        verify(bookQueryService).saveRecommendations(eq(1L), recommendations.capture());
+        assertThat(recommendations.getValue())
+                .extracting(BookRecommendationLite::getB)
+                .containsExactly(2L);
+    }
+
+    @Test
+    void usesSemanticAnnWhenSemanticModelIsActive() {
+        BookEntity target = book(1L, "Цель");
+        BookEntity candidate = book(2L, "Кандидат");
+
+        when(bookRepository.findByIdWithMetadata(1L)).thenReturn(Optional.of(target));
+        when(embeddingVectorRepository.activeModel()).thenReturn("qwen3-128-v1");
+        when(semanticEmbeddingService.modelVersion()).thenReturn("qwen3-128-v1");
+        when(semanticEmbeddingService.ensureEmbedding(target)).thenReturn(Optional.of("[0.1,0.2]"));
+        when(embeddingVectorRepository.findNearestCandidates(1L, "[0.1,0.2]", 1000, "qwen3-128-v1"))
+                .thenReturn(List.of(new BookEmbeddingCandidate(2L, 0.91, null)));
+        when(bookQueryService.findAllWithMetadataByIds(Set.of(2L))).thenReturn(List.of(candidate));
+
+        service.computeAndStore(1L, 25);
+
+        verify(embeddingVectorRepository).findNearestCandidates(1L, "[0.1,0.2]", 1000, "qwen3-128-v1");
+        verify(vectorService, never()).deserializeVector(anyString());
+        verify(bookQueryService).saveRecommendations(eq(1L), anySet());
     }
 
     private BookEntity book(long id, String title) {

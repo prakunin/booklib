@@ -29,6 +29,7 @@ public class MetadataExtractorFactory {
             case MOBI -> mobiMetadataExtractor.extractMetadata(file);
             case AZW3 -> azw3MetadataExtractor.extractMetadata(file);
             case AUDIOBOOK -> audiobookMetadataExtractor.extractMetadata(file);
+            case OTHER -> null;
         };
     }
 
@@ -65,6 +66,7 @@ public class MetadataExtractorFactory {
             case MOBI -> mobiMetadataExtractor;
             case AZW3 -> azw3MetadataExtractor;
             case AUDIOBOOK -> audiobookMetadataExtractor;
+            case OTHER -> null;
         };
     }
 }

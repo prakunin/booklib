@@ -7,10 +7,15 @@ import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.CategoryEntity;
+import org.booklore.model.dto.PreparedBookEmbedding;
+import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -19,10 +24,16 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class BookVectorService {
 
+    // EmbeddingGemma uses asymmetric retrieval prompts. The document and query templates are paired:
+    // changing one without the other silently degrades similarity scores.
+    private static final String DOCUMENT_PROMPT = "title: %s | text: %s";
+    private static final String QUERY_PROMPT = "task: search result | query: %s";
+
     private final ObjectMapper objectMapper;
     private static final int VECTOR_DIMENSION = 128;
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
     private static final Pattern NON_ALPHANUMERIC_EXCEPT_SPACE_PATTERN = Pattern.compile("[^a-z0-9\\s]");
+    private static final int MAX_DESCRIPTION_LENGTH = 4_000;
 
     public double[] generateEmbedding(BookEntity book) {
         if (book.getMetadata() == null) {
@@ -63,6 +74,75 @@ public class BookVectorService {
         }
 
         return featuresToVector(features);
+    }
+
+    public PreparedBookEmbedding prepareSemanticEmbedding(BookEntity book) {
+        String text = buildSemanticText(book);
+        return new PreparedBookEmbedding(book.getId(), text, sha256(text));
+    }
+
+    public String buildSemanticQueryText(String query) {
+        return QUERY_PROMPT.formatted(query == null ? "" : query.trim());
+    }
+
+    private String buildSemanticText(BookEntity book) {
+        BookMetadataEntity metadata = book.getMetadata();
+        if (metadata == null) {
+            return DOCUMENT_PROMPT.formatted("none", "Book metadata is unavailable");
+        }
+
+        String title = metadata.getTitle() == null || metadata.getTitle().isBlank()
+                ? "none"
+                : metadata.getTitle().trim();
+        List<String> textFields = new ArrayList<>();
+        addSemanticField(textFields, "Authors", joinedNames(
+                metadata.getAuthors(), AuthorEntity::getName));
+        addSemanticField(textFields, "Series", metadata.getSeriesName());
+        addSemanticField(textFields, "Categories", joinedNames(
+                metadata.getCategories(), CategoryEntity::getName));
+        addSemanticField(textFields, "Publisher", metadata.getPublisher());
+        if (metadata.getDescription() != null) {
+            String description = Jsoup.parse(metadata.getDescription()).text();
+            if (description.length() > MAX_DESCRIPTION_LENGTH) {
+                description = description.substring(0, MAX_DESCRIPTION_LENGTH);
+            }
+            addSemanticField(textFields, "Description", description);
+        }
+
+        String text = textFields.isEmpty()
+                ? ("none".equals(title) ? "Book metadata is unavailable" : title)
+                : String.join("\n", textFields);
+        return DOCUMENT_PROMPT.formatted(title, text);
+    }
+
+    private <T> String joinedNames(Collection<T> values, java.util.function.Function<T, String> nameExtractor) {
+        if (values == null) {
+            return null;
+        }
+        return values.stream()
+                .map(nameExtractor)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    private void addSemanticField(List<String> lines, String label, String value) {
+        if (value != null && !value.isBlank()) {
+            lines.add(label + ": " + value.trim());
+        }
+    }
+
+    private String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 
     private void addTextFeatures(Map<String, Double> features, String prefix, String text, double weight) {
@@ -157,4 +237,3 @@ public class BookVectorService {
 
     }
 }
-

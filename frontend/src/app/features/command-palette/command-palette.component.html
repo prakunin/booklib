@@ -55,14 +55,14 @@
                       type="button"
                       class="command-palette-item"
                       [class.active]="activeItem()?.id === item.id"
-                      [class.book-item]="item.kind === 'book' && !!item.bookMeta"
+                      [class.book-item]="!!item.bookMeta"
                       [id]="itemDomId(item)"
                       role="option"
                       [attr.aria-selected]="activeItem()?.id === item.id"
                       (mouseenter)="onItemHover(item)"
                       (click)="svc.select(item)"
                     >
-                      @if (item.kind === 'book' && item.bookMeta; as bookMeta) {
+                      @if (item.bookMeta; as bookMeta) {
                         <ng-container *transloco="let tb; prefix: 'book.searcher'">
                           <div class="command-palette-book-cover" [class.square-cover]="bookMeta.isAudiobook">
                             <app-cover

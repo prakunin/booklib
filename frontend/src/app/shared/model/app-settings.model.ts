@@ -175,6 +175,8 @@ export interface OidcTestResult {
 export interface AppSettings {
   autoBookSearch: boolean;
   similarBookRecommendation: boolean;
+  recommendationEmbeddingSettings?: RecommendationEmbeddingSettings;
+  smartEnrichmentSettings?: SmartEnrichmentSettings;
   defaultMetadataRefreshOptions: MetadataRefreshOptions;
   libraryMetadataRefreshOptions: MetadataRefreshOptions[];
   uploadPattern: string;
@@ -200,6 +202,37 @@ export interface AppSettings {
   oidcForceOnlyMode: boolean;
   passwordPolicy?: PasswordPolicy;
   diskType: string;
+}
+
+export interface RecommendationEmbeddingSettings {
+  ollamaBaseUrl: string;
+  model: string;
+  dimensions: number;
+  batchSize: number;
+  minSearchSimilarity: number;
+}
+
+export interface SmartEnrichmentSettings {
+  enabled: boolean;
+  /** Blank leaves the agent CLI on its own configured default. */
+  model: string;
+  /** 'low' | 'medium' | 'high', or blank for the CLI default. */
+  effort: string;
+  /** When true the agent searches the web (accurate, slow, quota-heavy); off = model-knowledge only. */
+  deepSearch: boolean;
+}
+
+/** Whether the agent binary is installed and signed in, and what it can be pointed at. */
+export interface SmartEnrichmentStatus {
+  installed: boolean;
+  version: string | null;
+  authenticated: boolean;
+  models: string[];
+}
+
+export interface SmartEnrichmentTestResult {
+  success: boolean;
+  message: string;
 }
 
 export interface PasswordPolicy {
@@ -236,6 +269,8 @@ export enum AppSettingKey {
   QUICK_BOOK_MATCH = 'QUICK_BOOK_MATCH',
   AUTO_BOOK_SEARCH = 'AUTO_BOOK_SEARCH',
   SIMILAR_BOOK_RECOMMENDATION = 'SIMILAR_BOOK_RECOMMENDATION',
+  RECOMMENDATION_EMBEDDING_SETTINGS = 'RECOMMENDATION_EMBEDDING_SETTINGS',
+  SMART_ENRICHMENT_SETTINGS = 'SMART_ENRICHMENT_SETTINGS',
   LIBRARY_METADATA_REFRESH_OPTIONS = 'LIBRARY_METADATA_REFRESH_OPTIONS',
   UPLOAD_FILE_PATTERN = 'UPLOAD_FILE_PATTERN',
   OPDS_SERVER_ENABLED = 'OPDS_SERVER_ENABLED',

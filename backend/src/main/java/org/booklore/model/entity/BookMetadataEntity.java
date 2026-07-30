@@ -382,7 +382,7 @@ public class BookMetadataEntity {
     @JoinColumn(name = "book_id", referencedColumnName = "book_id", insertable = false, updatable = false)
     private ComicMetadataEntity comicMetadata;
 
-    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToMany(fetch = FetchType.LAZY, cascade = CascadeType.MERGE)
     @JoinTable(
             name = "book_metadata_author_mapping",
             joinColumns = @JoinColumn(name = "book_id"),

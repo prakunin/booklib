@@ -295,6 +295,7 @@ public class KomgaMapper {
             case MOBI -> "application/x-mobipocket-ebook";
             case AZW3 -> "application/vnd.amazon.ebook";
             case AUDIOBOOK -> "audio/*";
+            case OTHER -> "application/octet-stream";
         };
     }
 
@@ -311,6 +312,7 @@ public class KomgaMapper {
             case CBX -> "DIVINA"; // DIVINA is for comic books
             case FB2 -> "DIVINA";
             case AUDIOBOOK -> "AUDIOBOOK";
+            case OTHER -> "UNKNOWN";
         };
     }
 

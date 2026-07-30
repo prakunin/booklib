@@ -67,6 +67,28 @@ describe('TaskService', () => {
     await expect(requestPromise).resolves.toEqual({taskHistories: []});
   });
 
+  it('loads the administrator task overview', async () => {
+    const requestPromise = firstValueFrom(service.getTaskOverview());
+    const overview = {
+      activeTasks: [{
+        taskId: 'task-1',
+        taskType: TaskType.UPDATE_BOOK_RECOMMENDATIONS,
+        startedAt: '2026-07-24T06:49:02Z'
+      }],
+      scheduledTasks: [{
+        taskType: TaskType.CLEANUP_TEMP_METADATA,
+        cronExpression: '0 45 0 * * 1',
+        nextRunAt: '2026-07-27T00:45:00Z'
+      }]
+    };
+
+    const request = httpTestingController.expectOne(`${API_CONFIG.BASE_URL}/api/v1/tasks/overview`);
+    expect(request.request.method).toBe('GET');
+    request.flush(overview);
+
+    await expect(requestPromise).resolves.toEqual(overview);
+  });
+
   it('cancels tasks', async () => {
     const requestPromise = firstValueFrom(service.cancelTask('task-1'));
 

@@ -28,7 +28,7 @@ class BookQueryServiceTest {
     void getAllBooks_usesBoundedLegacyCatalogPage() {
         BookRepository bookRepository = mock(BookRepository.class);
         BookMapperV2 bookMapperV2 = mock(BookMapperV2.class);
-        BookQueryService bookQueryService = new BookQueryService(bookRepository, bookMapperV2, null, null);
+        BookQueryService bookQueryService = new BookQueryService(bookRepository, null, bookMapperV2, null, null);
         BookEntity bookEntity = BookEntity.builder().id(1L).build();
         when(bookRepository.findAllWithMetadataPage(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(bookEntity)));
@@ -47,7 +47,7 @@ class BookQueryServiceTest {
         BookRepository bookRepository = mock(BookRepository.class);
         BookMapperV2 bookMapperV2 = mock(BookMapperV2.class);
         ContentRestrictionService contentRestrictionService = mock(ContentRestrictionService.class);
-        BookQueryService bookQueryService = new BookQueryService(bookRepository, bookMapperV2, contentRestrictionService, null);
+        BookQueryService bookQueryService = new BookQueryService(bookRepository, null, bookMapperV2, contentRestrictionService, null);
         BookEntity bookEntity = BookEntity.builder().id(1L).build();
         Set<Long> libraryIds = Set.of(10L);
         when(bookRepository.findAllWithMetadataByLibraryIdsPage(eq(libraryIds), any(Pageable.class)))
@@ -66,7 +66,7 @@ class BookQueryServiceTest {
     @Test
     void mapEntitiesToDto_keepsPublicShelvesForUser() {
         BookMapperV2 bookMapperV2 = mock(BookMapperV2.class);
-        BookQueryService bookQueryService = new BookQueryService(null, bookMapperV2, null, null);
+        BookQueryService bookQueryService = new BookQueryService(null, null, bookMapperV2, null, null);
         BookEntity bookEntity = BookEntity.builder().id(1L).build();
         Shelf ownShelf = Shelf.builder().id(1L).userId(1L).publicShelf(false).build();
         Shelf otherPrivateShelf = Shelf.builder().id(2L).userId(2L).publicShelf(false).build();

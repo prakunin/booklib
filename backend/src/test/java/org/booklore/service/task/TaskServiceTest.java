@@ -16,11 +16,14 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.Trigger;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -199,6 +202,58 @@ class TaskServiceTest {
 
         assertEquals(asyncType, resp.getTaskType());
         assertEquals(TaskStatus.ACCEPTED, resp.getStatus());
+    }
+
+    @Test
+    void taskOverviewIncludesQueuedAsyncTask() {
+        TaskType asyncType = TaskType.UPDATE_BOOK_RECOMMENDATIONS;
+        Task asyncTask = mock(Task.class);
+        when(asyncTask.getTaskType()).thenReturn(asyncType);
+
+        taskService = new TaskService(
+                authenticationService,
+                taskHistoryService,
+                taskCronService,
+                List.of(asyncTask),
+                cancellationManager,
+                taskExecutor,
+                objectMapper,
+                taskScheduler
+        );
+
+        BookLoreUser user = new BookLoreUser();
+        user.setId(10L);
+        user.setUsername("admin");
+        when(authenticationService.getAuthenticatedUser()).thenReturn(user);
+
+        TaskCreateResponse response = taskService.runAsUser(
+                TaskCreateRequest.builder().taskType(asyncType).build());
+        var overview = taskService.getTaskOverview();
+
+        assertEquals(1, overview.activeTasks().size());
+        assertEquals(response.getTaskId(), overview.activeTasks().getFirst().taskId());
+        assertEquals(asyncType, overview.activeTasks().getFirst().taskType());
+    }
+
+    @Test
+    void taskOverviewIncludesEnabledRuntimeSchedule() {
+        CronConfig cronConfig = CronConfig.builder()
+                .taskType(TaskType.CLEANUP_TEMP_METADATA)
+                .enabled(true)
+                .cronExpression("0 0 * * * *")
+                .build();
+        ScheduledFuture<?> scheduledFuture = mock(ScheduledFuture.class);
+        when(taskCronService.getCronConfigOrDefault(TaskType.CLEANUP_TEMP_METADATA)).thenReturn(cronConfig);
+        doReturn(scheduledFuture).when(taskScheduler).schedule(any(Runnable.class), any(Trigger.class));
+        when(scheduledFuture.getDelay(TimeUnit.MILLISECONDS)).thenReturn(60_000L);
+
+        taskService.rescheduleTask(TaskType.CLEANUP_TEMP_METADATA);
+        var overview = taskService.getTaskOverview();
+
+        assertEquals(1, overview.scheduledTasks().size());
+        assertEquals(TaskType.CLEANUP_TEMP_METADATA, overview.scheduledTasks().getFirst().taskType());
+        assertEquals("0 0 * * * *", overview.scheduledTasks().getFirst().cronExpression());
+        assertNotNull(overview.scheduledTasks().getFirst().nextRunAt());
     }
 
     @Test

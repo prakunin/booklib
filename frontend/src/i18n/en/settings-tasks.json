@@ -5,6 +5,18 @@
     "sectionTitle": "System Tasks",
     "sectionDesc": "Execute tasks manually, monitor progress in real-time, and configure scheduled automation."
   },
+  "overview": {
+    "sectionTitle": "Task Overview",
+    "sectionDesc": "Live application tasks and enabled recurring schedules. Visible to administrators only.",
+    "activeTitle": "Active Tasks",
+    "scheduledTitle": "Scheduled Tasks",
+    "noActive": "No tasks are currently running.",
+    "noScheduled": "No recurring tasks are enabled.",
+    "startedAt": "Started:",
+    "nextRun": "Next run:",
+    "processed": "Processed: {{processed}} of {{total}}",
+    "refresh": "Refresh task overview"
+  },
   "loading": "Loading tasks...",
   "emptyTitle": "No tasks available",
   "status": {
@@ -60,6 +72,7 @@
     "cancelError": "Failed to cancel the task. The task may already be completed or failed.",
     "cancelNoId": "Cannot cancel task without ID.",
     "loadError": "Failed to load tasks",
+    "overviewLoadError": "Failed to load the task overview.",
     "metadataScheduled": "Metadata Update Scheduled",
     "metadataScheduledDetail": "The metadata update for the selected books has been successfully scheduled.",
     "metadataAlreadyRunningDetail": "A metadata refresh task is already in progress. Please wait for it to complete before starting another one.",

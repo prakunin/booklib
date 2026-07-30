@@ -4,6 +4,8 @@ import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.enums.PermissionType;
 import org.booklore.model.websocket.Topic;
+import org.booklore.model.websocket.TaskProgressPayload;
+import org.booklore.service.task.TaskHistoryService;
 import org.booklore.service.event.BookCatalogChangedEvent;
 import org.booklore.service.event.LibraryScanCompletedEvent;
 import jakarta.persistence.EntityManager;
@@ -31,10 +33,12 @@ public class NotificationService {
     private final AuthenticationService authenticationService;
     private final EntityManager entityManager;
     private final ApplicationEventPublisher eventPublisher;
+    private final TaskHistoryService taskHistoryService;
 
     public void sendMessage(Topic topic, Object message) {
         publishCatalogChangedEvent(topic);
         publishScanCompletedEvent(topic, message);
+        persistTaskProgress(topic, message);
         try {
             var user = authenticationService.getAuthenticatedUser();
             if (user == null) {
@@ -45,6 +49,21 @@ public class NotificationService {
             messagingTemplate.convertAndSendToUser(username, topic.getPath(), message);
         } catch (Exception e) {
             log.error("Error sending message to topic {}: {}", topic, e.getMessage(), e);
+        }
+    }
+
+    private void persistTaskProgress(Topic topic, Object message) {
+        if (topic != Topic.TASK_PROGRESS || !(message instanceof TaskProgressPayload progress)) {
+            return;
+        }
+        try {
+            taskHistoryService.updateTaskProgress(
+                    progress.getTaskId(),
+                    progress.getTaskStatus(),
+                    progress.getProgress(),
+                    progress.getMessage());
+        } catch (Exception exception) {
+            log.error("Failed to persist task progress for taskId={}", progress.getTaskId(), exception);
         }
     }
 

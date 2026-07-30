@@ -5,6 +5,7 @@ import {FetchMetadataRequest} from '../../metadata/model/request/fetch-metadata-
 import {BookMetadata} from '../model/book.model';
 import {AuthService} from '../../../shared/service/auth.service';
 import {HttpClient} from '@angular/common/http';
+import {streamServerSentEvents} from '../../../shared/service/sse-stream';
 
 @Injectable({providedIn: 'root'})
 export class BookMetadataService {
@@ -19,88 +20,11 @@ export class BookMetadataService {
       throw new Error('No authentication token available');
     }
 
-    return new Observable<BookMetadata>((subscriber) => {
-      const abortController = new AbortController();
-
-      fetch(`${this.url}/${bookId}/metadata/prospective`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(request),
-        signal: abortController.signal,
-      })
-        .then(async (response) => {
-          if (!response.ok) {
-            subscriber.error(new Error(`HTTP error! status: ${response.status}`));
-            return;
-          }
-
-          const reader = response.body?.getReader();
-          if (!reader) {
-            subscriber.error(new Error('Response body is null'));
-            return;
-          }
-
-          const decoder = new TextDecoder();
-          let buffer = '';
-          const emitLine = (line: string) => {
-            if (!line.startsWith('data:')) {
-              return;
-            }
-
-            const data = line.slice(5).trim();
-            if (!data) {
-              return;
-            }
-
-            try {
-              const metadata = JSON.parse(data) as BookMetadata;
-              subscriber.next(metadata);
-            } catch (e) {
-              console.error('Error parsing SSE data:', e);
-            }
-          };
-
-          try {
-            while (true) {
-              const {done, value} = await reader.read();
-              if (done) break;
-
-              buffer += decoder.decode(value, {stream: true});
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-
-              for (const line of lines) {
-                emitLine(line);
-              }
-            }
-            if (buffer) {
-              emitLine(buffer);
-            }
-            subscriber.complete();
-          } catch (error) {
-            if (error instanceof Error && error.name === 'AbortError') {
-              // Silently handle abort
-            } else {
-              subscriber.error(error);
-            }
-          } finally {
-            reader.releaseLock();
-          }
-        })
-        .catch((error) => {
-          if (error instanceof Error && error.name === 'AbortError') {
-            return;
-          }
-          subscriber.error(error);
-        });
-
-      return () => {
-        abortController.abort();
-      };
-    });
+    return streamServerSentEvents<BookMetadata>(
+      `${this.url}/${bookId}/metadata/prospective`,
+      token,
+      {body: request}
+    );
   }
 
   fetchMetadataDetail(provider: string, providerItemId: string): Observable<BookMetadata> {

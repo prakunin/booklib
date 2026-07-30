@@ -101,6 +101,29 @@ class TaskHistoryServiceTest {
     }
 
     @Test
+    void updateTaskProgressPersistsCurrentState() {
+        TaskHistoryEntity entity = TaskHistoryEntity.builder()
+                .id("task-progress")
+                .type(TaskType.UPDATE_BOOK_RECOMMENDATIONS)
+                .status(TaskStatus.IN_PROGRESS)
+                .progressPercentage(0)
+                .createdAt(FIXED_TIME)
+                .build();
+        when(taskHistoryRepository.findById("task-progress")).thenReturn(Optional.of(entity));
+
+        taskHistoryService.updateTaskProgress(
+                "task-progress",
+                TaskStatus.IN_PROGRESS,
+                42,
+                "Generated semantic embeddings: 100/200 books");
+
+        assertEquals(42, entity.getProgressPercentage());
+        assertEquals("Generated semantic embeddings: 100/200 books", entity.getMessage());
+        assertNotNull(entity.getUpdatedAt());
+        verify(taskHistoryRepository).save(entity);
+    }
+
+    @Test
     void testUpdateTaskError_foundAndUpdated() {
         String taskId = "task3";
         TaskHistoryEntity entity = TaskHistoryEntity.builder()

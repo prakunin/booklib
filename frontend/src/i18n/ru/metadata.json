@@ -26,6 +26,7 @@
         "regenerateCoverTooltip": "Перегенерировать обложку (из файла)",
         "generateCustomCoverTooltip": "Сгенерировать пользовательскую обложку",
         "searchCoverTooltip": "Найти обложку",
+        "smartEnrichTooltip": "Опознать произведение в интернете и заполнить недостающие метаданные",
         "uploadCoverTooltip": "Загрузить обложку",
         "lockCoverTooltip": "Заблокировать обложку",
         "unlockCoverTooltip": "Разблокировать обложку",
@@ -402,7 +403,9 @@
         "menuUnmarkPhysical": "",
         "firstAuthorBadge": "",
         "shelvesLabel": "",
-        "audiobookAbridged": ""
+        "audiobookAbridged": "",
+        "smartEnrichBtn": "Умное дополнение",
+        "smartEnrichTooltip": "Определить произведение в интернете и предложить недостающие метаданные"
     },
     "sidecar": {
         "title": "Сопроводительные метаданные",
@@ -599,5 +602,50 @@
     },
     "fetchOptions": {
         "startRefresh": "Начать обновление"
+    },
+    "smartEnrichment": {
+        "title": "Умное дополнение",
+        "subtitle": "Определяет произведение по файлу и проверяет найденное",
+        "stageResolving": "Определяем произведение…",
+        "stageVerifying": "Проверяем рейтинг по Goodreads…",
+        "identifiedWork": "Определённое произведение",
+        "originalTitle": "Оригинальное название",
+        "originalAuthor": "Оригинальный автор",
+        "firstPublished": "Первая публикация",
+        "ratingVerification": "Рейтинг",
+        "ratingVerified": "Получен с Goodreads",
+        "ratingReported": "агент прочитал",
+        "ratingUnverified": "проверить не удалось",
+        "sources": "Источники",
+        "proposals": "Предлагаемые изменения",
+        "noProposals": "Для этой книги ничего нового не найдено.",
+        "currentValue": "Сейчас",
+        "proposedValue": "Предлагается",
+        "empty": "(пусто)",
+        "lockedField": "Заблокировано",
+        "field": {
+            "title": "Название",
+            "authors": "Автор",
+            "description": "Описание",
+            "publisher": "Издатель",
+            "publishedDate": "Дата издания",
+            "isbn13": "ISBN-13",
+            "isbn10": "ISBN-10",
+            "pageCount": "Страниц",
+            "seriesName": "Серия",
+            "seriesNumber": "Номер в серии",
+            "seriesTotal": "Всего в серии",
+            "categories": "Жанры",
+            "goodreadsId": "Goodreads ID",
+            "goodreadsRating": "Рейтинг Goodreads"
+        },
+        "applyBtn": "Применить выбранное",
+        "fillFormBtn": "Заполнить форму",
+        "applyingBtn": "Применяем…",
+        "closeBtn": "Закрыть",
+        "appliedSummary": "Метаданные обновлены",
+        "appliedDetail": "Применено полей: {{count}}",
+        "applyErrorSummary": "Не удалось применить метаданные",
+        "genericError": "Умное дополнение не сработало"
     }
 }

@@ -685,6 +685,7 @@ public class OpdsFeedService {
             case AZW3 -> "application/vnd.amazon.ebook";
             case CBX -> cbxMimeType(bookFile);
             case AUDIOBOOK -> audiobookMimeType(bookFile);
+            case OTHER -> "application/octet-stream";
         };
     }
 

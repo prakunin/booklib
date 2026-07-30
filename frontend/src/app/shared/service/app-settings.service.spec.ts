@@ -198,4 +198,22 @@ describe('AppSettingsService', () => {
       expect.objectContaining({oidcEnabled: false}),
     );
   });
+
+  it('loads recommendation embedding models from the settings endpoint', () => {
+    flushInitialSettingsRequests(httpTestingController);
+    const models = ['qwen3-embedding:0.6b', 'snowflake-arctic-embed2'];
+    let result: string[] | undefined;
+
+    service.getRecommendationEmbeddingModels().subscribe(value => {
+      result = value;
+    });
+
+    const request = httpTestingController.expectOne(
+      req => req.url.endsWith('/api/v1/settings/recommendation-embedding/models'),
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush(models);
+
+    expect(result).toEqual(models);
+  });
 });

@@ -2,6 +2,8 @@ package org.booklore.service.appsettings;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.booklore.config.AppProperties;
+import org.booklore.config.RecommendationEmbeddingProperties;
+import org.booklore.config.SmartEnrichmentProperties;
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.exception.ApiError;
 import org.booklore.model.dto.BookLoreUser;
@@ -36,12 +38,22 @@ public class AppSettingService {
     private static final String DEFAULT_DISABLED = "false";
 
     private final AppProperties appProperties;
+    private final RecommendationEmbeddingProperties recommendationEmbeddingProperties;
+    private final SmartEnrichmentProperties smartEnrichmentProperties;
     private final SettingPersistenceHelper settingPersistenceHelper;
     private final AuthenticationService authenticationService;
     private final AuditService auditService;
 
-    public AppSettingService(AppProperties appProperties, SettingPersistenceHelper settingPersistenceHelper, @Lazy AuthenticationService authenticationService, @Lazy AuditService auditService) {
+    public AppSettingService(
+            AppProperties appProperties,
+            RecommendationEmbeddingProperties recommendationEmbeddingProperties,
+            SmartEnrichmentProperties smartEnrichmentProperties,
+            SettingPersistenceHelper settingPersistenceHelper,
+            @Lazy AuthenticationService authenticationService,
+            @Lazy AuditService auditService) {
         this.appProperties = appProperties;
+        this.recommendationEmbeddingProperties = recommendationEmbeddingProperties;
+        this.smartEnrichmentProperties = smartEnrichmentProperties;
         this.settingPersistenceHelper = settingPersistenceHelper;
         this.authenticationService = authenticationService;
         this.auditService = auditService;
@@ -74,6 +86,20 @@ public class AppSettingService {
             PasswordPolicy policy = settingPersistenceHelper.convertSettingValue(val, PasswordPolicy.class);
             validatePasswordPolicy(policy);
             val = policy;
+        }
+
+        if (key == AppSettingKey.RECOMMENDATION_EMBEDDING_SETTINGS) {
+            RecommendationEmbeddingSettings settings = settingPersistenceHelper.convertSettingValue(
+                    val, RecommendationEmbeddingSettings.class);
+            validateRecommendationEmbeddingSettings(settings);
+            val = settings;
+        }
+
+        if (key == AppSettingKey.SMART_ENRICHMENT_SETTINGS) {
+            SmartEnrichmentSettings settings = settingPersistenceHelper.convertSettingValue(
+                    val, SmartEnrichmentSettings.class);
+            validateSmartEnrichmentSettings(settings);
+            val = settings;
         }
 
         var setting = settingPersistenceHelper.appSettingsRepository.findByName(key.toString());
@@ -118,6 +144,67 @@ public class AppSettingService {
             throw ApiError.INVALID_INPUT.createException(
                     "Password minimum length must be between 1 and " + PasswordPolicy.MAX_PASSWORD_LENGTH);
         }
+    }
+
+    private void validateRecommendationEmbeddingSettings(RecommendationEmbeddingSettings settings) {
+        if (settings == null) {
+            throw ApiError.INVALID_INPUT.createException("Recommendation embedding settings are required");
+        }
+        if (settings.getOllamaBaseUrl() == null || settings.getOllamaBaseUrl().isBlank()) {
+            throw ApiError.INVALID_INPUT.createException("Ollama base URL is required");
+        }
+        try {
+            URI uri = URI.create(settings.getOllamaBaseUrl().trim());
+            if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
+                throw ApiError.INVALID_INPUT.createException("Ollama base URL must use HTTP or HTTPS");
+            }
+            if (uri.getHost() == null || uri.getHost().isBlank()) {
+                throw ApiError.INVALID_INPUT.createException("Ollama base URL must include a host");
+            }
+            settings.setOllamaBaseUrl(uri.toString().replaceAll("/+$", ""));
+        } catch (IllegalArgumentException exception) {
+            throw ApiError.INVALID_INPUT.createException("Ollama base URL is invalid");
+        }
+        if (settings.getModel() == null || settings.getModel().isBlank()) {
+            throw ApiError.INVALID_INPUT.createException("Embedding model is required");
+        }
+        settings.setModel(settings.getModel().trim());
+        if (settings.getDimensions() != 512) {
+            throw ApiError.INVALID_INPUT.createException("The current semantic vector index requires 512 dimensions");
+        }
+        if ((settings.getModel() + "-" + settings.getDimensions() + "-v1").length() > 48) {
+            throw ApiError.INVALID_INPUT.createException("Embedding model name is too long");
+        }
+        if (settings.getBatchSize() < 1 || settings.getBatchSize() > 256) {
+            throw ApiError.INVALID_INPUT.createException("Embedding batch size must be between 1 and 256");
+        }
+        Double minSearchSimilarity = settings.getMinSearchSimilarity();
+        if (minSearchSimilarity != null && (minSearchSimilarity < 0 || minSearchSimilarity > 1)) {
+            throw ApiError.INVALID_INPUT.createException("Minimum search similarity must be between 0 and 1");
+        }
+    }
+
+    /**
+     * The model name reaches the agent CLI as a command-line argument. It is passed through
+     * {@link ProcessBuilder} rather than a shell, so nothing here is guarding against injection —
+     * the character allowlist exists so a typo becomes a rejected setting instead of a CLI that
+     * refuses every run once the agent is enabled.
+     */
+    private void validateSmartEnrichmentSettings(SmartEnrichmentSettings settings) {
+        if (settings == null) {
+            throw ApiError.INVALID_INPUT.createException("Smart enrichment settings are required");
+        }
+        String model = settings.getModel() == null ? "" : settings.getModel().trim();
+        if (!model.isEmpty() && !model.matches("[A-Za-z0-9._:-]{1,64}")) {
+            throw ApiError.INVALID_INPUT.createException("Agent model name is invalid");
+        }
+        settings.setModel(model);
+
+        String effort = settings.getEffort() == null ? "" : settings.getEffort().trim().toLowerCase();
+        if (!effort.isEmpty() && !Set.of("low", "medium", "high").contains(effort)) {
+            throw ApiError.INVALID_INPUT.createException("Agent effort must be low, medium or high");
+        }
+        settings.setEffort(effort);
     }
 
     private void validatePermission(AppSettingKey key, BookLoreUser user) {
@@ -249,6 +336,19 @@ public class AppSettingService {
         builder.autoBookSearch(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.AUTO_BOOK_SEARCH, DEFAULT_DISABLED)));
         builder.uploadPattern(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.UPLOAD_FILE_PATTERN, "{authors}/<{series}/><{seriesIndex}. >/{title}/{title}< - {authors}>< ({year})>"));
         builder.similarBookRecommendation(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.SIMILAR_BOOK_RECOMMENDATION, "true")));
+        builder.recommendationEmbeddingSettings(withDefaultSearchSimilarity(
+                settingPersistenceHelper.getJsonSetting(
+                        settingsMap,
+                        AppSettingKey.RECOMMENDATION_EMBEDDING_SETTINGS,
+                        RecommendationEmbeddingSettings.class,
+                        defaultRecommendationEmbeddingSettings(),
+                        true)));
+        builder.smartEnrichmentSettings(settingPersistenceHelper.getJsonSetting(
+                settingsMap,
+                AppSettingKey.SMART_ENRICHMENT_SETTINGS,
+                SmartEnrichmentSettings.class,
+                defaultSmartEnrichmentSettings(),
+                true));
         builder.opdsServerEnabled(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OPDS_SERVER_ENABLED, DEFAULT_DISABLED)));
         builder.komgaApiEnabled(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.KOMGA_API_ENABLED, DEFAULT_DISABLED)));
         builder.komgaGroupUnknown(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.KOMGA_GROUP_UNKNOWN, "true")));
@@ -278,6 +378,40 @@ public class AppSettingService {
         builder.diskType(appProperties.getDiskType());
 
         return builder.build();
+    }
+
+    /**
+     * Settings rows persisted before semantic search existed carry no similarity threshold. Filling it
+     * on read keeps the value concrete for API consumers instead of leaking a null into the UI.
+     */
+    private RecommendationEmbeddingSettings withDefaultSearchSimilarity(RecommendationEmbeddingSettings settings) {
+        if (settings != null && settings.getMinSearchSimilarity() == null) {
+            settings.setMinSearchSimilarity(recommendationEmbeddingProperties.getMinSearchSimilarity());
+        }
+        return settings;
+    }
+
+    /**
+     * YAML supplies the first value only. Once the row exists the UI owns it, which is why the
+     * enabled flag can start from a deployment default and then be flipped without a restart.
+     */
+    private SmartEnrichmentSettings defaultSmartEnrichmentSettings() {
+        return SmartEnrichmentSettings.builder()
+                .enabled(smartEnrichmentProperties.isEnabled())
+                .model(smartEnrichmentProperties.getModel() == null ? "" : smartEnrichmentProperties.getModel())
+                .effort(smartEnrichmentProperties.getEffort() == null ? "" : smartEnrichmentProperties.getEffort())
+                .deepSearch(smartEnrichmentProperties.isDeepSearch())
+                .build();
+    }
+
+    private RecommendationEmbeddingSettings defaultRecommendationEmbeddingSettings() {
+        return RecommendationEmbeddingSettings.builder()
+                .ollamaBaseUrl(recommendationEmbeddingProperties.getOllamaBaseUrl())
+                .model(recommendationEmbeddingProperties.getModel())
+                .dimensions(recommendationEmbeddingProperties.getDimensions())
+                .batchSize(recommendationEmbeddingProperties.getBatchSize())
+                .minSearchSimilarity(recommendationEmbeddingProperties.getMinSearchSimilarity())
+                .build();
     }
 
     public String getSettingValue(String key) {

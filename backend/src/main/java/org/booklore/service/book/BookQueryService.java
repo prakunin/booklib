@@ -8,6 +8,7 @@ import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.BookRecommendationLite;
 import org.booklore.model.dto.ComicMetadata;
 import org.booklore.model.entity.BookEntity;
+import org.booklore.repository.BookEmbeddingVectorRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.UserContentRestrictionRepository;
 import org.booklore.security.policy.ContentRestrictionSpecification;
@@ -37,6 +38,7 @@ public class BookQueryService {
             0, MAX_LEGACY_FULL_CATALOG_BOOKS, Sort.by("id").ascending());
 
     private final BookRepository bookRepository;
+    private final BookEmbeddingVectorRepository bookEmbeddingVectorRepository;
     private final BookMapperV2 bookMapperV2;
     private final ContentRestrictionService contentRestrictionService;
     private final UserContentRestrictionRepository restrictionRepository;
@@ -88,13 +90,23 @@ public class BookQueryService {
 
     public List<BookEntity> getAllFullBookEntitiesBatch(Pageable pageable) {
         List<BookEntity> books = bookRepository.findAllFullBooksBatch(pageable);
+        initializeEmbeddingMetadata(books);
+        return books;
+    }
+
+    public List<BookEntity> getAllFullBookEntitiesAfterId(long afterId, Pageable pageable) {
+        List<BookEntity> books = bookRepository.findAllFullBooksAfterId(afterId, pageable);
+        initializeEmbeddingMetadata(books);
+        return books;
+    }
+
+    private void initializeEmbeddingMetadata(List<BookEntity> books) {
         for (BookEntity book : books) {
             if (book.getMetadata() != null) {
                 Hibernate.initialize(book.getMetadata().getAuthors());
                 Hibernate.initialize(book.getMetadata().getCategories());
             }
         }
-        return books;
     }
 
     public List<BookEntity> getRecommendationCandidatesAfterId(long excludeBookId, long afterId, Pageable pageable) {
@@ -146,6 +158,7 @@ public class BookQueryService {
                 book.getMetadata().setEmbeddingUpdatedAt(Instant.now());
             }
         }
+        bookEmbeddingVectorRepository.upsertAll(embeddingJsonByBookId);
     }
 
     @Transactional
@@ -169,6 +182,11 @@ public class BookQueryService {
         BookEntity book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new IllegalArgumentException("Book not found with ID: " + bookId));
         book.setSimilarBooksJson(recommendations);
+    }
+
+    @Transactional
+    public int clearAllRecommendations() {
+        return bookRepository.clearAllRecommendations();
     }
 
     private List<Book> mapBooksToDto(List<BookEntity> books, boolean includeDescription, Long userId, boolean stripForListView) {

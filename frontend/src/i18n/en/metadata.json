@@ -26,6 +26,7 @@
     "regenerateCoverTooltip": "Regenerate cover (From File)",
     "generateCustomCoverTooltip": "Generate Custom Cover",
     "searchCoverTooltip": "Search for cover",
+    "smartEnrichTooltip": "Identify the work online and fill in missing metadata",
     "uploadCoverTooltip": "Upload cover",
     "lockCoverTooltip": "Lock Cover",
     "unlockCoverTooltip": "Unlock Cover",
@@ -402,7 +403,9 @@
       "largeFileMessage": "This file exceeds 25MB. Some email providers may reject large attachments.\n\nDo you want to send it anyway?",
       "largeFileHeader": "Large File Warning",
       "sendAnyway": "Send Anyway"
-    }
+    },
+    "smartEnrichBtn": "Smart Enrich",
+    "smartEnrichTooltip": "Identify the work online and suggest missing metadata"
   },
   "sidecar": {
     "title": "Sidecar Metadata",
@@ -599,5 +602,50 @@
   },
   "fetchOptions": {
     "startRefresh": "Start Refresh"
+  },
+  "smartEnrichment": {
+    "title": "Smart Enrichment",
+    "subtitle": "Identifies the work behind this file, then verifies what it finds",
+    "stageResolving": "Identifying the work…",
+    "stageVerifying": "Verifying the rating against Goodreads…",
+    "identifiedWork": "Identified work",
+    "originalTitle": "Original title",
+    "originalAuthor": "Original author",
+    "firstPublished": "First published",
+    "ratingVerification": "Rating",
+    "ratingVerified": "Fetched from Goodreads",
+    "ratingReported": "agent read",
+    "ratingUnverified": "could not be verified",
+    "sources": "Sources",
+    "proposals": "Proposed changes",
+    "noProposals": "Nothing new was found for this book.",
+    "currentValue": "Current",
+    "proposedValue": "Proposed",
+    "empty": "(empty)",
+    "lockedField": "Locked",
+    "field": {
+      "title": "Title",
+      "authors": "Author",
+      "description": "Description",
+      "publisher": "Publisher",
+      "publishedDate": "Publish date",
+      "isbn13": "ISBN-13",
+      "isbn10": "ISBN-10",
+      "pageCount": "Pages",
+      "seriesName": "Series",
+      "seriesNumber": "Series #",
+      "seriesTotal": "Series total",
+      "categories": "Genres",
+      "goodreadsId": "Goodreads ID",
+      "goodreadsRating": "Goodreads rating"
+    },
+    "applyBtn": "Apply selected",
+    "fillFormBtn": "Fill in the form",
+    "applyingBtn": "Applying…",
+    "closeBtn": "Close",
+    "appliedSummary": "Metadata updated",
+    "appliedDetail": "{{count}} field(s) applied",
+    "applyErrorSummary": "Could not apply metadata",
+    "genericError": "Smart enrichment failed"
   }
 }

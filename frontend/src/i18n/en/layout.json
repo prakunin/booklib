@@ -9,6 +9,7 @@
             "action": "Actions",
             "page": "Navigation",
             "book": "Books",
+            "semanticBook": "Related by meaning",
             "author": "Authors",
             "series": "Series",
             "shelf": "Shelves",

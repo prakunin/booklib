@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component, computed, inject, input, output, signal} from '@angular/core';
 import {Tooltip} from 'primeng/tooltip';
-import {AdditionalFile, Book, BookType, ReadStatus} from '../../../model/book.model';
+import {AdditionalFile, Book, BookType, isReadableBookType, ReadStatus} from '../../../model/book.model';
 import {ConfirmationService, MenuItem, MessageService} from 'primeng/api';
 import {BookService} from '../../../service/book.service';
 import {BookFileService} from '../../../service/book-file.service';
@@ -176,6 +176,8 @@ export class BookCardComponent {
   });
 
   readonly hasDigitalFile = computed(() => !!this.book().primaryFile);
+  // Download-only formats (OTHER) have no reader, so the card hides its Read affordance for them.
+  readonly isReadable = computed(() => isReadableBookType(this.book().primaryFile?.bookType));
 
   readonly readingUrl = computed(() => this.urlHelper.getBookPrimaryReadingUrl(this.book()));
 
