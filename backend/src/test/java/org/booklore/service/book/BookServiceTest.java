@@ -9,7 +9,11 @@ import org.booklore.model.dto.request.ReadProgressRequest;
 import org.booklore.model.dto.response.BookDeletionResponse;
 import org.booklore.model.dto.response.BookStatusUpdateResponse;
 import org.booklore.model.entity.*;
+import org.booklore.model.entity.CbxViewerPreferencesEntity;
+import org.booklore.model.entity.NewPdfViewerPreferencesEntity;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.CbxPageViewMode;
+import org.booklore.model.enums.NewPdfPageViewMode;
 import org.booklore.repository.*;
 import org.booklore.service.audit.AuditService;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
@@ -266,6 +270,38 @@ class BookServiceTest {
         assertEquals(2, settings.getEbookSettings().getMaxColumnCount());
         assertEquals(1200, settings.getEbookSettings().getMaxInlineSize());
         assertEquals("light", settings.getEbookSettings().getTheme());
+    }
+
+    @Test
+    void getBookViewerSetting_djvu_returnsBothPageAndPdfSettings() {
+        // A DjVu book is read in the page reader and, once its searchable rendition exists, in the
+        // PDF reader. Both readers ask this one endpoint for the same book, so refusing either kind
+        // of setting is what leaves the reader unable to open the book at all.
+        BookEntity entity = new BookEntity();
+        entity.setId(6L);
+        BookFileEntity primaryFile = new BookFileEntity();
+        primaryFile.setId(1L);
+        primaryFile.setBook(entity);
+        primaryFile.setBookType(BookFileType.DJVU);
+        entity.setBookFiles(List.of(primaryFile));
+        when(bookRepository.findByIdWithBookFiles(6L)).thenReturn(Optional.of(entity));
+
+        CbxViewerPreferencesEntity cbxPref = new CbxViewerPreferencesEntity();
+        cbxPref.setPageViewMode(CbxPageViewMode.SINGLE_PAGE);
+        when(cbxViewerPreferencesRepository.findByBookIdAndUserId(6L, testUser.getId()))
+                .thenReturn(Optional.of(cbxPref));
+
+        NewPdfViewerPreferencesEntity pdfPref = new NewPdfViewerPreferencesEntity();
+        pdfPref.setPageViewMode(NewPdfPageViewMode.SINGLE_PAGE);
+        when(newPdfViewerPreferencesRepository.findByBookIdAndUserId(6L, testUser.getId()))
+                .thenReturn(Optional.of(pdfPref));
+
+        when(authenticationService.getAuthenticatedUser()).thenReturn(testUser);
+
+        BookViewerSettings settings = bookService.getBookViewerSetting(6L, 1L);
+
+        assertNotNull(settings.getCbxSettings());
+        assertNotNull(settings.getNewPdfSettings());
     }
 
     @Test

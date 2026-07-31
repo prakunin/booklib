@@ -8,6 +8,7 @@ import org.booklore.model.dto.response.BookStatusUpdateResponse;
 import org.booklore.model.dto.response.PersonalRatingUpdateResponse;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.BookFileType;
+import org.booklore.model.enums.NewPdfPageViewMode;
 import org.booklore.model.enums.ReadStatus;
 import org.booklore.repository.*;
 import org.booklore.service.progress.ReadingProgressService;
@@ -406,5 +407,34 @@ class BookUpdateServiceTest {
         Set<Long> unassignIds = new HashSet<>();
 
         assertThrows(APIException.class, () -> bookUpdateService.assignShelvesToBooks(bookIds, assignIds, unassignIds));
+    }
+
+    @Test
+    void updateBookViewerSetting_djvu_writesWhicheverReaderSentTheSettings() {
+        // The page reader sends cbxSettings, the PDF reader newPdfSettings. A DjVu book is read in
+        // both, so neither may be rejected for it.
+        BookEntity book = new BookEntity();
+        book.setId(6L);
+        BookFileEntity primaryFile = new BookFileEntity();
+        primaryFile.setId(1L);
+        primaryFile.setBook(book);
+        primaryFile.setBookType(BookFileType.DJVU);
+        book.setBookFiles(List.of(primaryFile));
+        BookLoreUser user = mock(BookLoreUser.class);
+        when(user.getId()).thenReturn(1L);
+        when(bookRepository.findByIdWithBookFiles(6L)).thenReturn(Optional.of(book));
+        when(authenticationService.getAuthenticatedUser()).thenReturn(user);
+        when(newPdfViewerPreferencesRepository.findByBookIdAndUserId(6L, 1L))
+                .thenReturn(Optional.of(new NewPdfViewerPreferencesEntity()));
+
+        BookViewerSettings settings = BookViewerSettings.builder()
+                .newPdfSettings(NewPdfViewerPreferences.builder()
+                        .bookId(6L)
+                        .pageViewMode(NewPdfPageViewMode.SINGLE_PAGE)
+                        .build())
+                .build();
+
+        assertDoesNotThrow(() -> bookUpdateService.updateBookViewerSetting(6L, settings));
+        verify(newPdfViewerPreferencesRepository).save(any(NewPdfViewerPreferencesEntity.class));
     }
 }
