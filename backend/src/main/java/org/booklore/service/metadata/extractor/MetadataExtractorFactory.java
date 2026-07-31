@@ -20,6 +20,7 @@ public class MetadataExtractorFactory {
     private final Azw3MetadataExtractor azw3MetadataExtractor;
     private final AudiobookMetadataExtractor audiobookMetadataExtractor;
     private final DocMetadataExtractor docMetadataExtractor;
+    private final DjvuMetadataExtractor djvuMetadataExtractor;
 
     public BookMetadata extractMetadata(BookFileType bookFileType, File file) {
         return switch (bookFileType) {
@@ -31,6 +32,7 @@ public class MetadataExtractorFactory {
             case AZW3 -> azw3MetadataExtractor.extractMetadata(file);
             case AUDIOBOOK -> audiobookMetadataExtractor.extractMetadata(file);
             case DOC -> docMetadataExtractor.extractMetadata(file);
+            case DJVU -> djvuMetadataExtractor.extractMetadata(file);
             case OTHER -> null;
         };
     }
@@ -45,6 +47,7 @@ public class MetadataExtractorFactory {
             case AZW3, AZW -> azw3MetadataExtractor.extractMetadata(file);
             case M4B, M4A, MP3, OPUS -> audiobookMetadataExtractor.extractMetadata(file);
             case DOC, DOCX -> docMetadataExtractor.extractMetadata(file);
+            case DJVU, DJV -> djvuMetadataExtractor.extractMetadata(file);
         };
     }
 
@@ -58,6 +61,7 @@ public class MetadataExtractorFactory {
             case AZW3, AZW -> azw3MetadataExtractor.extractCover(file);
             case M4B, M4A, MP3, OPUS -> audiobookMetadataExtractor.extractCover(file);
             case DOC, DOCX -> docMetadataExtractor.extractCover(file);
+            case DJVU, DJV -> djvuMetadataExtractor.extractCover(file);
         };
     }
 
@@ -71,6 +75,7 @@ public class MetadataExtractorFactory {
             case AZW3 -> azw3MetadataExtractor;
             case AUDIOBOOK -> audiobookMetadataExtractor;
             case DOC -> docMetadataExtractor;
+            case DJVU -> djvuMetadataExtractor;
             case OTHER -> null;
         };
     }

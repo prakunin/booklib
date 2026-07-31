@@ -1,5 +1,6 @@
 package org.booklore.service.system;
 
+import org.booklore.service.djvu.DjvuToolRunner;
 import org.booklore.util.FileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -24,12 +25,14 @@ class ToolVersionServiceTest {
     private FileService fileService;
     @Mock
     private ProcessRunner processRunner;
+    @Mock
+    private DjvuToolRunner djvuToolRunner;
 
     private ToolVersionService service;
 
     @BeforeEach
     void setUp() {
-        service = new ToolVersionService(fileService, processRunner);
+        service = new ToolVersionService(fileService, processRunner, djvuToolRunner);
     }
 
     @Nested

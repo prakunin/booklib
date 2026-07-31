@@ -686,6 +686,7 @@ public class OpdsFeedService {
             case CBX -> cbxMimeType(bookFile);
             case AUDIOBOOK -> audiobookMimeType(bookFile);
             case DOC -> docMimeType(bookFile);
+            case DJVU -> "image/vnd.djvu";
             case OTHER -> "application/octet-stream";
         };
     }

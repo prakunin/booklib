@@ -93,7 +93,9 @@ ENV JAVA_TOOL_OPTIONS="-XX:+UseShenandoahGC \
     --enable-native-access=ALL-UNNAMED \
     --enable-preview"
 
-RUN apk add --no-cache su-exec libstdc++ libgcc libarchive && \
+# djvulibre supplies ddjvu and djvused, which decode DjVu. Unlike ffprobe and kepubify below it
+# publishes no static binary, so it is installed rather than copied in from a scratch layer.
+RUN apk add --no-cache su-exec libstdc++ libgcc libarchive djvulibre && \
     mkdir -p /bookdrop
 
 # Manually link `libarchive.so.13` so java and other libraries can see it
