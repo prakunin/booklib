@@ -117,6 +117,29 @@ public class DjvuToolRunner {
      *                           not the PPM we asked for
      */
     public void renderPageAsJpeg(Path file, int pageNumber, int maxEdgePixels, OutputStream jpegOut) {
+        BufferedImage image = renderPage(file, pageNumber, maxEdgePixels);
+        try {
+            if (!ImageIO.write(image, "jpeg", jpegOut)) {
+                throw new DjvuToolException("No JPEG writer available for a rendered DjVu page");
+            }
+        } catch (IOException e) {
+            throw new DjvuToolException("Failed to encode page " + pageNumber + " of " + file.getFileName(), e);
+        }
+    }
+
+    /**
+     * Renders one page as an image, exactly as the decoder produced it.
+     * <p>
+     * Callers that are going to encode the page themselves must use this rather than
+     * {@link #renderPageAsJpeg}: a scanned page is two colours, and a JPEG round trip turns those
+     * two into hundreds of near-identical ones. Anything deciding <em>how</em> to store the page has
+     * to see it before that happens, or it will be looking at compression artefacts instead of the
+     * scan.
+     *
+     * @param maxEdgePixels longest edge the rendered page may have, or a non-positive value for the
+     *                      document's natural size
+     */
+    public BufferedImage renderPage(Path file, int pageNumber, int maxEdgePixels) {
         Path ddjvu = binary(DDJVU);
 
         List<String> args = new ArrayList<>(List.of("-format=ppm", "-page=" + pageNumber));
@@ -128,15 +151,7 @@ public class DjvuToolRunner {
 
         ByteArrayOutputStream ppm = new ByteArrayOutputStream();
         commandRunner.binary(ddjvu, args, ppm, RENDER_TIMEOUT);
-
-        BufferedImage image = PpmImage.decode(ppm.toByteArray());
-        try {
-            if (!ImageIO.write(image, "jpeg", jpegOut)) {
-                throw new DjvuToolException("No JPEG writer available for a rendered DjVu page");
-            }
-        } catch (IOException e) {
-            throw new DjvuToolException("Failed to encode page " + pageNumber + " of " + file.getFileName(), e);
-        }
+        return PpmImage.decode(ppm.toByteArray());
     }
 
     /**
