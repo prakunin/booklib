@@ -1,8 +1,7 @@
 package org.booklore.model.dto.smart;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import tools.jackson.databind.PropertyNamingStrategies;
-import tools.jackson.databind.annotation.JsonNaming;
 
 import java.util.List;
 
@@ -18,31 +17,30 @@ import java.util.List;
  * year belongs to the work, an ISBN never does.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record ResolvedWorkIdentity(
-        String originalTitle,
-        String originalAuthor,
-        String originalLanguage,
+        @JsonAlias("original_title") String originalTitle,
+        @JsonAlias("original_author") String originalAuthor,
+        @JsonAlias("original_language") String originalLanguage,
         // The title, author and language as they appear on THIS release — for a translation these
         // differ from the original and are what the book record should actually carry. Filled from a
         // real edition page; null when the agent only pinned the work down, not the specific release.
-        String editionTitle,
-        String editionAuthor,
-        String editionLanguage,
-        Integer firstPublishedYear,
-        String goodreadsUrl,
-        Double reportedRating,
+        @JsonAlias("edition_title") String editionTitle,
+        @JsonAlias("edition_author") String editionAuthor,
+        @JsonAlias("edition_language") String editionLanguage,
+        @JsonAlias("first_published_year") Integer firstPublishedYear,
+        @JsonAlias("goodreads_url") String goodreadsUrl,
+        @JsonAlias("reported_rating") Double reportedRating,
         String description,
-        String descriptionLanguage,
-        String descriptionSourceUrl,
+        @JsonAlias("description_language") String descriptionLanguage,
+        @JsonAlias("description_source_url") String descriptionSourceUrl,
         String publisher,
-        String publishedDate,
+        @JsonAlias("published_date") String publishedDate,
         String isbn13,
         String isbn10,
-        Integer pageCount,
-        String seriesName,
-        Float seriesNumber,
-        Integer seriesTotal,
+        @JsonAlias("page_count") Integer pageCount,
+        @JsonAlias("series_name") String seriesName,
+        @JsonAlias("series_number") Float seriesNumber,
+        @JsonAlias("series_total") Integer seriesTotal,
         List<String> genres,
         List<String> sources
 ) {

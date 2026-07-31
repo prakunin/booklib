@@ -65,13 +65,23 @@ public class MetadataProposalBuilder {
                     firstSource(identity), locked(current == null ? null : current.getTitleLocked())));
         }
 
-        // Only when nothing is recorded: an author list that already exists may hold co-authors or a
-        // translator the agent never saw, and a single reported name would silently replace them.
-        boolean hasAuthors = current != null && current.getAuthors() != null && !current.getAuthors().isEmpty();
-        String preferredAuthor = isUsable(identity.editionAuthor()) ? identity.editionAuthor() : identity.originalAuthor();
-        if (!hasAuthors && isUsable(preferredAuthor)) {
-            proposals.add(proposal("authors", null, preferredAuthor.strip(), AGENT_SOURCE,
-                    firstSource(identity), locked(current == null ? null : current.getAuthorsLocked())));
+        // A single bad extractor value (often an uploader nickname) must not suppress a better,
+        // reviewable identity. Multiple names may be co-authors or translators, so never collapse
+        // that list to the agent's one reported name.
+        List<String> currentAuthors =
+                current == null || current.getAuthors() == null ? List.of() : current.getAuthors();
+        boolean hasEditionAuthor = isUsable(identity.editionAuthor());
+        String preferredAuthor = hasEditionAuthor ? identity.editionAuthor() : identity.originalAuthor();
+        boolean safeToReplace = currentAuthors.isEmpty() || hasEditionAuthor;
+        if (currentAuthors.size() <= 1 && safeToReplace && isUsable(preferredAuthor)) {
+            String proposedAuthor = preferredAuthor.strip();
+            String currentAuthor = currentAuthors.isEmpty() ? null : currentAuthors.getFirst();
+            boolean alreadyMatches = isUsable(currentAuthor)
+                    && proposedAuthor.equalsIgnoreCase(currentAuthor.strip());
+            if (!alreadyMatches) {
+                proposals.add(proposal("authors", currentAuthor, proposedAuthor, AGENT_SOURCE,
+                        firstSource(identity), locked(current == null ? null : current.getAuthorsLocked())));
+            }
         }
 
         // Fill the language only when it is missing; the edition's language is the right one, with the

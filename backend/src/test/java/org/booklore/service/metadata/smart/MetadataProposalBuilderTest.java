@@ -157,6 +157,58 @@ class MetadataProposalBuilderTest {
                     .noneMatch(p -> p.field().equals("authors"));
         }
 
+        @Test
+        void proposeReplacingADifferentSingletonAuthor() {
+            Book withBadAuthor = Book.builder()
+                    .id(6L)
+                    .metadata(BookMetadata.builder()
+                            .authors(List.of("AndreyKr"))
+                            .build())
+                    .build();
+
+            MetadataFieldProposal authors = proposal(builder.build(withBadAuthor, TestIdentities.builder()
+                    .editionAuthor("Анатолий Бурак")
+                    .build(), null), "authors").orElseThrow();
+
+            assertThat(authors.currentValue()).isEqualTo("AndreyKr");
+            assertThat(authors.proposedValue()).isEqualTo("Анатолий Бурак");
+            assertThat(authors.locked()).isFalse();
+        }
+
+        @Test
+        void doNotProposeAMatchingSingletonAuthor() {
+            Book withMatchingAuthor = Book.builder()
+                    .id(7L)
+                    .metadata(BookMetadata.builder()
+                            .authors(List.of("  анатолий бурак "))
+                            .build())
+                    .build();
+
+            assertThat(builder.build(withMatchingAuthor, TestIdentities.builder()
+                    .editionAuthor("Анатолий Бурак")
+                    .build(), null))
+                    .noneMatch(p -> p.field().equals("authors"));
+        }
+
+        @Test
+        void showButLockASingletonAuthorReplacementWhenAuthorsAreLocked() {
+            Book withLockedAuthor = Book.builder()
+                    .id(8L)
+                    .metadata(BookMetadata.builder()
+                            .authors(List.of("AndreyKr"))
+                            .authorsLocked(true)
+                            .build())
+                    .build();
+
+            MetadataFieldProposal authors = proposal(builder.build(withLockedAuthor, TestIdentities.builder()
+                    .editionAuthor("Анатолий Бурак")
+                    .build(), null), "authors").orElseThrow();
+
+            assertThat(authors.currentValue()).isEqualTo("AndreyKr");
+            assertThat(authors.proposedValue()).isEqualTo("Анатолий Бурак");
+            assertThat(authors.locked()).isTrue();
+        }
+
         // The common case the feature exists for: an FB2 with empty internals. Edition fields (the
         // release's own title/author/language) fill the blanks with the right, same-language values.
         @Test

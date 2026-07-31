@@ -11,8 +11,10 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,11 +57,33 @@ class AgentWorkIdentityResolverTest {
         when(statusService.isBinaryAvailable()).thenReturn(true);
         when(excerptExtractor.openingText(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
                 .thenReturn(Optional.empty());
-        AgentCliClient client = new AgentCliClient() {
+        return new AgentWorkIdentityResolver(appSettingService, statusService, new AgentCliClient() {
             @Override
             public Optional<String> run(String prompt) {
                 capturedPrompt.set(prompt);
                 return Optional.ofNullable(response);
+            }
+
+            @Override
+            public Optional<String> runCommand(List<String> args, Duration timeout) {
+                throw new AssertionError("Resolution must not shell out to CLI subcommands");
+            }
+        }, new WorkIdentityPromptBuilder(), excerptExtractor, new ObjectMapper());
+    }
+
+    private AgentWorkIdentityResolver resolverReturning(List<String> responses, List<String> capturedPrompts) {
+        when(appSettingService.getAppSettings())
+                .thenReturn(AppSettings.builder().smartEnrichmentSettings(settings).build());
+        when(statusService.isBinaryAvailable()).thenReturn(true);
+        when(excerptExtractor.openingText(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(Optional.empty());
+        AtomicInteger nextResponse = new AtomicInteger();
+        AgentCliClient client = new AgentCliClient() {
+            @Override
+            public Optional<String> run(String prompt) {
+                capturedPrompts.add(prompt);
+                int index = nextResponse.getAndIncrement();
+                return index < responses.size() ? Optional.ofNullable(responses.get(index)) : Optional.empty();
             }
 
             @Override
@@ -101,6 +125,54 @@ class AgentWorkIdentityResolverTest {
             assertThat(identity.reportedRating()).isEqualTo(3.68);
             assertThat(identity.descriptionLanguage()).isEqualTo("ru");
             assertThat(identity.sources()).hasSize(2);
+        }
+
+        @Test
+        void retriesAParsedEmptyQuickIdentityOnceWithDeepSearch() {
+            settings.setEnabled(true);
+            List<String> prompts = new ArrayList<>();
+
+            Optional<ResolvedWorkIdentity> resolved =
+                    resolverReturning(List.of("{}", REAL_RESPONSE), prompts).resolve(book());
+
+            assertThat(resolved).isPresent();
+            assertThat(resolved.orElseThrow().originalAuthor()).isEqualTo("Michel de Montaigne");
+            assertThat(prompts).hasSize(2);
+            assertThat(prompts.getFirst()).contains("Do NOT search the web");
+            assertThat(prompts.get(1)).contains("Using web search");
+        }
+
+        @Test
+        void doesNotRetryAUsableQuickIdentity() {
+            settings.setEnabled(true);
+            List<String> prompts = new ArrayList<>();
+
+            resolverReturning(List.of(REAL_RESPONSE), prompts).resolve(book());
+
+            assertThat(prompts).hasSize(1);
+            assertThat(prompts.getFirst()).contains("Do NOT search the web");
+        }
+
+        @Test
+        void doesNotRetryAnUnparseableQuickResponse() {
+            settings.setEnabled(true);
+            List<String> prompts = new ArrayList<>();
+
+            assertThat(resolverReturning(List.of("not json"), prompts).resolve(book())).isEmpty();
+
+            assertThat(prompts).hasSize(1);
+        }
+
+        @Test
+        void explicitDeepModeRunsOnlyOnce() {
+            settings.setEnabled(true);
+            settings.setDeepSearch(true);
+            List<String> prompts = new ArrayList<>();
+
+            resolverReturning(List.of("{}"), prompts).resolve(book());
+
+            assertThat(prompts).hasSize(1);
+            assertThat(prompts.getFirst()).contains("Using web search");
         }
 
         @Test

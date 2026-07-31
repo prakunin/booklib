@@ -37,6 +37,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     private static final Pattern ISBN_CLEANER_PATTERN = Pattern.compile("[^0-9Xx]");
     private static final Pattern ISO_DATE_PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final String TITLE_INFO_ELEMENT = "title-info";
+    private static final String BODY_ELEMENT = "body";
     private static final String BINARY_ELEMENT = "binary";
 
     /**
@@ -81,13 +82,17 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                         if (scan.titleInfoDepth > 0) {
                             scan.titleInfoDepth--;
                         }
+                        if (scan.bodyDepth > 0) {
+                            scan.bodyDepth--;
+                        }
                     }
                 }
             } finally {
                 reader.close();
             }
 
-            String binaryId = StringUtils.defaultIfBlank(scan.coverBinaryId, scan.referencedImageId);
+            String binaryId = StringUtils.defaultIfBlank(scan.coverBinaryId,
+                    StringUtils.defaultIfBlank(scan.referencedImageId, scan.firstBodyImageId));
             return StringUtils.isBlank(binaryId) ? null : new CoverCandidate(binaryId);
         }
     }
@@ -99,14 +104,21 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         if (scan.coverpageDepth > 0) {
             scan.coverpageDepth++;
         }
+        if (scan.bodyDepth > 0) {
+            scan.bodyDepth++;
+        }
 
         String localName = reader.getLocalName();
         if (TITLE_INFO_ELEMENT.equals(localName)) {
             scan.titleInfoDepth = 1;
+        } else if (BODY_ELEMENT.equals(localName)) {
+            scan.bodyDepth = 1;
         } else if (scan.titleInfoDepth > 0 && "coverpage".equals(localName)) {
             scan.coverpageDepth = 1;
         } else if (scan.coverpageDepth > 0 && "image".equals(localName) && scan.referencedImageId == null) {
             readReferencedImageId(reader, scan);
+        } else if (scan.bodyDepth > 0 && "image".equals(localName) && scan.firstBodyImageId == null) {
+            readFirstBodyImageId(reader, scan);
         } else if (BINARY_ELEMENT.equals(localName) && scan.coverBinaryId == null) {
             readCoverBinaryId(reader, scan);
         }
@@ -116,6 +128,13 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         String href = getHrefAttribute(reader);
         if (href != null && href.startsWith("#")) {
             scan.referencedImageId = href.substring(1);
+        }
+    }
+
+    private void readFirstBodyImageId(XMLStreamReader reader, CoverScan scan) {
+        String href = getHrefAttribute(reader);
+        if (href != null && href.startsWith("#")) {
+            scan.firstBodyImageId = href.substring(1);
         }
     }
 
@@ -131,8 +150,10 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     private static final class CoverScan {
         private String coverBinaryId;
         private String referencedImageId;
+        private String firstBodyImageId;
         private int titleInfoDepth;
         private int coverpageDepth;
+        private int bodyDepth;
     }
 
     @SuppressWarnings("java:S1168") // return value flows straight through to extractCover's null-means-no-cover contract
