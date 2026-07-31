@@ -241,4 +241,150 @@ describe('SmartEnrichmentComponent', () => {
       expect(result.proposals[0].field).toBe('description');
     });
   });
+
+  describe('bulk mode', () => {
+    let bulkFixture: ComponentFixture<SmartEnrichmentComponent>;
+    let bulkComponent: SmartEnrichmentComponent;
+    let bulkDialogRef: {close: ReturnType<typeof vi.fn>};
+    let bulkUpdate: ReturnType<typeof vi.fn>;
+    let enrich: ReturnType<typeof vi.fn>;
+    let firstBookEvents: Subject<SmartEnrichmentEvent>;
+    let secondBookEvents: Subject<SmartEnrichmentEvent>;
+
+    beforeEach(async () => {
+      firstBookEvents = new Subject<SmartEnrichmentEvent>();
+      secondBookEvents = new Subject<SmartEnrichmentEvent>();
+      bulkDialogRef = {close: vi.fn()};
+      bulkUpdate = vi.fn(() => of({}));
+      enrich = vi.fn((bookId: number) => bookId === 7
+        ? firstBookEvents.asObservable()
+        : secondBookEvents.asObservable());
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [SmartEnrichmentComponent, getTranslocoModule()],
+        providers: [
+          MessageService,
+          {provide: DynamicDialogConfig, useValue: {data: {bookIds: [7, 8]}}},
+          {provide: DynamicDialogRef, useValue: bulkDialogRef},
+          {provide: SmartEnrichmentService, useValue: {enrich}},
+          {provide: BookMetadataManageService, useValue: {updateBookMetadata: bulkUpdate}},
+        ],
+      }).compileComponents();
+
+      bulkFixture = TestBed.createComponent(SmartEnrichmentComponent);
+      bulkComponent = bulkFixture.componentInstance;
+      bulkFixture.detectChanges();
+    });
+
+    it('starts only the first selected book and automatically applies before advancing', () => {
+      expect(enrich).toHaveBeenCalledTimes(1);
+      expect(enrich).toHaveBeenLastCalledWith(7);
+      expect(firstBookEvents.observed).toBe(true);
+      expect(secondBookEvents.observed).toBe(false);
+
+      firstBookEvents.next(completed());
+
+      expect(bulkUpdate).toHaveBeenCalledWith(
+        7,
+        expect.objectContaining({metadata: expect.objectContaining({bookId: 7})}),
+        false,
+        'REPLACE_WHEN_PROVIDED'
+      );
+      expect(firstBookEvents.observed).toBe(false);
+      expect(enrich).toHaveBeenCalledTimes(2);
+      expect(enrich).toHaveBeenLastCalledWith(8);
+      expect(bulkComponent.currentIndex()).toBe(1);
+      expect(bulkComponent.stage()).toBe('RESOLVING');
+      expect(bulkComponent.proposals()).toEqual([]);
+      expect(bulkDialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('keeps a stable bulk progress view while books are processed', () => {
+      expect(bulkComponent.processedBooks()).toBe(0);
+      expect(bulkComponent.progressPercent()).toBe(0);
+      expect(bulkFixture.nativeElement.querySelector('.bulk-progress')).not.toBeNull();
+      expect(bulkFixture.nativeElement.querySelector('.stage')).toBeNull();
+      expect(bulkFixture.nativeElement.querySelector('.proposals')).toBeNull();
+
+      firstBookEvents.next(completed());
+      bulkFixture.detectChanges();
+
+      expect(bulkComponent.processedBooks()).toBe(1);
+      expect(bulkComponent.progressPercent()).toBe(50);
+      expect(bulkFixture.nativeElement.querySelector('.bulk-progress')).not.toBeNull();
+      expect(bulkFixture.nativeElement.querySelector('.proposals')).toBeNull();
+    });
+
+    it('continues automatically when a book cannot be identified', () => {
+      firstBookEvents.next({
+        stage: 'FAILED',
+        message: 'Could not identify the work',
+        identity: null,
+        ratingVerification: null,
+        proposals: [],
+      });
+
+      expect(firstBookEvents.observed).toBe(false);
+      expect(enrich).toHaveBeenLastCalledWith(8);
+      expect(bulkComponent.currentIndex()).toBe(1);
+      expect(bulkComponent.failedBooks()).toBe(1);
+    });
+
+    it('finishes the queue automatically after the last book is applied', () => {
+      firstBookEvents.next(completed());
+      secondBookEvents.next(completed());
+
+      expect(bulkUpdate).toHaveBeenCalledTimes(2);
+      expect(secondBookEvents.observed).toBe(false);
+      expect(bulkDialogRef.close).toHaveBeenCalledWith({completed: true});
+      expect(bulkComponent.updatedBooks()).toBe(2);
+    });
+
+    it('advances without an empty metadata update when a book has no unlocked proposals', () => {
+      firstBookEvents.next(completed({proposals: []}));
+
+      expect(firstBookEvents.observed).toBe(false);
+      expect(enrich).toHaveBeenLastCalledWith(8);
+      expect(bulkUpdate).not.toHaveBeenCalled();
+      expect(bulkComponent.unchangedBooks()).toBe(1);
+    });
+
+    it('continues after a stream error or metadata-save failure', () => {
+      firstBookEvents.error(new Error('stream failed'));
+
+      expect(enrich).toHaveBeenLastCalledWith(8);
+      expect(bulkComponent.failedBooks()).toBe(1);
+
+      bulkUpdate.mockReturnValueOnce(throwError(() => new Error('save failed')));
+      secondBookEvents.next(completed());
+
+      expect(bulkComponent.failedBooks()).toBe(2);
+      expect(bulkDialogRef.close).toHaveBeenCalledWith({completed: true});
+    });
+
+    it('cancels the active queue when the dialog is closed', () => {
+      bulkComponent.close();
+
+      expect(firstBookEvents.observed).toBe(false);
+      expect(enrich).toHaveBeenCalledTimes(1);
+      expect(bulkDialogRef.close).toHaveBeenCalledWith(false);
+    });
+
+    it('cancels an in-flight metadata save without starting the next book', () => {
+      const saveResult = new Subject<object>();
+      bulkUpdate.mockReturnValueOnce(saveResult.asObservable());
+      firstBookEvents.next(completed());
+
+      expect(saveResult.observed).toBe(true);
+      expect(enrich).toHaveBeenCalledTimes(1);
+
+      bulkComponent.close();
+      saveResult.next({});
+
+      expect(saveResult.observed).toBe(false);
+      expect(enrich).toHaveBeenCalledTimes(1);
+      expect(bulkDialogRef.close).toHaveBeenCalledWith(false);
+    });
+  });
 });

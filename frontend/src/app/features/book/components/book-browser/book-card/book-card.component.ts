@@ -98,6 +98,14 @@ export class BookCardComponent {
     this.progressPercentage() !== null || this.koProgressPercentage() !== null || this.koboProgressPercentage() !== null
   );
 
+  readonly bookFileCount = computed(() =>
+    (this.book().primaryFile ? 1 : 0) + (this.book().alternativeFormats?.length ?? 0)
+  );
+
+  readonly bookFileCountTooltip = computed(() =>
+    this.t.translate('book.card.alt.bookFiles', {count: this.bookFileCount()})
+  );
+
   readonly isSeriesViewActive = computed(() =>
     this.seriesViewEnabled() && !!this.book().seriesCount && this.book().seriesCount! >= 1
   );

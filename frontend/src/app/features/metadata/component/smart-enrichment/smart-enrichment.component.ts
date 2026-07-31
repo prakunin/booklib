@@ -2,6 +2,7 @@ import {Component, computed, inject, OnDestroy, OnInit, signal} from '@angular/c
 import {Button} from 'primeng/button';
 import {Checkbox} from 'primeng/checkbox';
 import {FormsModule} from '@angular/forms';
+import {ProgressBar} from 'primeng/progressbar';
 import {ProgressSpinner} from 'primeng/progressspinner';
 import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
 import {MessageService} from 'primeng/api';
@@ -24,16 +25,15 @@ function splitProposedList(value: string): string[] {
 }
 
 /**
- * Shows what an enrichment run found and lets the user apply it field by field.
+ * Shows what a single-book enrichment run found and lets the user apply it field by field.
  *
- * Nothing is written without an explicit click. That is the whole design of the first version: a
- * wrong match has to be a visible mistake the user declines, not a silent overwrite discovered
- * months later.
+ * Bulk mode is intentionally different: selecting the group and starting Smart Enrich authorizes
+ * an unattended sequential run that applies every unlocked proposal.
  */
 @Component({
   selector: 'app-smart-enrichment',
   standalone: true,
-  imports: [Button, Checkbox, FormsModule, ProgressSpinner, TranslocoDirective],
+  imports: [Button, Checkbox, FormsModule, ProgressBar, ProgressSpinner, TranslocoDirective],
   templateUrl: './smart-enrichment.component.html',
   styleUrl: './smart-enrichment.component.scss',
 })
@@ -46,13 +46,18 @@ export class SmartEnrichmentComponent implements OnInit, OnDestroy {
   private readonly t = inject(TranslocoService);
 
   private subscription?: Subscription;
+  private metadataUpdateSubscription?: Subscription;
 
-  readonly bookId: number = this.config.data.bookId;
+  readonly bulkMode = Array.isArray(this.config.data.bookIds);
+  readonly bookIds: number[] = this.bulkMode
+    ? [...this.config.data.bookIds]
+    : [this.config.data.bookId];
   /**
    * Opened from the editor, the dialog hands the values back instead of writing them: the user is
    * already looking at the form and expects to see the change before it is saved.
    */
   readonly applyMode: SmartEnrichmentApplyMode = this.config.data.applyMode ?? 'save';
+  readonly currentIndex = signal(0);
   readonly stage = signal<SmartEnrichmentStage>('RESOLVING');
   readonly identity = signal<ResolvedWorkIdentity | null>(null);
   readonly ratingVerification = signal<RatingVerification | null>(null);
@@ -60,13 +65,48 @@ export class SmartEnrichmentComponent implements OnInit, OnDestroy {
   readonly errorMessage = signal<string | null>(null);
   readonly applying = signal(false);
   readonly selectedFields = signal<Set<string>>(new Set());
+  readonly updatedBooks = signal(0);
+  readonly unchangedBooks = signal(0);
+  readonly failedBooks = signal(0);
 
   readonly running = computed(() => this.stage() === 'RESOLVING' || this.stage() === 'VERIFYING');
   readonly applicableProposals = computed(() => this.proposals().filter((proposal) => !proposal.locked));
   readonly canApply = computed(() => !this.applying() && this.selectedFields().size > 0);
+  readonly currentBookId = computed(() => this.bookIds[this.currentIndex()]);
+  readonly isLastBook = computed(() => this.currentIndex() === this.bookIds.length - 1);
+  readonly processedBooks = computed(() => this.updatedBooks() + this.unchangedBooks() + this.failedBooks());
+  readonly progressPercent = computed(() => this.bookIds.length === 0
+    ? 0
+    : Math.round(this.processedBooks() * 100 / this.bookIds.length));
 
   ngOnInit(): void {
-    this.subscription = this.smartEnrichmentService.enrich(this.bookId).subscribe({
+    this.startCurrentBook();
+  }
+
+  ngOnDestroy(): void {
+    // Aborts the request: a run left going after the dialog closes would hold an agent process
+    // open for minutes with nowhere to deliver its answer.
+    this.subscription?.unsubscribe();
+    this.metadataUpdateSubscription?.unsubscribe();
+  }
+
+  private startCurrentBook(): void {
+    this.subscription?.unsubscribe();
+    this.stage.set('RESOLVING');
+    this.identity.set(null);
+    this.ratingVerification.set(null);
+    this.proposals.set([]);
+    this.errorMessage.set(null);
+    this.applying.set(false);
+    this.selectedFields.set(new Set());
+
+    const bookId = this.currentBookId();
+    if (bookId == null) {
+      this.finishQueue();
+      return;
+    }
+
+    const subscription = this.smartEnrichmentService.enrich(bookId).subscribe({
       next: (event) => {
         this.stage.set(event.stage);
         if (event.identity) {
@@ -80,22 +120,32 @@ export class SmartEnrichmentComponent implements OnInit, OnDestroy {
           // Unlocked proposals start selected: the common case is accepting all of them, and the
           // user is looking at every value before the apply button is ever pressed.
           this.selectedFields.set(new Set(event.proposals.filter((p) => !p.locked).map((p) => p.field)));
+          if (this.bulkMode) {
+            this.apply();
+          }
         }
         if (event.stage === 'FAILED') {
           this.errorMessage.set(event.message);
+          if (this.bulkMode) {
+            this.failedBooks.update(count => count + 1);
+            this.advanceQueue();
+          }
         }
       },
       error: (error) => {
         this.stage.set('FAILED');
         this.errorMessage.set(error?.message ?? this.t.translate('metadata.smartEnrichment.genericError'));
+        if (this.bulkMode) {
+          this.failedBooks.update(count => count + 1);
+          this.advanceQueue();
+        }
       },
     });
-  }
-
-  ngOnDestroy(): void {
-    // Aborts the request: a run left going after the dialog closes would hold an agent process
-    // open for minutes with nowhere to deliver its answer.
-    this.subscription?.unsubscribe();
+    // A synchronous failure can advance the queue from inside subscribe(); never let the closed
+    // subscription from the previous book overwrite the newly-started one.
+    if (this.currentBookId() === bookId && !subscription.closed) {
+      this.subscription = subscription;
+    }
   }
 
   isSelected(field: string): boolean {
@@ -113,34 +163,52 @@ export class SmartEnrichmentComponent implements OnInit, OnDestroy {
   apply(): void {
     const selected = this.applicableProposals().filter((proposal) => this.isSelected(proposal.field));
     if (selected.length === 0) {
+      if (this.bulkMode) {
+        this.unchangedBooks.update(count => count + 1);
+        this.advanceQueue();
+      }
       return;
     }
     if (this.applyMode === 'form') {
       this.dialogRef.close({proposals: selected});
       return;
     }
+    const bookId = this.currentBookId();
+    if (bookId == null) {
+      return;
+    }
     this.applying.set(true);
 
-    const metadata: Partial<BookMetadata> = {bookId: this.bookId};
+    const metadata: Partial<BookMetadata> = {bookId};
     for (const proposal of selected) {
       this.assign(metadata, proposal);
     }
 
     // REPLACE_WHEN_PROVIDED so the fields the user did not tick keep their current values instead
     // of being cleared by an update that omits them.
-    this.metadataManageService
-      .updateBookMetadata(this.bookId, {metadata: metadata as BookMetadata, clearFlags: {}}, false, 'REPLACE_WHEN_PROVIDED')
+    this.metadataUpdateSubscription = this.metadataManageService
+      .updateBookMetadata(bookId, {metadata: metadata as BookMetadata, clearFlags: {}}, false, 'REPLACE_WHEN_PROVIDED')
       .subscribe({
         next: () => {
-          this.messageService.add({
-            severity: 'success',
-            summary: this.t.translate('metadata.smartEnrichment.appliedSummary'),
-            detail: this.t.translate('metadata.smartEnrichment.appliedDetail', {count: selected.length}),
-          });
-          this.dialogRef.close(true);
+          if (this.bulkMode) {
+            this.updatedBooks.update(count => count + 1);
+            this.advanceQueue();
+          } else {
+            this.messageService.add({
+              severity: 'success',
+              summary: this.t.translate('metadata.smartEnrichment.appliedSummary'),
+              detail: this.t.translate('metadata.smartEnrichment.appliedDetail', {count: selected.length}),
+            });
+            this.dialogRef.close(true);
+          }
         },
         error: (error) => {
           this.applying.set(false);
+          if (this.bulkMode) {
+            this.failedBooks.update(count => count + 1);
+            this.advanceQueue();
+            return;
+          }
           this.messageService.add({
             severity: 'error',
             summary: this.t.translate('metadata.smartEnrichment.applyErrorSummary'),
@@ -151,7 +219,33 @@ export class SmartEnrichmentComponent implements OnInit, OnDestroy {
   }
 
   close(): void {
+    this.subscription?.unsubscribe();
+    this.metadataUpdateSubscription?.unsubscribe();
     this.dialogRef.close(false);
+  }
+
+  private advanceQueue(): void {
+    this.subscription?.unsubscribe();
+    if (this.isLastBook()) {
+      this.finishQueue();
+      return;
+    }
+    this.currentIndex.update(index => index + 1);
+    this.startCurrentBook();
+  }
+
+  private finishQueue(): void {
+    this.subscription?.unsubscribe();
+    this.messageService.add({
+      severity: this.failedBooks() > 0 ? 'warn' : 'success',
+      summary: this.t.translate('metadata.smartEnrichment.bulkCompletedSummary'),
+      detail: this.t.translate('metadata.smartEnrichment.bulkCompletedDetail', {
+        updated: this.updatedBooks(),
+        unchanged: this.unchangedBooks(),
+        failed: this.failedBooks(),
+      }),
+    });
+    this.dialogRef.close({completed: true});
   }
 
   private assign(metadata: Partial<BookMetadata>, proposal: MetadataFieldProposal): void {

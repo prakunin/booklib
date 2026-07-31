@@ -84,7 +84,7 @@ export class BookCardOverlayPreferenceService {
         sortDir: 'DESC',
         view: 'GRID',
         coverSize: 1,
-        seriesCollapsed: false,
+        seriesCollapsed: true,
         overlayBookType: true
       },
       overrides: []

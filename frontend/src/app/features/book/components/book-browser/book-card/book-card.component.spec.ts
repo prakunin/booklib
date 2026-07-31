@@ -334,6 +334,37 @@ describe('BookCardComponent', () => {
     expect(component.coverImageUrl()).toBe('thumb:9:2024-01-01');
   });
 
+  it('shows the number of merged book files without counting supplementary material', () => {
+    ref.setInput('book', makeBook({
+      primaryFile: {
+        id: 411,
+        bookId: 41,
+        bookType: 'EPUB',
+      },
+      alternativeFormats: [
+        {id: 412, bookId: 41, bookType: 'PDF'} as AdditionalFile,
+        {id: 413, bookId: 41, bookType: 'FB2'} as AdditionalFile,
+      ],
+      supplementaryFiles: [
+        {id: 414, bookId: 41, bookType: 'PDF'} as AdditionalFile,
+      ],
+    }));
+    fixture.detectChanges();
+
+    const badge = fixture.nativeElement.querySelector('.book-files-count-overlay') as HTMLElement;
+    expect(component.bookFileCount()).toBe(3);
+    expect(badge.textContent).toContain('3');
+    expect(badge.getAttribute('aria-label')).toContain('3 book files');
+
+    ref.setInput('book', makeBook({
+      primaryFile: {id: 415, bookId: 41, bookType: 'EPUB'},
+    }));
+    fixture.detectChanges();
+
+    expect(component.bookFileCount()).toBe(1);
+    expect(fixture.nativeElement.querySelector('.book-files-count-overlay')).toBeNull();
+  });
+
   it('uses forced ebook mode for audiobook reads and falls back to the normal read flow otherwise', () => {
     const audiobookWithAlternativeFormat = makeBook({
       id: 12,

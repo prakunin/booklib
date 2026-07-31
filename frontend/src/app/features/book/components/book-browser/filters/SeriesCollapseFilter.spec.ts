@@ -45,6 +45,10 @@ describe('SeriesCollapseFilter', () => {
     service = TestBed.inject(SeriesCollapseFilter);
   });
 
+  it('collapses series when no preference has been saved', () => {
+    expect(service.seriesCollapsed()).toBe(true);
+  });
+
   it('returns books unchanged when collapse is disabled or series expansion is forced', () => {
     const books = [makeBook(1), makeBook(2, 'Series', 2)];
 

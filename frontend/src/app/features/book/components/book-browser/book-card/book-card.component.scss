@@ -213,7 +213,8 @@
   z-index: 3;
 }
 
-.series-items-count-overlay {
+.series-items-count-overlay,
+.book-files-count-overlay {
   position: absolute;
   background-color: var(--color-primary);
   color: var(--color-primary-contrast);
@@ -288,7 +289,8 @@
 
 .book-type-pill-overlay,
 .series-number-overlay,
-.series-items-count-overlay {
+.series-items-count-overlay,
+.book-files-count-overlay {
   position: static;
   margin: 0;
 

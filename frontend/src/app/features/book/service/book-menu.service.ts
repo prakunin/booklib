@@ -31,7 +31,9 @@ export class BookMenuService {
     multiBookEditMetadata: () => void,
     regenerateCovers: () => void,
     generateCustomCovers: () => void,
-    user: User | null): MenuItem[] {
+    user: User | null,
+    smartEnrich?: () => void,
+    smartEnrichmentAvailable = false): MenuItem[] {
 
     const permissions = user?.permissions;
     const items: MenuItem[] = [];
@@ -53,6 +55,13 @@ export class BookMenuService {
     }
 
     if (permissions?.canBulkEditMetadata) {
+      if (smartEnrichmentAvailable && smartEnrich) {
+        items.push({
+          label: this.t.translate('book.menuService.menu.smartEnrich'),
+          icon: 'pi pi-sparkles',
+          command: smartEnrich
+        });
+      }
       items.push({
         label: this.t.translate('book.menuService.menu.bulkMetadataEditor'),
         icon: 'pi pi-table',

@@ -79,7 +79,7 @@ export class BookBrowserQueryParamsService {
       sortDir: 'ASC',
       view: 'GRID',
       coverSize: 1,
-      seriesCollapsed: false,
+      seriesCollapsed: true,
       overlayBookType: true
     };
 

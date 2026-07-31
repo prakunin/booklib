@@ -4,106 +4,129 @@
       <i class="pi pi-sparkles header-icon"></i>
       <div class="header-text">
         <h2>{{ t('title') }}</h2>
-        <p>{{ t('subtitle') }}</p>
+        <p>{{ bulkMode ? t('bulkSubtitle') : t('subtitle') }}</p>
+        @if (bulkMode) {
+          <span class="queue-progress">{{ t('queueProgress', {current: currentIndex() + 1, total: bookIds.length}) }}</span>
+        }
       </div>
     </div>
 
-    @if (running()) {
-      <div class="stage">
-        <p-progress-spinner styleClass="stage-spinner" strokeWidth="4"></p-progress-spinner>
-        <span>{{ stage() === 'RESOLVING' ? t('stageResolving') : t('stageVerifying') }}</span>
-      </div>
-    }
-
-    @if (stage() === 'FAILED') {
-      <div class="failure">
-        <i class="pi pi-exclamation-triangle"></i>
-        <span>{{ errorMessage() ?? t('genericError') }}</span>
-      </div>
-    }
-
-    @if (identity(); as work) {
-      <section class="identity">
-        <h3>{{ t('identifiedWork') }}</h3>
-        <div class="identity-grid">
-          <span class="label">{{ t('originalTitle') }}</span>
-          <span class="value">{{ work.originalTitle ?? '—' }}</span>
-          <span class="label">{{ t('originalAuthor') }}</span>
-          <span class="value">{{ work.originalAuthor ?? '—' }}</span>
-          <span class="label">{{ t('firstPublished') }}</span>
-          <span class="value">{{ work.firstPublishedYear ?? '—' }}</span>
+    @if (bulkMode) {
+      <section class="bulk-progress">
+        <div class="bulk-progress-heading">
+          <span>{{ t('completedProgress', {processed: processedBooks(), total: bookIds.length}) }}</span>
+          <span>{{ progressPercent() }}%</span>
         </div>
-
-        @if (ratingVerification(); as verification) {
-          <!-- Both numbers are shown deliberately: only the verified one can be applied, and a
-               persistent gap between them is the signal that the agent is reading pages badly. -->
-          <div class="verification" [class.verification-mismatch]="verification.reported !== null && !verification.agrees">
-            <span class="label">{{ t('ratingVerification') }}</span>
-            <span class="value">
-              {{ t('ratingVerified') }}: {{ verification.verified ?? t('ratingUnverified') }}
-              @if (verification.reported !== null) {
-                <span class="reported">({{ t('ratingReported') }}: {{ verification.reported }})</span>
-              }
-            </span>
-          </div>
-        }
-
-        @if (work.sources?.length) {
-          <div class="sources">
-            <span class="label">{{ t('sources') }}</span>
-            <ul>
-              @for (source of work.sources; track source) {
-                <li><a [href]="source" target="_blank" rel="noopener noreferrer">{{ source }}</a></li>
-              }
-            </ul>
-          </div>
-        }
-      </section>
-    }
-
-    @if (stage() === 'COMPLETED') {
-      <section class="proposals">
-        <h3>{{ t('proposals') }}</h3>
-        @if (proposals().length === 0) {
-          <p class="empty">{{ t('noProposals') }}</p>
-        }
-        @for (proposal of proposals(); track proposal.field) {
-          <div class="proposal" [class.proposal-locked]="proposal.locked">
-            <div class="proposal-head">
-              <p-checkbox
-                [binary]="true"
-                [ngModel]="isSelected(proposal.field)"
-                [disabled]="proposal.locked"
-                (ngModelChange)="toggleField(proposal.field)"
-                [inputId]="'proposal-' + proposal.field">
-              </p-checkbox>
-              <label [for]="'proposal-' + proposal.field" class="field-name">{{ t('field.' + proposal.field) }}</label>
-              <span class="source">{{ proposal.source }}</span>
-              @if (proposal.locked) {
-                <span class="locked-badge"><i class="pi pi-lock"></i>{{ t('lockedField') }}</span>
-              }
-            </div>
-            <div class="proposal-values">
-              <div class="current">
-                <span class="label">{{ t('currentValue') }}</span>
-                <span class="value">{{ proposal.currentValue || t('empty') }}</span>
-              </div>
-              <div class="proposed">
-                <span class="label">{{ t('proposedValue') }}</span>
-                <span class="value">{{ proposal.proposedValue }}</span>
-              </div>
-            </div>
-            @if (proposal.sourceUrl) {
-              <a class="proposal-source" [href]="proposal.sourceUrl" target="_blank" rel="noopener noreferrer">{{ proposal.sourceUrl }}</a>
+        <p-progressbar [value]="progressPercent()" [showValue]="false"></p-progressbar>
+        <div class="bulk-stage">
+          <p-progress-spinner styleClass="stage-spinner" strokeWidth="4"></p-progress-spinner>
+          <span>
+            @if (applying()) {
+              {{ t('applyingBtn') }}
+            } @else {
+              {{ stage() === 'VERIFYING' ? t('stageVerifying') : t('stageResolving') }}
             }
-          </div>
-        }
+          </span>
+        </div>
       </section>
+    } @else {
+      @if (running()) {
+        <div class="stage">
+          <p-progress-spinner styleClass="stage-spinner" strokeWidth="4"></p-progress-spinner>
+          <span>{{ stage() === 'RESOLVING' ? t('stageResolving') : t('stageVerifying') }}</span>
+        </div>
+      }
+
+      @if (stage() === 'FAILED') {
+        <div class="failure">
+          <i class="pi pi-exclamation-triangle"></i>
+          <span>{{ errorMessage() ?? t('genericError') }}</span>
+        </div>
+      }
+
+      @if (identity(); as work) {
+        <section class="identity">
+          <h3>{{ t('identifiedWork') }}</h3>
+          <div class="identity-grid">
+            <span class="label">{{ t('originalTitle') }}</span>
+            <span class="value">{{ work.originalTitle ?? '—' }}</span>
+            <span class="label">{{ t('originalAuthor') }}</span>
+            <span class="value">{{ work.originalAuthor ?? '—' }}</span>
+            <span class="label">{{ t('firstPublished') }}</span>
+            <span class="value">{{ work.firstPublishedYear ?? '—' }}</span>
+          </div>
+
+          @if (ratingVerification(); as verification) {
+            <!-- Both numbers are shown deliberately: only the verified one can be applied, and a
+                 persistent gap between them is the signal that the agent is reading pages badly. -->
+            <div class="verification" [class.verification-mismatch]="verification.reported !== null && !verification.agrees">
+              <span class="label">{{ t('ratingVerification') }}</span>
+              <span class="value">
+                {{ t('ratingVerified') }}: {{ verification.verified ?? t('ratingUnverified') }}
+                @if (verification.reported !== null) {
+                  <span class="reported">({{ t('ratingReported') }}: {{ verification.reported }})</span>
+                }
+              </span>
+            </div>
+          }
+
+          @if (work.sources?.length) {
+            <div class="sources">
+              <span class="label">{{ t('sources') }}</span>
+              <ul>
+                @for (source of work.sources; track source) {
+                  <li><a [href]="source" target="_blank" rel="noopener noreferrer">{{ source }}</a></li>
+                }
+              </ul>
+            </div>
+          }
+        </section>
+      }
+
+      @if (stage() === 'COMPLETED') {
+        <section class="proposals">
+          <h3>{{ t('proposals') }}</h3>
+          @if (proposals().length === 0) {
+            <p class="empty">{{ t('noProposals') }}</p>
+          }
+          @for (proposal of proposals(); track proposal.field) {
+            <div class="proposal" [class.proposal-locked]="proposal.locked">
+              <div class="proposal-head">
+                <p-checkbox
+                  [binary]="true"
+                  [ngModel]="isSelected(proposal.field)"
+                  [disabled]="proposal.locked"
+                  (ngModelChange)="toggleField(proposal.field)"
+                  [inputId]="'proposal-' + proposal.field">
+                </p-checkbox>
+                <label [for]="'proposal-' + proposal.field" class="field-name">{{ t('field.' + proposal.field) }}</label>
+                <span class="source">{{ proposal.source }}</span>
+                @if (proposal.locked) {
+                  <span class="locked-badge"><i class="pi pi-lock"></i>{{ t('lockedField') }}</span>
+                }
+              </div>
+              <div class="proposal-values">
+                <div class="current">
+                  <span class="label">{{ t('currentValue') }}</span>
+                  <span class="value">{{ proposal.currentValue || t('empty') }}</span>
+                </div>
+                <div class="proposed">
+                  <span class="label">{{ t('proposedValue') }}</span>
+                  <span class="value">{{ proposal.proposedValue }}</span>
+                </div>
+              </div>
+              @if (proposal.sourceUrl) {
+                <a class="proposal-source" [href]="proposal.sourceUrl" target="_blank" rel="noopener noreferrer">{{ proposal.sourceUrl }}</a>
+              }
+            </div>
+          }
+        </section>
+      }
     }
 
     <div class="actions">
       <p-button [label]="t('closeBtn')" severity="secondary" [outlined]="true" (onClick)="close()"></p-button>
-      @if (stage() === 'COMPLETED' && applicableProposals().length > 0) {
+      @if (!bulkMode && stage() === 'COMPLETED' && applicableProposals().length > 0) {
         <p-button
           [label]="applying() ? t('applyingBtn') : (applyMode === 'form' ? t('fillFormBtn') : t('applyBtn'))"
           [icon]="applying() ? 'pi pi-spin pi-spinner' : 'pi pi-check'"

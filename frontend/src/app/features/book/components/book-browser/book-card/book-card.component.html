@@ -41,6 +41,14 @@
           <i class="pi pi-book series-items-count-icon"></i>{{ book().seriesCount }}
         </div>
       }
+      @if (bookFileCount() > 1) {
+        <div class="book-files-count-overlay"
+             [pTooltip]="bookFileCountTooltip()"
+             tooltipPosition="bottom"
+             [attr.aria-label]="bookFileCountTooltip()">
+          <i class="pi pi-copy" aria-hidden="true"></i>{{ bookFileCount() }}
+        </div>
+      }
     </div>
 
     @if (isSeriesViewActive()) {
