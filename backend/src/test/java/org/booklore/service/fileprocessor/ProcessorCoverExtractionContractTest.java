@@ -13,7 +13,11 @@ import org.booklore.service.ArchiveService;
 import org.booklore.service.book.BookCreatorService;
 import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.service.metadata.MetadataMatchService;
+import org.booklore.service.djvu.DjvuRenditionService;
+import org.booklore.service.djvu.DjvuToolException;
+import org.booklore.service.djvu.DjvuToolRunner;
 import org.booklore.service.metadata.extractor.Azw3MetadataExtractor;
+import org.booklore.service.metadata.extractor.DjvuMetadataExtractor;
 import org.booklore.service.metadata.extractor.CbxMetadataExtractor;
 import org.booklore.service.metadata.extractor.EpubMetadataExtractor;
 import org.booklore.service.metadata.extractor.Fb2MetadataExtractor;
@@ -46,7 +50,12 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -517,6 +526,62 @@ class ProcessorCoverExtractionContractTest {
             BookEntity book = bookWithFile(BookFileType.PDF, "does-not-exist.pdf");
 
             assertPureRead(book, () -> processor().extractCover(book, fileOf(book)));
+        }
+    }
+
+    // =====================================================================================
+    // DJVU - the real djvulibre-backed extractor
+    // =====================================================================================
+
+    @Nested
+    class Djvu {
+
+        @Mock private DjvuToolRunner toolRunner;
+
+        private DjvuProcessor processor() {
+            return new DjvuProcessor(bookRepository, bookAdditionalFileRepository, bookCreatorService,
+                    bookMapper, fileService, metadataMatchService, sidecarMetadataWriter,
+                    new DjvuMetadataExtractor(toolRunner), toolRunner, mock(DjvuRenditionService.class));
+        }
+
+        /**
+         * Every DjVu document has a page one, so this processor has no clean miss to report: a page
+         * that will not render is a failed read, and nothing else.
+         */
+        @Test
+        void reportsReadFailedWhenThePageCannotBeRendered() {
+            lenient().doThrow(new DjvuToolException("no ddjvu"))
+                    .when(toolRunner).renderPageAsJpeg(any(), anyInt(), anyInt(), any());
+            BookEntity book = bookWithFile(BookFileType.DJVU, "does-not-exist.djvu");
+
+            CoverExtraction extraction = processor().extractCover(book, fileOf(book));
+
+            assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.READ_FAILED);
+        }
+
+        @Test
+        void writesNothingAndLeavesTheEntityUntouchedEvenWhenTheReadFails() {
+            lenient().doThrow(new DjvuToolException("no ddjvu"))
+                    .when(toolRunner).renderPageAsJpeg(any(), anyInt(), anyInt(), any());
+            BookEntity book = bookWithFile(BookFileType.DJVU, "does-not-exist.djvu");
+
+            assertPureRead(book, () -> processor().extractCover(book, fileOf(book)));
+        }
+
+        @Test
+        void handsBackTheRenderedFirstPageWithoutWritingIt() {
+            doAnswer(invocation -> {
+                java.io.OutputStream out = invocation.getArgument(3);
+                out.write(pngBytes());
+                return null;
+            }).when(toolRunner).renderPageAsJpeg(any(), eq(1), anyInt(), any());
+            BookEntity book = bookWithFile(BookFileType.DJVU, "scan.djvu");
+
+            CoverExtraction extraction = processor().extractCover(book, fileOf(book));
+
+            assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.COVER_FOUND);
+            assertThat(extraction.data()).isNotEmpty();
+            verifyNoInteractions(fileService);
         }
     }
 }

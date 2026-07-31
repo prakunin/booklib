@@ -89,3 +89,33 @@ describe('PdfReaderComponent save handling', () => {
     );
   });
 });
+
+describe('PdfReaderComponent source selection', () => {
+
+  interface SourceHarness {
+    localSettingsService: {get: () => {cacheStorageEnabled: boolean}};
+    getBookData: (bookId: string, fileType: string | undefined, bookType?: string) => {subscribe: (fn: (uri: string) => void) => void};
+  }
+
+  function makeSourceComponent(): SourceHarness {
+    const component = Object.create(PdfReaderComponent.prototype) as SourceHarness;
+    component.localSettingsService = {get: () => ({cacheStorageEnabled: false})};
+    return component;
+  }
+
+  function uriFor(bookType?: string): string {
+    let uri = '';
+    makeSourceComponent().getBookData('1494366', undefined, bookType).subscribe(value => (uri = value));
+    return uri;
+  }
+
+  it('loads a DjVu book from its PDF rendition, not from the source file', () => {
+    // /content serves the book's own bytes, and a .djvu is not a PDF: handing it to the viewer is
+    // what leaves the reader spinning forever with no error to show for it.
+    expect(uriFor('DJVU')).toContain('/api/v1/djvu/1494366/rendition');
+  });
+
+  it('still loads a real PDF from its own content', () => {
+    expect(uriFor('PDF')).toContain('/api/v1/books/1494366/content');
+  });
+});

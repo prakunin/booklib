@@ -25,6 +25,8 @@ describe('UrlHelperService', () => {
     {bookType: 'MOBI', readerSegment: 'ebook-reader'},
     {bookType: 'AZW3', readerSegment: 'ebook-reader'},
     {bookType: 'CBX', readerSegment: 'cbx-reader'},
+    // DjVu pages are rendered server-side into the same page cache the CBX reader reads from.
+    {bookType: 'DJVU', readerSegment: 'cbx-reader'},
     {bookType: 'AUDIOBOOK', readerSegment: 'audiobook-player'},
   ];
 

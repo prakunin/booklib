@@ -306,6 +306,17 @@ describe('BookService', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/ebook-reader/book/43'], {queryParams: {streaming: false}});
   });
 
+  it('opens DjVu in the page reader, which serves its server-rendered pages', () => {
+    setup();
+    queryClientHarness.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [
+      buildBook(45, {primaryFile: {id: 1, bookId: 45, bookType: 'DJVU'}}),
+    ]);
+
+    service.readBook(45);
+
+    expect(router.navigate).toHaveBeenCalledWith(['/cbx-reader/book/45'], undefined);
+  });
+
   it('reports a known unreadable document without navigating to the reader', () => {
     setup();
     queryClientHarness.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [

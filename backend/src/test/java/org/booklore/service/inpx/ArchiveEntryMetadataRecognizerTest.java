@@ -32,8 +32,12 @@ class ArchiveEntryMetadataRecognizerTest {
         // same readable type a library folder would give it.
         assertThat(recognizer.resolveBookType("x.doc")).isEqualTo(BookFileType.DOC);
         assertThat(recognizer.resolveBookType("x.docx")).isEqualTo(BookFileType.DOC);
+        // DjVu is decoded by djvulibre, so an archive entry resolves to the readable type a library
+        // folder would give it.
+        assertThat(recognizer.resolveBookType("x.djvu")).isEqualTo(BookFileType.DJVU);
+        assertThat(recognizer.resolveBookType("x.djv")).isEqualTo(BookFileType.DJVU);
         // Formats that still have no reader stay download-only.
-        assertThat(recognizer.resolveBookType("x.djvu")).isEqualTo(BookFileType.OTHER);
+        assertThat(recognizer.resolveBookType("x.rtf")).isEqualTo(BookFileType.OTHER);
     }
 
     @Test
@@ -41,12 +45,13 @@ class ArchiveEntryMetadataRecognizerTest {
         assertThat(recognizer.hasExtractor("x.pdf")).isTrue();
         assertThat(recognizer.hasExtractor("x.doc")).isTrue();
         assertThat(recognizer.hasExtractor("x.docx")).isTrue();
-        assertThat(recognizer.hasExtractor("x.djvu")).isFalse();
+        assertThat(recognizer.hasExtractor("x.djvu")).isTrue();
+        assertThat(recognizer.hasExtractor("x.rtf")).isFalse();
     }
 
     @Test
     void fallsBackToFilenameWhenNoExtractorExists() {
-        BookMetadata metadata = recognizer.recognize("Megan_Lindholm_Silver_Lady.djvu", anyFile);
+        BookMetadata metadata = recognizer.recognize("Megan_Lindholm_Silver_Lady.rtf", anyFile);
 
         assertThat(metadata.getTitle()).isEqualTo("Silver Lady");
         assertThat(metadata.getAuthors()).containsExactly("Megan Lindholm");

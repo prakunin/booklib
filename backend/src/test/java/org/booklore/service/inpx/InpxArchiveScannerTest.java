@@ -144,7 +144,7 @@ class InpxArchiveScannerTest {
         assertThat(doc.getAuthors()).containsExactly("Mark Semyonovich Solonin");
 
         InpxBookDto djvu = byExtension(books, "djvu");
-        assertThat(djvu.getBookType()).isEqualTo(BookFileType.OTHER);
+        assertThat(djvu.getBookType()).isEqualTo(BookFileType.DJVU);
         assertThat(djvu.getTitle()).isEqualTo("zhurnal Radio 1972 10");
         assertThat(djvu.getAuthors()).isEmpty();
     }

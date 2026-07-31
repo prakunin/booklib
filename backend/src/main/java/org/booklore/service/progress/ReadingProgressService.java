@@ -161,7 +161,10 @@ public class ReadingProgressService {
                     .percentage(roundToOneDecimal(fileProgress.getProgressPercent()))
                     .ttsPositionCfi(fileProgress.getTtsPositionCfi())
                     .build());
-            case PDF -> book.setPdfProgress(PdfProgress.builder()
+            // DjVu shares the PDF position shape on purpose: it is read as page images and, once its
+            // background rendition exists, in the PDF reader. One page number has to mean the same
+            // thing in both, or switching layers would move the reader.
+            case PDF, DJVU -> book.setPdfProgress(PdfProgress.builder()
                     .page(parseIntOrNull(fileProgress.getPositionData()))
                     .percentage(roundToOneDecimal(fileProgress.getProgressPercent()))
                     .build());
@@ -371,7 +374,7 @@ public class ReadingProgressService {
         entity.setContentSourceProgressPercent(null);
 
         switch (bookFile.getBookType()) {
-            case PDF -> {
+            case PDF, DJVU -> {
                 entity.setPositionData(progress.getPdfProgress() != null ?
                         String.valueOf(progress.getPdfProgress()) : null);
                 entity.setProgressPercent(progress.getPdfProgressPercent());
@@ -400,7 +403,7 @@ public class ReadingProgressService {
     private void updateProgressFromFileProgress(UserBookProgressEntity progress, BookFileType bookType,
                                                  BookFileProgress fileProgress) {
         switch (bookType) {
-            case PDF -> {
+            case PDF, DJVU -> {
                 progress.setPdfProgress(fileProgress.positionData() != null ?
                         Integer.parseInt(fileProgress.positionData()) : null);
                 progress.setPdfProgressPercent(fileProgress.progressPercent());
@@ -430,7 +433,7 @@ public class ReadingProgressService {
         return switch (bookType) {
             // DOC reads through a synthesised EPUB rendition, so its position is an EPUB CFI like the rest.
             case EPUB, FB2, MOBI, AZW3, DOC -> updateEbookProgress(progress, request.getEpubProgress());
-            case PDF -> updatePdfProgress(progress, request.getPdfProgress());
+            case PDF, DJVU -> updatePdfProgress(progress, request.getPdfProgress());
             case CBX -> updateCbxProgress(progress, request.getCbxProgress());
             case AUDIOBOOK -> updateAudiobookProgress(request.getAudiobookProgress());
             // Download-only formats have no reader and therefore no reading progress.
@@ -484,7 +487,7 @@ public class ReadingProgressService {
     private void setProgressPercent(UserBookProgressEntity progress, BookFileType type, Float percentage) {
         switch (type) {
             case EPUB, FB2, MOBI, AZW3 -> progress.setEpubProgressPercent(percentage);
-            case PDF -> progress.setPdfProgressPercent(percentage);
+            case PDF, DJVU -> progress.setPdfProgressPercent(percentage);
             case CBX -> progress.setCbxProgressPercent(percentage);
             case AUDIOBOOK -> {
                 // Audiobook progress percentage is stored in UserBookFileProgressEntity

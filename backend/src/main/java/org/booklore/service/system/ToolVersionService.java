@@ -3,6 +3,7 @@ package org.booklore.service.system;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.dto.system.ToolsInfo;
+import org.booklore.service.djvu.DjvuToolRunner;
 import org.booklore.util.FileService;
 import org.springframework.stereotype.Service;
 
@@ -46,6 +47,7 @@ public class ToolVersionService {
 
     private final FileService fileService;
     private final ProcessRunner processRunner;
+    private final DjvuToolRunner djvuToolRunner;
 
     private final Map<String, Optional<String>> cache = new ConcurrentHashMap<>();
     // Binaries whose output was read successfully but rejected by sanitizeVersion. That shape is a
@@ -57,6 +59,9 @@ public class ToolVersionService {
         return ToolsInfo.builder()
                 .ffprobeVersion(version("ffprobe", "-version").orElse(null))
                 .kepubifyVersion(version("kepubify", "--version").orElse(null))
+                // Probed by the djvu layer rather than here: djvulibre prints its banner to stderr
+                // and exits non-zero, which this service's probe correctly refuses to accept.
+                .djvulibreVersion(djvuToolRunner.version().orElse(null))
                 .build();
     }
 

@@ -56,7 +56,9 @@ class SystemInfoLeakTest {
             StorageInfo.class, Set.of("diskType"),
             FilesystemInfo.class, Set.of("paths", "totalBytes", "usableBytes"),
             LibraryPathInfo.class, Set.of("path", "status"),
-            ToolsInfo.class, Set.of("ffprobeVersion", "kepubifyVersion"));
+            // djvulibreVersion carries the banner djvused prints ("DjVuLibre-3.5.29") and nothing
+            // else: DjvuToolRunner keeps only the version it matched, discarding the rest of the line.
+            ToolsInfo.class, Set.of("ffprobeVersion", "kepubifyVersion", "djvulibreVersion"));
 
     @Nested
     class FieldAllowlist {

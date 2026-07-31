@@ -29,6 +29,7 @@ class MetadataExtractorFactoryTest {
     @Mock private Azw3MetadataExtractor azw3MetadataExtractor;
     @Mock private AudiobookMetadataExtractor audiobookMetadataExtractor;
     @Mock private DocMetadataExtractor docMetadataExtractor;
+    @Mock private DjvuMetadataExtractor djvuMetadataExtractor;
 
     private MetadataExtractorFactory factory;
     private final File dummyFile = new File("test.bin");
@@ -39,7 +40,7 @@ class MetadataExtractorFactoryTest {
         factory = new MetadataExtractorFactory(
                 epubMetadataExtractor, pdfMetadataExtractor, cbxMetadataExtractor,
                 fb2MetadataExtractor, mobiMetadataExtractor, azw3MetadataExtractor,
-                audiobookMetadataExtractor, docMetadataExtractor
+                audiobookMetadataExtractor, docMetadataExtractor, djvuMetadataExtractor
         );
     }
 
@@ -263,6 +264,11 @@ class MetadataExtractorFactoryTest {
         @EnumSource(value = BookFileType.class, names = "OTHER", mode = EnumSource.Mode.EXCLUDE)
         void allReadableFileTypesReturnNonNull(BookFileType type) {
             assertThat(factory.getExtractor(type)).isNotNull();
+        }
+
+        @Test
+        void returnsDjvuExtractor() {
+            assertThat(factory.getExtractor(BookFileType.DJVU)).isSameAs(djvuMetadataExtractor);
         }
 
         @Test

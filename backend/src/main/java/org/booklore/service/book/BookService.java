@@ -244,28 +244,44 @@ public class BookService {
                                 .spread(pdfPref.getSpread())
                                 .isDarkTheme(pdfPref.getIsDarkTheme())
                                 .build()));
-                newPdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
-                        .ifPresent(pdfPref -> settingsBuilder.newPdfSettings(NewPdfViewerPreferences.builder()
-                                .bookId(bookId)
-                                .pageViewMode(pdfPref.getPageViewMode())
-                                .pageSpread(pdfPref.getPageSpread())
-                                .fitMode(pdfPref.getFitMode())
-                                .scrollMode(pdfPref.getScrollMode())
-                                .backgroundColor(pdfPref.getBackgroundColor())
-                                .build()));
+                loadNewPdfSettings(bookId, user.getId(), settingsBuilder);
             }
-            case CBX -> cbxViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
-                    .ifPresent(cbxPref -> settingsBuilder.cbxSettings(CbxViewerPreferences.builder()
-                            .bookId(bookId)
-                            .pageViewMode(cbxPref.getPageViewMode())
-                            .pageSpread(cbxPref.getPageSpread())
-                            .fitMode(cbxPref.getFitMode())
-                            .scrollMode(cbxPref.getScrollMode())
-                            .backgroundColor(cbxPref.getBackgroundColor())
-                            .build()));
+            case CBX -> loadCbxSettings(bookId, user.getId(), settingsBuilder);
+            // A DjVu book is read in the page reader and, once its searchable rendition exists, in
+            // the PDF reader. Both ask this one endpoint about the same book, so both kinds of
+            // setting have to come back - answering with one of them leaves the other reader unable
+            // to open the book at all.
+            case DJVU -> {
+                loadCbxSettings(bookId, user.getId(), settingsBuilder);
+                loadNewPdfSettings(bookId, user.getId(), settingsBuilder);
+            }
             case null, default -> throw ApiError.UNSUPPORTED_BOOK_TYPE.createException();
         }
         return settingsBuilder.build();
+    }
+
+    private void loadCbxSettings(long bookId, Long userId, BookViewerSettings.BookViewerSettingsBuilder settingsBuilder) {
+        cbxViewerPreferencesRepository.findByBookIdAndUserId(bookId, userId)
+                .ifPresent(cbxPref -> settingsBuilder.cbxSettings(CbxViewerPreferences.builder()
+                        .bookId(bookId)
+                        .pageViewMode(cbxPref.getPageViewMode())
+                        .pageSpread(cbxPref.getPageSpread())
+                        .fitMode(cbxPref.getFitMode())
+                        .scrollMode(cbxPref.getScrollMode())
+                        .backgroundColor(cbxPref.getBackgroundColor())
+                        .build()));
+    }
+
+    private void loadNewPdfSettings(long bookId, Long userId, BookViewerSettings.BookViewerSettingsBuilder settingsBuilder) {
+        newPdfViewerPreferencesRepository.findByBookIdAndUserId(bookId, userId)
+                .ifPresent(pdfPref -> settingsBuilder.newPdfSettings(NewPdfViewerPreferences.builder()
+                        .bookId(bookId)
+                        .pageViewMode(pdfPref.getPageViewMode())
+                        .pageSpread(pdfPref.getPageSpread())
+                        .fitMode(pdfPref.getFitMode())
+                        .scrollMode(pdfPref.getScrollMode())
+                        .backgroundColor(pdfPref.getBackgroundColor())
+                        .build()));
     }
 
     @Transactional

@@ -42,7 +42,7 @@ import java.util.zip.ZipFile;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CbxReaderService {
+public class CbxReaderService implements PageImageSource {
 
     private static final String[] SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".avif", ".heic", ".gif", ".bmp"};
     private static final int MAX_CACHE_ENTRIES = 50;
@@ -89,6 +89,11 @@ public class CbxReaderService {
             imageEntries = List.copyOf(imageEntries);
             pageDimensions = pageDimensions != null ? List.copyOf(pageDimensions) : null;
         }
+    }
+
+    @Override
+    public BookFileType supportedType() {
+        return BookFileType.CBX;
     }
 
     public void initCache(Long bookId, String bookType) throws IOException {
@@ -154,6 +159,7 @@ public class CbxReaderService {
         return getAvailablePages(bookId, null);
     }
 
+    @Override
     public List<Integer> getAvailablePages(Long bookId, String bookType) {
         Path cbxPath = getBookPath(bookId, bookType);
         try {
@@ -174,6 +180,7 @@ public class CbxReaderService {
         return getPageInfo(bookId, null);
     }
 
+    @Override
     public List<CbxPageInfo> getPageInfo(Long bookId, String bookType) {
         Path cbxPath = getBookPath(bookId, bookType);
         try {
@@ -194,6 +201,7 @@ public class CbxReaderService {
         }
     }
 
+    @Override
     public List<CbxPageDimension> getPageDimensions(Long bookId, String bookType) {
         Path cbxPath = getBookPath(bookId, bookType);
         try {
@@ -347,6 +355,7 @@ public class CbxReaderService {
         streamPageImage(bookId, null, page, outputStream);
     }
 
+    @Override
     public void streamPageImage(Long bookId, String bookType, int page, OutputStream outputStream) throws IOException {
         Path cbxPath = getBookPath(bookId, bookType);
         CachedArchiveMetadata metadata = getCachedMetadata(cbxPath);

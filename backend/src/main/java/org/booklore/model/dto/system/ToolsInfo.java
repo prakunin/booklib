@@ -12,4 +12,5 @@ import lombok.NoArgsConstructor;
 public class ToolsInfo {
     private String ffprobeVersion;
     private String kepubifyVersion;
+    private String djvulibreVersion;
 }

@@ -298,6 +298,7 @@ public class KomgaMapper {
             // One BookFileType covers both .doc and .docx, so the concrete Word media type cannot be
             // told apart here; Komga clients download the source file either way.
             case DOC -> "application/octet-stream";
+            case DJVU -> "image/vnd.djvu";
             case OTHER -> "application/octet-stream";
         };
     }
@@ -318,6 +319,9 @@ public class KomgaMapper {
             // Not EPUB: the rendition is synthesised for our own reader, while a Komga client
             // receives the Word file itself and could not open it as an EPUB.
             case DOC -> "UNKNOWN";
+            // A Komga client receives the source .djvu, which it has no profile for; the PDF
+            // rendition exists for our own reader, not for external clients.
+            case DJVU -> "UNKNOWN";
             case OTHER -> "UNKNOWN";
         };
     }
