@@ -373,7 +373,8 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
         );
       }),
       switchMap(({book, bookSetting, myself}) => {
-        return this.getBookData(this.bookId.toString(), this.altBookType).pipe(
+        const bookType = this.altBookType ?? book.primaryFile?.bookType;
+        return this.getBookData(this.bookId.toString(), this.altBookType, bookType).pipe(
           map(bookData => ({book, bookSetting, myself, bookData}))
         );
       })
@@ -1555,15 +1556,28 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   private getBookData(
     bookId: string,
     fileType: string | undefined,
+    bookType?: string,
   ): Observable<string> {
-    const uri = fileType
-      ? `${API_CONFIG.BASE_URL}/api/v1/books/${bookId}/content?bookType=${fileType}`
-      : `${API_CONFIG.BASE_URL}/api/v1/books/${bookId}/content`;
+    // A DjVu book reaches this reader through its PDF rendition. /content would serve the book's
+    // own bytes, and a .djvu is not a PDF: the viewer accepts it, finds no document, and spins.
+    const uri = bookType === 'DJVU'
+      ? this.djvuRenditionUri(bookId, fileType)
+      : this.bookContentUri(bookId, fileType);
     if (!this.localSettingsService.get().cacheStorageEnabled) return of(uri);
     return from(this.cacheStorageService.getCache(uri)).pipe(
       switchMap(res => res.blob()),
       map(blob => URL.createObjectURL(blob))
     )
+  }
+
+  private djvuRenditionUri(bookId: string, fileType: string | undefined): string {
+    const base = `${API_CONFIG.BASE_URL}/api/v1/djvu/${bookId}/rendition`;
+    return fileType ? `${base}?bookType=${fileType}` : base;
+  }
+
+  private bookContentUri(bookId: string, fileType: string | undefined): string {
+    const base = `${API_CONFIG.BASE_URL}/api/v1/books/${bookId}/content`;
+    return fileType ? `${base}?bookType=${fileType}` : base;
   }
 
   private async persistAnnotations(): Promise<void> {
