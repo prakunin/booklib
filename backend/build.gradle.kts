@@ -199,6 +199,8 @@ dependencies {
 
     // --- Book & Image Processing ---
     implementation("org.grimmory:pdfium4j:$pdfium4jVersion")
+    // Writes the DjVu PDF rendition. pdfium4j above only reads.
+    implementation(libs.pdfbox)
 
     // --- TwelveMonkeys ImageIO ---
     implementation(libs.twelvemonkeys.imageio.jpeg)

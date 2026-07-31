@@ -13,6 +13,7 @@ import org.booklore.service.ArchiveService;
 import org.booklore.service.book.BookCreatorService;
 import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.service.metadata.MetadataMatchService;
+import org.booklore.service.djvu.DjvuRenditionService;
 import org.booklore.service.djvu.DjvuToolException;
 import org.booklore.service.djvu.DjvuToolRunner;
 import org.booklore.service.metadata.extractor.Azw3MetadataExtractor;
@@ -54,6 +55,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -539,7 +541,7 @@ class ProcessorCoverExtractionContractTest {
         private DjvuProcessor processor() {
             return new DjvuProcessor(bookRepository, bookAdditionalFileRepository, bookCreatorService,
                     bookMapper, fileService, metadataMatchService, sidecarMetadataWriter,
-                    new DjvuMetadataExtractor(toolRunner), toolRunner);
+                    new DjvuMetadataExtractor(toolRunner), toolRunner, mock(DjvuRenditionService.class));
         }
 
         /**

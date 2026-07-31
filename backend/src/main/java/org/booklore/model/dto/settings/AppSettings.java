@@ -24,6 +24,8 @@ public class AppSettings {
     private boolean komgaGroupUnknown;
     private String uploadPattern;
     private Integer pdfCacheSizeInMb;
+    private boolean djvuPdfRenditionEnabled;
+    private Integer djvuRenditionCacheSizeInMb;
     private Integer maxFileUploadSizeInMb;
     private boolean remoteAuthEnabled;
     private boolean metadataDownloadOnBookdrop;

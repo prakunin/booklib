@@ -4,16 +4,12 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.booklore.exception.ApiError;
 import org.booklore.model.dto.response.CbxPageDimension;
 import org.booklore.model.dto.response.CbxPageInfo;
-import org.booklore.model.entity.BookEntity;
-import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
-import org.booklore.repository.BookRepository;
+import org.booklore.service.djvu.DjvuBookLocator;
 import org.booklore.service.djvu.DjvuDocumentInfo;
 import org.booklore.service.djvu.DjvuToolRunner;
-import org.booklore.util.FileUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.FileNotFoundException;
@@ -62,7 +58,7 @@ public class DjvuReaderService implements PageImageSource {
      */
     private static final int MAX_PAGE_EDGE_PIXELS = 2400;
 
-    private final BookRepository bookRepository;
+    private final DjvuBookLocator bookLocator;
     private final DjvuToolRunner toolRunner;
     private final ChapterCacheService chapterCacheService;
 
@@ -210,18 +206,6 @@ public class DjvuReaderService implements PageImageSource {
     }
 
     private Path bookPath(Long bookId, String bookType) {
-        BookEntity book = bookRepository.findByIdForStreaming(bookId)
-                .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
-        if (bookType != null) {
-            BookFileType requestedType = BookFileType.fromName(bookType)
-                    .orElseThrow(() -> ApiError.INVALID_INPUT.createException("Invalid book type: " + bookType));
-            return book.getBookFiles().stream()
-                    .filter(file -> file.getBookType() == requestedType)
-                    .findFirst()
-                    .map(BookFileEntity::getFullFilePath)
-                    .orElseThrow(() -> ApiError.FILE_NOT_FOUND.createException(
-                            "No file of type " + bookType + " found for book"));
-        }
-        return FileUtils.getBookFullPath(book);
+        return bookLocator.locate(bookId, bookType);
     }
 }

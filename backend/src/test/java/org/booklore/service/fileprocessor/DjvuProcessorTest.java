@@ -12,6 +12,7 @@ import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.book.BookCreatorService;
 import org.booklore.service.djvu.DjvuDocumentInfo;
+import org.booklore.service.djvu.DjvuRenditionService;
 import org.booklore.service.djvu.DjvuToolException;
 import org.booklore.service.djvu.DjvuToolRunner;
 import org.booklore.service.metadata.MetadataMatchService;
@@ -53,6 +54,7 @@ class DjvuProcessorTest {
     @Mock private SidecarMetadataWriter sidecarMetadataWriter;
     @Mock private DjvuMetadataExtractor djvuMetadataExtractor;
     @Mock private DjvuToolRunner toolRunner;
+    @Mock private DjvuRenditionService renditionService;
     @Mock private LibraryFile libraryFile;
 
     @TempDir
@@ -65,7 +67,7 @@ class DjvuProcessorTest {
     void setUp() {
         processor = new DjvuProcessor(bookRepository, bookAdditionalFileRepository, bookCreatorService,
                 bookMapper, fileService, metadataMatchService, sidecarMetadataWriter,
-                djvuMetadataExtractor, toolRunner);
+                djvuMetadataExtractor, toolRunner, renditionService);
 
         BookFileEntity bookFile = BookFileEntity.builder()
                 .fileName("zhurnal_Radio_1972_10.djvu")

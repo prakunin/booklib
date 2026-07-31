@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, ParamMap, Router } from '@angular/router';
-import { forkJoin, from, Subject } from 'rxjs';
+import { EMPTY, forkJoin, from, Subject } from 'rxjs';
 import { debounceTime, map, switchMap, tap } from 'rxjs/operators';
 import { PageTitleService } from "../../../shared/service/page-title.service";
 import { CbxReaderService } from '../../book/service/cbx-reader.service';
@@ -41,6 +41,7 @@ import {
 } from './core/cbx-reader-storage';
 import {computeCbxSpreads, findCbxSpreadForPage} from './core/cbx-spread.util';
 import {CbxSlideshowController} from './core/cbx-slideshow-controller';
+import {DjvuRenditionService} from '../shared/djvu-rendition.service';
 import {ReaderFullscreenService} from '../shared/reader-fullscreen.service';
 
 
@@ -234,6 +235,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   private readonly wakeLockService = inject(WakeLockService);
   private readonly readerPreferencesService = inject(ReaderPreferencesService);
   private readonly fullscreenService = inject(ReaderFullscreenService);
+  private readonly djvuRenditionService = inject(DjvuRenditionService);
   private readonly slideshowController = new CbxSlideshowController({
     canAdvance: () => this.currentPage() < this.pages().length - 1,
     advance: () => this.advancePage(1),
@@ -278,6 +280,32 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   private bumpReaderLayoutGeneration(): void {
     this.readerLayoutGeneration.update(v => v + 1);
     this.continuationHintLatched.set(false);
+  }
+
+  /** Everything the reader needs to open a book, fetched in parallel. */
+  private bootstrapReader(book: Book) {
+    // Determine which file ID to use for progress tracking
+    if (this.altBookType()) {
+      const altFile = book.alternativeFormats?.find(f => f.bookType === this.altBookType());
+      this.bookFileId.set(altFile?.id ?? null);
+    } else {
+      this.bookFileId.set(book.primaryFile?.id ?? null);
+    }
+
+    return forkJoin([
+      this.bookService.getBookSetting(this.bookId()!, this.bookFileId()!),
+      this.userService.getMyself(),
+      this.cbxReaderService.getAvailablePages(this.bookId()!, this.altBookType()),
+      this.pageDimensionService.getPageDimensions(this.bookId()!, this.altBookType())
+    ]).pipe(
+      map(([bookSettings, myself, pages, dimensions]) => ({
+        book,
+        bookSettings,
+        myself,
+        pages,
+        dimensions
+      }))
+    );
   }
 
   private getImageScrollContainer(): HTMLElement | null {
@@ -352,29 +380,22 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
             this.bookType.set(resolvedBookType);
             this.currentBook.set(book);
 
-            // Determine which file ID to use for progress tracking
-            if (this.altBookType()) {
-              const altFile = book.alternativeFormats?.find(f => f.bookType === this.altBookType());
-              this.bookFileId.set(altFile?.id ?? null);
-            } else {
-              this.bookFileId.set(book.primaryFile?.id ?? null);
+            // A DjVu book is always readable here, but it is better read in the PDF reader once its
+            // searchable rendition exists. Asking is also what starts that rendition being built,
+            // so the first open queues it and later opens get the richer reader.
+            if (resolvedBookType === 'DJVU') {
+              return this.djvuRenditionService.isRenditionReady(this.bookId()!, this.altBookType()).pipe(
+                switchMap((ready) => {
+                  if (ready) {
+                    this.router.navigate([`/pdf-reader/book/${this.bookId()}`]);
+                    return EMPTY;
+                  }
+                  return this.bootstrapReader(book);
+                })
+              );
             }
 
-            // Parallelize all remaining bootstrap data
-            return forkJoin([
-              this.bookService.getBookSetting(this.bookId()!, this.bookFileId()!),
-              this.userService.getMyself(),
-              this.cbxReaderService.getAvailablePages(this.bookId()!, this.altBookType()),
-              this.pageDimensionService.getPageDimensions(this.bookId()!, this.altBookType())
-            ]).pipe(
-              map(([bookSettings, myself, pages, dimensions]) => ({
-                book,
-                bookSettings,
-                myself,
-                pages,
-                dimensions
-              }))
-            );
+            return this.bootstrapReader(book);
           })
         );
       })

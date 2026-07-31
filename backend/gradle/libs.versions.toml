@@ -8,6 +8,7 @@ mariadb-java-client = "3.5.9"
 flyway = "12.11.0"
 lombok = "1.18.46"
 pdfium4j = "1.2.0"
+pdfbox = "3.0.6"
 twelvemonkeys = "3.14.0"
 epub4j = "1.4.0"
 jaudiotagger = "2.0.25"
@@ -33,6 +34,7 @@ nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimb
 mariadb-java-client = { module = "org.mariadb.jdbc:mariadb-java-client", version.ref = "mariadb-java-client" }
 flyway-mysql = { module = "org.flywaydb:flyway-mysql", version.ref = "flyway" }
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 twelvemonkeys-imageio-jpeg = { module = "com.twelvemonkeys.imageio:imageio-jpeg", version.ref = "twelvemonkeys" }
 twelvemonkeys-imageio-tiff = { module = "com.twelvemonkeys.imageio:imageio-tiff", version.ref = "twelvemonkeys" }
 twelvemonkeys-imageio-webp = { module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys" }

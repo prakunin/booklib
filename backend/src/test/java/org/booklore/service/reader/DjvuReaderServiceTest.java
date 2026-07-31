@@ -1,10 +1,8 @@
 package org.booklore.service.reader;
 
 import org.booklore.model.dto.response.CbxPageDimension;
-import org.booklore.model.entity.BookEntity;
-import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
-import org.booklore.repository.BookRepository;
+import org.booklore.service.djvu.DjvuBookLocator;
 import org.booklore.service.djvu.DjvuDocumentInfo;
 import org.booklore.service.djvu.DjvuToolRunner;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +16,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,11 +34,11 @@ class DjvuReaderServiceTest {
 
     private static final long BOOK_ID = 42L;
 
-    private final BookRepository bookRepository = mock(BookRepository.class);
+    private final DjvuBookLocator bookLocator = mock(DjvuBookLocator.class);
     private final DjvuToolRunner toolRunner = mock(DjvuToolRunner.class);
     private final ChapterCacheService chapterCacheService = mock(ChapterCacheService.class);
 
-    private final DjvuReaderService service = new DjvuReaderService(bookRepository, toolRunner, chapterCacheService);
+    private final DjvuReaderService service = new DjvuReaderService(bookLocator, toolRunner, chapterCacheService);
 
     @TempDir
     Path tempDir;
@@ -53,13 +50,7 @@ class DjvuReaderServiceTest {
         djvuFile = tempDir.resolve("scan.djvu");
         Files.writeString(djvuFile, "not really a djvu, only its path and mtime are used");
 
-        BookFileEntity bookFile = mock(BookFileEntity.class);
-        when(bookFile.getBookType()).thenReturn(BookFileType.DJVU);
-        when(bookFile.getFullFilePath()).thenReturn(djvuFile);
-
-        BookEntity book = mock(BookEntity.class);
-        when(book.getBookFiles()).thenReturn(List.of(bookFile));
-        when(bookRepository.findByIdForStreaming(BOOK_ID)).thenReturn(Optional.of(book));
+        when(bookLocator.locate(BOOK_ID, "DJVU")).thenReturn(djvuFile);
 
         when(toolRunner.probe(djvuFile)).thenReturn(new DjvuDocumentInfo(3, List.of(
                 new DjvuDocumentInfo.PageSize(120, 160),
@@ -181,7 +172,7 @@ class DjvuReaderServiceTest {
 
     @Test
     void anUnknownBookIsRejectedWithoutTouchingTheDecoder() {
-        when(bookRepository.findByIdForStreaming(99L)).thenReturn(Optional.empty());
+        when(bookLocator.locate(99L, "DJVU")).thenThrow(new IllegalStateException("book not found"));
 
         assertThatThrownBy(() -> service.getAvailablePages(99L, "DJVU")).isInstanceOf(RuntimeException.class);
         verifyNoInteractions(toolRunner);

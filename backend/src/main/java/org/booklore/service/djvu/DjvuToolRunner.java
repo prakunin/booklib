@@ -47,6 +47,9 @@ public class DjvuToolRunner {
 
     private static final Pattern SIZE_LINE = Pattern.compile("width=(\\d+)\\s+height=(\\d+)");
     private static final Pattern META_LINE = Pattern.compile("^(\\S+)\\s+\"(.*)\"\\s*$");
+    /** {@code (word 10 100 60 140 "Hello")} - a leaf zone of the hidden text tree. */
+    private static final Pattern WORD_ZONE = Pattern.compile(
+            "\\(word\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\"((?:[^\"\\\\]|\\\\.)*)\"\\s*\\)");
     /** "DJVUSED --- DjVuLibre-3.5.28" is the whole banner these tools print. */
     private static final Pattern VERSION_BANNER = Pattern.compile("(DjVuLibre-[\\d.]+)");
 
@@ -134,6 +137,37 @@ public class DjvuToolRunner {
         } catch (IOException e) {
             throw new DjvuToolException("Failed to encode page " + pageNumber + " of " + file.getFileName(), e);
         }
+    }
+
+    /**
+     * The hidden text of one page, word by word, or an empty list when the page carries none.
+     * <p>
+     * Most scans have no text layer at all - it is there only when the file was OCR'd - so an empty
+     * result is the normal case and never an error.
+     */
+    public List<DjvuTextWord> pageText(Path file, int pageNumber) {
+        Path djvused = binary(DJVUSED);
+        String output = run(djvused,
+                List.of("-e", "select " + pageNumber + "; print-txt", file.toAbsolutePath().toString()),
+                PROBE_TIMEOUT);
+        return parseWords(output);
+    }
+
+    private List<DjvuTextWord> parseWords(String output) {
+        List<DjvuTextWord> words = new ArrayList<>();
+        Matcher matcher = WORD_ZONE.matcher(output);
+        while (matcher.find()) {
+            String text = matcher.group(5).replace("\\\"", "\"").replace("\\\\", "\\");
+            if (text.isBlank()) {
+                continue;
+            }
+            words.add(new DjvuTextWord(text,
+                    Integer.parseInt(matcher.group(1)),
+                    Integer.parseInt(matcher.group(2)),
+                    Integer.parseInt(matcher.group(3)),
+                    Integer.parseInt(matcher.group(4))));
+        }
+        return words;
     }
 
     private List<DjvuDocumentInfo.PageSize> probeSizes(Path djvused, String path, int pageCount) {

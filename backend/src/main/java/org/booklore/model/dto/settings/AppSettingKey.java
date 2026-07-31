@@ -41,6 +41,8 @@ public enum AppSettingKey {
     RECOMMENDATION_EMBEDDING_SETTINGS   ("recommendation_embedding_settings",    true,  false, List.of(PermissionType.ADMIN, PermissionType.MANAGE_GLOBAL_PREFERENCES)),
     SMART_ENRICHMENT_SETTINGS           ("smart_enrichment_settings",            true,  false, List.of(PermissionType.ADMIN, PermissionType.MANAGE_GLOBAL_PREFERENCES)),
     PDF_CACHE_SIZE_IN_MB                ("pdf_cache_size_in_mb",                 false, false, List.of(PermissionType.ADMIN, PermissionType.MANAGE_GLOBAL_PREFERENCES)),
+    DJVU_PDF_RENDITION_ENABLED          ("djvu_pdf_rendition_enabled",           false, false, List.of(PermissionType.ADMIN, PermissionType.MANAGE_GLOBAL_PREFERENCES)),
+    DJVU_RENDITION_CACHE_SIZE_IN_MB     ("djvu_rendition_cache_size_in_mb",      false, false, List.of(PermissionType.ADMIN, PermissionType.MANAGE_GLOBAL_PREFERENCES)),
     MAX_FILE_UPLOAD_SIZE_IN_MB          ("max_file_upload_size_in_mb",           false, false, List.of(PermissionType.ADMIN, PermissionType.MANAGE_GLOBAL_PREFERENCES)),
 
     // No specific permissions required

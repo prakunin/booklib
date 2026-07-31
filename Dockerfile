@@ -95,7 +95,9 @@ ENV JAVA_TOOL_OPTIONS="-XX:+UseShenandoahGC \
 
 # djvulibre supplies ddjvu and djvused, which decode DjVu. Unlike ffprobe and kepubify below it
 # publishes no static binary, so it is installed rather than copied in from a scratch layer.
-RUN apk add --no-cache su-exec libstdc++ libgcc libarchive djvulibre && \
+# font-dejavu is not for display: the DjVu PDF rendition writes its text layer invisibly, and PDF's
+# built-in fonts cannot encode Cyrillic, which is most of what DjVu is used for.
+RUN apk add --no-cache su-exec libstdc++ libgcc libarchive djvulibre font-dejavu && \
     mkdir -p /bookdrop
 
 # Manually link `libarchive.so.13` so java and other libraries can see it

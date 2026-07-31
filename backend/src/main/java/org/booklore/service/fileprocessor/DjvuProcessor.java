@@ -16,6 +16,7 @@ import org.booklore.repository.BookAdditionalFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.book.BookCreatorService;
 import org.booklore.service.djvu.DjvuDocumentInfo;
+import org.booklore.service.djvu.DjvuRenditionService;
 import org.booklore.service.djvu.DjvuToolException;
 import org.booklore.service.djvu.DjvuToolRunner;
 import org.booklore.service.metadata.MetadataMatchService;
@@ -48,6 +49,7 @@ public class DjvuProcessor extends AbstractFileProcessor implements BookFileProc
 
     private final DjvuMetadataExtractor djvuMetadataExtractor;
     private final DjvuToolRunner toolRunner;
+    private final DjvuRenditionService renditionService;
 
     public DjvuProcessor(BookRepository bookRepository,
                          BookAdditionalFileRepository bookAdditionalFileRepository,
@@ -57,11 +59,13 @@ public class DjvuProcessor extends AbstractFileProcessor implements BookFileProc
                          MetadataMatchService metadataMatchService,
                          SidecarMetadataWriter sidecarMetadataWriter,
                          DjvuMetadataExtractor djvuMetadataExtractor,
-                         DjvuToolRunner toolRunner) {
+                         DjvuToolRunner toolRunner,
+                         DjvuRenditionService renditionService) {
         super(bookRepository, bookAdditionalFileRepository, bookCreatorService, bookMapper, fileService,
                 metadataMatchService, sidecarMetadataWriter);
         this.djvuMetadataExtractor = djvuMetadataExtractor;
         this.toolRunner = toolRunner;
+        this.renditionService = renditionService;
     }
 
     /**
@@ -79,6 +83,10 @@ public class DjvuProcessor extends AbstractFileProcessor implements BookFileProc
             bookEntity.setBookCoverHash(BookCoverUtils.generateCoverHash());
         }
         setMetadata(bookEntity);
+
+        // Opportunistic and off the ingest path: the book is already readable without it, and the
+        // rendition only adds searchable text once it finishes.
+        renditionService.requestRendition(bookEntity.getId(), FileUtils.getBookFullPath(bookEntity));
 
         return bookEntity;
     }
