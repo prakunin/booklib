@@ -376,7 +376,10 @@ export class BookService {
         baseUrl = 'ebook-reader';
         break;
 
+      // DJVU joins CBX rather than getting a reader of its own: its pages are rendered on the
+      // server into the same page cache this reader already serves from.
       case 'CBX':
+      case 'DJVU':
         baseUrl = 'cbx-reader';
         break;
 

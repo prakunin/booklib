@@ -101,7 +101,11 @@ export class UrlHelperService {
         baseUrl = 'ebook-reader';
         break;
 
+      // DJVU is here for the same reason DOC sits with the ebook readers: its pages are rendered
+      // on the server into the very cache this reader serves from, so nothing about the reader
+      // itself has to know the format.
       case 'CBX':
+      case 'DJVU':
         baseUrl = 'cbx-reader';
         break;
 

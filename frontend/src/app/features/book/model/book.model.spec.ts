@@ -3,15 +3,27 @@ import {describe, expect, expectTypeOf, it} from 'vitest';
 import {
   AdditionalFileType,
   Book,
+  BOOK_TYPES,
   BookMetadata,
   BookStatusUpdateResponse,
   BulkMetadataUpdateRequest,
   computeSeriesReadStatus,
   CreatePhysicalBookRequest,
+  isReadableBookType,
   ReadStatus
 } from './book.model';
 
 describe('book.model', () => {
+  it('treats DJVU as a known, readable type', () => {
+    expect(BOOK_TYPES).toContain('DJVU');
+    expect(isReadableBookType('DJVU')).toBe(true);
+  });
+
+  it('keeps OTHER download-only', () => {
+    expect(BOOK_TYPES).toContain('OTHER');
+    expect(isReadableBookType('OTHER')).toBe(false);
+  });
+
   it('exposes stable additional file and read-status enums', () => {
     expect(AdditionalFileType).toEqual({
       ALTERNATIVE_FORMAT: 'ALTERNATIVE_FORMAT',

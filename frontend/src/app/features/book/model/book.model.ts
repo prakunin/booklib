@@ -2,14 +2,15 @@ import {Shelf} from './shelf.model';
 import {CbxBackgroundColor, CbxFitMode, CbxPageSpread, CbxPageSplitOption, CbxPageViewMode, CbxScrollMode, NewPdfReaderSetting} from '../../settings/user-management/user.service';
 import {BookReview} from '../components/book-reviews/book-review-service';
 
-export const BOOK_TYPES = ['PDF', 'EPUB', 'CBX', 'FB2', 'MOBI', 'AZW3', 'AUDIOBOOK', 'DOC', 'OTHER'] as const;
+export const BOOK_TYPES = ['PDF', 'EPUB', 'CBX', 'FB2', 'MOBI', 'AZW3', 'AUDIOBOOK', 'DOC', 'DJVU', 'OTHER'] as const;
 export type BookType = typeof BOOK_TYPES[number];
 export type DocumentParseStatus = 'READABLE' | 'UNREADABLE';
 
 // Formats with a reader. DOC reads through the ebook reader via a rendition synthesised on the
-// server. OTHER (djvu, rtf, … ingested from INPX archives) stays a download-only catalog entry:
-// it can be listed and downloaded, but there is nothing to open.
-export const READABLE_BOOK_TYPES: readonly BookType[] = ['PDF', 'EPUB', 'CBX', 'FB2', 'MOBI', 'AZW3', 'AUDIOBOOK', 'DOC'];
+// server. DJVU reads as page images rendered on demand by ddjvu. OTHER (rtf, … ingested from INPX
+// archives) stays a download-only catalog entry: it can be listed and downloaded, but there is
+// nothing to open.
+export const READABLE_BOOK_TYPES: readonly BookType[] = ['PDF', 'EPUB', 'CBX', 'FB2', 'MOBI', 'AZW3', 'AUDIOBOOK', 'DOC', 'DJVU'];
 
 export function isReadableBookType(bookType: BookType | string | undefined | null): boolean {
   return !!bookType && (READABLE_BOOK_TYPES as readonly string[]).includes(bookType);

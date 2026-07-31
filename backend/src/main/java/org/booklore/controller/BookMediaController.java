@@ -4,7 +4,7 @@ import org.booklore.service.AuthorMetadataService;
 import org.booklore.config.security.annotation.CheckBookAccess;
 import org.booklore.service.book.BookService;
 import org.booklore.service.bookdrop.BookDropService;
-import org.booklore.service.reader.CbxReaderService;
+import org.booklore.service.reader.PageImageSourceResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,7 +31,7 @@ public class BookMediaController {
     private static final CacheControl IMAGE_CACHE = CacheControl.maxAge(Duration.ofDays(365)).cachePrivate().immutable();
 
     private final BookService bookService;
-    private final CbxReaderService cbxReaderService;
+    private final PageImageSourceResolver pageImageSourceResolver;
     private final BookDropService bookDropService;
     private final AuthorMetadataService authorMetadataService;
 
@@ -88,7 +88,8 @@ public class BookMediaController {
             HttpServletResponse response) throws IOException {
         response.setContentType(MediaType.IMAGE_JPEG_VALUE);
         response.setHeader(HttpHeaders.CACHE_CONTROL, IMAGE_CACHE.getHeaderValue());
-        cbxReaderService.streamPageImage(bookId, bookType, pageNumber, response.getOutputStream());
+        pageImageSourceResolver.resolve(bookId, bookType)
+                .streamPageImage(bookId, bookType, pageNumber, response.getOutputStream());
     }
 
     @Operation(summary = "Get author photo", description = "Retrieve the photo for a specific author.")

@@ -3,7 +3,7 @@ package org.booklore.controller;
 import org.booklore.config.security.annotation.CheckBookAccess;
 import org.booklore.model.dto.response.CbxPageDimension;
 import org.booklore.model.dto.response.CbxPageInfo;
-import org.booklore.service.reader.CbxReaderService;
+import org.booklore.service.reader.PageImageSourceResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -19,7 +19,7 @@ import java.util.List;
 @Tag(name = "CBX Reader", description = "Endpoints for reading CBX format books")
 public class CbxReaderController {
 
-    private final CbxReaderService cbxReaderService;
+    private final PageImageSourceResolver pageImageSourceResolver;
 
     @Operation(summary = "List pages in a CBX book", description = "Retrieve a list of available page numbers for a CBX book.")
     @ApiResponse(responseCode = "200", description = "Page numbers returned successfully")
@@ -28,7 +28,7 @@ public class CbxReaderController {
     public List<Integer> listPages(
             @Parameter(description = "ID of the book") @PathVariable Long bookId,
             @Parameter(description = "Optional book type for alternative format (e.g., PDF, CBX)") @RequestParam(required = false) String bookType) {
-        return cbxReaderService.getAvailablePages(bookId, bookType);
+        return pageImageSourceResolver.resolve(bookId, bookType).getAvailablePages(bookId, bookType);
     }
 
     @Operation(summary = "Get page info for a CBX book", description = "Retrieve page information including display names for a CBX book.")
@@ -38,7 +38,7 @@ public class CbxReaderController {
     public List<CbxPageInfo> getPageInfo(
             @Parameter(description = "ID of the book") @PathVariable Long bookId,
             @Parameter(description = "Optional book type for alternative format (e.g., PDF, CBX)") @RequestParam(required = false) String bookType) {
-        return cbxReaderService.getPageInfo(bookId, bookType);
+        return pageImageSourceResolver.resolve(bookId, bookType).getPageInfo(bookId, bookType);
     }
 
     @Operation(summary = "Get page dimensions for a CBX book", description = "Retrieve width, height, and wide flag for each page in a CBX book.")
@@ -48,6 +48,6 @@ public class CbxReaderController {
     public List<CbxPageDimension> getPageDimensions(
             @Parameter(description = "ID of the book") @PathVariable Long bookId,
             @Parameter(description = "Optional book type for alternative format (e.g., PDF, CBX)") @RequestParam(required = false) String bookType) {
-        return cbxReaderService.getPageDimensions(bookId, bookType);
+        return pageImageSourceResolver.resolve(bookId, bookType).getPageDimensions(bookId, bookType);
     }
 }

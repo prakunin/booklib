@@ -3,7 +3,7 @@ package org.booklore.controller;
 import org.booklore.service.AuthorMetadataService;
 import org.booklore.service.book.BookService;
 import org.booklore.service.bookdrop.BookDropService;
-import org.booklore.service.reader.CbxReaderService;
+import org.booklore.service.reader.PageImageSourceResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
@@ -28,7 +28,7 @@ class BookMediaControllerTest {
         authorMetadataService = mock(AuthorMetadataService.class);
         controller = new BookMediaController(
                 bookService,
-                mock(CbxReaderService.class),
+                mock(PageImageSourceResolver.class),
                 mock(BookDropService.class),
                 authorMetadataService);
     }
