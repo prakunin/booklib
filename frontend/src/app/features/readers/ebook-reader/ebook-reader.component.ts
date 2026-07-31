@@ -287,7 +287,11 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
         this.headerService.initialize(this.bookId, book.metadata?.title || '');
 
         const useStreaming = this.route.snapshot.queryParamMap.get('streaming') !== 'false';
-        const loadBook$ = bookType === 'EPUB' && useStreaming
+        // DOC must stream: the blob branch hands the raw file to foliate, which parses FB2, MOBI and
+        // AZW3 natively but has no idea what a Word document is. Streaming is the only path that goes
+        // through the server-side rendition.
+        const streamable = bookType === 'EPUB' || bookType === 'DOC';
+        const loadBook$ = streamable && useStreaming
           ? this.viewManager.loadEpubStreaming(this.bookId, this.altBookType)
           : this.loadBookBlob(bookType);
 

@@ -355,9 +355,12 @@ export class BookService {
         }
         break;
 
+      // DOC is here because Word documents are served to this reader as a rendition synthesised
+      // on the server, not because the file itself is an ebook.
       case 'FB2':
       case 'MOBI':
       case 'AZW3':
+      case 'DOC':
         baseUrl = 'ebook-reader';
         break;
 
