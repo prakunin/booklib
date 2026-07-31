@@ -295,6 +295,9 @@ public class KomgaMapper {
             case MOBI -> "application/x-mobipocket-ebook";
             case AZW3 -> "application/vnd.amazon.ebook";
             case AUDIOBOOK -> "audio/*";
+            // One BookFileType covers both .doc and .docx, so the concrete Word media type cannot be
+            // told apart here; Komga clients download the source file either way.
+            case DOC -> "application/octet-stream";
             case OTHER -> "application/octet-stream";
         };
     }
@@ -312,6 +315,9 @@ public class KomgaMapper {
             case CBX -> "DIVINA"; // DIVINA is for comic books
             case FB2 -> "DIVINA";
             case AUDIOBOOK -> "AUDIOBOOK";
+            // Not EPUB: the rendition is synthesised for our own reader, while a Komga client
+            // receives the Word file itself and could not open it as an EPUB.
+            case DOC -> "UNKNOWN";
             case OTHER -> "UNKNOWN";
         };
     }

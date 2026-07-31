@@ -233,9 +233,13 @@ dependencies {
     // --- MIME Detection ---
     implementation(libs.tika.core)
 
-    // Apache POI: metadata (title/author) from Word documents in INPX archives — .docx via XWPF core
-    // properties, .doc (and other OLE2) via HPSF SummaryInformation.
+    // Apache POI: metadata (title/author) from Word documents — .docx via XWPF core properties,
+    // .doc (and other OLE2) via HPSF SummaryInformation.
     implementation(libs.poi.ooxml)
+    // Body text of legacy .doc lives in HWPF, which ships separately from poi/poi-ooxml. Pure Java
+    // on the same POI version, and the only way to read a Word 97-2003 document without an office
+    // suite in the image.
+    implementation(libs.poi.scratchpad)
 
     // --- XML Support (JAXB) ---
     implementation(libs.jakarta.xml.bind.api)

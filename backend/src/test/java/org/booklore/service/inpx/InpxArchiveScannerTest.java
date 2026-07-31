@@ -139,7 +139,7 @@ class InpxArchiveScannerTest {
         assertThat(pdf.getAuthors()).containsExactly("Megan Lindholm");
 
         InpxBookDto doc = byExtension(books, "doc");
-        assertThat(doc.getBookType()).isEqualTo(BookFileType.OTHER);
+        assertThat(doc.getBookType()).isEqualTo(BookFileType.DOC);
         assertThat(doc.getTitle()).isEqualTo("Den M");
         assertThat(doc.getAuthors()).containsExactly("Mark Semyonovich Solonin");
 

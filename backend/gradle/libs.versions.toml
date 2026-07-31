@@ -49,6 +49,7 @@ xz = { module = "org.tukaani:xz", version.ref = "xz" }
 commons-text = { module = "org.apache.commons:commons-text", version.ref = "commons-text" }
 tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }
 poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
+poi-scratchpad = { module = "org.apache.poi:poi-scratchpad", version.ref = "poi" }
 jakarta-xml-bind-api = { module = "jakarta.xml.bind:jakarta.xml.bind-api", version.ref = "jakarta-xml-bind" }
 jaxb-runtime = { module = "org.glassfish.jaxb:jaxb-runtime", version.ref = "jaxb-runtime" }
 freemarker = { module = "org.freemarker:freemarker", version.ref = "freemarker" }

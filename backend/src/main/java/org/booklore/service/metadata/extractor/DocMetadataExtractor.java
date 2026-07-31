@@ -11,6 +11,9 @@ import org.booklore.model.dto.BookMetadata;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -44,7 +47,7 @@ public class DocMetadataExtractor implements FileMetadataExtractor {
     private BookMetadata extractDocx(File file) throws Exception {
         try (OPCPackage pkg = OPCPackage.open(file); XWPFDocument doc = new XWPFDocument(pkg)) {
             var core = doc.getProperties().getCoreProperties();
-            return build(core.getTitle(), core.getCreator());
+            return build(core.getTitle(), core.getCreator(), core.getCreated());
         }
     }
 
@@ -52,15 +55,28 @@ public class DocMetadataExtractor implements FileMetadataExtractor {
         try (POIFSFileSystem fs = new POIFSFileSystem(file, true)) {
             SummaryInformation summary = (SummaryInformation) PropertySetFactory.create(
                     fs.getRoot(), SummaryInformation.DEFAULT_STREAM_NAME);
-            return build(summary.getTitle(), summary.getAuthor());
+            return build(summary.getTitle(), summary.getAuthor(), summary.getCreateDateTime());
         }
     }
 
-    private BookMetadata build(String title, String author) {
+    private BookMetadata build(String title, String author, Date created) {
         return BookMetadata.builder()
                 .title(StringUtils.trimToNull(title))
                 .authors(StringUtils.isBlank(author) ? List.of() : List.of(author.strip()))
+                .publishedDate(toLocalDate(created))
                 .build();
+    }
+
+    /**
+     * A document's creation date is stored in {@code publishedDate}, which elsewhere means the year an
+     * edition was published. Reusing it avoids a migration on {@code book_metadata}, at the cost of
+     * documents sorting by year alongside book editions as if the two dates meant the same thing.
+     * Deliberate, and the reason a year-based filter can look odd for documents.
+     * <p>
+     * Converted in UTC rather than the default zone so the same file yields the same date on any host.
+     */
+    private LocalDate toLocalDate(Date created) {
+        return created == null ? null : created.toInstant().atZone(ZoneOffset.UTC).toLocalDate();
     }
 
     /**

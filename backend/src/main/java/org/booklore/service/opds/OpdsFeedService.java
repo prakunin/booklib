@@ -685,8 +685,16 @@ public class OpdsFeedService {
             case AZW3 -> "application/vnd.amazon.ebook";
             case CBX -> cbxMimeType(bookFile);
             case AUDIOBOOK -> audiobookMimeType(bookFile);
+            case DOC -> docMimeType(bookFile);
             case OTHER -> "application/octet-stream";
         };
+    }
+
+    private String docMimeType(BookFile bookFile) {
+        String lower = bookFile.getFileName() == null ? "" : bookFile.getFileName().toLowerCase();
+        return lower.endsWith(".docx")
+                ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                : "application/msword";
     }
 
     private String fb2MimeType(BookFile bookFile) {

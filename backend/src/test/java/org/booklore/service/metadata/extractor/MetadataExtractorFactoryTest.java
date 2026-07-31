@@ -28,6 +28,7 @@ class MetadataExtractorFactoryTest {
     @Mock private MobiMetadataExtractor mobiMetadataExtractor;
     @Mock private Azw3MetadataExtractor azw3MetadataExtractor;
     @Mock private AudiobookMetadataExtractor audiobookMetadataExtractor;
+    @Mock private DocMetadataExtractor docMetadataExtractor;
 
     private MetadataExtractorFactory factory;
     private final File dummyFile = new File("test.bin");
@@ -38,7 +39,7 @@ class MetadataExtractorFactoryTest {
         factory = new MetadataExtractorFactory(
                 epubMetadataExtractor, pdfMetadataExtractor, cbxMetadataExtractor,
                 fb2MetadataExtractor, mobiMetadataExtractor, azw3MetadataExtractor,
-                audiobookMetadataExtractor
+                audiobookMetadataExtractor, docMetadataExtractor
         );
     }
 

@@ -21,7 +21,9 @@ public enum BookFileExtension {
     M4B("m4b", BookFileType.AUDIOBOOK),
     M4A("m4a", BookFileType.AUDIOBOOK),
     MP3("mp3", BookFileType.AUDIOBOOK),
-    OPUS("opus", BookFileType.AUDIOBOOK);
+    OPUS("opus", BookFileType.AUDIOBOOK),
+    DOC("doc", BookFileType.DOC),
+    DOCX("docx", BookFileType.DOC);
 
     private final String extension;
     private final BookFileType type;

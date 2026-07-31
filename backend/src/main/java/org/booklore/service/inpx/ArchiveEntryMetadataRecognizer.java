@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.booklore.model.dto.BookMetadata;
+import org.booklore.model.enums.BookFileExtension;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.service.metadata.extractor.DocMetadataExtractor;
 import org.booklore.service.metadata.extractor.FileMetadataExtractor;
@@ -33,9 +34,17 @@ public class ArchiveEntryMetadataRecognizer {
     private final DocMetadataExtractor docMetadataExtractor;
     private final InpxFilenameMetadataParser filenameMetadataParser;
 
-    /** The stored file type: a readable type when the extension has one, else the download-only OTHER. */
+    /**
+     * The stored file type: a readable type when the extension has one, else the download-only OTHER.
+     * <p>
+     * Resolved through {@link BookFileExtension} rather than {@code BookFileType.fromExtension},
+     * because Word documents deliberately carry no extensions on the type - they are recognised by
+     * extension so that library folders and archive entries reach the same reader.
+     */
     public BookFileType resolveBookType(String entryName) {
-        return BookFileType.fromExtension(extension(entryName)).orElse(BookFileType.OTHER);
+        return BookFileExtension.fromFileName(entryName)
+                .map(BookFileExtension::getType)
+                .orElse(BookFileType.OTHER);
     }
 
     /** Whether a metadata extractor exists for the entry — the gate for materialising it on refresh. */
