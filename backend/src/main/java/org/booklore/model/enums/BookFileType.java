@@ -16,7 +16,11 @@ public enum BookFileType {
     MOBI(Set.of("mobi")),
     AZW3(Set.of("azw3", "azw")),
     AUDIOBOOK(Set.of("m4b", "m4a", "mp3", "opus")),
-    // Download-only catch-all for catalog entries whose format has no reader (djvu, doc, rtf, …).
+    // Word documents from library folders and BookDrop, which resolve through BookFileExtension.
+    // Deliberately carries no extensions, for the same reason OTHER does not: fromExtension is used
+    // only by the INPX archive path, and archive entries must keep resolving to OTHER.
+    DOC(Set.of()),
+    // Download-only catch-all for catalog entries whose format has no reader (djvu, rtf, …).
     // Deliberately carries no extensions: fromExtension never resolves to it, so only code that
     // explicitly chooses OTHER (the INPX archive ingest) ever assigns it.
     OTHER(Set.of());

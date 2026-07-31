@@ -40,6 +40,9 @@ class EpubReaderServiceTest {
     @Mock
     BookRepository bookRepository;
 
+    @Mock
+    DocumentRenditionService documentRenditionService;
+
     @InjectMocks
     EpubReaderService epubReaderService;
 

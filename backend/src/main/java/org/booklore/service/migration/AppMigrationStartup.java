@@ -24,6 +24,7 @@ public class AppMigrationStartup {
     private final PopulateAuthorSortNameMigration populateAuthorSortNameMigration;
     private final RemoveBundledCustomSvgIconsMigration removeBundledCustomSvgIconsMigration;
     private final PopulateAuthorNormalizedNameMigration populateAuthorNormalizedNameMigration;
+    private final PromoteWordDocumentsFromOtherMigration promoteWordDocumentsFromOtherMigration;
 
     @EventListener(ApplicationReadyEvent.class)
     public void runMigrationsOnce() {
@@ -40,5 +41,6 @@ public class AppMigrationStartup {
         appMigrationService.executeMigration(populateAuthorSortNameMigration);
         appMigrationService.executeMigration(removeBundledCustomSvgIconsMigration);
         appMigrationService.executeMigration(populateAuthorNormalizedNameMigration);
+        appMigrationService.executeMigration(promoteWordDocumentsFromOtherMigration);
     }
 }

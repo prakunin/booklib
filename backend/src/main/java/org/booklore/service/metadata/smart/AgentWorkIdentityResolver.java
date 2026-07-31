@@ -49,6 +49,16 @@ public class AgentWorkIdentityResolver implements WorkIdentityResolver {
         SmartEnrichmentSettings settings = appSettingService.getAppSettings().getSmartEnrichmentSettings();
         boolean deepSearch = settings != null && settings.isDeepSearch();
         String excerpt = bookExcerptExtractor.openingText(book, EXCERPT_MAX_CHARS).orElse(null);
+        Optional<ResolvedWorkIdentity> first = resolveOnce(book, deepSearch, excerpt);
+        if (deepSearch || first.isEmpty() || isIdentified(first.get())) {
+            return first;
+        }
+        log.info("Quick resolution could not identify book {}; retrying once with bounded web search", book.getId());
+        Optional<ResolvedWorkIdentity> fallback = resolveOnce(book, true, excerpt);
+        return fallback.or(() -> first);
+    }
+
+    private Optional<ResolvedWorkIdentity> resolveOnce(Book book, boolean deepSearch, String excerpt) {
         String prompt = promptBuilder.build(book, deepSearch, excerpt);
         Optional<String> response = agentCliClient.run(prompt);
         if (response.isEmpty()) {
@@ -72,5 +82,16 @@ public class AgentWorkIdentityResolver implements WorkIdentityResolver {
             log.warn("Could not parse work identity for book {}: {}", book.getId(), e.getMessage());
             return Optional.empty();
         }
+    }
+
+    private boolean isIdentified(ResolvedWorkIdentity identity) {
+        return isUsable(identity.originalTitle())
+                || isUsable(identity.editionTitle())
+                || isUsable(identity.originalAuthor())
+                || isUsable(identity.editionAuthor());
+    }
+
+    private boolean isUsable(String value) {
+        return value != null && !value.isBlank();
     }
 }

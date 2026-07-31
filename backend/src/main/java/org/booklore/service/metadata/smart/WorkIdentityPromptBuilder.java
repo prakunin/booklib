@@ -5,7 +5,9 @@ import org.booklore.model.dto.BookFile;
 import org.booklore.model.dto.BookMetadata;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Builds the resolution prompt.
@@ -126,9 +128,10 @@ public class WorkIdentityPromptBuilder {
         // — the title page usually prints author, title, series and publisher verbatim — and it is
         // what lets the cheap no-web mode identify the book at all. Appended as a delimited block so
         // its own line breaks do not blur the INPUT fields above.
-        if (excerpt != null && !excerpt.isBlank()) {
+        String cleanedExcerpt = cleanExcerpt(excerpt);
+        if (cleanedExcerpt != null) {
             prompt.append("\nbook_excerpt (opening pages of the file):\n<<<\n")
-                    .append(excerpt.strip())
+                    .append(cleanedExcerpt)
                     .append("\n>>>\n");
         }
 
@@ -175,6 +178,38 @@ public class WorkIdentityPromptBuilder {
         }
         String flattened = text.replaceAll("\\s+", " ").trim();
         return flattened.length() <= 300 ? flattened : flattened.substring(0, 300) + "…";
+    }
+
+    /**
+     * PDF-to-FB2 converters often put the same viewer/tracker watermark on every opening line.
+     * Removing that deterministic debris gives the resolver actual phrases to identify while
+     * keeping ordinary short Russian prose intact.
+     */
+    private String cleanExcerpt(String excerpt) {
+        if (excerpt == null || excerpt.isBlank()) {
+            return null;
+        }
+        List<String> cleaned = new ArrayList<>();
+        String previous = null;
+        for (String rawLine : excerpt.lines().toList()) {
+            String line = rawLine.strip();
+            if (line.isBlank() || isConversionNoise(line) || line.equals(previous)) {
+                continue;
+            }
+            cleaned.add(line);
+            previous = line;
+        }
+        return cleaned.isEmpty() ? null : String.join("\n", cleaned);
+    }
+
+    private boolean isConversionNoise(String line) {
+        String lower = line.toLowerCase(Locale.ROOT);
+        return lower.contains("f-xchange view")
+                || lower.contains("click to buy now")
+                || lower.contains("docu-track")
+                || lower.contains("u-track.co")
+                || line.matches("[A-Za-z.]{1,2}")
+                || line.matches("\\d{1,3}");
     }
 
     private String joinAuthors(List<String> authors) {

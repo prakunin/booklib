@@ -123,6 +123,41 @@ class WorkIdentityPromptBuilderTest {
     }
 
     @Test
+    void removesConverterWatermarksButKeepsIdentifyingProse() {
+        String prompt = builder.build(Book.builder().title("A").build(), false, """
+                F-XChange View
+                F-XChange View
+                D
+                e
+                Click to buy NOW!
+                c u-track.co
+                3
+                Тысячи лет люди не знали, что живут в своих воспоминаниях.
+                Перед началом
+                До момента написания этой книги, я не видел никого, кто достиг бы просветления.
+                """);
+
+        assertThat(prompt)
+                .contains("Тысячи лет люди не знали")
+                .contains("Перед началом")
+                .contains("До момента написания этой книги")
+                .doesNotContain("F-XChange", "Click to buy NOW", "u-track.co");
+    }
+
+    @Test
+    void omitsTheExcerptWhenOnlyConversionNoiseRemains() {
+        String prompt = builder.build(Book.builder().title("A").build(), false, """
+                F-XChange View
+                Click to buy NOW!
+                D
+                e
+                3
+                """);
+
+        assertThat(prompt).doesNotContain("book_excerpt (opening pages of the file):");
+    }
+
+    @Test
     void omitsTheExcerptBlockWhenThereIsNone() {
         // The rules mention book_excerpt by name, so absence is asserted on the delimited block header.
         assertThat(quick(Book.builder().title("A").build()))

@@ -97,6 +97,7 @@ export class UrlHelperService {
       case 'FB2':
       case 'MOBI':
       case 'AZW3':
+      case 'DOC':
         baseUrl = 'ebook-reader';
         break;
 

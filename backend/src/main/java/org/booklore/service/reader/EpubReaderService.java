@@ -11,6 +11,7 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookRepository;
+import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.util.FileUtils;
 import org.grimmory.epub4j.domain.*;
 import org.grimmory.epub4j.epub.CoverDetector;
@@ -70,6 +71,8 @@ public class EpubReaderService {
     );
 
     private final BookRepository bookRepository;
+    private final DocumentRenditionService documentRenditionService;
+    private final ArchivedBookContentService archivedBookContentService;
     private final Cache<String, CachedEpubMetadata> metadataCache = Caffeine.newBuilder()
             .maximumSize(MAX_CACHE_ENTRIES)
             .expireAfterAccess(Duration.ofMinutes(30))
@@ -125,6 +128,11 @@ public class EpubReaderService {
     public void streamFile(Long bookId, String bookType, String filePath, OutputStream outputStream) throws IOException {
         Path epubPath = getBookPath(bookId, bookType);
         CachedEpubMetadata metadata = getCachedMetadata(epubPath);
+
+        if (documentRenditionService.supports(epubPath)) {
+            documentRenditionService.streamResource(epubPath, filePath, outputStream);
+            return;
+        }
 
         String cleanPath = filePath.startsWith("/") ? filePath.substring(1) : filePath;
         String actualPath;
@@ -184,9 +192,16 @@ public class EpubReaderService {
                     .filter(bf -> bf.getBookType() == requestedType)
                     .findFirst()
                     .orElseThrow(() -> ApiError.FILE_NOT_FOUND.createException("No file of type " + bookType + " found for book"));
-            return bookFile.getFullFilePath();
+            return bookFile.isArchivedSource()
+                    ? archivedBookContentService.resolve(bookFile)
+                    : bookFile.getFullFilePath();
         }
-        return FileUtils.getBookFullPath(bookEntity);
+        // An entry inside an INPX archive has no path of its own: it is materialised into a cached
+        // file first, the same way downloads and metadata extraction already reach archived content.
+        BookFileEntity primaryFile = bookEntity.getPrimaryBookFile();
+        return primaryFile != null && primaryFile.isArchivedSource()
+                ? archivedBookContentService.resolve(primaryFile)
+                : FileUtils.getBookFullPath(bookEntity);
     }
 
     private CachedEpubMetadata getCachedMetadata(Path epubPath) throws IOException {
@@ -206,6 +221,11 @@ public class EpubReaderService {
     }
 
     private CachedEpubMetadata parseEpubMetadata(Path epubPath, long lastModified) throws IOException {
+        // A Word document has no archive to open: its spine, manifest and table of contents are
+        // synthesised from the parsed text, and the chunks are rendered on request rather than read.
+        if (documentRenditionService.supports(epubPath)) {
+            return new CachedEpubMetadata(documentRenditionService.buildBookInfo(epubPath), lastModified);
+        }
         try {
             Book book = new EpubReader().readEpubLazy(epubPath, "UTF-8");
             EpubBookInfo bookInfo = mapBookToInfo(book);

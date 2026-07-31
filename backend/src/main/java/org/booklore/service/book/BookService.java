@@ -214,7 +214,9 @@ public class BookService {
                 .orElseThrow(() -> ApiError.FILE_NOT_FOUND.createException("Book file not found: " + bookFileId));
         BookFileType bookType = bookFile.getBookType();
         switch (bookType) {
-            case EPUB, FB2, MOBI, AZW3 -> ebookViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
+            // Also a switch statement: DOC renders through the ebook reader, so it must be listed
+            // here or its viewer preferences are silently never loaded.
+            case EPUB, FB2, MOBI, AZW3, DOC -> ebookViewerPreferencesRepository.findByBookIdAndUserId(bookId, user.getId())
                     .ifPresent(epubPref -> settingsBuilder.ebookSettings(EbookViewerPreferences.builder()
                             .bookId(bookId)
                             .userId(user.getId())

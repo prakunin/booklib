@@ -28,7 +28,11 @@ class ArchiveEntryMetadataRecognizerTest {
     void resolvesReadableTypeByExtensionAndOtherForTheRest() {
         assertThat(recognizer.resolveBookType("x.pdf")).isEqualTo(BookFileType.PDF);
         assertThat(recognizer.resolveBookType("x.fb2")).isEqualTo(BookFileType.FB2);
-        assertThat(recognizer.resolveBookType("x.doc")).isEqualTo(BookFileType.OTHER);
+        // Word documents read through a synthesised rendition, so an archive entry resolves to the
+        // same readable type a library folder would give it.
+        assertThat(recognizer.resolveBookType("x.doc")).isEqualTo(BookFileType.DOC);
+        assertThat(recognizer.resolveBookType("x.docx")).isEqualTo(BookFileType.DOC);
+        // Formats that still have no reader stay download-only.
         assertThat(recognizer.resolveBookType("x.djvu")).isEqualTo(BookFileType.OTHER);
     }
 
