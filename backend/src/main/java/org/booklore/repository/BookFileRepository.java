@@ -77,6 +77,17 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
     List<BookFileEntity> findDownloadOnlyWordDocumentsAfterId(@Param("afterId") long afterId, Pageable pageable);
 
     @Query("""
+            SELECT bf FROM BookFileEntity bf
+            JOIN bf.book b
+            WHERE bf.id > :afterId
+            AND bf.bookType = org.booklore.model.enums.BookFileType.OTHER
+            AND (LOWER(bf.fileName) LIKE '%.djvu' OR LOWER(bf.fileName) LIKE '%.djv')
+            AND (b.deleted IS NULL OR b.deleted = false)
+            ORDER BY bf.id
+            """)
+    List<BookFileEntity> findDownloadOnlyDjvuFilesAfterId(@Param("afterId") long afterId, Pageable pageable);
+
+    @Query("""
             SELECT bf.sourceArchive, COUNT(bf)
             FROM BookFileEntity bf
             WHERE bf.book.library.id = :libraryId
