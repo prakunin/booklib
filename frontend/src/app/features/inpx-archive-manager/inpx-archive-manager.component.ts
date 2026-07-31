@@ -1,13 +1,13 @@
 import {ChangeDetectionStrategy, Component, DestroyRef, inject, signal} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DatePipe} from '@angular/common';
-import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
+import {ActivatedRoute, Router} from '@angular/router';
 import {TableModule} from 'primeng/table';
 import {Button} from 'primeng/button';
 import {Tag} from 'primeng/tag';
 import {ProgressSpinner} from 'primeng/progressspinner';
 import {MessageService} from 'primeng/api';
-import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
+import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {catchError, EMPTY, exhaustMap, filter, finalize, map, Subscription, take, tap, timer} from 'rxjs';
 import {InpxArchive, InpxArchiveScanStatus, InpxArchiveScanTask} from './inpx-archive.model';
 import {InpxArchiveService} from './inpx-archive.service';
@@ -19,34 +19,35 @@ import {DialogLauncherService} from '../../shared/services/dialog-launcher.servi
   templateUrl: './inpx-archive-manager.component.html',
   styleUrl: './inpx-archive-manager.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, TableModule, Button, Tag, ProgressSpinner, TranslocoDirective, TranslocoPipe],
+  imports: [DatePipe, TableModule, Button, Tag, ProgressSpinner, TranslocoDirective],
 })
 export class InpxArchiveManagerComponent {
   private readonly service = inject(InpxArchiveService);
-  private readonly config = inject(DynamicDialogConfig);
-  private readonly ref = inject(DynamicDialogRef);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
   private readonly t = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialogLauncher = inject(DialogLauncherService);
-  private readonly libraryId = (this.config.data as {libraryId: number}).libraryId;
+  readonly libraryId = Number(this.route.snapshot.paramMap.get('libraryId'));
 
   readonly archives = signal<InpxArchive[]>([]);
   readonly loading = signal(true);
   readonly loadFailed = signal(false);
   private pollSubscription: Subscription | null = null;
+  private calculationPollSubscription: Subscription | null = null;
   private rescanVersion = 0;
 
   constructor() {
     this.load();
   }
 
-  close(): void {
-    this.ref.close();
-  }
-
   openScanQueue(): void {
     void this.dialogLauncher.openInpxScanQueueDialog(this.libraryId);
+  }
+
+  openArchive(archive: InpxArchive): void {
+    void this.router.navigate(['/library', this.libraryId, 'archives', archive.archiveName, 'books']);
   }
 
   rescan(archive: InpxArchive): void {
@@ -105,9 +106,34 @@ export class InpxArchiveManagerComponent {
       finalize(() => this.loading.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: archives => this.archives.set(archives),
+      next: archives => {
+        this.archives.set(archives);
+        if (this.hasPendingCalculations(archives)) {
+          this.pollCalculations();
+        }
+      },
       error: () => this.loadFailed.set(true),
     });
+  }
+
+  private pollCalculations(): void {
+    if (this.calculationPollSubscription) {
+      return;
+    }
+    this.calculationPollSubscription = timer(2000, 3000).pipe(
+      exhaustMap(() => this.service.getArchives(this.libraryId).pipe(catchError(() => EMPTY))),
+      tap(archives => this.archives.set(archives)),
+      filter(archives => !this.hasPendingCalculations(archives)),
+      take(1),
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.calculationPollSubscription = null),
+    ).subscribe();
+  }
+
+  private hasPendingCalculations(archives: InpxArchive[]): boolean {
+    return archives.some(archive => archive.fb2Count === null
+      || archive.importedBookCount === null
+      || archive.coveredBookCount === null);
   }
 
   private pollUntilIdle(): void {

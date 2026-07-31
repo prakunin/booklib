@@ -68,6 +68,19 @@ public class TaskExecutorConfig {
         return executor;
     }
 
+    @Bean(name = "inpxArchiveInspectionExecutor")
+    public AsyncTaskExecutor inpxArchiveInspectionExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setThreadNamePrefix("inpx-archive-inspection-");
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(1000);
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        return executor;
+    }
+
     @Bean
     public TaskScheduler taskScheduler() {
         var scheduler = new SimpleAsyncTaskScheduler();

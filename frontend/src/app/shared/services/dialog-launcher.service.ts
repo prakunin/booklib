@@ -97,17 +97,6 @@ export class DialogLauncherService {
     });
   }
 
-  async openInpxArchiveManagerDialog(libraryId: number): Promise<DynamicDialogRef | null> {
-    return this.launchLazyDialog(async () => {
-      const {InpxArchiveManagerComponent} = await import('../../features/inpx-archive-manager/inpx-archive-manager.component');
-      return this.openDialog(InpxArchiveManagerComponent, {
-        showHeader: false,
-        styleClass: `${DialogSize.XL} ${DialogStyle.MINIMAL}`,
-        data: {libraryId},
-      });
-    });
-  }
-
   async openInpxScanQueueDialog(libraryId: number): Promise<DynamicDialogRef | null> {
     return this.launchLazyDialog(async () => {
       const {InpxScanQueueComponent} = await import('../../features/inpx-archive-manager/inpx-scan-queue.component');

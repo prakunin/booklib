@@ -125,6 +125,7 @@ export interface LanguageOption {
 
 export interface AppBookFilters {
   libraryId?: number;
+  sourceArchive?: string;
   shelfId?: number;
   magicShelfId?: number;
   unshelved?: boolean;

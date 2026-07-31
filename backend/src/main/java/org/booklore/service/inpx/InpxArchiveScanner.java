@@ -1,6 +1,5 @@
 package org.booklore.service.inpx;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
@@ -11,6 +10,8 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.service.metadata.extractor.Fb2MetadataExtractor;
 import org.booklore.util.FileUtils;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -20,6 +21,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,9 +29,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -51,7 +55,6 @@ import java.util.zip.ZipEntry;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class InpxArchiveScanner {
 
     private static final int EXISTING_ENTRY_BATCH_SIZE = 500;
@@ -59,7 +62,20 @@ public class InpxArchiveScanner {
     private final BookFileRepository bookFileRepository;
     private final Fb2MetadataExtractor fb2MetadataExtractor;
     private final ArchiveEntryMetadataRecognizer entryMetadataRecognizer;
+    private final TaskExecutor archiveInspectionExecutor;
     private final ConcurrentMap<Path, ArchiveFile> archiveFileCache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<ArchiveInspectionKey, CompletableFuture<ArchiveFile>> inspections =
+            new ConcurrentHashMap<>();
+
+    public InpxArchiveScanner(BookFileRepository bookFileRepository,
+                              Fb2MetadataExtractor fb2MetadataExtractor,
+                              ArchiveEntryMetadataRecognizer entryMetadataRecognizer,
+                              @Qualifier("inpxArchiveInspectionExecutor") TaskExecutor archiveInspectionExecutor) {
+        this.bookFileRepository = bookFileRepository;
+        this.fb2MetadataExtractor = fb2MetadataExtractor;
+        this.entryMetadataRecognizer = entryMetadataRecognizer;
+        this.archiveInspectionExecutor = archiveInspectionExecutor;
+    }
 
     public Discovery discover(long libraryId, String archiveRoot) {
         Map<String, Long> persistedCounts = persistedCounts(libraryId);
@@ -82,6 +98,14 @@ public class InpxArchiveScanner {
     }
 
     public List<ArchiveFile> listArchives(String archiveRoot) {
+        return listArchives(archiveRoot, true);
+    }
+
+    public List<ArchiveFile> listArchiveMetadata(String archiveRoot) {
+        return listArchives(archiveRoot, false);
+    }
+
+    private List<ArchiveFile> listArchives(String archiveRoot, boolean awaitInspection) {
         Path root = validateArchiveRoot(archiveRoot);
         try (Stream<Path> paths = Files.list(root)) {
             List<ArchiveFile> archives = new ArrayList<>();
@@ -97,10 +121,9 @@ public class InpxArchiveScanner {
                 if (cached != null && cached.sizeBytes() == size && cached.modifiedAt().equals(modifiedAt)) {
                     archives.add(cached);
                 } else {
-                    ArchiveFile inspected = new ArchiveFile(path, path.getFileName().toString(), size,
-                            modifiedAt, countIngestableEntries(path));
-                    archiveFileCache.put(path, inspected);
-                    archives.add(inspected);
+                    CompletableFuture<ArchiveFile> inspection = inspectInBackground(path, size, modifiedAt);
+                    archives.add(awaitInspection ? awaitInspection(inspection)
+                            : new ArchiveFile(path, path.getFileName().toString(), size, modifiedAt, null));
                 }
             }
             archiveFileCache.keySet().retainAll(seenArchives);
@@ -112,6 +135,10 @@ public class InpxArchiveScanner {
 
     int archiveFileCacheSize() {
         return archiveFileCache.size();
+    }
+
+    int activeInspectionCount() {
+        return inspections.size();
     }
 
     public ArchiveCandidate inspectArchive(String archiveRoot, String archiveName) {
@@ -129,9 +156,18 @@ public class InpxArchiveScanner {
             if (!path.startsWith(root) || !Files.isRegularFile(path) || !Files.isReadable(path)) {
                 throw ApiError.FILE_NOT_FOUND.createException("ZIP archive is unavailable: " + archiveName);
             }
-            return new ArchiveCandidate(path, archiveName, countIngestableEntries(path));
+            long size = Files.size(path);
+            Instant modifiedAt = Files.getLastModifiedTime(path).toInstant();
+            ArchiveFile cached = archiveFileCache.get(path);
+            ArchiveFile inspected = cached != null && cached.sizeBytes() == size
+                    && cached.modifiedAt().equals(modifiedAt)
+                    ? cached
+                    : awaitInspection(inspectInBackground(path, size, modifiedAt));
+            return new ArchiveCandidate(path, archiveName, inspected.entryCount());
         } catch (InvalidPathException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid ZIP archive name");
+        } catch (IOException e) {
+            throw ApiError.FILE_READ_ERROR.createException("Unable to inspect ZIP archive: " + e.getMessage());
         }
     }
 
@@ -296,11 +332,52 @@ public class InpxArchiveScanner {
     }
 
     private long countIngestableEntries(Path path) {
-        try (ZipFile archive = ZipFile.builder().setFile(path.toFile()).get()) {
+        try (ZipFile archive = ZipFile.builder()
+                .setFile(path.toFile())
+                .setIgnoreLocalFileHeader(true)
+                .get()) {
             return Collections.list(archive.getEntries()).stream().filter(this::isIngestableEntry).count();
         } catch (IOException e) {
             log.warn("Unable to inspect ZIP archive {}: {}", path, e.getMessage());
             return 0;
+        }
+    }
+
+    private CompletableFuture<ArchiveFile> inspectInBackground(Path path, long size, Instant modifiedAt) {
+        ArchiveInspectionKey key = new ArchiveInspectionKey(path, size, modifiedAt);
+        CompletableFuture<ArchiveFile> created = new CompletableFuture<>();
+        CompletableFuture<ArchiveFile> existing = inspections.putIfAbsent(key, created);
+        if (existing != null) {
+            return existing;
+        }
+        try {
+            archiveInspectionExecutor.execute(() -> {
+                try {
+                    ArchiveFile inspected = new ArchiveFile(path, path.getFileName().toString(), size,
+                            modifiedAt, countIngestableEntries(path));
+                    archiveFileCache.put(path, inspected);
+                    created.complete(inspected);
+                } catch (Exception | Error e) {
+                    created.completeExceptionally(e);
+                } finally {
+                    inspections.remove(key, created);
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            inspections.remove(key, created);
+            created.completeExceptionally(e);
+        }
+        return created;
+    }
+
+    private ArchiveFile awaitInspection(CompletableFuture<ArchiveFile> inspection) {
+        try {
+            return inspection.join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw e;
         }
     }
 
@@ -353,6 +430,9 @@ public class InpxArchiveScanner {
     public record ArchiveCandidate(Path path, String archiveName, long entryCount) {
     }
 
-    public record ArchiveFile(Path path, String archiveName, long sizeBytes, Instant modifiedAt, long entryCount) {
+    public record ArchiveFile(Path path, String archiveName, long sizeBytes, Instant modifiedAt, Long entryCount) {
+    }
+
+    private record ArchiveInspectionKey(Path path, long sizeBytes, Instant modifiedAt) {
     }
 }

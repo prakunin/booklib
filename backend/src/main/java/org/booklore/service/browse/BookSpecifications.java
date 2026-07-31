@@ -123,6 +123,22 @@ public class BookSpecifications {
         };
     }
 
+    public static Specification<BookEntity> inSourceArchive(String archiveName) {
+        return (root, query, cb) -> {
+            if (archiveName == null || archiveName.isBlank()) {
+                return cb.conjunction();
+            }
+            Subquery<Long> subquery = query.subquery(Long.class);
+            Root<BookFileEntity> fileRoot = subquery.from(BookFileEntity.class);
+            subquery.select(fileRoot.get("book").get("id"))
+                    .where(
+                            cb.equal(fileRoot.get("book").get("id"), root.get("id")),
+                            cb.equal(fileRoot.get("sourceArchive"), archiveName)
+                    );
+            return cb.exists(subquery);
+        };
+    }
+
     public static Specification<BookEntity> inShelf(Long shelfId) {
         return (root, query, cb) -> {
             if (shelfId == null) {

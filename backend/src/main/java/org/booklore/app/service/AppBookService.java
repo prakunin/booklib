@@ -1982,6 +1982,10 @@ public class AppBookService {
         addLibraryScope(specs, accessibleLibraryIds, req);
         addShelfScope(specs, req, userId);
 
+        if (req.sourceArchive() != null && !req.sourceArchive().isBlank()) {
+            specs.add(BookSpecifications.inSourceArchive(req.sourceArchive()));
+        }
+
         if (req.search() != null && !req.search().trim().isEmpty()) {
             specs.add(BookSpecifications.searchText(req.search()));
         }

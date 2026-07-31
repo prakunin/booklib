@@ -124,11 +124,11 @@ export class LibraryShelfMenuService {
             label: this.t.translate('book.shelfMenuService.library.manageInpxArchives'),
             icon: 'pi pi-database',
             disabled: libraryId == null,
-            command: async () => {
+            command: () => {
               if (libraryId == null) {
                 return;
               }
-              await this.dialogLauncherService.openInpxArchiveManagerDialog(libraryId).catch(() => undefined);
+              void this.router.navigate(['/library', libraryId, 'archives']);
             }
           }] : []),
           {

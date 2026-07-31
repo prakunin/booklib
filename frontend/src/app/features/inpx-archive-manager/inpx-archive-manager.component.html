@@ -1,16 +1,15 @@
-<div *transloco="let t; prefix: 'book.inpxArchives'" class="archive-dialog">
-  <header class="dialog-header">
+<div *transloco="let t; prefix: 'book.inpxArchives'" class="archive-page">
+  <header class="page-header">
     <div>
       <h2>{{ t('title') }}</h2>
       <p>{{ t('subtitle') }}</p>
     </div>
     <div class="header-actions">
       <p-button icon="pi pi-list" [label]="t('scanQueue')" [outlined]="true" (onClick)="openScanQueue()"/>
-      <p-button icon="pi pi-times" [text]="true" [rounded]="true" [ariaLabel]="'common.close' | transloco" (onClick)="close()"/>
     </div>
   </header>
 
-  <main class="dialog-content">
+  <main class="page-content">
     @if (loading()) {
       <div class="state"><p-progress-spinner strokeWidth="4"/></div>
     } @else if (loadFailed()) {
@@ -21,7 +20,7 @@
     } @else if (archives().length === 0) {
       <div class="state">{{ t('empty') }}</div>
     } @else {
-      <p-table [value]="archives()" [scrollable]="true" scrollHeight="60vh" responsiveLayout="scroll">
+      <p-table [value]="archives()" responsiveLayout="scroll">
         <ng-template #header>
           <tr>
             <th scope="col">{{ t('archive') }}</th>
@@ -36,10 +35,20 @@
         </ng-template>
         <ng-template #body let-archive>
           <tr>
-            <td class="archive-name" [title]="archive.archiveName">{{ archive.archiveName }}</td>
+            <td class="archive-name" [title]="archive.archiveName">
+              <button type="button" class="archive-link" (click)="openArchive(archive)">
+                {{ archive.archiveName }}
+              </button>
+            </td>
             <td>{{ formatSize(archive.sizeBytes) }}</td>
-            <td>{{ archive.importedBookCount }} / {{ archive.fb2Count }}</td>
-            <td>{{ archive.coveredBookCount }} / {{ archive.importedBookCount }}</td>
+            <td>
+              {{ archive.importedBookCount ?? t('calculating') }} /
+              {{ archive.fb2Count ?? t('calculating') }}
+            </td>
+            <td>
+              {{ archive.coveredBookCount ?? t('calculating') }} /
+              {{ archive.importedBookCount ?? t('calculating') }}
+            </td>
             <td>{{ archive.addedAt ? (archive.addedAt | date:'medium') : '—' }}</td>
             <td>{{ archive.lastScannedAt ? (archive.lastScannedAt | date:'medium') : '—' }}</td>
             <td>
@@ -54,7 +63,7 @@
                 [label]="t('fullRescan')"
                 size="small"
                 [loading]="isActive(archive)"
-                [disabled]="isActive(archive)"
+                [disabled]="isActive(archive) || archive.fb2Count === null"
                 (onClick)="rescan(archive)"/>
             </td>
           </tr>

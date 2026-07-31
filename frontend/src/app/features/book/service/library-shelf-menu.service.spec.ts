@@ -88,7 +88,6 @@ describe('LibraryShelfMenuService', () => {
   };
   const dialogLauncherService = {
     openLibraryEditDialog: vi.fn(() => Promise.resolve(null)),
-    openInpxArchiveManagerDialog: vi.fn(() => Promise.resolve(null)),
     openShelfEditDialog: vi.fn(() => Promise.resolve(null)),
     openMagicShelfEditDialog: vi.fn(() => Promise.resolve(null)),
   };
@@ -144,7 +143,6 @@ describe('LibraryShelfMenuService', () => {
     userService.getCurrentUser.mockClear();
     router.navigate.mockClear();
     dialogLauncherService.openLibraryEditDialog.mockClear();
-    dialogLauncherService.openInpxArchiveManagerDialog.mockClear();
     dialogLauncherService.openShelfEditDialog.mockClear();
     dialogLauncherService.openMagicShelfEditDialog.mockClear();
     magicShelfService.deleteShelf.mockClear();
@@ -229,7 +227,7 @@ describe('LibraryShelfMenuService', () => {
 
     runCommand(findMenuItem(items, 'book.shelfMenuService.library.manageInpxArchives'));
 
-    expect(dialogLauncherService.openInpxArchiveManagerDialog).toHaveBeenCalledWith(42);
+    expect(router.navigate).toHaveBeenCalledWith(['/library', 42, 'archives']);
     const filesystemItems = service.initializeLibraryMenuItems(buildLibrary({sourceType: 'FILESYSTEM'}));
     expect(filesystemItems.flatMap(item => item.items ?? [item]))
       .not.toContainEqual(expect.objectContaining({label: 'book.shelfMenuService.library.manageInpxArchives'}));

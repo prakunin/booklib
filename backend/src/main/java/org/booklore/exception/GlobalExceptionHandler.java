@@ -1,13 +1,17 @@
 package org.booklore.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -15,6 +19,7 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @RestControllerAdvice
@@ -111,6 +116,18 @@ public class GlobalExceptionHandler {
         log.error("Unsupported operation: {}", ex.getMessage(), ex);
         ErrorResponse errorResponse = new ErrorResponse(HttpStatus.NOT_IMPLEMENTED.value(), "Operation not supported.");
         return new ResponseEntity<>(errorResponse, HttpStatus.NOT_IMPLEMENTED);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        log.warn("Unsupported method {} for {}", request.getMethod(), request.getRequestURI());
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.METHOD_NOT_ALLOWED.value(), "Request method not supported.");
+        HttpHeaders headers = new HttpHeaders();
+        Set<HttpMethod> supportedMethods = ex.getSupportedHttpMethods();
+        if (supportedMethods != null && !supportedMethods.isEmpty()) {
+            headers.setAllow(supportedMethods);
+        }
+        return new ResponseEntity<>(errorResponse, headers, HttpStatus.METHOD_NOT_ALLOWED);
     }
 
     @ExceptionHandler(Exception.class)

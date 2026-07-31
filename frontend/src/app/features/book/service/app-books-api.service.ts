@@ -373,6 +373,7 @@ export class AppBooksApiService {
 
     if (search) params = params.set('search', search);
     if (filters.libraryId) params = params.set('libraryId', filters.libraryId.toString());
+    if (filters.sourceArchive) params = params.set('sourceArchive', filters.sourceArchive);
     if (filters.shelfId) params = params.set('shelfId', filters.shelfId.toString());
     if (filters.magicShelfId) params = params.set('magicShelfId', filters.magicShelfId.toString());
     if (filters.unshelved) params = params.set('unshelved', 'true');

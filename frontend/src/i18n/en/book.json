@@ -32,6 +32,7 @@
     },
     "labels": {
       "allBooks": "All Books",
+      "archive": "Archive",
       "unshelvedBooks": "Unshelved Books",
       "unshelvedBooksFiltered": "Unshelved Books (Filtered)",
       "filteredSuffix": "(Filtered)",
@@ -274,6 +275,7 @@
     "lastScanned": "Last scanned",
     "status": "Status",
     "fullRescan": "Full scan",
+    "calculating": "Calculating…",
     "empty": "No ZIP archives were found in the library folder.",
     "loadFailed": "Could not load the archive list.",
     "retry": "Retry",

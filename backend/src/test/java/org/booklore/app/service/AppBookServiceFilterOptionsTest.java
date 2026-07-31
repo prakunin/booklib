@@ -415,7 +415,7 @@ class AppBookServiceFilterOptionsTest {
                 null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null,
-                null, null
+                null, null, null
         );
     }
 

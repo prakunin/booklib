@@ -58,6 +58,34 @@ class BookSpecificationsTest {
         assertThat(result).isSameAs(conjunction);
     }
 
+    @Test
+    void sourceArchiveUsesExactCorrelatedMembershipCheck() {
+        Root<BookEntity> root = deepRoot();
+        CriteriaQuery<?> query = deepQuery();
+        CriteriaBuilder cb = deepCb();
+        Predicate exists = mock(Predicate.class);
+        when(cb.exists(any())).thenReturn(exists);
+
+        Predicate result = BookSpecifications.inSourceArchive("f.fb2-173909-177717.zip")
+                .toPredicate(root, query, cb);
+
+        assertThat(result).isSameAs(exists);
+        verify(cb).equal(any(Expression.class), eq("f.fb2-173909-177717.zip"));
+    }
+
+    @Test
+    void blankSourceArchiveKeepsQueryUnrestricted() {
+        Root<BookEntity> root = deepRoot();
+        CriteriaQuery<?> query = deepQuery();
+        CriteriaBuilder cb = deepCb();
+        Predicate conjunction = mock(Predicate.class);
+        when(cb.conjunction()).thenReturn(conjunction);
+
+        Predicate result = BookSpecifications.inSourceArchive("  ").toPredicate(root, query, cb);
+
+        assertThat(result).isSameAs(conjunction);
+    }
+
     // --- Shared deep-stub harness for the multi-value filter builders ---
 
     @SuppressWarnings("unchecked")

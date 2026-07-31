@@ -147,6 +147,7 @@ export class BookBrowserComponent implements AfterViewInit {
   private readonly queryParamMap = toSignal(this.activatedRoute.queryParamMap, {
     initialValue: this.activatedRoute.snapshot.queryParamMap
   });
+  readonly archiveName = computed(() => this.routeParamMap().get('archiveName'));
   private readonly searchTerm = signal('');
   private readonly debouncedSearchTerm = toSignal(
     toObservable(this.searchTerm).pipe(
@@ -201,12 +202,17 @@ export class BookBrowserComponent implements AfterViewInit {
   });
   private readonly syncPagedQueryEffect = effect(() => {
     const {entityId, entityType} = this.entityInfo();
-    this.appBooksApi.setFilters(toAppBookFilters(
+    const filters = toAppBookFilters(
       entityId,
       entityType,
       this.selectedFilter(),
       this.selectedFilterMode(),
-    ));
+    );
+    const archiveName = this.archiveName();
+    if (archiveName) {
+      filters.sourceArchive = archiveName;
+    }
+    this.appBooksApi.setFilters(filters);
     this.appBooksApi.setSearch(this.debouncedSearchTerm());
     this.appBooksApi.setSort(toAppBookSort(this.sortCriteria()));
   });
@@ -389,6 +395,7 @@ export class BookBrowserComponent implements AfterViewInit {
     this.activeLang();
     const entityType = this.entityType();
     const entity = this.entity();
+    const archiveName = this.archiveName();
 
     if (entityType === EntityType.ALL_BOOKS) {
       this.pageTitle.setPageTitle(this.t.translate('book.browser.labels.allBooks'));
@@ -403,7 +410,7 @@ export class BookBrowserComponent implements AfterViewInit {
     }
 
     if (entity) {
-      this.pageTitle.setPageTitle(entity.name);
+      this.pageTitle.setPageTitle(archiveName ?? entity.name);
     }
 
     if (!entity) {

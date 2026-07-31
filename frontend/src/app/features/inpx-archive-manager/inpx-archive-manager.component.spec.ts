@@ -1,5 +1,5 @@
 import {TestBed} from '@angular/core/testing';
-import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
+import {ActivatedRoute, convertToParamMap, Router} from '@angular/router';
 import {MessageService} from 'primeng/api';
 import {of, Subject} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
@@ -30,6 +30,9 @@ describe('InpxArchiveManagerComponent', () => {
   const dialogLauncher = {
     openInpxScanQueueDialog: vi.fn(() => Promise.resolve(null)),
   };
+  const router = {
+    navigate: vi.fn(() => Promise.resolve(true)),
+  };
 
   afterEach(() => {
     vi.useRealTimers();
@@ -40,12 +43,13 @@ describe('InpxArchiveManagerComponent', () => {
     archiveService.getArchives.mockReset().mockReturnValue(of([archive]));
     archiveService.getScanQueue.mockReset().mockReturnValue(of([]));
     archiveService.rescan.mockReset().mockReturnValue(of(undefined));
+    router.navigate.mockClear();
     TestBed.configureTestingModule({
       imports: [InpxArchiveManagerComponent, getTranslocoModule()],
       providers: [
         {provide: InpxArchiveService, useValue: archiveService},
-        {provide: DynamicDialogConfig, useValue: {data: {libraryId: 7}}},
-        {provide: DynamicDialogRef, useValue: {close: vi.fn()}},
+        {provide: ActivatedRoute, useValue: {snapshot: {paramMap: convertToParamMap({libraryId: '7'})}}},
+        {provide: Router, useValue: router},
         {provide: MessageService, useValue: {add: vi.fn()}},
         {provide: DialogLauncherService, useValue: dialogLauncher},
       ],
@@ -61,6 +65,15 @@ describe('InpxArchiveManagerComponent', () => {
     fixture.destroy();
   });
 
+  it('navigates to the selected archive book page', () => {
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+
+    fixture.componentInstance.openArchive(archive);
+
+    expect(router.navigate).toHaveBeenCalledWith(['/library', 7, 'archives', 'new.zip', 'books']);
+    fixture.destroy();
+  });
+
   it('loads and formats archive statistics', () => {
     const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
     fixture.detectChanges();
@@ -69,6 +82,28 @@ describe('InpxArchiveManagerComponent', () => {
     expect(fixture.componentInstance.archives()).toEqual([archive]);
     expect(fixture.componentInstance.formatSize(archive.sizeBytes)).toBe('2.0 MB');
     expect(fixture.componentInstance.statusSeverity(archive)).toBe('secondary');
+    fixture.destroy();
+  });
+
+  it('polls until background archive calculations finish', () => {
+    vi.useFakeTimers();
+    archiveService.getArchives
+      .mockReturnValueOnce(of([{
+        ...archive,
+        fb2Count: null,
+        importedBookCount: null,
+        coveredBookCount: null,
+      }]))
+      .mockReturnValueOnce(of([archive]));
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.archives()[0].fb2Count).toBeNull();
+
+    vi.advanceTimersByTime(2000);
+
+    expect(archiveService.getArchives).toHaveBeenCalledTimes(2);
+    expect(fixture.componentInstance.archives()).toEqual([archive]);
     fixture.destroy();
   });
 

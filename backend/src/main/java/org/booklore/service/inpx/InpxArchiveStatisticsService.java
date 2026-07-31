@@ -11,8 +11,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.RejectedExecutionException;
@@ -66,18 +66,13 @@ public class InpxArchiveStatisticsService {
         }
     }
 
-    public Map<String, ArchiveStatistics> loadBlocking(long libraryId) {
-        try {
-            return load(libraryId).join();
-        } catch (CompletionException e) {
-            if (e.getCause() instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            if (e.getCause() instanceof Error error) {
-                throw error;
-            }
-            throw e;
+    public Optional<Map<String, ArchiveStatistics>> getCachedOrSchedule(long libraryId) {
+        Map<String, ArchiveStatistics> cached = cache.getIfPresent(libraryId);
+        if (cached != null) {
+            return Optional.of(cached);
         }
+        load(libraryId);
+        return Optional.ofNullable(cache.getIfPresent(libraryId));
     }
 
     public void invalidate(long libraryId) {

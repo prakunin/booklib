@@ -48,9 +48,9 @@ class InpxArchiveCatalogServiceTest {
         Instant added = Instant.parse("2026-07-01T10:00:00Z");
         Instant scanned = Instant.parse("2026-07-10T10:00:00Z");
         givenLibrary();
-        when(archiveScanner.listArchives("/books")).thenReturn(List.of(
+        when(archiveScanner.listArchiveMetadata("/books")).thenReturn(List.of(
                 new InpxArchiveScanner.ArchiveFile(
-                        Path.of("/books/new.zip"), "new.zip", 2048, modified, 100)));
+                        Path.of("/books/new.zip"), "new.zip", 2048, modified, 100L)));
         when(bookFileRepository.findArchiveStatistics(7L)).thenReturn(List.<Object[]>of(
                 new Object[]{"new.zip", 90L, added, scanned, 75L}));
 
@@ -70,9 +70,9 @@ class InpxArchiveCatalogServiceTest {
     @Test
     void preventsTwoConcurrentScansOfTheSameArchiveAndExposesFailure() {
         givenLibrary();
-        when(archiveScanner.listArchives("/books")).thenReturn(List.of(
+        when(archiveScanner.listArchiveMetadata("/books")).thenReturn(List.of(
                 new InpxArchiveScanner.ArchiveFile(
-                        Path.of("/books/new.zip"), "new.zip", 2048, Instant.now(), 1)));
+                        Path.of("/books/new.zip"), "new.zip", 2048, Instant.now(), 1L)));
         when(bookFileRepository.findArchiveStatistics(7L)).thenReturn(List.of());
 
         assertThat(service.queue(7L, "new.zip", 1)).isTrue();
@@ -121,9 +121,9 @@ class InpxArchiveCatalogServiceTest {
     @Test
     void cachesArchiveStatisticsBetweenRequestsInsteadOfRecomputing() {
         givenLibrary();
-        when(archiveScanner.listArchives("/books")).thenReturn(List.of(
+        when(archiveScanner.listArchiveMetadata("/books")).thenReturn(List.of(
                 new InpxArchiveScanner.ArchiveFile(
-                        Path.of("/books/new.zip"), "new.zip", 2048, Instant.now(), 100)));
+                        Path.of("/books/new.zip"), "new.zip", 2048, Instant.now(), 100L)));
         when(bookFileRepository.findArchiveStatistics(7L)).thenReturn(List.of());
 
         service.list(7L);
@@ -137,9 +137,9 @@ class InpxArchiveCatalogServiceTest {
     @Test
     void recomputesArchiveStatisticsAfterScanCompletes() {
         givenLibrary();
-        when(archiveScanner.listArchives("/books")).thenReturn(List.of(
+        when(archiveScanner.listArchiveMetadata("/books")).thenReturn(List.of(
                 new InpxArchiveScanner.ArchiveFile(
-                        Path.of("/books/new.zip"), "new.zip", 2048, Instant.now(), 100)));
+                        Path.of("/books/new.zip"), "new.zip", 2048, Instant.now(), 100L)));
         when(bookFileRepository.findArchiveStatistics(7L)).thenReturn(List.of());
 
         service.list(7L);
@@ -153,9 +153,9 @@ class InpxArchiveCatalogServiceTest {
     @Test
     void recomputesArchiveStatisticsAfterScanFails() {
         givenLibrary();
-        when(archiveScanner.listArchives("/books")).thenReturn(List.of(
+        when(archiveScanner.listArchiveMetadata("/books")).thenReturn(List.of(
                 new InpxArchiveScanner.ArchiveFile(
-                        Path.of("/books/new.zip"), "new.zip", 2048, Instant.now(), 100)));
+                        Path.of("/books/new.zip"), "new.zip", 2048, Instant.now(), 100L)));
         when(bookFileRepository.findArchiveStatistics(7L)).thenReturn(List.of());
 
         service.list(7L);
@@ -171,8 +171,8 @@ class InpxArchiveCatalogServiceTest {
                 .id(7L).name("A").sourceType(LibrarySourceType.INPX).inpxArchivePath("/a").build()));
         when(libraryRepository.findByIdWithPaths(8L)).thenReturn(Optional.of(LibraryEntity.builder()
                 .id(8L).name("B").sourceType(LibrarySourceType.INPX).inpxArchivePath("/b").build()));
-        when(archiveScanner.listArchives("/a")).thenReturn(List.of());
-        when(archiveScanner.listArchives("/b")).thenReturn(List.of());
+        when(archiveScanner.listArchiveMetadata("/a")).thenReturn(List.of());
+        when(archiveScanner.listArchiveMetadata("/b")).thenReturn(List.of());
         when(bookFileRepository.findArchiveStatistics(7L)).thenReturn(List.of());
         when(bookFileRepository.findArchiveStatistics(8L)).thenReturn(List.of());
 

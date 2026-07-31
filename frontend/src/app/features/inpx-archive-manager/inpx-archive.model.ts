@@ -4,9 +4,9 @@ export type InpxArchiveScanPhase = 'QUEUED' | 'IMPORTING' | 'METADATA_AND_COVERS
 export interface InpxArchive {
   archiveName: string;
   sizeBytes: number;
-  fb2Count: number;
-  importedBookCount: number;
-  coveredBookCount: number;
+  fb2Count: number | null;
+  importedBookCount: number | null;
+  coveredBookCount: number | null;
   fileModifiedAt: string;
   addedAt: string | null;
   lastScannedAt: string | null;

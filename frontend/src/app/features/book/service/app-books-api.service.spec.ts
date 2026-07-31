@@ -162,6 +162,23 @@ describe('AppBooksApiService', () => {
     expect(result).toEqual([1, 2]);
   });
 
+  it('serializes the exact source archive when counting books', () => {
+    service.getCount({libraryId: 7, sourceArchive: 'f.fb2 1.zip'}).subscribe();
+
+    const request = http.expectOne(req => req.url.endsWith('/api/v1/app/books'));
+    expect(request.request.params.get('libraryId')).toBe('7');
+    expect(request.request.params.get('sourceArchive')).toBe('f.fb2 1.zip');
+    request.flush({
+      content: [],
+      page: 0,
+      size: 1,
+      totalElements: 0,
+      totalPages: 0,
+      hasNext: false,
+      hasPrevious: false,
+    });
+  });
+
   it('preserves the document parse status when adapting paginated summaries', () => {
     const unreadable = summary(7);
     unreadable.primaryFileId = 70;

@@ -7,7 +7,9 @@
         @if (entityType(); as entityType) {
           <div class="entity-info">
             <p class="entity-title">
-              @if (entityType === EntityType.ALL_BOOKS) {
+              @if (archiveName(); as archiveName) {
+                {{ t('labels.archive') }}: {{ archiveName }}{{ (isFilterActive() || hasSearchTerm()) ? ' ' + t('labels.filteredSuffix') : '' }}
+              } @else if (entityType === EntityType.ALL_BOOKS) {
                 @if (currentFilterLabel() && rawFilterParamFromUrl()) {
                   {{ currentFilterLabel() }}
                 } @else if (isFilterActive() || hasSearchTerm()) {

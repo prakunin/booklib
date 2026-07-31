@@ -9,9 +9,9 @@ import java.time.Instant;
 public record InpxArchiveDto(
         String archiveName,
         long sizeBytes,
-        long fb2Count,
-        long importedBookCount,
-        long coveredBookCount,
+        Long fb2Count,
+        Long importedBookCount,
+        Long coveredBookCount,
         Instant fileModifiedAt,
         Instant addedAt,
         Instant lastScannedAt,

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.times;
@@ -82,6 +83,21 @@ class InpxArchiveStatisticsServiceTest {
         executor.runNext();
 
         verify(bookFileRepository, times(2)).findArchiveStatistics(1L);
+    }
+
+    @Test
+    void schedulesMissingStatisticsWithoutBlockingTheCaller() {
+        when(bookFileRepository.findArchiveStatistics(1L)).thenReturn(List.of());
+
+        Optional<?> initial = service.getCachedOrSchedule(1L);
+
+        assertThat(initial).isEmpty();
+        assertThat(executor.size()).isOne();
+
+        executor.runNext();
+
+        assertThat(service.getCachedOrSchedule(1L)).isPresent();
+        assertThat(executor.size()).isZero();
     }
 
     @Test

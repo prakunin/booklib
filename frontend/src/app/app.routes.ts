@@ -40,6 +40,8 @@ export const routes: Routes = [
       {path: 'all-books', loadComponent: loadBookBrowserComponent},
       {path: 'settings', loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)},
       {path: 'library/:libraryId/books', loadComponent: loadBookBrowserComponent},
+      {path: 'library/:libraryId/archives', loadComponent: () => import('./features/inpx-archive-manager/inpx-archive-manager.component').then(m => m.InpxArchiveManagerComponent)},
+      {path: 'library/:libraryId/archives/:archiveName/books', loadComponent: loadBookBrowserComponent},
       {path: 'shelf/:shelfId/books', loadComponent: loadBookBrowserComponent},
       {path: 'unshelved-books', loadComponent: loadBookBrowserComponent},
       {path: 'series', loadComponent: () => import('./features/series-browser/components/series-browser/series-browser.component').then(m => m.SeriesBrowserComponent)},

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -28,24 +29,26 @@ public class InpxArchiveCatalogService {
 
     public List<InpxArchiveDto> list(long libraryId) {
         LibraryEntity library = requireInpxLibrary(libraryId);
-        Map<String, InpxArchiveStatisticsService.ArchiveStatistics> statistics =
-                statisticsService.loadBlocking(libraryId);
+        Optional<Map<String, InpxArchiveStatisticsService.ArchiveStatistics>> statistics =
+                statisticsService.getCachedOrSchedule(libraryId);
 
-        return archiveScanner.listArchives(library.getInpxArchivePath()).stream()
+        return archiveScanner.listArchiveMetadata(library.getInpxArchivePath()).stream()
                 .map(file -> {
-                    InpxArchiveStatisticsService.ArchiveStatistics stats = statistics.getOrDefault(
-                            file.archiveName(), InpxArchiveStatisticsService.ArchiveStatistics.EMPTY);
+                    InpxArchiveStatisticsService.ArchiveStatistics stats = statistics
+                            .map(items -> items.getOrDefault(file.archiveName(),
+                                    InpxArchiveStatisticsService.ArchiveStatistics.EMPTY))
+                            .orElse(null);
                     ScanState state = scanStates.getOrDefault(
                             new ArchiveKey(libraryId, file.archiveName()), ScanState.IDLE);
                     return InpxArchiveDto.builder()
                             .archiveName(file.archiveName())
                             .sizeBytes(file.sizeBytes())
                             .fb2Count(file.entryCount())
-                            .importedBookCount(stats.bookCount())
-                            .coveredBookCount(stats.coverCount())
+                            .importedBookCount(stats == null ? null : stats.bookCount())
+                            .coveredBookCount(stats == null ? null : stats.coverCount())
                             .fileModifiedAt(file.modifiedAt())
-                            .addedAt(stats.addedAt() != null ? stats.addedAt() : file.modifiedAt())
-                            .lastScannedAt(stats.lastScannedAt())
+                            .addedAt(stats != null && stats.addedAt() != null ? stats.addedAt() : file.modifiedAt())
+                            .lastScannedAt(stats == null ? null : stats.lastScannedAt())
                             .status(state.overallStatus())
                             .errorMessage(state.errorMessage())
                             .build();

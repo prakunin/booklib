@@ -1,5 +1,16 @@
-.archive-dialog {
-  min-height: 24rem;
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.archive-page {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  padding: 1.5rem;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 .header-actions {
@@ -8,12 +19,12 @@
   gap: 0.5rem;
 }
 
-.dialog-header {
+.page-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.25rem 1.5rem;
+  padding: 0 0 1.25rem;
   border-bottom: 1px solid var(--p-content-border-color);
 
   h2 {
@@ -27,8 +38,8 @@
   }
 }
 
-.dialog-content {
-  padding: 1rem 1.5rem 1.5rem;
+.page-content {
+  padding-top: 1rem;
 }
 
 .state {
@@ -50,6 +61,33 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+}
+
+.archive-link {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  color: var(--p-primary-color);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+@media (width <= 768px) {
+  .archive-page {
+    padding: 1rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+  }
 }
 
 .scan-error {

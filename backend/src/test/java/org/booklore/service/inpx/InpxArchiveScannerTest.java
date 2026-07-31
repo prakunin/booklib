@@ -13,6 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.core.task.TaskExecutor;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +22,9 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.Month;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -52,7 +55,7 @@ class InpxArchiveScannerTest {
     void setUp() {
         ArchiveEntryMetadataRecognizer recognizer = new ArchiveEntryMetadataRecognizer(
                 metadataExtractorFactory, docMetadataExtractor, new InpxFilenameMetadataParser());
-        scanner = new InpxArchiveScanner(bookFileRepository, fb2MetadataExtractor, recognizer);
+        scanner = new InpxArchiveScanner(bookFileRepository, fb2MetadataExtractor, recognizer, Runnable::run);
     }
 
     @Test
@@ -207,6 +210,33 @@ class InpxArchiveScannerTest {
         assertThat(scanner.archiveFileCacheSize()).isEqualTo(1);
     }
 
+    @Test
+    void listsMetadataImmediatelyAndCoalescesBackgroundInspection(@TempDir Path root) throws IOException {
+        createArchive(root.resolve("books.zip"), "1.fb2", "2.fb2");
+        QueuedTaskExecutor executor = new QueuedTaskExecutor();
+        ArchiveEntryMetadataRecognizer recognizer = new ArchiveEntryMetadataRecognizer(
+                metadataExtractorFactory, docMetadataExtractor, new InpxFilenameMetadataParser());
+        InpxArchiveScanner asynchronousScanner = new InpxArchiveScanner(
+                bookFileRepository, fb2MetadataExtractor, recognizer, executor);
+
+        assertThat(asynchronousScanner.listArchiveMetadata(root.toString()))
+                .singleElement()
+                .extracting(InpxArchiveScanner.ArchiveFile::entryCount)
+                .isNull();
+        asynchronousScanner.listArchiveMetadata(root.toString());
+
+        assertThat(executor.size()).isOne();
+        assertThat(asynchronousScanner.activeInspectionCount()).isOne();
+
+        executor.runNext();
+
+        assertThat(asynchronousScanner.listArchiveMetadata(root.toString()))
+                .singleElement()
+                .extracting(InpxArchiveScanner.ArchiveFile::entryCount)
+                .isEqualTo(2L);
+        assertThat(asynchronousScanner.activeInspectionCount()).isZero();
+    }
+
     private void createArchive(Path path, String... entries) throws IOException {
         try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(path))) {
             for (String entry : entries) {
@@ -214,6 +244,23 @@ class InpxArchiveScannerTest {
                 output.write("<FictionBook/>".getBytes(StandardCharsets.UTF_8));
                 output.closeEntry();
             }
+        }
+    }
+
+    private static final class QueuedTaskExecutor implements TaskExecutor {
+        private final Queue<Runnable> tasks = new ArrayDeque<>();
+
+        @Override
+        public void execute(Runnable task) {
+            tasks.add(task);
+        }
+
+        private int size() {
+            return tasks.size();
+        }
+
+        private void runNext() {
+            tasks.remove().run();
         }
     }
 }

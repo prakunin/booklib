@@ -10,6 +10,7 @@ public record BookListRequest(
         String sort,
         String dir,
         Long libraryId,
+        String sourceArchive,
         Long shelfId,
         @Size(max = 20) List<String> status,
         String search,
