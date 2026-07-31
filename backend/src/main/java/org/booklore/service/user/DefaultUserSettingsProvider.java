@@ -137,7 +137,7 @@ public class DefaultUserSettingsProvider {
                         .sortDir("ASC")
                         .view("GRID")
                         .coverSize(1.0F)
-                        .seriesCollapsed(false)
+                        .seriesCollapsed(true)
                         .overlayBookType(true)
                         .build())
                 .overrides(null)

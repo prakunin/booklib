@@ -10,7 +10,7 @@ export class SeriesCollapseFilter {
   private readonly userService = inject(UserService);
   private readonly messageService = inject(MessageService);
 
-  private readonly _seriesCollapsed = signal(false);
+  private readonly _seriesCollapsed = signal(true);
   readonly seriesCollapsed = this._seriesCollapsed.asReadonly();
   private currentContext: { type: 'LIBRARY' | 'SHELF' | 'MAGIC_SHELF', id: number } | null = null;
   private persistTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -42,12 +42,12 @@ export class SeriesCollapseFilter {
     const user = this.userService.getCurrentUser();
     const prefs = user?.userSettings?.entityViewPreferences;
 
-    let collapsed = false;
+    let collapsed = true;
 
     if (prefs) {
       // Backward compatibility: check for old 'seriesCollapse' field
       const legacyGlobalSeriesCollapse = (prefs.global as { seriesCollapse?: boolean }).seriesCollapse;
-      collapsed = prefs.global?.seriesCollapsed ?? legacyGlobalSeriesCollapse ?? false;
+      collapsed = prefs.global?.seriesCollapsed ?? legacyGlobalSeriesCollapse ?? true;
 
       if (this.currentContext) {
         const override = prefs.overrides?.find(o =>
@@ -126,7 +126,7 @@ export class SeriesCollapseFilter {
         sortDir: 'DESC',
         view: 'GRID',
         coverSize: 1,
-        seriesCollapsed: false
+        seriesCollapsed: true
       },
       overrides: []
     });

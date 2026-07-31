@@ -37,6 +37,7 @@ import {Badge} from 'primeng/badge';
 import {BookMenuService} from '../../service/book-menu.service';
 import {SidebarFilterTogglePrefService} from './filters/sidebar-filter-toggle-pref.service';
 import {MetadataRefreshType} from '../../../metadata/model/request/metadata-refresh-type.enum';
+import {SmartEnrichmentService} from '../../../metadata/service/smart-enrichment.service';
 import {TaskHelperService} from '../../../settings/task-management/task-helper.service';
 import {FilterLabelHelper} from './filter-label.helper';
 import {LoadingService} from '../../../../core/services/loading.service';
@@ -99,6 +100,7 @@ export class BookBrowserComponent implements AfterViewInit {
   private readonly bookMetadataManageService = inject(BookMetadataManageService);
   private readonly dialogHelperService = inject(BookDialogHelperService);
   private readonly bookMenuService = inject(BookMenuService);
+  private readonly smartEnrichmentService = inject(SmartEnrichmentService);
   private readonly libraryShelfMenuService = inject(LibraryShelfMenuService);
   private readonly pageTitle = inject(PageTitleService);
   private readonly loadingService = inject(LoadingService);
@@ -505,6 +507,7 @@ export class BookBrowserComponent implements AfterViewInit {
   });
 
   readonly hasSearchTerm = computed(() => this.searchTerm().trim().length > 0);
+  readonly smartEnrichmentAvailable = toSignal(this.smartEnrichmentService.available$, {initialValue: false});
 
   readonly sortCriteriaCount = computed(() => this.bookSorter.selectedSortCriteria.length);
 
@@ -549,7 +552,9 @@ export class BookBrowserComponent implements AfterViewInit {
       () => this.multiBookEditMetadata(),
       () => this.regenerateCoversForSelected(),
       () => this.generateCustomCoversForSelected(),
-      user
+      user,
+      () => this.bulkSmartEnrich(),
+      this.smartEnrichmentAvailable()
     );
   });
 
@@ -755,7 +760,7 @@ export class BookBrowserComponent implements AfterViewInit {
     }));
 
     const currentPrefs = user.userSettings.entityViewPreferences ?? {
-      global: {sortKey: 'title', sortDir: 'ASC', view: 'GRID', coverSize: 1, seriesCollapsed: false, overlayBookType: true},
+      global: {sortKey: 'title', sortDir: 'ASC', view: 'GRID', coverSize: 1, seriesCollapsed: true, overlayBookType: true},
       overrides: []
     };
     const prefs: EntityViewPreferences = {
@@ -809,7 +814,7 @@ export class BookBrowserComponent implements AfterViewInit {
             sortCriteria,
             view: 'GRID',
             coverSize: 1,
-            seriesCollapsed: false,
+            seriesCollapsed: true,
             overlayBookType: true
           }
         });
@@ -911,6 +916,18 @@ export class BookBrowserComponent implements AfterViewInit {
 
   async fetchMetadata() {
     await this.dialogHelperService.openMetadataRefreshDialog(this.selectedBooks());
+  }
+
+  async bulkSmartEnrich(): Promise<void> {
+    const selectedBooks = this.selectedBooks();
+    if (selectedBooks.size === 0) return;
+
+    this.dynamicDialogRef = await this.dialogHelperService.openBulkSmartEnrichmentDialog(selectedBooks);
+    this.dynamicDialogRef?.onClose.pipe(take(1)).subscribe(result => {
+      if (result?.completed) {
+        this.bookSelectionService.deselectAll();
+      }
+    });
   }
 
   async bulkEditMetadata() {

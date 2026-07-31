@@ -606,6 +606,9 @@
   "smartEnrichment": {
     "title": "Smart Enrichment",
     "subtitle": "Identifies the work behind this file, then verifies what it finds",
+    "bulkSubtitle": "Enriching the selected books one at a time",
+    "queueProgress": "Book {{current}} of {{total}}",
+    "completedProgress": "{{processed}} of {{total}} completed",
     "stageResolving": "Identifying the work…",
     "stageVerifying": "Verifying the rating against Goodreads…",
     "identifiedWork": "Identified work",
@@ -626,6 +629,7 @@
     "field": {
       "title": "Title",
       "authors": "Author",
+      "language": "Language",
       "description": "Description",
       "publisher": "Publisher",
       "publishedDate": "Publish date",
@@ -643,6 +647,8 @@
     "fillFormBtn": "Fill in the form",
     "applyingBtn": "Applying…",
     "closeBtn": "Close",
+    "bulkCompletedSummary": "Smart Enrichment completed",
+    "bulkCompletedDetail": "Updated: {{updated}}, unchanged: {{unchanged}}, failed: {{failed}}",
     "appliedSummary": "Metadata updated",
     "appliedDetail": "{{count}} field(s) applied",
     "applyErrorSummary": "Could not apply metadata",

@@ -183,6 +183,19 @@ export class BookDialogHelperService {
     });
   }
 
+  async openBulkSmartEnrichmentDialog(bookIds: Set<number>): Promise<DynamicDialogRef | null> {
+    return this.dialogLauncherService.launchLazyDialog(async () => {
+      const {SmartEnrichmentComponent} = await import('../../../metadata/component/smart-enrichment/smart-enrichment.component');
+      return this.openDialog(SmartEnrichmentComponent, {
+        showHeader: false,
+        styleClass: `${DialogSize.LG} ${DialogStyle.MINIMAL}`,
+        data: {
+          bookIds: Array.from(bookIds),
+        },
+      });
+    });
+  }
+
   async openAdditionalFileUploaderDialog(book: Book): Promise<DynamicDialogRef | null> {
     return this.dialogLauncherService.launchLazyDialog(async () => {
       const {AdditionalFileUploaderComponent} = await import('../additional-file-uploader/additional-file-uploader.component');

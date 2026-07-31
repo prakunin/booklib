@@ -375,7 +375,7 @@ export class ViewPreferencesComponent implements OnInit {
           sortCriteria: [...o.sortCriteria],
           view: o.view,
           coverSize: existing?.coverSize ?? 1,
-          seriesCollapsed: existing?.seriesCollapsed ?? false,
+          seriesCollapsed: existing?.seriesCollapsed ?? true,
           overlayBookType: existing?.overlayBookType ?? true
         }
       };

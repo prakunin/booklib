@@ -33,6 +33,7 @@ import {BookBrowserComponent, EntityType} from './book-browser.component';
 import {SortService} from '../../service/sort.service';
 import {TranslocoService} from '@jsverse/transloco';
 import {LayoutService} from '../../../../shared/layout/layout.service';
+import {SmartEnrichmentService} from '../../../metadata/service/smart-enrichment.service';
 
 function makeBook(id: number, libraryId: number, title: string, addedOn: string): Book {
   return {
@@ -131,6 +132,14 @@ interface BookBrowserHarness {
     queryParamMap: ParamMap;
     params: Record<string, string>;
   };
+  bookMenuService: {
+    getMetadataMenuItems: ReturnType<typeof vi.fn>;
+  };
+  dialogHelperService: {
+    openBulkSmartEnrichmentDialog: ReturnType<typeof vi.fn>;
+  };
+  deselectAll: ReturnType<typeof vi.fn>;
+  dialogClosed$: Subject<unknown>;
 }
 
 function createHarness(options?: {
@@ -139,6 +148,8 @@ function createHarness(options?: {
   booksError?: string | null;
   isBooksLoading?: boolean;
   translate?: (key: string) => string;
+  selectedBookIds?: number[];
+  smartEnrichmentAvailable?: boolean;
 }): BookBrowserHarness {
   const books = signal<Book[]>(
     options?.books ?? [
@@ -156,6 +167,16 @@ function createHarness(options?: {
   const hasPreviousPage = signal(false);
   const isFetchingPreviousPage = signal(false);
   const currentUser = signal(makeCurrentUser());
+  const selectedBooks = signal(new Set(options?.selectedBookIds ?? []));
+  const deselectAll = vi.fn();
+  const dialogClosed$ = new Subject<unknown>();
+  const dialogHelperService = {
+    openBulkSmartEnrichmentDialog: vi.fn(async () => ({onClose: dialogClosed$.asObservable()})),
+  };
+  const bookMenuService = {
+    getMoreActionsMenu: vi.fn(() => []),
+    getMetadataMenuItems: vi.fn(() => []),
+  };
   const showFilter = signal(false);
   const seriesCollapsed = signal(false);
   const routerEvents$ = new Subject<unknown>();
@@ -237,9 +258,9 @@ function createHarness(options?: {
       {
         provide: BookSelectionService,
         useValue: {
-          selectedBooks: signal([]),
-          selectedCount: signal(0),
-          deselectAll: vi.fn(),
+          selectedBooks: selectedBooks.asReadonly(),
+          selectedCount: signal(selectedBooks().size),
+          deselectAll,
           setCurrentBooks: vi.fn(),
         },
       },
@@ -269,6 +290,7 @@ function createHarness(options?: {
         },
       },
       {provide: AppSettingsService, useValue: {appSettings: vi.fn(() => null)}},
+      {provide: SmartEnrichmentService, useValue: {available$: of(options?.smartEnrichmentAvailable ?? false)}},
       {provide: LayoutService, useValue: {isDesktop: signal(true), sidebarTransitioning: signal(false)}},
       {
         provide: ActivatedRoute,
@@ -314,13 +336,10 @@ function createHarness(options?: {
         },
       },
       {provide: BookMetadataManageService, useValue: {}},
-      {provide: BookDialogHelperService, useValue: {}},
+      {provide: BookDialogHelperService, useValue: dialogHelperService},
       {
         provide: BookMenuService,
-        useValue: {
-          getMoreActionsMenu: vi.fn(() => []),
-          getMetadataMenuItems: vi.fn(() => []),
-        },
+        useValue: bookMenuService,
       },
       {
         provide: LibraryShelfMenuService,
@@ -386,6 +405,10 @@ function createHarness(options?: {
     setIsFetchingNextPage: value => isFetchingNextPage.set(value),
     queryParamsService,
     routeSnapshot,
+    bookMenuService,
+    dialogHelperService,
+    deselectAll,
+    dialogClosed$,
   };
 }
 
@@ -500,5 +523,36 @@ describe('BookBrowserComponent', () => {
     expect(component.books()).toHaveLength(3);
     expect(component.virtualRowCount()).toBe(3);
     expect(component.virtualGrid.virtualizer.options().count).toBe(3);
+  });
+
+  it('passes Smart Enrichment availability into the selected-book metadata menu', () => {
+    const {bookMenuService} = createHarness({smartEnrichmentAvailable: true});
+
+    TestBed.flushEffects();
+
+    expect(bookMenuService.getMetadataMenuItems).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Object),
+      expect.any(Function),
+      true
+    );
+  });
+
+  it('opens one queue for a snapshot of selected books and clears selection on completion', async () => {
+    const {component, dialogHelperService, dialogClosed$, deselectAll} = createHarness({
+      selectedBookIds: [7, 8],
+    });
+
+    await component.bulkSmartEnrich();
+
+    expect(dialogHelperService.openBulkSmartEnrichmentDialog).toHaveBeenCalledWith(new Set([7, 8]));
+
+    dialogClosed$.next({completed: true});
+    expect(deselectAll).toHaveBeenCalledTimes(1);
   });
 });

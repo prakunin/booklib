@@ -133,6 +133,7 @@
       "cover": "Cover of {{ title }}",
       "titleTooltip": "Title: {{ title }}",
       "seriesCollapsed": "Series collapsed: {{ count }} books",
+      "bookFiles": "{{ count }} book files",
       "viewSeriesInfo": "View series information",
       "viewDetails": "View book details",
       "readBook": "Read book",
@@ -194,6 +195,7 @@
     "menu": {
       "autoFetchMetadata": "Auto Fetch Metadata",
       "customFetchMetadata": "Custom Fetch Metadata",
+      "smartEnrich": "Smart Enrich",
       "bulkMetadataEditor": "Bulk Metadata Editor",
       "multiBookMetadataEditor": "Multi-Book Metadata Editor",
       "regenerateCovers": "Regenerate Covers",

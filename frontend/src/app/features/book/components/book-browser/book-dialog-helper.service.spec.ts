@@ -77,4 +77,19 @@ describe('BookDialogHelperService', () => {
       })
     );
   });
+
+  it('snapshots selected IDs for the bulk Smart Enrichment dialog', async () => {
+    const selectedIds = new Set([7, 8]);
+
+    await service.openBulkSmartEnrichmentDialog(selectedIds);
+    selectedIds.add(9);
+
+    expect(dialogLauncherService.openDialog).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        showHeader: false,
+        data: {bookIds: [7, 8]},
+      })
+    );
+  });
 });
