@@ -30,7 +30,10 @@ describe('CbxReaderComponent', () => {
 
   const BOOK_ID = 42;
 
-  let router: {navigate: ReturnType<typeof vi.fn>};
+  let router: {
+    navigate: ReturnType<typeof vi.fn>;
+    currentNavigation: ReturnType<typeof vi.fn>;
+  };
   let cbxReaderService: {
     getAvailablePages: ReturnType<typeof vi.fn>;
     getPageInfo: ReturnType<typeof vi.fn>;
@@ -56,8 +59,13 @@ describe('CbxReaderComponent', () => {
     });
   }
 
-  function setup(bookType: string, renditionReady = false): void {
-    router = {navigate: vi.fn()};
+  function setup(bookType: string, renditionReady = false, hasInAppPreviousNavigation = true): void {
+    router = {
+      navigate: vi.fn(),
+      currentNavigation: vi.fn(() => ({
+        previousNavigation: hasInAppPreviousNavigation ? {} : null,
+      })),
+    };
     cbxReaderService = {
       getAvailablePages: vi.fn(() => of([1, 2, 3])),
       getPageInfo: vi.fn(() => of([])),
@@ -173,10 +181,23 @@ describe('CbxReaderComponent', () => {
     setup('DJVU', true);
     await settle();
 
-    expect(router.navigate).toHaveBeenCalledWith([`/pdf-reader/book/${BOOK_ID}`]);
+    expect(router.navigate).toHaveBeenCalledWith([`/pdf-reader/book/${BOOK_ID}`], {
+      replaceUrl: true,
+      state: {readerHasInAppPreviousNavigation: true},
+    });
     // Handing the book to the richer reader means this one must not go on loading pages it will
     // never show.
     expect(cbxReaderService.getAvailablePages).not.toHaveBeenCalled();
+  });
+
+  it('delegates missing predecessor provenance when a ready DjVu was opened directly', async () => {
+    setup('DJVU', true, false);
+    await settle();
+
+    expect(router.navigate).toHaveBeenCalledWith([`/pdf-reader/book/${BOOK_ID}`], {
+      replaceUrl: true,
+      state: {readerHasInAppPreviousNavigation: false},
+    });
   });
 
   it('reads a DjVu book here while its rendition is still being built', async () => {

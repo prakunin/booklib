@@ -68,6 +68,11 @@ CLAUDE.md
 /.superpowers/
 /docs/superpowers/
 
+### Local build counter ###
+# Bumped by ./booklib.sh rebuild and appended to the dev version as 3.2.18+<n>.
+# Per-machine and deliberately untracked: committing it would dirty the tree on every rebuild.
+/.build-number
+
 ### Temporary editor and backup files ###
 *.bak
 *.bak-*

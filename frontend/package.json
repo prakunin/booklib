@@ -1,6 +1,6 @@
 {
   "name": "booklib",
-  "version": "0.0.0",
+  "version": "3.2.18",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",

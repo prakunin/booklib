@@ -70,8 +70,11 @@ dev-logs service='':
     fi
 
 # Build the production image locally with buildx. Usage: `just image-build [platform] [tag]`.
+# APP_VERSION is passed explicitly so the OCI labels match the version baked into the jar.
 image-build platform='linux/amd64' tag=local_image_tag:
-    docker buildx build --platform "{{ platform }}" -t "{{ tag }}" --load .
+    docker buildx build --platform "{{ platform }}" \
+      --build-arg "APP_VERSION=$(cat VERSION)" \
+      -t "{{ tag }}" --load .
 
 # Run the locally built production image against the expected development defaults.
 image-run tag=local_image_tag db_url=local_db_url db_user=local_db_user db_password=local_db_password:
@@ -86,6 +89,17 @@ image-run tag=local_image_tag db_url=local_db_url db_user=local_db_user db_passw
       -v ./shared/bookdrop:/bookdrop \
       -p 6060:6060 \
       "{{ tag }}"
+
+# Print the app version. VERSION is the single source of truth; the backend bakes it into
+# build-info.properties and the UI reads it back from /api/v1/version.
+version:
+    @cat VERSION
+
+# Set the app version in VERSION and mirror it into frontend/package.json.
+# BookLib releases stay on the compatibility line declared by the workspace contract.
+# Usage: `just set-version 3.2.19`.
+set-version new_version:
+    @node -e 'const fs=require("fs"),v=process.argv[1];if(!/^3\.2\.\d+$/.test(v)){console.error(`not a BookLib 3.2.x version: ${v}`);process.exit(1)}const f="frontend/package.json",p=JSON.parse(fs.readFileSync(f,"utf8"));p.version=v;fs.writeFileSync("VERSION",v+"\n");fs.writeFileSync(f,JSON.stringify(p,null,2)+"\n");console.log(`version set to ${v} (VERSION, frontend/package.json)`)' {{ quote(new_version) }}
 
 # Show the resolved tool versions that the local commands expect to find.
 doctor:

@@ -25,11 +25,15 @@ RUN --mount=type=cache,target=/workspace/frontend/.angular/cache \
 FROM --platform=$BUILDPLATFORM gradle:9.6.1-jdk25-alpine AS backend-build
 
 ARG TARGETARCH
-ARG APP_VERSION=development
+# Empty by default so the repo's VERSION file (copied below) decides. Release automation
+# passes an explicit APP_VERSION for tagged builds, which takes precedence.
+ARG APP_VERSION=
 ARG APP_REVISION=unknown
 
 WORKDIR /workspace/backend
 
+# build.gradle.kts resolves the version from ../VERSION relative to the backend project dir.
+COPY VERSION /workspace/VERSION
 COPY backend/gradlew backend/gradlew.bat backend/build.gradle.kts backend/settings.gradle.kts backend/gradle.lockfile ./
 COPY backend/gradle ./gradle
 RUN chmod +x ./gradlew

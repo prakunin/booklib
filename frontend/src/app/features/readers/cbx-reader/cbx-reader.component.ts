@@ -218,6 +218,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly hasInAppPreviousNavigation = Boolean(this.router.currentNavigation()?.previousNavigation);
   private readonly cbxReaderService = inject(CbxReaderService);
   private readonly bookService = inject(BookService);
   private readonly userService = inject(UserService);
@@ -387,7 +388,10 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
               return this.djvuRenditionService.isRenditionReady(this.bookId()!, this.altBookType()).pipe(
                 switchMap((ready) => {
                   if (ready) {
-                    this.router.navigate([`/pdf-reader/book/${this.bookId()}`]);
+                    this.router.navigate([`/pdf-reader/book/${this.bookId()}`], {
+                      replaceUrl: true,
+                      state: {readerHasInAppPreviousNavigation: this.hasInAppPreviousNavigation},
+                    });
                     return EMPTY;
                   }
                   return this.bootstrapReader(book);

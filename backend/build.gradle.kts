@@ -15,7 +15,26 @@ plugins {
 }
 
 group = "org.booklore"
-version = (System.getenv("APP_VERSION") ?: "0.0.1-SNAPSHOT").replace(Regex("^v"), "")
+
+// The repo-root VERSION file is the single source of truth for the app version.
+// APP_VERSION (set by release automation and by the production Dockerfile) overrides
+// it for tagged builds; the literal fallback only applies to a checkout without either.
+val releaseVersion = System.getenv("APP_VERSION")?.takeIf { it.isNotBlank() }
+val baseVersion = (releaseVersion
+    ?: file("$rootDir/../VERSION").takeIf { it.isFile }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+    ?: "0.0.1-SNAPSHOT").removePrefix("v")
+
+// Local builds append the build counter that `./booklib.sh rebuild` bumps, so two dev builds
+// of the same VERSION are distinguishable. Nothing in Gradle writes the counter — a build that
+// only runs tests leaves it alone, which is what keeps `test` up-to-date between runs.
+// Release builds (APP_VERSION set) stay a clean semantic version so the GitHub release
+// comparison in VersionService keeps working.
+val buildNumber = if (releaseVersion != null) null else {
+    file("$rootDir/../.build-number").takeIf { it.isFile }
+        ?.readText()?.trim()?.takeIf { it.matches(Regex("\\d+")) }
+}
+
+version = if (buildNumber != null) "$baseVersion+$buildNumber" else baseVersion
 
 providers.gradleProperty("externalBuildDir")
     .map { file(it) }
@@ -172,13 +191,6 @@ val epub4jNativeVersion = libs.versions.epub4j.get()
 val epub4jNativeCoords = if (useLocalLibs) "org.grimmory:epub4j-native:+" else "org.grimmory:epub4j-native:$epub4jNativeVersion"
 
 dependencies {
-    // --- Dev tooling ---
-    // Auto-restart the app when compiled classes change. Pair `./gradlew bootRun`
-    // with `./gradlew -t classes` (continuous compile) in a second shell: Gradle
-    // does not compile on its own, so without the latter devtools never sees a change.
-    // developmentOnly => never packaged into the production bootJar.
-    developmentOnly("org.springframework.boot:spring-boot-devtools")
-
     // --- Spring Boot ---
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
@@ -342,6 +354,19 @@ tasks.named<Copy>("processResources") {
         from(frontendResourcesDir) {
             into("static")
         }
+    }
+}
+
+// Generates META-INF/build-info.properties, which backs the BuildProperties bean that
+// VersionService reads. Without it the version is only visible through the jar manifest,
+// so `bootRun` (which runs from build/classes, not a jar) would report no version at all.
+springBoot {
+    buildInfo {
+        // Drop build.time. It changes on every run, so leaving it in makes the generated
+        // resource differ each build and knocks `classes` (and everything downstream,
+        // including `test`) out of up-to-date. Setting properties.time to null does not
+        // work — the task falls back to the build instant; excluding the key does.
+        excludes.add("time")
     }
 }
 

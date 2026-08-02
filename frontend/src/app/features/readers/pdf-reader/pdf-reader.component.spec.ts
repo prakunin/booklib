@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
+import type {Navigation} from '@angular/router';
 
-import {PdfReaderComponent} from './pdf-reader.component';
+import {hasInAppReaderPredecessor, PdfReaderComponent} from './pdf-reader.component';
 
 interface PdfReaderHarness {
   embedPdfIframe: {contentWindow: {postMessage: Mock<(message: unknown, targetOrigin: string) => void>}} | null;
@@ -11,6 +12,24 @@ interface PdfReaderHarness {
   cacheStorageService: {delete: ReturnType<typeof vi.fn>};
   bookId: number;
   saveEmbedPdfDocument: () => Promise<boolean>;
+}
+
+interface PdfReaderCloseHarness {
+  closeReaderPromise: Promise<void> | null;
+  hasInAppPreviousNavigation: boolean;
+  viewerMode: () => 'book' | 'document';
+  embedPdfIframe: HTMLIFrameElement | null;
+  persistAnnotations: () => Promise<void>;
+  readingSessionService: {
+    isSessionActive: () => boolean;
+    endSession: ReturnType<typeof vi.fn>;
+  };
+  page: () => number;
+  totalPages: () => number;
+  location: {back: ReturnType<typeof vi.fn>};
+  router: {navigate: ReturnType<typeof vi.fn>};
+  isClosingReader: {set: ReturnType<typeof vi.fn>};
+  closeReader: () => Promise<void>;
 }
 
 function makeComponent(savedBuffer: ArrayBuffer): PdfReaderHarness {
@@ -32,6 +51,28 @@ function makeComponent(savedBuffer: ArrayBuffer): PdfReaderHarness {
   component.authService = {getInternalAccessToken: () => null};
   component.cacheStorageService = {delete: vi.fn(() => Promise.resolve(true))};
   component.bookId = 123;
+  return component;
+}
+
+function makeCloseComponent(
+  hasInAppPreviousNavigation: boolean,
+  persistAnnotations: () => Promise<void> = () => Promise.resolve(),
+): PdfReaderCloseHarness {
+  const component = Object.create(PdfReaderComponent.prototype) as PdfReaderCloseHarness;
+  component.closeReaderPromise = null;
+  component.hasInAppPreviousNavigation = hasInAppPreviousNavigation;
+  component.viewerMode = () => 'book';
+  component.embedPdfIframe = null;
+  component.persistAnnotations = persistAnnotations;
+  component.readingSessionService = {
+    isSessionActive: () => true,
+    endSession: vi.fn(),
+  };
+  component.page = () => 3;
+  component.totalPages = () => 10;
+  component.location = {back: vi.fn()};
+  component.router = {navigate: vi.fn(() => Promise.resolve(true))};
+  component.isClosingReader = {set: vi.fn()};
   return component;
 }
 
@@ -117,5 +158,85 @@ describe('PdfReaderComponent source selection', () => {
 
   it('still loads a real PDF from its own content', () => {
     expect(uriFor('PDF')).toContain('/api/v1/books/1494366/content');
+  });
+});
+
+describe('PdfReaderComponent close navigation', () => {
+  it('uses a normal Angular predecessor when no delegated provenance exists', () => {
+    const navigation = {
+      previousNavigation: {} as Navigation,
+      extras: {},
+    } as Pick<Navigation, 'extras' | 'previousNavigation'>;
+
+    expect(hasInAppReaderPredecessor(navigation)).toBe(true);
+  });
+
+  it('rejects a transient CBX predecessor when CBX was opened directly', () => {
+    const navigation = {
+      previousNavigation: {} as Navigation,
+      extras: {state: {readerHasInAppPreviousNavigation: false}},
+    } as Pick<Navigation, 'extras' | 'previousNavigation'>;
+
+    expect(hasInAppReaderPredecessor(navigation)).toBe(false);
+  });
+
+  it('rejects stale delegated provenance when a PDF reader navigation has no predecessor', () => {
+    const navigation = {
+      previousNavigation: null,
+      extras: {state: {readerHasInAppPreviousNavigation: true}},
+    } as Pick<Navigation, 'extras' | 'previousNavigation'>;
+
+    expect(hasInAppReaderPredecessor(navigation)).toBe(false);
+  });
+
+  it('returns to the in-app page that opened the reader after persistence and session cleanup', async () => {
+    const persistAnnotations = vi.fn(() => Promise.resolve());
+    const component = makeCloseComponent(true, persistAnnotations);
+
+    await component.closeReader();
+
+    expect(persistAnnotations).toHaveBeenCalledOnce();
+    expect(component.readingSessionService.endSession).toHaveBeenCalledWith('3', 30);
+    expect(component.location.back).toHaveBeenCalledOnce();
+    expect(component.router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('replaces a directly loaded reader URL with the dashboard', async () => {
+    const component = makeCloseComponent(false);
+
+    await component.closeReader();
+
+    expect(component.location.back).not.toHaveBeenCalled();
+    expect(component.router.navigate).toHaveBeenCalledWith(['/dashboard'], {replaceUrl: true});
+  });
+
+  it('logs a persistence failure and still leaves the reader once', async () => {
+    const error = new Error('save failed');
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const component = makeCloseComponent(true, () => Promise.reject(error));
+
+    await component.closeReader();
+
+    expect(consoleError).toHaveBeenCalledWith('[PDF Reader] Error saving on close:', error);
+    expect(component.readingSessionService.endSession).toHaveBeenCalledOnce();
+    expect(component.location.back).toHaveBeenCalledOnce();
+  });
+
+  it('shares persistence and navigation across duplicate close requests', async () => {
+    let finishPersistence!: () => void;
+    const persistAnnotations = vi.fn(() => new Promise<void>(resolve => {
+      finishPersistence = resolve;
+    }));
+    const component = makeCloseComponent(true, persistAnnotations);
+
+    const firstClose = component.closeReader();
+    const secondClose = component.closeReader();
+
+    expect(persistAnnotations).toHaveBeenCalledOnce();
+    finishPersistence();
+    await Promise.all([firstClose, secondClose]);
+
+    expect(component.readingSessionService.endSession).toHaveBeenCalledOnce();
+    expect(component.location.back).toHaveBeenCalledOnce();
   });
 });

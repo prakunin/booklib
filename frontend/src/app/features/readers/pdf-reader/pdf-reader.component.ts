@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, Injector, NgZone, OnDestroy, OnInit, afterNextRender, viewChild, DestroyRef, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, type Navigation } from '@angular/router';
 import { PageTitleService } from "../../../shared/service/page-title.service";
 import { BookService } from '../../book/service/book.service';
 import { forkJoin, from, Observable, of, Subject } from "rxjs";
@@ -30,6 +30,13 @@ import { WakeLockService } from '../../../shared/service/wake-lock.service';
 import { Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {ReaderFullscreenService} from '../shared/reader-fullscreen.service';
+
+export function hasInAppReaderPredecessor(
+  navigation: Pick<Navigation, 'extras' | 'previousNavigation'> | null,
+): boolean {
+  return Boolean(navigation?.previousNavigation)
+    && navigation?.extras.state?.['readerHasInAppPreviousNavigation'] !== false;
+}
 
 @Component({
   selector: 'app-pdf-reader',
@@ -179,6 +186,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   private readonly readingSessionService = inject(ReadingSessionService);
   private readonly location = inject(Location);
   private readonly router = inject(Router);
+  private readonly hasInAppPreviousNavigation = hasInAppReaderPredecessor(this.router.currentNavigation());
   private readonly pdfAnnotationService = inject(PdfAnnotationService);
   private readonly cacheStorageService = inject(CacheStorageService);
   private readonly localSettingsService = inject(LocalSettingsService);
@@ -1513,7 +1521,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     void this.closeReader();
   }
 
-  closeReader = async (): Promise<void> => {
+  async closeReader(): Promise<void> {
     if (this.closeReaderPromise) return this.closeReaderPromise;
     this.closeReaderPromise = this.performCloseReader();
     return this.closeReaderPromise;
@@ -1537,11 +1545,10 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
         const percentage = total > 0 ? Math.round((currentPage / total) * 1000) / 10 : 0;
         this.readingSessionService.endSession(currentPage.toString(), percentage);
       }
-      // Navigate back within the SPA; fall back to home if there's no history
-      if (globalThis.history.length > 1) {
+      if (this.hasInAppPreviousNavigation) {
         this.location.back();
       } else {
-        this.router.navigate(['/']);
+        await this.router.navigate(['/dashboard'], {replaceUrl: true});
       }
     } finally {
       this.resetCloseReaderState();
