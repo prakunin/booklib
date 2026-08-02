@@ -11,7 +11,9 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.DocumentParseStatus;
+import org.booklore.repository.BookFileRepository;
 import org.booklore.repository.BookRepository;
+import org.booklore.service.document.UnreadableDocumentException;
 import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.util.FileUtils;
 import org.grimmory.epub4j.domain.*;
@@ -72,6 +74,7 @@ public class EpubReaderService {
     );
 
     private final BookRepository bookRepository;
+    private final BookFileRepository bookFileRepository;
     private final DocumentRenditionService documentRenditionService;
     private final HtmlRenditionService htmlRenditionService;
     private final ArchivedBookContentService archivedBookContentService;
@@ -117,10 +120,22 @@ public class EpubReaderService {
         try {
             CachedEpubMetadata metadata = getCachedMetadata(resolvedBook);
             return metadata.bookInfo;
+        } catch (UnreadableDocumentException _) {
+            markDocumentUnreadable(resolvedBook.bookFile());
+            throw ApiError.DOCUMENT_UNREADABLE.createException();
         } catch (IOException e) {
             log.error("Failed to read EPUB for book {}", bookId, e);
             throw ApiError.FILE_READ_ERROR.createException("Failed to read EPUB: " + e.getMessage());
         }
+    }
+
+    private void markDocumentUnreadable(BookFileEntity bookFile) {
+        if (bookFile == null || bookFile.getBookType() != BookFileType.DOC
+                || bookFile.getDocumentParseStatus() == DocumentParseStatus.UNREADABLE) {
+            return;
+        }
+        bookFile.setDocumentParseStatus(DocumentParseStatus.UNREADABLE);
+        bookFileRepository.save(bookFile);
     }
 
     public void streamFile(Long bookId, String filePath, OutputStream outputStream) throws IOException {

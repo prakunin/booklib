@@ -9,7 +9,9 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.DocumentParseStatus;
+import org.booklore.repository.BookFileRepository;
 import org.booklore.repository.BookRepository;
+import org.booklore.service.document.UnreadableDocumentException;
 import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.util.FileUtils;
 import org.grimmory.epub4j.domain.*;
@@ -43,6 +45,9 @@ class EpubReaderServiceTest {
 
     @Mock
     BookRepository bookRepository;
+
+    @Mock
+    BookFileRepository bookFileRepository;
 
     @Mock
     DocumentRenditionService documentRenditionService;
@@ -152,6 +157,35 @@ class EpubReaderServiceTest {
     }
 
     @Test
+    void streamsArchivedHtmlThroughTheRenditionService() throws Exception {
+        BookFileEntity htmlFile = BookFileEntity.builder()
+                .id(8L)
+                .bookType(BookFileType.HTML)
+                .fileName("letter.html")
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry("letter.html")
+                .build();
+        bookEntity.setBookFiles(new java.util.ArrayList<>(List.of(htmlFile)));
+        htmlFile.setBook(bookEntity);
+        Path htmlPath = tempDir.resolve("letter.html");
+        Files.writeString(htmlPath, "<html></html>");
+        EpubBookInfo bookInfo = EpubBookInfo.builder()
+                .manifest(List.of())
+                .spine(List.of())
+                .build();
+        when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
+        when(archivedBookContentService.resolve(htmlFile)).thenReturn(htmlPath);
+        when(htmlRenditionService.supports(htmlFile)).thenReturn(true);
+        when(htmlRenditionService.buildBookInfo(htmlFile)).thenReturn(bookInfo);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        epubReaderService.streamFile(1L, "content.xhtml", outputStream);
+
+        verify(htmlRenditionService).streamResource(htmlFile, "content.xhtml", outputStream);
+        verifyNoInteractions(documentRenditionService);
+    }
+
+    @Test
     void usesTheExplicitNonArchivedAlternativePath() throws Exception {
         BookFileEntity primary = mock(BookFileEntity.class);
         BookFileEntity alternative = mock(BookFileEntity.class);
@@ -196,6 +230,28 @@ class EpubReaderServiceTest {
 
         assertEquals("Document cannot be read", exception.getMessage());
         verifyNoInteractions(documentRenditionService);
+    }
+
+    @Test
+    void discoveredUnreadableDocumentIsPersistedAndReturnedAsUnprocessable() throws Exception {
+        BookFileEntity file = mock(BookFileEntity.class);
+        Path documentPath = tempDir.resolve("legacy.doc");
+        Files.writeString(documentPath, "document");
+        when(file.getBookType()).thenReturn(BookFileType.DOC);
+        when(file.getFullFilePath()).thenReturn(documentPath);
+        bookEntity.setBookFiles(List.of(file));
+        when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
+        when(documentRenditionService.supports(documentPath)).thenReturn(true);
+        when(documentRenditionService.buildBookInfo(documentPath))
+                .thenThrow(new UnreadableDocumentException());
+
+        var exception = assertThrows(
+                ApiError.DOCUMENT_UNREADABLE.createException().getClass(),
+                () -> epubReaderService.getBookInfo(1L));
+
+        assertEquals("Document cannot be read", exception.getMessage());
+        verify(file).setDocumentParseStatus(DocumentParseStatus.UNREADABLE);
+        verify(bookFileRepository).save(file);
     }
 
     @Test

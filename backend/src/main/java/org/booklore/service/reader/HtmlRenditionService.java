@@ -43,6 +43,7 @@ public class HtmlRenditionService {
     private static final String FIXED_MODIFIED = "1970-01-01T00:00:00Z";
     private static final long MAX_HTML_BYTES = 16L * 1024 * 1024;
     private static final long MAX_CACHE_WEIGHT = 64L * 1024 * 1024;
+    private static final int RESOURCE_WEIGHT_BYTES = 4 * 1024;
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("gif", "jpg", "jpeg", "png", "webp");
     private static final Set<String> UNSAFE_ELEMENTS = Set.of(
             "script", "style", "link", "base", "iframe", "frame", "frameset", "object", "embed",
@@ -51,7 +52,9 @@ public class HtmlRenditionService {
     private final ArchivedBookContentService archivedBookContentService;
     private final Cache<Long, CachedRendition> cache = Caffeine.<Long, CachedRendition>newBuilder()
             .maximumWeight(MAX_CACHE_WEIGHT)
-            .weigher((Long bookId, CachedRendition rendition) -> rendition.xhtml().length)
+            .weigher((Long bookId, CachedRendition rendition) -> Math.toIntExact(Math.min(
+                    Integer.MAX_VALUE,
+                    (long) rendition.xhtml().length + (long) rendition.resources().size() * RESOURCE_WEIGHT_BYTES)))
             .expireAfterAccess(Duration.ofMinutes(30))
             .build();
 

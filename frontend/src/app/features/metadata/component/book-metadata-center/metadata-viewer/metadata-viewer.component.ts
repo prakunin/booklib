@@ -508,7 +508,7 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
   }
 
   readPreferred(book: Book): void {
-    if (isReadableBookType(book.primaryFile?.bookType)) {
+    if (this.isReadable(book)) {
       this.read(book.id);
       return;
     }

@@ -400,6 +400,18 @@ describe('MetadataViewerComponent', () => {
     expect(readBook).toHaveBeenCalledWith(21, undefined, 'HTML');
   });
 
+  it('reads a readable alternative when the primary document is unreadable', () => {
+    const component = createComponent();
+    const book = createBook({
+      primaryFile: createFile(1, {bookType: 'DOC', documentParseStatus: 'UNREADABLE'}),
+      alternativeFormats: [createFile(2, {bookType: 'HTML'})],
+    });
+
+    component.readPreferred(book);
+
+    expect(readBook).toHaveBeenCalledWith(21, undefined, 'HTML');
+  });
+
   it('falls back to an empty series list when the series lookup fails', async () => {
     const component = createComponent();
     getBooksInSeries.mockReturnValueOnce(throwError(() => new Error('series failed')));
