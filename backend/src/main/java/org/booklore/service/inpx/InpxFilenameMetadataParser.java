@@ -85,7 +85,7 @@ public class InpxFilenameMetadataParser {
             if (tokens[i].isEmpty()) {
                 continue;
             }
-            if (builder.length() > 0) {
+            if (!builder.isEmpty()) {
                 builder.append(' ');
             }
             builder.append(tokens[i]);

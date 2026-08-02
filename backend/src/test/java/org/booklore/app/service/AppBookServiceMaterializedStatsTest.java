@@ -164,11 +164,12 @@ class AppBookServiceMaterializedStatsTest {
 
         List<Long> scope = List.of(libraryId);
         Map<String, Long> sums = appBookService.materializedScalarSums(scope);
-        assertThat(sums.get("TOTAL_BOOKS")).isEqualTo(liveBooks);
-        assertThat(sums.get("TOTAL_SIZE_KB")).isEqualTo(liveSize);
-        assertThat(sums.get("TOTAL_AUTHORS")).isEqualTo(liveAuthors);
-        assertThat(sums.get("TOTAL_SERIES")).isEqualTo(liveSeries);
-        assertThat(sums.get("TOTAL_PUBLISHERS")).isEqualTo(livePublishers);
+        assertThat(sums)
+                .containsEntry("TOTAL_BOOKS", liveBooks)
+                .containsEntry("TOTAL_SIZE_KB", liveSize)
+                .containsEntry("TOTAL_AUTHORS", liveAuthors)
+                .containsEntry("TOTAL_SERIES", liveSeries)
+                .containsEntry("TOTAL_PUBLISHERS", livePublishers);
 
         assertThat(appBookService.materializedMonths(scope)).isEqualTo(liveMonths);
         assertThat(appBookService.materializedAuthorStats(false, scope, spec, userId))
@@ -176,9 +177,10 @@ class AppBookServiceMaterializedStatsTest {
 
         // The whole-catalog scope (one library here) must match the same live aggregates.
         Map<String, Long> catalog = appBookService.catalogScalarMap();
-        assertThat(catalog.get("TOTAL_AUTHORS")).isEqualTo(liveAuthors);
-        assertThat(catalog.get("TOTAL_SERIES")).isEqualTo(liveSeries);
-        assertThat(catalog.get("TOTAL_PUBLISHERS")).isEqualTo(livePublishers);
+        assertThat(catalog)
+                .containsEntry("TOTAL_AUTHORS", liveAuthors)
+                .containsEntry("TOTAL_SERIES", liveSeries)
+                .containsEntry("TOTAL_PUBLISHERS", livePublishers);
         assertThat(appBookService.materializedAuthorStats(true, List.of(), spec, userId))
                 .isEqualTo(liveAuthorStats);
     }

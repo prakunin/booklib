@@ -12,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,5 +47,63 @@ class InpxArchiveReconciliationServiceTest {
         assertThat(retired).isOne();
         assertThat(legacyBook.getDeleted()).isTrue();
         verify(bookRepository).saveAll(List.of(legacyBook));
+    }
+
+    @Test
+    void returnsImmediatelyForEmptyArchiveNames() {
+        InpxArchiveReconciliationService service = service();
+
+        assertThat(service.retireObsoleteGenericContainers(7L, List.of())).isZero();
+
+        verify(bookFileRepository, never()).findBookFilesByArchives(7L, List.of());
+        verify(bookRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void leavesContainersActiveUntilALiveNestedLeafExists() {
+        InpxArchiveReconciliationService service = service();
+        BookEntity legacyBook = BookEntity.builder().id(10L).deleted(false).build();
+        BookFileEntity legacyContainer = BookFileEntity.builder()
+                .book(legacyBook).sourceArchive("outer.zip").sourceArchiveEntry("inner.zip").build();
+        BookEntity deletedLeafBook = BookEntity.builder().id(11L).deleted(true).build();
+        BookFileEntity deletedNestedLeaf = BookFileEntity.builder()
+                .book(deletedLeafBook).sourceArchive("outer.zip")
+                .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("inner.zip", "book.fb2")))
+                .build();
+        when(bookFileRepository.findBookFilesByArchives(7L, List.of("outer.zip")))
+                .thenReturn(List.of(legacyContainer, deletedNestedLeaf));
+
+        assertThat(service.retireObsoleteGenericContainers(7L, List.of("outer.zip"))).isZero();
+        assertThat(legacyBook.getDeleted()).isFalse();
+        verify(bookRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void ignoresDeletedNestedContainersAndNonGenericEntries() {
+        InpxArchiveReconciliationService service = service();
+        BookEntity leafBook = BookEntity.builder().id(11L).deleted(false).build();
+        BookFileEntity nestedLeaf = BookFileEntity.builder()
+                .book(leafBook).sourceArchive("outer.zip")
+                .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("inner.zip", "book.fb2")))
+                .build();
+        BookEntity deletedBook = BookEntity.builder().id(12L).deleted(true).build();
+        BookFileEntity deletedContainer = BookFileEntity.builder()
+                .book(deletedBook).sourceArchive("outer.zip").sourceArchiveEntry("deleted.zip").build();
+        BookEntity nonGenericBook = BookEntity.builder().id(13L).deleted(false).build();
+        BookFileEntity nonGenericContainer = BookFileEntity.builder()
+                .book(nonGenericBook).sourceArchive("outer.zip").sourceArchiveEntry("cover.jpg").build();
+        when(bookFileRepository.findBookFilesByArchives(7L, List.of("outer.zip")))
+                .thenReturn(List.of(nestedLeaf, deletedContainer, nonGenericContainer));
+        when(entryMetadataRecognizer.isGenericArchive("cover.jpg")).thenReturn(false);
+
+        assertThat(service.retireObsoleteGenericContainers(7L, List.of("outer.zip"))).isZero();
+        assertThat(deletedBook.getDeleted()).isTrue();
+        assertThat(nonGenericBook.getDeleted()).isFalse();
+        verify(bookRepository, never()).saveAll(any());
+    }
+
+    private InpxArchiveReconciliationService service() {
+        return new InpxArchiveReconciliationService(
+                bookFileRepository, bookRepository, entryMetadataRecognizer);
     }
 }

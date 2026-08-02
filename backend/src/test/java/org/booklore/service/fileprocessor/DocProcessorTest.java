@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Set;
 
@@ -96,14 +97,14 @@ class DocProcessorTest {
                         new DocumentBlock(1, 0, "Opening paragraph"),
                         new DocumentBlock(4, 0, "Distinctive café phrase"),
                         new DocumentBlock(7, 0, "Closing paragraph")),
-                "Internal Report", "Ada Lovelace", LocalDate.of(2026, 7, 31));
+                "Internal Report", "Ada Lovelace", LocalDate.of(2026, Month.JULY, 31));
         when(documentContentExtractor.parse(book.getFullFilePath().toFile()))
                 .thenReturn(DocumentParseResult.readable(content));
 
         BookEntity result = processor.processNewFile(libraryFile);
 
         assertThat(result.getMetadata().getTitle()).isEqualTo("Internal Report");
-        assertThat(result.getMetadata().getPublishedDate()).isEqualTo(LocalDate.of(2026, 7, 31));
+        assertThat(result.getMetadata().getPublishedDate()).isEqualTo(LocalDate.of(2026, Month.JULY, 31));
         assertThat(result.getPrimaryBookFile().getDocumentParseStatus()).isEqualTo(DocumentParseStatus.READABLE);
         assertThat(BookUtils.extractDocumentBodySearchText(result.getMetadata().getSearchText()))
                 .isEqualTo("opening paragraph distinctive cafe phrase closing paragraph");

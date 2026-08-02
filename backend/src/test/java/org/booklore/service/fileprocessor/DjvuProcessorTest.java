@@ -29,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -97,7 +98,7 @@ class DjvuProcessorTest {
                 .authors(List.of("A. Popov"))
                 .publisher("Svyaz")
                 .language("ru")
-                .publishedDate(LocalDate.of(1972, 1, 1))
+                .publishedDate(LocalDate.of(1972, Month.JANUARY, 1))
                 .build());
         when(djvuMetadataExtractor.extractCover(any())).thenReturn(new byte[]{1, 2, 3});
         when(fileService.saveCoverImageFromBytes(anyLong(), any())).thenReturn(CoverSaveOutcome.SAVED);
@@ -107,7 +108,7 @@ class DjvuProcessorTest {
         assertThat(result.getMetadata().getTitle()).isEqualTo("Radio Magazine");
         assertThat(result.getMetadata().getPublisher()).isEqualTo("Svyaz");
         assertThat(result.getMetadata().getLanguage()).isEqualTo("ru");
-        assertThat(result.getMetadata().getPublishedDate()).isEqualTo(LocalDate.of(1972, 1, 1));
+        assertThat(result.getMetadata().getPublishedDate()).isEqualTo(LocalDate.of(1972, Month.JANUARY, 1));
         assertThat(result.getMetadata().getPageCount()).isEqualTo(48);
         verify(bookCreatorService).addAuthorsToBook(Set.of("A. Popov"), book);
     }

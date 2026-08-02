@@ -12,7 +12,7 @@ export type DocumentParseStatus = 'READABLE' | 'UNREADABLE';
 // nothing to open.
 export const READABLE_BOOK_TYPES: readonly BookType[] = ['PDF', 'EPUB', 'CBX', 'FB2', 'MOBI', 'AZW3', 'AUDIOBOOK', 'DOC', 'DJVU'];
 
-export function isReadableBookType(bookType: BookType | string | undefined | null): boolean {
+export function isReadableBookType(bookType: string | undefined | null): boolean {
   return !!bookType && (READABLE_BOOK_TYPES as readonly string[]).includes(bookType);
 }
 

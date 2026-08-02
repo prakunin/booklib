@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Reports whether the agent CLI is installed and signed in, and what it can be pointed at.
@@ -58,12 +59,12 @@ public class AgentCliStatusService {
     private final SmartEnrichmentProperties properties;
     private final AgentCliClient agentCliClient;
 
-    private volatile CachedProbe cachedProbe;
+    private final AtomicReference<CachedProbe> cachedProbe = new AtomicReference<>();
     // The model catalogue is near-static, so the last good list is kept and reused when a later
     // `models` call comes back empty — which happens when the CLI is busy with a resolution and the
     // subcommand blocks on its lock. Without this the settings dropdown collapses to nothing
     // whenever the page is opened mid-run.
-    private volatile List<String> cachedModels = List.of();
+    private final AtomicReference<List<String>> cachedModels = new AtomicReference<>(List.of());
     private volatile long cachedModelsAtNanos;
 
     /**
@@ -116,7 +117,7 @@ public class AgentCliStatusService {
     }
 
     public List<String> listModels() {
-        List<String> cached = cachedModels;
+        List<String> cached = cachedModels.get();
         if (!cached.isEmpty() && System.nanoTime() - cachedModelsAtNanos < CACHE_TTL.toNanos()) {
             return cached;
         }
@@ -137,14 +138,14 @@ public class AgentCliStatusService {
                     output.get().length(), cached.size());
             return cached;
         }
-        cachedModels = models;
+        cachedModels.set(models);
         cachedModelsAtNanos = System.nanoTime();
         log.info("Agent models refreshed ({}): {}", models.size(), models);
         return models;
     }
 
     private CachedProbe probe() {
-        CachedProbe cached = cachedProbe;
+        CachedProbe cached = cachedProbe.get();
         if (cached != null && !cached.isExpired()) {
             return cached;
         }
@@ -153,7 +154,7 @@ public class AgentCliStatusService {
                 version.isPresent(),
                 version.map(String::strip).orElse(null),
                 System.nanoTime());
-        cachedProbe = fresh;
+        cachedProbe.set(fresh);
         return fresh;
     }
 

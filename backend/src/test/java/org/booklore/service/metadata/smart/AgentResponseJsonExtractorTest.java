@@ -2,8 +2,6 @@ package org.booklore.service.metadata.smart;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AgentResponseJsonExtractorTest {
@@ -59,6 +57,6 @@ class AgentResponseJsonExtractorTest {
     @Test
     void returnsEmptyForBlankOrNullInput() {
         assertThat(AgentResponseJsonExtractor.extractObject(null)).isEmpty();
-        assertThat(AgentResponseJsonExtractor.extractObject("   ")).isEqualTo(Optional.empty());
+        assertThat(AgentResponseJsonExtractor.extractObject("   ")).isEmpty();
     }
 }

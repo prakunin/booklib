@@ -192,9 +192,11 @@ class MetadataManagementServiceTest {
     void consolidateAuthors_throwsWhenAllTargetsResolveEmpty() {
         when(authorRepository.findByNameIgnoreCase("   ")).thenReturn(Optional.empty());
         when(authorLocalResolver.resolve("   ")).thenReturn(Optional.empty());
+        List<String> targets = List.of("   ");
+        List<String> toMerge = List.of("Old");
 
         assertThatThrownBy(() ->
-                service.consolidateMetadata(MergeMetadataType.authors, List.of("   "), List.of("Old"))
+                service.consolidateMetadata(MergeMetadataType.authors, targets, toMerge)
         ).isInstanceOf(APIException.class)
                 .hasMessageContaining("No valid target author(s) to consolidate into");
 

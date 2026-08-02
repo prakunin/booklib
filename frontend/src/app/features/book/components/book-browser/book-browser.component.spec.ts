@@ -574,17 +574,17 @@ describe('BookBrowserComponent', () => {
 
     TestBed.flushEffects();
 
-    expect(bookMenuService.getMetadataMenuItems).toHaveBeenCalledWith(
-      expect.any(Function),
-      expect.any(Function),
-      expect.any(Function),
-      expect.any(Function),
-      expect.any(Function),
-      expect.any(Function),
-      expect.any(Object),
-      expect.any(Function),
-      true
-    );
+    expect(bookMenuService.getMetadataMenuItems).toHaveBeenCalledWith(expect.objectContaining({
+      autoFetchMetadata: expect.any(Function),
+      fetchMetadata: expect.any(Function),
+      bulkEditMetadata: expect.any(Function),
+      multiBookEditMetadata: expect.any(Function),
+      regenerateCovers: expect.any(Function),
+      generateCustomCovers: expect.any(Function),
+      user: expect.any(Object),
+      smartEnrich: expect.any(Function),
+      smartEnrichmentAvailable: true
+    }));
   });
 
   it('opens one queue for a snapshot of selected books and clears selection on completion', async () => {

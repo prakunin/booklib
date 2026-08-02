@@ -33,12 +33,17 @@ describe('BookMenuService metadata actions', () => {
 
   it('shows Smart Enrich only when it is available and bulk metadata editing is permitted', () => {
     const command = vi.fn();
-    const items = service.getMetadataMenuItems(
-      vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(),
-      user(true),
-      command,
-      true
-    );
+    const items = service.getMetadataMenuItems({
+      autoFetchMetadata: vi.fn(),
+      fetchMetadata: vi.fn(),
+      bulkEditMetadata: vi.fn(),
+      multiBookEditMetadata: vi.fn(),
+      regenerateCovers: vi.fn(),
+      generateCustomCovers: vi.fn(),
+      user: user(true),
+      smartEnrich: command,
+      smartEnrichmentAvailable: true
+    });
 
     const smartEnrich = items.find(item => item.label === 'book.menuService.menu.smartEnrich');
     expect(smartEnrich).toBeDefined();
@@ -48,12 +53,17 @@ describe('BookMenuService metadata actions', () => {
   });
 
   it('hides Smart Enrich when the feature is unavailable or permission is absent', () => {
-    const buildItems = (available: boolean, permitted: boolean) => service.getMetadataMenuItems(
-      vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(),
-      user(permitted),
-      vi.fn(),
-      available
-    );
+    const buildItems = (available: boolean, permitted: boolean) => service.getMetadataMenuItems({
+      autoFetchMetadata: vi.fn(),
+      fetchMetadata: vi.fn(),
+      bulkEditMetadata: vi.fn(),
+      multiBookEditMetadata: vi.fn(),
+      regenerateCovers: vi.fn(),
+      generateCustomCovers: vi.fn(),
+      user: user(permitted),
+      smartEnrich: vi.fn(),
+      smartEnrichmentAvailable: available
+    });
 
     expect(buildItems(false, true).some(item => item.label === 'book.menuService.menu.smartEnrich')).toBe(false);
     expect(buildItems(true, false).some(item => item.label === 'book.menuService.menu.smartEnrich')).toBe(false);

@@ -128,8 +128,7 @@ class MetadataProposalBuilderTest {
         void doNotProposeTheOriginalTitleForATranslation() {
             List<MetadataFieldProposal> proposals = builder.build(russianTranslation(), TestIdentities.builder().build(), null);
 
-            assertThat(proposals).noneMatch(p -> p.field().equals("title"));
-            assertThat(proposals).noneMatch(p -> p.field().equals("authors"));
+            assertThat(proposals).noneMatch(p -> p.field().equals("title") || p.field().equals("authors"));
         }
 
         // Same field, opposite conclusion: for a file already in the original language, the reported

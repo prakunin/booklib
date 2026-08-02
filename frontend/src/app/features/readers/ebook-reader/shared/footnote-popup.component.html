@@ -1,15 +1,13 @@
 @if (visible()) {
   <ng-container *transloco="let t">
-    <div
+    <button
+      type="button"
       class="footnote-backdrop"
-      role="button"
-      tabindex="0"
       [attr.aria-label]="t('readerEbook.footnote.close')"
-      (click)="dismissed.emit()"
-      (keydown.enter)="dismissed.emit()"></div>
-    <div
+      (click)="dismissed.emit()"></button>
+    <dialog
+      open
       class="footnote-popup"
-      role="dialog"
       [attr.aria-label]="t('readerEbook.footnote.title')"
       [class.show-below]="showBelow()"
       [class.is-dark]="dark()"
@@ -28,6 +26,6 @@
           {{ t('readerEbook.footnote.close') }}
         </button>
       </div>
-    </div>
+    </dialog>
   </ng-container>
 }

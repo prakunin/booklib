@@ -94,9 +94,8 @@ final class ZipEntryNameResolver {
 
     private static int score(String value) {
         int score = 0;
-        for (int index = 0; index < value.length();) {
+        for (int index = 0; index < value.length(); index = value.offsetByCodePoints(index, 1)) {
             int codePoint = value.codePointAt(index);
-            index += Character.charCount(codePoint);
             if (isUkrainianLetter(codePoint)) {
                 score += 6;
             } else if (isRussianLetter(codePoint)) {

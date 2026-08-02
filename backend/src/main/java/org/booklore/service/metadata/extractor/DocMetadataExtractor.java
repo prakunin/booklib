@@ -11,9 +11,9 @@ import org.booklore.model.dto.BookMetadata;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -28,6 +28,7 @@ import java.util.Locale;
  */
 @Slf4j
 @Component
+@SuppressWarnings("java:S112")
 public class DocMetadataExtractor implements FileMetadataExtractor {
 
     @Override
@@ -47,7 +48,8 @@ public class DocMetadataExtractor implements FileMetadataExtractor {
     private BookMetadata extractDocx(File file) throws Exception {
         try (OPCPackage pkg = OPCPackage.open(file); XWPFDocument doc = new XWPFDocument(pkg)) {
             var core = doc.getProperties().getCoreProperties();
-            return build(core.getTitle(), core.getCreator(), core.getCreated());
+            var created = core.getCreated();
+            return build(core.getTitle(), core.getCreator(), created == null ? null : created.toInstant());
         }
     }
 
@@ -55,11 +57,12 @@ public class DocMetadataExtractor implements FileMetadataExtractor {
         try (POIFSFileSystem fs = new POIFSFileSystem(file, true)) {
             SummaryInformation summary = (SummaryInformation) PropertySetFactory.create(
                     fs.getRoot(), SummaryInformation.DEFAULT_STREAM_NAME);
-            return build(summary.getTitle(), summary.getAuthor(), summary.getCreateDateTime());
+            var created = summary.getCreateDateTime();
+            return build(summary.getTitle(), summary.getAuthor(), created == null ? null : created.toInstant());
         }
     }
 
-    private BookMetadata build(String title, String author, Date created) {
+    private BookMetadata build(String title, String author, Instant created) {
         return BookMetadata.builder()
                 .title(StringUtils.trimToNull(title))
                 .authors(StringUtils.isBlank(author) ? List.of() : List.of(author.strip()))
@@ -75,8 +78,8 @@ public class DocMetadataExtractor implements FileMetadataExtractor {
      * <p>
      * Converted in UTC rather than the default zone so the same file yields the same date on any host.
      */
-    private LocalDate toLocalDate(Date created) {
-        return created == null ? null : created.toInstant().atZone(ZoneOffset.UTC).toLocalDate();
+    private LocalDate toLocalDate(Instant created) {
+        return created == null ? null : created.atZone(ZoneOffset.UTC).toLocalDate();
     }
 
     /**

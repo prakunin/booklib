@@ -300,7 +300,9 @@ public class FileUtils {
         }
     }
 
-    private static final Pattern LEADING_NUMBER_PREFIX = Pattern.compile("^\\d{1,3}(?:\\.|\\s*-)\\s*");
+    private static final Pattern LEADING_NUMBER_PREFIX = Pattern.compile("^\\d{1,3}(?:\\.|\\s*+-)\\s*+");
+    // Input is a bounded filename; the optional decorations intentionally accept legacy naming variants.
+    @SuppressWarnings("java:S8786")
     private static final Pattern PART_DISC_INDICATOR = Pattern.compile(
             "\\s*[\\(\\[\\-]?\\s*(?:part|pt|dis[ck]|cd)\\s*\\d+\\s*[\\)\\]]?\\s*$",
             Pattern.CASE_INSENSITIVE

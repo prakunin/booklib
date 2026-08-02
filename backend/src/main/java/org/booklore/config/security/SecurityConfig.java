@@ -33,7 +33,6 @@ import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +45,6 @@ import org.springframework.web.util.pattern.PathPatternParser;
 @Configuration
 public class SecurityConfig {
 
-    private static final Pattern ALLOWED = Pattern.compile("\\s*,\\s*");
     private final OpdsUserDetailsService opdsUserDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AuthenticationCheckFilter authenticationCheckFilter;
@@ -370,7 +368,7 @@ public class SecurityConfig {
         
         String allowedOriginsStr = env.getProperty("app.cors.allowed-origins", "").trim();
         if (!allowedOriginsStr.isEmpty()) {
-            List<String> origins = Arrays.stream(ALLOWED.split(allowedOriginsStr))
+            List<String> origins = Arrays.stream(allowedOriginsStr.split(","))
                     .filter(s -> !s.isEmpty())
                     .map(String::trim)
                     .toList();

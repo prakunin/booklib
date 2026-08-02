@@ -8,6 +8,9 @@ import org.booklore.model.dto.smart.ResolvedWorkIdentity;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.Month;
+import java.time.Year;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +58,13 @@ public class MetadataProposalBuilder {
      * the original-language edition; the edition title, being same-language, is always safe.
      */
     private void addWorkProposals(List<MetadataFieldProposal> proposals, BookMetadata current, ResolvedWorkIdentity identity) {
+        addTitleProposal(proposals, current, identity);
+        addAuthorProposal(proposals, current, identity);
+        addLanguageProposal(proposals, current, identity);
+    }
+
+    private void addTitleProposal(List<MetadataFieldProposal> proposals, BookMetadata current,
+                                  ResolvedWorkIdentity identity) {
         String currentTitle = current == null ? null : current.getTitle();
         String editionTitle = identity.editionTitle();
         String preferredTitle = isUsable(editionTitle) ? editionTitle : identity.originalTitle();
@@ -65,6 +75,10 @@ public class MetadataProposalBuilder {
                     firstSource(identity), locked(current == null ? null : current.getTitleLocked())));
         }
 
+    }
+
+    private void addAuthorProposal(List<MetadataFieldProposal> proposals, BookMetadata current,
+                                   ResolvedWorkIdentity identity) {
         // A single bad extractor value (often an uploader nickname) must not suppress a better,
         // reviewable identity. Multiple names may be co-authors or translators, so never collapse
         // that list to the agent's one reported name.
@@ -84,6 +98,10 @@ public class MetadataProposalBuilder {
             }
         }
 
+    }
+
+    private void addLanguageProposal(List<MetadataFieldProposal> proposals, BookMetadata current,
+                                     ResolvedWorkIdentity identity) {
         // Fill the language only when it is missing; the edition's language is the right one, with the
         // quoted description's language as a fallback since the agent read that page in it.
         String currentLanguage = current == null ? null : current.getLanguage();
@@ -115,11 +133,23 @@ public class MetadataProposalBuilder {
     }
 
     private void addEditionProposals(List<MetadataFieldProposal> proposals, BookMetadata current, ResolvedWorkIdentity identity) {
+        addPublisherProposal(proposals, current, identity);
+        addPublishedDateProposal(proposals, current, identity);
+        addIsbnProposals(proposals, current, identity);
+        addPageCountProposal(proposals, current, identity);
+    }
+
+    private void addPublisherProposal(List<MetadataFieldProposal> proposals, BookMetadata current,
+                                      ResolvedWorkIdentity identity) {
         if (isUsable(identity.publisher())) {
             proposals.add(proposal("publisher", current == null ? null : current.getPublisher(),
                     identity.publisher().strip(), AGENT_SOURCE, firstSource(identity),
                     locked(current == null ? null : current.getPublisherLocked())));
         }
+    }
+
+    private void addPublishedDateProposal(List<MetadataFieldProposal> proposals, BookMetadata current,
+                                          ResolvedWorkIdentity identity) {
         String publishedDate = normalizePublishedDate(identity.publishedDate());
         if (publishedDate != null) {
             proposals.add(proposal("publishedDate",
@@ -127,6 +157,10 @@ public class MetadataProposalBuilder {
                     publishedDate, AGENT_SOURCE, firstSource(identity),
                     locked(current == null ? null : current.getPublishedDateLocked())));
         }
+    }
+
+    private void addIsbnProposals(List<MetadataFieldProposal> proposals, BookMetadata current,
+                                  ResolvedWorkIdentity identity) {
         String isbn13 = normalizeIsbn(identity.isbn13(), 13);
         if (isbn13 != null) {
             proposals.add(proposal("isbn13", current == null ? null : current.getIsbn13(), isbn13,
@@ -137,6 +171,10 @@ public class MetadataProposalBuilder {
             proposals.add(proposal("isbn10", current == null ? null : current.getIsbn10(), isbn10,
                     AGENT_SOURCE, firstSource(identity), locked(current == null ? null : current.getIsbn10Locked())));
         }
+    }
+
+    private void addPageCountProposal(List<MetadataFieldProposal> proposals, BookMetadata current,
+                                      ResolvedWorkIdentity identity) {
         Integer pageCount = identity.pageCount();
         if (pageCount != null && pageCount > 0 && pageCount <= MAX_PAGE_COUNT) {
             proposals.add(proposal("pageCount",
@@ -156,6 +194,12 @@ public class MetadataProposalBuilder {
                 identity.seriesName().strip(), AGENT_SOURCE, firstSource(identity),
                 locked(current == null ? null : current.getSeriesNameLocked())));
 
+        addSeriesNumberProposal(proposals, current, identity);
+        addSeriesTotalProposal(proposals, current, identity);
+    }
+
+    private void addSeriesNumberProposal(List<MetadataFieldProposal> proposals, BookMetadata current,
+                                         ResolvedWorkIdentity identity) {
         Float seriesNumber = identity.seriesNumber();
         if (seriesNumber != null && seriesNumber > 0 && seriesNumber < 10_000) {
             proposals.add(proposal("seriesNumber",
@@ -163,6 +207,10 @@ public class MetadataProposalBuilder {
                     seriesNumber.toString(), AGENT_SOURCE, firstSource(identity),
                     locked(current == null ? null : current.getSeriesNumberLocked())));
         }
+    }
+
+    private void addSeriesTotalProposal(List<MetadataFieldProposal> proposals, BookMetadata current,
+                                        ResolvedWorkIdentity identity) {
         Integer seriesTotal = identity.seriesTotal();
         if (seriesTotal != null && seriesTotal > 0 && seriesTotal <= 1_000) {
             proposals.add(proposal("seriesTotal",
@@ -231,8 +279,11 @@ public class MetadataProposalBuilder {
         }
         String value = reported.strip();
         try {
-            LocalDate date = value.matches("\\d{4}") ? LocalDate.of(Integer.parseInt(value), 1, 1) : LocalDate.parse(value);
-            if (date.getYear() < EARLIEST_YEAR || date.getYear() > LocalDate.now().getYear() + 1) {
+            LocalDate date = value.matches("\\d{4}")
+                    ? LocalDate.of(Integer.parseInt(value), Month.JANUARY, 1)
+                    : LocalDate.parse(value);
+            if (date.getYear() < EARLIEST_YEAR
+                    || date.getYear() > Year.now(ZoneId.systemDefault()).getValue() + 1) {
                 log.debug("Discarding out-of-range published date '{}' from the agent", reported);
                 return null;
             }

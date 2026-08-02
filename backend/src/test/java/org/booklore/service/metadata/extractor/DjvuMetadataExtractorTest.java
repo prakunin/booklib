@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.io.OutputStream;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Map;
 
@@ -66,7 +67,7 @@ class DjvuMetadataExtractorTest {
             probeReturns(Map.of("Year", "1972"));
 
             assertThat(extractor.extractMetadata(file).getPublishedDate())
-                    .isEqualTo(LocalDate.of(1972, 1, 1));
+                    .isEqualTo(LocalDate.of(1972, Month.JANUARY, 1));
         }
 
         @Test
@@ -74,7 +75,7 @@ class DjvuMetadataExtractorTest {
             probeReturns(Map.of("Date", "1972-10-15"));
 
             assertThat(extractor.extractMetadata(file).getPublishedDate())
-                    .isEqualTo(LocalDate.of(1972, 10, 15));
+                    .isEqualTo(LocalDate.of(1972, Month.OCTOBER, 15));
         }
 
         @Test

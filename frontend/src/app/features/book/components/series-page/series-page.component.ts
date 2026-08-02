@@ -386,15 +386,15 @@ export class SeriesPageComponent implements AfterViewChecked {
         return;
       }
 
-      this.metadataMenuItems.set(this.bookMenuService.getMetadataMenuItems(
-        () => this.autoFetchMetadata(),
-        () => this.fetchMetadata(),
-        () => this.bulkEditMetadata(),
-        () => this.multiBookEditMetadata(),
-        () => this.regenerateCoversForSelected(),
-        () => this.generateCustomCoversForSelected(),
+      this.metadataMenuItems.set(this.bookMenuService.getMetadataMenuItems({
+        autoFetchMetadata: () => this.autoFetchMetadata(),
+        fetchMetadata: () => this.fetchMetadata(),
+        bulkEditMetadata: () => this.bulkEditMetadata(),
+        multiBookEditMetadata: () => this.multiBookEditMetadata(),
+        regenerateCovers: () => this.regenerateCoversForSelected(),
+        generateCustomCovers: () => this.generateCustomCoversForSelected(),
         user
-      ));
+      }));
       this.moreActionsMenuItems.set(this.bookMenuService.getMoreActionsMenu(this.selectedBooks(), user));
     });
 

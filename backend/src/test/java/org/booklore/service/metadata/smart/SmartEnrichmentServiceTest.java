@@ -28,8 +28,6 @@ import static org.mockito.Mockito.when;
 
 class SmartEnrichmentServiceTest {
 
-    private static final String GOODREADS_URL = "https://www.goodreads.com/book/show/104595.Montaigne_s_Travel_Journal";
-
     private final BookRepository bookRepository = mock(BookRepository.class);
     private final BookMapper bookMapper = mock(BookMapper.class);
     private final WorkIdentityResolver resolver = mock(WorkIdentityResolver.class);

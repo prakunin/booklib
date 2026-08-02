@@ -98,7 +98,8 @@ public class BookUtils {
                     body.append(' ');
                     retainedBytes++;
                 }
-                for (int offset = 0; offset < block.length();) {
+                int offset = 0;
+                while (offset < block.length()) {
                     int codePoint = block.codePointAt(offset);
                     int codePointBytes = utf8Length(codePoint);
                     if (retainedBytes + codePointBytes > DOCUMENT_SEARCH_TEXT_MAX_UTF8_BYTES) {

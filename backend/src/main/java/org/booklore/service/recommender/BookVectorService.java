@@ -110,9 +110,13 @@ public class BookVectorService {
         }
 
         String text = textFields.isEmpty()
-                ? ("none".equals(title) ? "Book metadata is unavailable" : title)
+                ? fallbackSemanticText(title)
                 : String.join("\n", textFields);
         return DOCUMENT_PROMPT.formatted(title, text);
+    }
+
+    private String fallbackSemanticText(String title) {
+        return "none".equals(title) ? "Book metadata is unavailable" : title;
     }
 
     private <T> String joinedNames(Collection<T> values, java.util.function.Function<T, String> nameExtractor) {

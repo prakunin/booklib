@@ -36,6 +36,7 @@ public class AppAuthorService {
     private static final int DEFAULT_PAGE_SIZE = 30;
     private static final int MAX_PAGE_SIZE = 50;
     private static final String PARAM_USER_ID = "userId";
+    private static final String PARAM_LIBRARY_IDS = "libraryIds";
     private static final String PHOTO_IDS_PARAM = ":photoIds";
     private static final String COL_A_NAME = "a.name";
     private static final String BOOK_COUNT_EXPR = "COUNT(DISTINCT b.id)";
@@ -168,7 +169,7 @@ public class AppAuthorService {
         if (libraryId != null) {
             sql.append(" AND b.library_id = :libraryId");
         } else if (accessibleLibraryIds != null) {
-            sql.append(" AND b.library_id IN (:libraryIds)");
+            sql.append(" AND b.library_id IN (:" + PARAM_LIBRARY_IDS + ")");
         }
     }
 
@@ -176,7 +177,7 @@ public class AppAuthorService {
         if (libraryId != null) {
             query.setParameter("libraryId", libraryId);
         } else if (accessibleLibraryIds != null) {
-            query.setParameter("libraryIds", accessibleLibraryIds);
+            query.setParameter(PARAM_LIBRARY_IDS, accessibleLibraryIds);
         }
     }
 
@@ -216,12 +217,12 @@ public class AppAuthorService {
                         + " WHERE a.id = :authorId AND (b.deleted IS NULL OR b.deleted = false)"
                         + " AND (b.hasFiles = true OR b.isPhysical = true)");
         if (accessibleLibraryIds != null) {
-            jpql.append(" AND b.library.id IN :libraryIds");
+            jpql.append(" AND b.library.id IN :" + PARAM_LIBRARY_IDS);
         }
         TypedQuery<Long> query = entityManager.createQuery(jpql.toString(), Long.class);
         query.setParameter("authorId", authorId);
         if (accessibleLibraryIds != null) {
-            query.setParameter("libraryIds", accessibleLibraryIds);
+            query.setParameter(PARAM_LIBRARY_IDS, accessibleLibraryIds);
         }
         return query.getSingleResult().intValue();
     }
@@ -341,7 +342,7 @@ public class AppAuthorService {
         if (libraryId != null) {
             whereClause.append(" AND b.library.id = :libraryId");
         } else if (accessibleLibraryIds != null) {
-            whereClause.append(" AND b.library.id IN :libraryIds");
+            whereClause.append(" AND b.library.id IN :" + PARAM_LIBRARY_IDS);
         }
     }
 
@@ -402,7 +403,7 @@ public class AppAuthorService {
         if (libraryId != null) {
             query.setParameter("libraryId", libraryId);
         } else if (accessibleLibraryIds != null) {
-            query.setParameter("libraryIds", accessibleLibraryIds);
+            query.setParameter(PARAM_LIBRARY_IDS, accessibleLibraryIds);
         }
     }
 

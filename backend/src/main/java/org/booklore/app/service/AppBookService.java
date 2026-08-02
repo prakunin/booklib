@@ -89,6 +89,7 @@ public class AppBookService {
     private static final String ATTR_READ_STATUS = "readStatus";
     private static final String ATTR_PERSONAL_RATING = "personalRating";
     private static final String ATTR_ADDED_ON = "addedOn";
+    private static final String ATTR_PAGE_COUNT = "pageCount";
 
     private static final String STAT_TOTAL_BOOKS = "TOTAL_BOOKS";
     private static final String STAT_TOTAL_SIZE_KB = "TOTAL_SIZE_KB";
@@ -582,7 +583,7 @@ public class AppBookService {
         Join<Object, Object> metadata = root.join(ATTR_METADATA);
         Join<Object, Object> author = metadata.join(F_AUTHORS);
         var bookCount = cb.countDistinct(root.get("id"));
-        var totalPages = cb.sumAsLong(metadata.<Integer>get("pageCount"));
+        var totalPages = cb.sumAsLong(metadata.<Integer>get(ATTR_PAGE_COUNT));
         query.multiselect(author.get("id"), bookCount, totalPages);
         query.where(spec.toPredicate(root, query, cb));
         query.groupBy(author.get("id"));
@@ -770,7 +771,7 @@ public class AppBookService {
         Join<BookEntity, UserBookProgressEntity> progress = joinUserProgress(root, cb, userId);
         var authorName = author.<String>get("name");
         var bookCount = cb.countDistinct(root.get("id"));
-        var totalPages = cb.sumAsLong(metadata.<Integer>get("pageCount"));
+        var totalPages = cb.sumAsLong(metadata.<Integer>get(ATTR_PAGE_COUNT));
         var averageRating = cb.avg(progress.<Integer>get(ATTR_PERSONAL_RATING));
         var readCount = cb.sum(cb.<Long>selectCase()
                 .when(cb.equal(progress.get(ATTR_READ_STATUS), ReadStatus.READ), 1L)
@@ -844,7 +845,7 @@ public class AppBookService {
         Root<BookEntity> root = query.from(BookEntity.class);
         Join<Object, Object> metadata = root.join(ATTR_METADATA);
         Join<BookEntity, UserBookProgressEntity> progress = joinUserProgress(root, cb, userId);
-        var pages = metadata.<Integer>get("pageCount");
+        var pages = metadata.<Integer>get(ATTR_PAGE_COUNT);
         var rating = progress.<Integer>get(ATTR_PERSONAL_RATING);
         var status = progress.<ReadStatus>get(ATTR_READ_STATUS);
         query.multiselect(pages, rating, status, cb.countDistinct(root.get("id")));

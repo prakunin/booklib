@@ -276,6 +276,42 @@ describe('TaskManagementComponent', () => {
     expect(component.overviewLoading()).toBe(false);
   });
 
+  it('parses spaced progress counts without backtracking', () => {
+    component.ngOnInit();
+    loadTaskHistory({
+      ...pendingHistory,
+      message: 'Processed 12345   /   67890 books',
+    });
+
+    expect(component.getActiveTaskProcessedCounts(component.taskOverview().activeTasks[0])).toEqual({
+      processed: '12,345',
+      total: '67,890',
+    });
+  });
+
+  it('skips slashes in the message prefix before progress counts', () => {
+    component.ngOnInit();
+    loadTaskHistory({
+      ...pendingHistory,
+      message: 'Rescan cancelled for library: Sci-Fi / Fantasy (3/10 books processed)',
+    });
+
+    expect(component.getActiveTaskProcessedCounts(component.taskOverview().activeTasks[0])).toEqual({
+      processed: '3',
+      total: '10',
+    });
+  });
+
+  it('rejects task progress messages without numeric counts around the separator', () => {
+    component.ngOnInit();
+    loadTaskHistory({
+      ...pendingHistory,
+      message: 'Processed books / total books',
+    });
+
+    expect(component.getActiveTaskProcessedCounts(component.taskOverview().activeTasks[0])).toBeNull();
+  });
+
   it('polls persisted progress while an administrator task is active', () => {
     component.ngOnInit();
     const overviewCallsBeforePolling = taskService.getTaskOverview.mock.calls.length;

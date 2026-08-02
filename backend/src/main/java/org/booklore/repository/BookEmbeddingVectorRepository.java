@@ -21,6 +21,10 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class BookEmbeddingVectorRepository {
 
+    private static final String BOOK_ID_COLUMN = "book_id";
+    private static final String SCORE_COLUMN = "score";
+    private static final String SERIES_NAME_COLUMN = "series_name";
+
     public static final String MODEL_VERSION = "feature-hash-v1";
 
     private static final String FIND_NEAREST_FEATURE_SQL = """
@@ -95,9 +99,9 @@ public class BookEmbeddingVectorRepository {
             return jdbcTemplate.query(
                     FIND_NEAREST_SEMANTIC_SQL,
                     (resultSet, rowNumber) -> new BookEmbeddingCandidate(
-                            resultSet.getLong("book_id"),
-                            resultSet.getDouble("score"),
-                            resultSet.getString("series_name")),
+                            resultSet.getLong(BOOK_ID_COLUMN),
+                            resultSet.getDouble(SCORE_COLUMN),
+                            resultSet.getString(SERIES_NAME_COLUMN)),
                     targetVectorJson,
                     semanticModelVersion,
                     excludedBookId,
@@ -107,9 +111,9 @@ public class BookEmbeddingVectorRepository {
         return jdbcTemplate.query(
                 FIND_NEAREST_FEATURE_SQL,
                 (resultSet, rowNumber) -> new BookEmbeddingCandidate(
-                        resultSet.getLong("book_id"),
-                        resultSet.getDouble("score"),
-                        resultSet.getString("series_name")),
+                        resultSet.getLong(BOOK_ID_COLUMN),
+                        resultSet.getDouble(SCORE_COLUMN),
+                        resultSet.getString(SERIES_NAME_COLUMN)),
                 targetVectorJson,
                 excludedBookId,
                 targetVectorJson,
@@ -126,9 +130,9 @@ public class BookEmbeddingVectorRepository {
         return jdbcTemplate.query(
                 FIND_NEAREST_BY_VECTOR_SQL,
                 (resultSet, rowNumber) -> new BookEmbeddingCandidate(
-                        resultSet.getLong("book_id"),
-                        resultSet.getDouble("score"),
-                        resultSet.getString("series_name")),
+                        resultSet.getLong(BOOK_ID_COLUMN),
+                        resultSet.getDouble(SCORE_COLUMN),
+                        resultSet.getString(SERIES_NAME_COLUMN)),
                 queryVectorJson,
                 semanticModelVersion,
                 queryVectorJson,
@@ -184,7 +188,7 @@ public class BookEmbeddingVectorRepository {
                         """,
                 Map.of("bookIds", bookIds, "modelVersion", modelVersion),
                 (RowCallbackHandler) resultSet -> fingerprints.put(
-                        resultSet.getLong("book_id"),
+                        resultSet.getLong(BOOK_ID_COLUMN),
                         resultSet.getString("content_hash")));
         return fingerprints;
     }

@@ -172,14 +172,14 @@ public class DocumentRenditionService {
 
         StringBuilder manifest = new StringBuilder();
         StringBuilder spine = new StringBuilder();
-        manifest.append("    <item id=\"nav\" href=\"%s\" media-type=\"%s\" properties=\"nav\"/>\n"
-                .formatted(NAV_HREF, XHTML_MEDIA_TYPE));
-        manifest.append("    <item id=\"document-css\" href=\"%s\" media-type=\"text/css\"/>\n"
-                .formatted(STYLESHEET_HREF));
+        manifest.append("    <item id=\"nav\" href=\"%s\" media-type=\"%s\" properties=\"nav\"/>"
+                .formatted(NAV_HREF, XHTML_MEDIA_TYPE)).append('\n');
+        manifest.append("    <item id=\"document-css\" href=\"%s\" media-type=\"text/css\"/>"
+                .formatted(STYLESHEET_HREF)).append('\n');
         for (Chunk chunk : chunks) {
-            manifest.append("    <item id=\"%s\" href=\"%s\" media-type=\"%s\"/>\n"
-                    .formatted(chunk.id(), chunk.href(), XHTML_MEDIA_TYPE));
-            spine.append("    <itemref idref=\"%s\"/>\n".formatted(chunk.id()));
+            manifest.append("    <item id=\"%s\" href=\"%s\" media-type=\"%s\"/>"
+                    .formatted(chunk.id(), chunk.href(), XHTML_MEDIA_TYPE)).append('\n');
+            spine.append("    <itemref idref=\"%s\"/>".formatted(chunk.id())).append('\n');
         }
 
         return """
