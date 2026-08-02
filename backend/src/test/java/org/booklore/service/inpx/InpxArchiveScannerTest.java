@@ -46,6 +46,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class InpxArchiveScannerTest {
 
+    private static final Path RAR5_FIXTURE = Path.of("src/test/resources/cbx/test-rar5.cbr");
+
     @Mock
     private BookFileRepository bookFileRepository;
     @Mock
@@ -344,6 +346,34 @@ class InpxArchiveScannerTest {
             assertThat(NestedArchiveLocator.decode(book.getSourceArchiveEntry()))
                     .containsExactly("nested.7z", "folder/book.pdf");
         });
+    }
+
+    @Test
+    @EnabledIf("org.booklore.service.ArchiveService#isAvailable")
+    void discoversLeavesInsideNestedRar(@TempDir Path root) throws IOException {
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(root.resolve("outer.zip")))) {
+            putEntry(output, "nested.rar", Files.readAllBytes(RAR5_FIXTURE));
+        }
+        when(bookFileRepository.countArchiveEntriesByLibraryId(7L)).thenReturn(List.of());
+        ArchiveEntryMetadataRecognizer recognizer = new ArchiveEntryMetadataRecognizer(
+                metadataExtractorFactory, docMetadataExtractor, new InpxFilenameMetadataParser());
+        InpxArchiveScanner nativeScanner = new InpxArchiveScanner(bookFileRepository, fb2MetadataExtractor,
+                recognizer, new ArchiveService(), Runnable::run);
+
+        InpxArchiveScanner.Discovery discovery = nativeScanner.discover(7L, root.toString());
+        List<InpxBookDto> books = new ArrayList<>();
+        nativeScanner.forEach(discovery, books::add, () -> false);
+
+        assertThat(discovery.candidates()).singleElement()
+                .satisfies(candidate -> assertThat(candidate.hasNestedContainers()).isTrue());
+        assertThat(discovery.totalEntries()).isEqualTo(4);
+        assertThat(books).extracting(InpxBookDto::getArchiveName).containsOnly("outer.zip");
+        assertThat(books).extracting(book -> NestedArchiveLocator.decode(book.getSourceArchiveEntry()))
+                .containsExactlyInAnyOrder(
+                        List.of("nested.rar", "ComicInfo.xml"),
+                        List.of("nested.rar", "page_001.jpg"),
+                        List.of("nested.rar", "page_002.jpg"),
+                        List.of("nested.rar", "page_003.jpg"));
     }
 
     private InpxBookDto byExtension(List<InpxBookDto> books, String extension) {
