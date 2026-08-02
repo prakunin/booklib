@@ -13,6 +13,7 @@ import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.booklore.model.document.DocumentBlock;
 import org.booklore.model.document.DocumentContent;
 import org.booklore.model.document.DocumentParseResult;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -65,6 +66,7 @@ public class DocumentContentExtractor {
     private final long maxDocxExpandedBytes;
     private final long maxTextBytes;
 
+    @Autowired
     public DocumentContentExtractor() {
         this(new ThreadPoolExecutor(
                         PARSER_THREADS,
@@ -109,7 +111,7 @@ public class DocumentContentExtractor {
                 started.countDown();
                 return extractBounded(file);
             });
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             log.warn("Document parser capacity exhausted for {}", file.getName());
             return DocumentParseResult.indeterminate();
         }
@@ -122,10 +124,10 @@ public class DocumentContentExtractor {
                 return DocumentParseResult.indeterminate();
             }
             return DocumentParseResult.readable(future.get(parseTimeout.toMillis(), TimeUnit.MILLISECONDS));
-        } catch (TimeoutException e) {
+        } catch (TimeoutException _) {
             cancelAndPurge(future);
             log.warn("Document parse timed out after {} seconds for {}", parseTimeout.toSeconds(), file.getName());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             cancelAndPurge(future);
             Thread.currentThread().interrupt();
             log.warn("Document parse interrupted for {}", file.getName());
@@ -216,7 +218,7 @@ public class DocumentContentExtractor {
         try {
             var description = doc.getStyleSheet().getStyleDescription(paragraph.getStyleIndex());
             return description == null ? null : description.getName();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             // A malformed stylesheet costs the heading hierarchy, not the text.
             return null;
         }

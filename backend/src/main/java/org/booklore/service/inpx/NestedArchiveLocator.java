@@ -13,6 +13,7 @@ final class NestedArchiveLocator {
     static final int MAX_CHAIN_ENTRIES = 6;
     private static final String PREFIX = "nested:v1:";
     private static final String DIRECT_PREFIX = "direct:v1:";
+    private static final String UNSAFE_PATH = "Unsafe archived book path";
 
     private NestedArchiveLocator() {
     }
@@ -47,41 +48,49 @@ final class NestedArchiveLocator {
 
     static List<String> decode(String locator) {
         if (locator == null || locator.isBlank() || locator.length() > MAX_LENGTH) {
-            throw ApiError.FILE_NOT_FOUND.createException("Unsafe archived book path");
+            throw unsafePath();
         }
         if (!locator.startsWith(PREFIX)) {
-            if (locator.startsWith(DIRECT_PREFIX)) {
-                try {
-                    String entry = decodeSegment(locator.substring(DIRECT_PREFIX.length()));
-                    if (invalidEntry(entry)) {
-                        throw new IllegalArgumentException("Invalid archive entry");
-                    }
-                    return List.of(entry);
-                } catch (IllegalArgumentException e) {
-                    throw ApiError.FILE_NOT_FOUND.createException("Unsafe archived book path");
-                }
-            }
-            if (invalidEntry(locator)) {
-                throw ApiError.FILE_NOT_FOUND.createException("Unsafe archived book path");
-            }
-            return List.of(locator);
+            return decodeDirect(locator);
         }
         try {
-            List<String> entries = new ArrayList<>();
-            for (String segment : locator.substring(PREFIX.length()).split("\\.", -1)) {
-                String entry = decodeSegment(segment);
-                if (invalidEntry(entry)) {
-                    throw new IllegalArgumentException("Invalid archive entry");
-                }
-                entries.add(entry);
-            }
-            if (entries.size() < 2 || entries.size() > MAX_CHAIN_ENTRIES) {
-                throw new IllegalArgumentException("Nested locator requires at least two entries");
-            }
-            return List.copyOf(entries);
-        } catch (IllegalArgumentException e) {
-            throw ApiError.FILE_NOT_FOUND.createException("Unsafe archived book path");
+            return decodeNested(locator);
+        } catch (IllegalArgumentException _) {
+            throw unsafePath();
         }
+    }
+
+    private static List<String> decodeDirect(String locator) {
+        try {
+            String entry = locator.startsWith(DIRECT_PREFIX)
+                    ? decodeSegment(locator.substring(DIRECT_PREFIX.length()))
+                    : locator;
+            if (invalidEntry(entry)) {
+                throw new IllegalArgumentException("Invalid archive entry");
+            }
+            return List.of(entry);
+        } catch (IllegalArgumentException _) {
+            throw unsafePath();
+        }
+    }
+
+    private static List<String> decodeNested(String locator) {
+        List<String> entries = new ArrayList<>();
+        for (String segment : locator.substring(PREFIX.length()).split("\\.", -1)) {
+            String entry = decodeSegment(segment);
+            if (invalidEntry(entry)) {
+                throw new IllegalArgumentException("Invalid archive entry");
+            }
+            entries.add(entry);
+        }
+        if (entries.size() < 2 || entries.size() > MAX_CHAIN_ENTRIES) {
+            throw new IllegalArgumentException("Nested locator requires at least two entries");
+        }
+        return List.copyOf(entries);
+    }
+
+    private static RuntimeException unsafePath() {
+        return ApiError.FILE_NOT_FOUND.createException(UNSAFE_PATH);
     }
 
     static boolean isNested(String locator) {

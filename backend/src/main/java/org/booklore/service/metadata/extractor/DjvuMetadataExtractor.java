@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
@@ -43,7 +44,6 @@ public class DjvuMetadataExtractor implements FileMetadataExtractor {
      */
     private static final int COVER_MAX_EDGE_PIXELS = 1200;
 
-    private static final Pattern MULTI_AUTHOR_SEPARATOR = Pattern.compile("\\s*;\\s*");
     private static final Pattern YEAR_ONLY = Pattern.compile("\\d{4}");
 
     private final DjvuToolRunner toolRunner;
@@ -109,7 +109,7 @@ public class DjvuMetadataExtractor implements FileMetadataExtractor {
         if (author == null) {
             return List.of();
         }
-        return Arrays.stream(MULTI_AUTHOR_SEPARATOR.split(author))
+        return Arrays.stream(author.split(";"))
                 .map(String::strip)
                 .filter(StringUtils::isNotBlank)
                 .toList();
@@ -129,7 +129,7 @@ public class DjvuMetadataExtractor implements FileMetadataExtractor {
             return LocalDate.parse(raw);
         } catch (DateTimeParseException _) {
             var year = YEAR_ONLY.matcher(raw);
-            return year.find() ? LocalDate.of(Integer.parseInt(year.group()), 1, 1) : null;
+            return year.find() ? LocalDate.of(Integer.parseInt(year.group()), Month.JANUARY, 1) : null;
         }
     }
 }

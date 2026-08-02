@@ -509,7 +509,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(languages);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, cb, cleaned, mode, "language");
+            return buildMetadataFieldSpec(root, cleaned, mode, "language");
         };
     }
 
@@ -525,7 +525,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(seriesNames);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, cb, cleaned, mode, "seriesName");
+            return buildMetadataFieldSpec(root, cleaned, mode, "seriesName");
         };
     }
 
@@ -558,7 +558,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(publishers);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, cb, cleaned, mode, "publisher");
+            return buildMetadataFieldSpec(root, cleaned, mode, "publisher");
         };
     }
 
@@ -608,7 +608,7 @@ public class BookSpecifications {
             List<String> cleaned = cleanLowerCase(narrators);
             if (cleaned.isEmpty()) return cb.conjunction();
 
-            return buildMetadataFieldSpec(root, cb, cleaned, mode, "narrator");
+            return buildMetadataFieldSpec(root, cleaned, mode, "narrator");
         };
     }
 
@@ -653,7 +653,7 @@ public class BookSpecifications {
         return (root, query, cb) -> {
             List<String> cleaned = cleanLowerCase(values);
             if (cleaned.isEmpty()) return cb.conjunction();
-            return buildMetadataFieldSpec(root, cb, cleaned, mode, "contentRating");
+            return buildMetadataFieldSpec(root, cleaned, mode, "contentRating");
         };
     }
 
@@ -976,8 +976,7 @@ public class BookSpecifications {
      * NOT = metadata field NOT IN (values)
      */
     private static Predicate buildMetadataFieldSpec(
-            Root<BookEntity> root, CriteriaBuilder cb,
-            List<String> values, String mode, String fieldName) {
+            Root<BookEntity> root, List<String> values, String mode, String fieldName) {
 
         Join<BookEntity, BookMetadataEntity> metadataJoin = getOrCreateJoin(root, ATTR_METADATA, JoinType.INNER);
         // These columns use MariaDB's case-insensitive utf8mb4_unicode_ci collation. Applying

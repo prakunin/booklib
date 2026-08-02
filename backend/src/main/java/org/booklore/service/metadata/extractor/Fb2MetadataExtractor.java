@@ -285,36 +285,45 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
      */
     public Optional<String> extractOpeningText(File file, int maxChars) {
         try (InputStream inputStream = getInputStream(file)) {
-            StringBuilder text = new StringBuilder(Math.min(maxChars, 8192));
             XMLStreamReader reader = createXmlStreamReader(inputStream);
             try {
-                boolean inBody = false;
-                while (reader.hasNext() && text.length() < maxChars) {
-                    int event = reader.next();
-                    if (event == XMLStreamConstants.START_ELEMENT && "body".equals(reader.getLocalName())) {
-                        inBody = true;
-                    } else if (event == XMLStreamConstants.START_ELEMENT && inBody
-                            && "p".equals(reader.getLocalName())) {
-                        String paragraph = readElementText(reader).trim();
-                        if (!paragraph.isEmpty()) {
-                            if (text.length() > 0) {
-                                text.append('\n');
-                            }
-                            text.append(paragraph);
-                        }
-                    }
-                }
+                return openingBody(reader, maxChars);
             } finally {
                 reader.close();
             }
-            if (text.isEmpty()) {
-                return Optional.empty();
-            }
-            return Optional.of(text.length() > maxChars ? text.substring(0, maxChars) : text.toString());
         } catch (Exception e) {
             log.warn("Failed to extract opening text from FB2: {}", file.getName(), e);
             return Optional.empty();
         }
+    }
+
+    private Optional<String> openingBody(XMLStreamReader reader, int maxChars) throws XMLStreamException {
+        StringBuilder text = new StringBuilder(Math.min(maxChars, 8192));
+        boolean inBody = false;
+        while (reader.hasNext() && text.length() < maxChars) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT && "body".equals(reader.getLocalName())) {
+                inBody = true;
+            } else if (event == XMLStreamConstants.START_ELEMENT && inBody
+                    && "p".equals(reader.getLocalName())) {
+                appendParagraph(text, readElementText(reader));
+            }
+        }
+        if (text.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(text.length() > maxChars ? text.substring(0, maxChars) : text.toString());
+    }
+
+    private void appendParagraph(StringBuilder text, String value) {
+        String paragraph = value.trim();
+        if (paragraph.isEmpty()) {
+            return;
+        }
+        if (!text.isEmpty()) {
+            text.append('\n');
+        }
+        text.append(paragraph);
     }
 
     /**
@@ -392,7 +401,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
 
     private boolean looksLikePersonName(String value) {
         return value.length() <= 100
-                && value.matches("^[\\p{L}][\\p{L} .'-]*$")
+                && value.matches("(?U)^[\\p{L}][\\p{L} .'-]*$")
                 && value.chars().filter(Character::isLetter).count() >= 4;
     }
 
@@ -404,7 +413,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     }
 
     private String normalizeParagraph(String value) {
-        return value.replaceFirst("(?i)^.*?оригинальное\\s+название\\s*:\\s*", "")
+        return value.replaceFirst("(?iu)^.*?оригинальное\\s+название\\s*:\\s*", "")
                 .replaceAll("\\s+", " ").trim();
     }
 

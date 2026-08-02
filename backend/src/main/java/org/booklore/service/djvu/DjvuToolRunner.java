@@ -49,7 +49,7 @@ public class DjvuToolRunner {
     private static final Pattern META_LINE = Pattern.compile("^(\\S+)\\s+\"(.*)\"\\s*$");
     /** {@code (word 10 100 60 140 "Hello")} - a leaf zone of the hidden text tree. */
     private static final Pattern WORD_ZONE = Pattern.compile(
-            "\\(word\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\"((?:[^\"\\\\]|\\\\.)*)\"\\s*\\)");
+            "\\(word\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\"((?:[^\"\\\\]++|\\\\.)*+)\"\\s*+\\)");
     /** "DJVUSED --- DjVuLibre-3.5.28" is the whole banner these tools print. */
     private static final Pattern VERSION_BANNER = Pattern.compile("(DjVuLibre-[\\d.]+)");
 

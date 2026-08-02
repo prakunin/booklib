@@ -587,15 +587,43 @@ export class TaskManagementComponent implements OnInit {
     if (history?.id !== task.taskId || !history.message) {
       return null;
     }
-    const match = history.message.match(/(\d+)\s*\/\s*(\d+)/);
-    if (!match) {
+    const counts = this.findProgressCounts(history.message);
+    if (!counts) {
       return null;
     }
+    const [processed, total] = counts;
     const formatter = new Intl.NumberFormat();
     return {
-      processed: formatter.format(Number(match[1])),
-      total: formatter.format(Number(match[2]))
+      processed: formatter.format(Number(processed)),
+      total: formatter.format(Number(total))
     };
+  }
+
+  private findProgressCounts(message: string): [string, string] | null {
+    for (let start = 0; start < message.length; start++) {
+      if (!this.isAsciiDigit(message.charAt(start))) continue;
+      let separator = start;
+      while (this.isAsciiDigit(message.charAt(separator))) separator++;
+      const processed = message.slice(start, separator);
+      while (this.isWhitespace(message.charAt(separator))) separator++;
+      if (message.charAt(separator) !== '/') continue;
+      let totalStart = separator + 1;
+      while (this.isWhitespace(message.charAt(totalStart))) totalStart++;
+      let totalEnd = totalStart;
+      while (this.isAsciiDigit(message.charAt(totalEnd))) totalEnd++;
+      if (totalEnd > totalStart) {
+        return [processed, message.slice(totalStart, totalEnd)];
+      }
+    }
+    return null;
+  }
+
+  private isAsciiDigit(value: string): boolean {
+    return value >= '0' && value <= '9';
+  }
+
+  private isWhitespace(value: string): boolean {
+    return value.length > 0 && value.trim().length === 0;
   }
 
   getTaskProgressPercentage(taskType: string): number | null {

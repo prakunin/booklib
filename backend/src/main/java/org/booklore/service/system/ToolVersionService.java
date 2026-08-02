@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 
 /**
  * Tool versions are only obtainable by running the binaries. They are baked into the image and
@@ -42,9 +41,6 @@ public class ToolVersionService {
      * inside the image already has code execution and gains nothing from this tab that they don't
      * already have.
      */
-    private static final Pattern PLAUSIBLE_VERSION = Pattern.compile(
-            "^[A-Za-z0-9][A-Za-z0-9 ._+/(),-]*\\d+\\.\\d+[A-Za-z0-9 ._+/(),-]*$");
-
     private final FileService fileService;
     private final ProcessRunner processRunner;
     private final DjvuToolRunner djvuToolRunner;
@@ -107,11 +103,40 @@ public class ToolVersionService {
         if (trimmed.isEmpty() || trimmed.length() > MAX_VERSION_LENGTH) {
             return null;
         }
-        if (!PLAUSIBLE_VERSION.matcher(trimmed).matches()) {
+        if (!hasPlausibleVersionCharacters(trimmed) || !hasDottedVersionNumber(trimmed)) {
             log.warn("Discarding tool output that does not look like a version line ({} chars)", trimmed.length());
             return null;
         }
         return trimmed;
+    }
+
+    private boolean hasPlausibleVersionCharacters(String value) {
+        if (!isAsciiLetterOrDigit(value.charAt(0))) {
+            return false;
+        }
+        return value.chars().allMatch(character -> isAsciiLetterOrDigit((char) character)
+                || " ._+/(),-".indexOf(character) >= 0);
+    }
+
+    private boolean hasDottedVersionNumber(String value) {
+        for (int index = 1; index < value.length() - 1; index++) {
+            if (value.charAt(index) == '.'
+                    && isAsciiDigit(value.charAt(index - 1))
+                    && isAsciiDigit(value.charAt(index + 1))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isAsciiLetterOrDigit(char value) {
+        return value >= 'a' && value <= 'z'
+                || value >= 'A' && value <= 'Z'
+                || isAsciiDigit(value);
+    }
+
+    private boolean isAsciiDigit(char value) {
+        return value >= '0' && value <= '9';
     }
 
     private record ProbeOutcome(Optional<String> value, boolean permanent) {

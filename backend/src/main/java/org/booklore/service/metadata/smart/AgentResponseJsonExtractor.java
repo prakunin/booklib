@@ -34,37 +34,42 @@ public final class AgentResponseJsonExtractor {
      * quote inside one, would otherwise end the object early or never.
      */
     private static Optional<String> readBalancedObject(String text, int start) {
-        int depth = 0;
-        boolean inString = false;
-        boolean escaped = false;
+        JsonBalance balance = new JsonBalance();
         for (int i = start; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (inString) {
-                if (c == '\\') {
-                    escaped = true;
-                } else if (c == '"') {
-                    inString = false;
-                }
-                continue;
-            }
-            switch (c) {
-                case '"' -> inString = true;
-                case '{' -> depth++;
-                case '}' -> {
-                    depth--;
-                    if (depth == 0) {
-                        return Optional.of(text.substring(start, i + 1));
-                    }
-                }
-                default -> {
-                    // Nothing outside strings and braces affects balance.
-                }
+            if (balance.accept(text.charAt(i))) {
+                return Optional.of(text.substring(start, i + 1));
             }
         }
         return Optional.empty();
+    }
+
+    private static final class JsonBalance {
+        private int depth;
+        private boolean inString;
+        private boolean escaped;
+
+        private boolean accept(char character) {
+            if (escaped) {
+                escaped = false;
+            } else if (inString) {
+                acceptStringCharacter(character);
+            } else if (character == '"') {
+                inString = true;
+            } else if (character == '{') {
+                depth++;
+            } else if (character == '}') {
+                depth--;
+                return depth == 0;
+            }
+            return false;
+        }
+
+        private void acceptStringCharacter(char character) {
+            if (character == '\\') {
+                escaped = true;
+            } else if (character == '"') {
+                inString = false;
+            }
+        }
     }
 }

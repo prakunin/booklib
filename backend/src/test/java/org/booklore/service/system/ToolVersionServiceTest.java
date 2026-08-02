@@ -97,6 +97,16 @@ class ToolVersionServiceTest {
         }
 
         @Test
+        void reportsNullForNonAsciiBannerText() {
+            when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
+            when(fileService.findSystemFile("kepubify")).thenReturn(null);
+            when(processRunner.firstLine(Path.of("/usr/local/bin/ffprobe"), "-version"))
+                    .thenReturn(Optional.of("версия 8.1.2"));
+
+            assertThat(service.toolsInfo().getFfprobeVersion()).isNull();
+        }
+
+        @Test
         void reportsNullInsteadOfAnOverlyLongLine() {
             when(fileService.findSystemFile("ffprobe")).thenReturn(Path.of("/usr/local/bin/ffprobe"));
             when(fileService.findSystemFile("kepubify")).thenReturn(null);

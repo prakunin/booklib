@@ -33,6 +33,8 @@ describe('FootnotePopupComponent', () => {
   it('renders the note content when visible', () => {
     render(true);
 
+    expect(fixture.nativeElement.querySelector('.footnote-popup').tagName).toBe('DIALOG');
+    expect(fixture.nativeElement.querySelector('.footnote-backdrop').tagName).toBe('BUTTON');
     const body = fixture.nativeElement.querySelector('.footnote-body');
     expect(body.textContent).toContain('Note text');
   });

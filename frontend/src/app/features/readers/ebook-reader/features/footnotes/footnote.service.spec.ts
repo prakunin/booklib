@@ -55,6 +55,12 @@ describe('ReaderFootnoteService', () => {
       expect(service.isFootnote(makeAnchor('noteref'), '#n_3')).toBe(true);
     });
 
+    it('accepts a case-insensitive note token among multiple EPUB types', () => {
+      viewManager.resolveHref.mockReturnValue(null);
+
+      expect(service.isFootnote(makeAnchor('bodymatter ENDNOTE'), '#n_3')).toBe(true);
+    });
+
     it('accepts a target in a linear="no" section', () => {
       viewManager.resolveHref.mockReturnValue({index: 13, anchor: () => null});
       viewManager.getSection.mockReturnValue({linear: 'no'});

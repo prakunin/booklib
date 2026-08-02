@@ -12,6 +12,18 @@ import {APIException} from '../../../shared/models/api-exception.model';
 import {HttpErrorResponse} from '@angular/common/http';
 import {TranslocoService} from '@jsverse/transloco';
 
+export interface MetadataMenuOptions {
+  autoFetchMetadata: () => void;
+  fetchMetadata: () => void;
+  bulkEditMetadata: () => void;
+  multiBookEditMetadata: () => void;
+  regenerateCovers: () => void;
+  generateCustomCovers: () => void;
+  user: User | null;
+  smartEnrich?: () => void;
+  smartEnrichmentAvailable?: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -24,16 +36,18 @@ export class BookMenuService {
   loadingService = inject(LoadingService);
   private readonly t = inject(TranslocoService);
 
-  getMetadataMenuItems(
-    autoFetchMetadata: () => void,
-    fetchMetadata: () => void,
-    bulkEditMetadata: () => void,
-    multiBookEditMetadata: () => void,
-    regenerateCovers: () => void,
-    generateCustomCovers: () => void,
-    user: User | null,
-    smartEnrich?: () => void,
-    smartEnrichmentAvailable = false): MenuItem[] {
+  getMetadataMenuItems(options: MetadataMenuOptions): MenuItem[] {
+    const {
+      autoFetchMetadata,
+      fetchMetadata,
+      bulkEditMetadata,
+      multiBookEditMetadata,
+      regenerateCovers,
+      generateCustomCovers,
+      user,
+      smartEnrich,
+      smartEnrichmentAvailable = false
+    } = options;
 
     const permissions = user?.permissions;
     const items: MenuItem[] = [];

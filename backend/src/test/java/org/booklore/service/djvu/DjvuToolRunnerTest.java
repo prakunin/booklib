@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -147,8 +148,9 @@ class DjvuToolRunnerTest {
         void aTruncatedRenderFailsRatherThanProducingAPartialPage() {
             byte[] truncated = "P6\n4 4\n255\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
             stubRaw(truncated);
+            OutputStream output = OutputStream.nullOutputStream();
 
-            assertThatThrownBy(() -> runner.renderPageAsJpeg(file, 1, 0, OutputStream.nullOutputStream()))
+            assertThatThrownBy(() -> runner.renderPageAsJpeg(file, 1, 0, output))
                     .isInstanceOf(DjvuToolException.class)
                     .hasMessageContaining("Truncated");
         }
@@ -156,8 +158,9 @@ class DjvuToolRunnerTest {
         @Test
         void missingDdjvuFailsBeforeAnythingIsRun() {
             when(fileService.findSystemFile("ddjvu")).thenReturn(null);
+            OutputStream output = OutputStream.nullOutputStream();
 
-            assertThatThrownBy(() -> runner.renderPageAsJpeg(file, 1, 0, OutputStream.nullOutputStream()))
+            assertThatThrownBy(() -> runner.renderPageAsJpeg(file, 1, 0, output))
                     .isInstanceOf(DjvuToolException.class)
                     .hasMessageContaining("ddjvu");
             verify(commandRunner, never()).binary(any(), anyList(), any(), any());
@@ -183,7 +186,7 @@ class DjvuToolRunnerTest {
             runner.version();
             runner.version();
 
-            verify(commandRunner, org.mockito.Mockito.times(1)).firstStderrLine(any(), anyList(), any());
+            verify(commandRunner, times(1)).firstStderrLine(any(), anyList(), any());
         }
 
         @Test

@@ -26,6 +26,7 @@ public class KomgaMapper {
     private final AppSettingService appSettingService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final String UNKNOWN_SERIES = "Unknown Series";
+    private static final String UNKNOWN_PROFILE = "UNKNOWN";
 
     public KomgaLibraryDto toKomgaLibraryDto(LibraryEntity library) {
         return KomgaLibraryDto.builder()
@@ -305,7 +306,7 @@ public class KomgaMapper {
 
     private String getMediaProfile(BookFileType bookType) {
         if (bookType == null) {
-            return "UNKNOWN";
+            return UNKNOWN_PROFILE;
         }
         
         return switch (bookType) {
@@ -318,11 +319,11 @@ public class KomgaMapper {
             case AUDIOBOOK -> "AUDIOBOOK";
             // Not EPUB: the rendition is synthesised for our own reader, while a Komga client
             // receives the Word file itself and could not open it as an EPUB.
-            case DOC -> "UNKNOWN";
+            case DOC -> UNKNOWN_PROFILE;
             // A Komga client receives the source .djvu, which it has no profile for; the PDF
             // rendition exists for our own reader, not for external clients.
-            case DJVU -> "UNKNOWN";
-            case OTHER -> "UNKNOWN";
+            case DJVU -> UNKNOWN_PROFILE;
+            case OTHER -> UNKNOWN_PROFILE;
         };
     }
 

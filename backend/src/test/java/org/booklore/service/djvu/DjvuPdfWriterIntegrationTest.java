@@ -84,7 +84,7 @@ class DjvuPdfWriterIntegrationTest {
     }
 
     @Test
-    void progressIsReportedOncePerPage() throws Exception {
+    void progressIsReportedOncePerPage() {
         Path source = fixture("two-page-with-text.djvu");
         java.util.List<Integer> reported = new java.util.ArrayList<>();
 
@@ -94,7 +94,7 @@ class DjvuPdfWriterIntegrationTest {
     }
 
     @Test
-    void theRenditionIsWrittenIntoADirectoryThatDoesNotExistYet() throws Exception {
+    void theRenditionIsWrittenIntoADirectoryThatDoesNotExistYet() {
         Path source = fixture("two-page-with-text.djvu");
         Path target = tempDir.resolve("nested").resolve("deeper").resolve("rendition.pdf");
 

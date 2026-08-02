@@ -61,6 +61,7 @@ public class InpxArchiveScanner {
     private static final int MAX_VISITED_ENTRIES = 100_000;
     private static final long MAX_CONTAINER_SIZE = 1024L * 1024 * 1024;
     private static final long MAX_EXPANDED_SIZE = 4L * 1024 * 1024 * 1024;
+    private static final String SKIP_ENTRY_LOG = "Skipping archive entry {} in {}: {}";
 
     private final BookFileRepository bookFileRepository;
     private final Fb2MetadataExtractor fb2MetadataExtractor;
@@ -196,7 +197,8 @@ public class InpxArchiveScanner {
         TraversalState state = new TraversalState(cancelled);
         try {
             List<InpxBookDto> discovered = new ArrayList<>();
-            traverseZip(candidate.path(), candidate.archiveName(), List.of(), 0, state, discovered, true);
+            TraversalContext context = new TraversalContext(candidate.archiveName(), state, discovered, true);
+            traverseZip(candidate.path(), List.of(), 0, context);
             for (int offset = 0; offset < discovered.size(); offset += EXISTING_ENTRY_BATCH_SIZE) {
                 List<InpxBookDto> batch = discovered.subList(offset,
                         Math.min(offset + EXISTING_ENTRY_BATCH_SIZE, discovered.size()));
@@ -299,13 +301,13 @@ public class InpxArchiveScanner {
                 : "";
     }
 
-    private void traverseZip(Path archivePath, String archiveName, List<String> chain, int depth,
-                             TraversalState state, List<InpxBookDto> books, boolean extractMetadata) throws IOException {
+    private void traverseZip(Path archivePath, List<String> chain, int depth,
+                             TraversalContext context) throws IOException {
         // Commons Compress remains the reader for the legacy outer ZIPs whose central directory is
         // rejected by java.util.zip. Nested ZIPs use it too, preserving exact case-sensitive names.
         try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
             for (ZipArchiveEntry entry : Collections.list(archive.getEntries())) {
-                if (!state.visit() || state.cancelled()) {
+                if (!context.state().visit() || context.state().cancelled()) {
                     return;
                 }
                 String entryName = ZipEntryNameResolver.resolve(entry);
@@ -313,29 +315,35 @@ public class InpxArchiveScanner {
                     continue;
                 }
                 if (isGenericArchive(entryName)) {
-                    state.hasNestedContainers = true;
-                    descend(archiveName, chain, depth, state, books, entryName, entry.getSize(),
+                    context.state().hasNestedContainers = true;
+                    descend(chain, depth, context, entryName, entry.getSize(),
                             output -> {
                                 try (InputStream input = archive.getInputStream(entry)) {
                                     input.transferTo(output);
                                 }
-                            }, extractMetadata);
+                            });
                 } else {
-                    try (InputStream input = extractMetadata && isFb2(entryName)
-                            ? new CountingInputStream(archive.getInputStream(entry), state) : null) {
-                        addLeaf(archiveName, chain, entryName, entry.getSize(), input, books, extractMetadata);
-                    } catch (RuntimeException | IOException e) {
-                        log.warn("Skipping archive entry {} in {}: {}", entryName, archiveName, e.getMessage());
-                    }
+                    addZipLeaf(archive, entry, entryName, chain, context);
                 }
             }
         }
     }
 
-    private void traverseNative(Path archivePath, String archiveName, List<String> chain, int depth,
-                                TraversalState state, List<InpxBookDto> books, boolean extractMetadata) throws IOException {
+    private void addZipLeaf(ZipFile archive, ZipArchiveEntry entry, String entryName, List<String> chain,
+                            TraversalContext context) {
+        try (InputStream input = context.extractMetadata() && isFb2(entryName)
+                ? new CountingInputStream(archive.getInputStream(entry), context.state()) : null) {
+            addLeaf(context.archiveName(), chain, entryName, entry.getSize(), input,
+                    context.books(), context.extractMetadata());
+        } catch (RuntimeException | IOException e) {
+            log.warn(SKIP_ENTRY_LOG, entryName, context.archiveName(), e.getMessage());
+        }
+    }
+
+    private void traverseNative(Path archivePath, List<String> chain, int depth,
+                                TraversalContext context) throws IOException {
         for (ArchiveService.Entry entry : archiveService.getEntries(archivePath)) {
-            if (!state.visit() || state.cancelled()) {
+            if (!context.state().visit() || context.state().cancelled()) {
                 return;
             }
             String entryName = entry.name();
@@ -343,38 +351,46 @@ public class InpxArchiveScanner {
                 continue;
             }
             if (isGenericArchive(entryName)) {
-                state.hasNestedContainers = true;
-                descend(archiveName, chain, depth, state, books, entryName, entry.size(),
-                        output -> archiveService.transferEntryTo(archivePath, entryName, output), extractMetadata);
-            } else if (extractMetadata && isFb2(entryName)) {
-                if (entry.size() < 0 || entry.size() > MAX_CONTAINER_SIZE) {
-                    log.warn("Skipping archive entry {} in {} because its size is unsafe", entryName, archiveName);
-                    continue;
-                }
-                Path leaf = state.createTemporary(suffix(entryName));
-                try {
-                    try (OutputStream output = Files.newOutputStream(leaf)) {
-                        copyNativeBounded(archivePath, entryName, output, state);
-                    }
-                    try (InputStream input = Files.newInputStream(leaf)) {
-                        addLeaf(archiveName, chain, entryName, entry.size(), input, books, true);
-                    }
-                } catch (RuntimeException | IOException e) {
-                    log.warn("Skipping archive entry {} in {}: {}", entryName, archiveName, e.getMessage());
-                } finally {
-                    state.releaseTemporary(leaf);
-                }
+                context.state().hasNestedContainers = true;
+                descend(chain, depth, context, entryName, entry.size(),
+                        output -> archiveService.transferEntryTo(archivePath, entryName, output));
+            } else if (context.extractMetadata() && isFb2(entryName)) {
+                addNativeFb2Leaf(archivePath, chain, entry, context);
             } else {
-                addLeaf(archiveName, chain, entryName, entry.size(), null, books, extractMetadata);
+                addLeaf(context.archiveName(), chain, entryName, entry.size(), null,
+                        context.books(), context.extractMetadata());
             }
         }
     }
 
-    private void descend(String archiveName, List<String> chain, int depth, TraversalState state,
-                         List<InpxBookDto> books, String entryName, long size, EntryTransfer transfer,
-                         boolean extractMetadata) {
-        if (depth >= MAX_NESTED_DEPTH || size < 0 || size > MAX_CONTAINER_SIZE || state.cancelled()) {
-            log.warn("Skipping nested archive {} in {} because a traversal limit was reached", entryName, archiveName);
+    private void addNativeFb2Leaf(Path archivePath, List<String> chain, ArchiveService.Entry entry,
+                                  TraversalContext context) throws IOException {
+        String entryName = entry.name();
+        if (entry.size() < 0 || entry.size() > MAX_CONTAINER_SIZE) {
+            log.warn("Skipping archive entry {} in {} because its size is unsafe",
+                    entryName, context.archiveName());
+            return;
+        }
+        Path leaf = context.state().createTemporary(suffix(entryName));
+        try {
+            try (OutputStream output = Files.newOutputStream(leaf)) {
+                copyNativeBounded(archivePath, entryName, output, context.state());
+            }
+            try (InputStream input = Files.newInputStream(leaf)) {
+                addLeaf(context.archiveName(), chain, entryName, entry.size(), input, context.books(), true);
+            }
+        } catch (RuntimeException | IOException e) {
+            log.warn(SKIP_ENTRY_LOG, entryName, context.archiveName(), e.getMessage());
+        } finally {
+            context.state().releaseTemporary(leaf);
+        }
+    }
+
+    private void descend(List<String> chain, int depth, TraversalContext context,
+                         String entryName, long size, EntryTransfer transfer) {
+        if (depth >= MAX_NESTED_DEPTH || size < 0 || size > MAX_CONTAINER_SIZE || context.state().cancelled()) {
+            log.warn("Skipping nested archive {} in {} because a traversal limit was reached",
+                    entryName, context.archiveName());
             return;
         }
         List<String> nestedChain = new ArrayList<>(chain);
@@ -382,18 +398,19 @@ public class InpxArchiveScanner {
         try {
             NestedArchiveLocator.encode(nestedChain.size() == 1
                     ? List.of(nestedChain.getFirst(), "probe") : nestedChain);
-            Path nested = state.createTemporary(suffix(entryName));
+            Path nested = context.state().createTemporary(suffix(entryName));
             try (OutputStream output = Files.newOutputStream(nested)) {
-                CountingOutputStream bounded = new CountingOutputStream(output, state);
+                CountingOutputStream bounded = new CountingOutputStream(output, context.state());
                 transfer.transfer(bounded);
             }
             if (isZip(entryName)) {
-                traverseZip(nested, archiveName, nestedChain, depth + 1, state, books, extractMetadata);
+                traverseZip(nested, nestedChain, depth + 1, context);
             } else {
-                traverseNative(nested, archiveName, nestedChain, depth + 1, state, books, extractMetadata);
+                traverseNative(nested, nestedChain, depth + 1, context);
             }
         } catch (Exception e) {
-            log.warn("Skipping unreadable nested archive {} in {}: {}", entryName, archiveName, e.getMessage());
+            log.warn("Skipping unreadable nested archive {} in {}: {}",
+                    entryName, context.archiveName(), e.getMessage());
         }
     }
 
@@ -402,7 +419,7 @@ public class InpxArchiveScanner {
         try {
             books.add(processEntry(archiveName, chain, entryName, size, input, extractMetadata));
         } catch (IllegalArgumentException e) {
-            log.warn("Skipping archive entry {} in {}: {}", entryName, archiveName, e.getMessage());
+            log.warn(SKIP_ENTRY_LOG, entryName, archiveName, e.getMessage());
         }
     }
 
@@ -424,7 +441,7 @@ public class InpxArchiveScanner {
         String leaf = leafName(name);
         try {
             return !leaf.isBlank() && !FileUtils.shouldIgnore(Path.of(leaf)) && !extension(leaf).isEmpty();
-        } catch (InvalidPathException e) {
+        } catch (InvalidPathException _) {
             return false;
         }
     }
@@ -491,6 +508,8 @@ public class InpxArchiveScanner {
         return counts;
     }
 
+    // The Error catch is required so callers do not wait forever when an executor task fails catastrophically.
+    @SuppressWarnings("java:S1181")
     private CompletableFuture<ArchiveFile> inspectInBackground(Path path, long size, Instant modifiedAt) {
         ArchiveInspectionKey key = new ArchiveInspectionKey(path, size, modifiedAt);
         CompletableFuture<ArchiveFile> created = new CompletableFuture<>();
@@ -542,7 +561,8 @@ public class InpxArchiveScanner {
         TraversalState state = new TraversalState(() -> false);
         try {
             List<InpxBookDto> books = new ArrayList<>();
-            traverseZip(path, path.getFileName().toString(), List.of(), 0, state, books, false);
+            TraversalContext context = new TraversalContext(path.getFileName().toString(), state, books, false);
+            traverseZip(path, List.of(), 0, context);
             return new InspectionResult(books.size(), state.hasNestedContainers);
         } catch (IOException e) {
             log.warn("Unable to inspect ZIP archive {}: {}", path, e.getMessage());
@@ -592,6 +612,10 @@ public class InpxArchiveScanner {
     private record InspectionResult(long entryCount, boolean hasNestedContainers) {
     }
 
+    private record TraversalContext(String archiveName, TraversalState state,
+                                    List<InpxBookDto> books, boolean extractMetadata) {
+    }
+
     @FunctionalInterface
     private interface EntryTransfer {
         void transfer(OutputStream output) throws IOException;
@@ -616,6 +640,8 @@ public class InpxArchiveScanner {
             return cancellation.getAsBoolean() || visitedEntries > MAX_VISITED_ENTRIES;
         }
 
+        // createTempFile is atomic and uses unpredictable owner-only files on supported filesystems.
+        @SuppressWarnings("java:S5443")
         private Path createTemporary(String suffix) throws IOException {
             Path path = Files.createTempFile("booklib-inpx-", suffix);
             temporaryPaths.add(path);

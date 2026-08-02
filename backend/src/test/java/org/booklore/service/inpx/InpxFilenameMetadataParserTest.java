@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@SuppressWarnings("java:S5976")
 class InpxFilenameMetadataParserTest {
 
     private final InpxFilenameMetadataParser parser = new InpxFilenameMetadataParser();

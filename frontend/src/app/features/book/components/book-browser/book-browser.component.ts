@@ -193,15 +193,15 @@ export class BookBrowserComponent implements AfterViewInit {
     }
 
     const archiveName = this.archiveName();
-    const actions = this.entityService.isLibrary(entity)
-      ? archiveName
+    if (this.entityService.isLibrary(entity)) {
+      return archiveName
         ? this.libraryShelfMenuService.initializeArchiveMenuItems(entity, archiveName)
-        : this.libraryShelfMenuService.initializeLibraryMenuItems(entity)
-      : this.entityService.isMagicShelf(entity)
-        ? this.libraryShelfMenuService.initializeMagicShelfMenuItems(entity)
-        : this.libraryShelfMenuService.initializeShelfMenuItems(entity);
-
-    return actions;
+        : this.libraryShelfMenuService.initializeLibraryMenuItems(entity);
+    }
+    if (this.entityService.isMagicShelf(entity)) {
+      return this.libraryShelfMenuService.initializeMagicShelfMenuItems(entity);
+    }
+    return this.libraryShelfMenuService.initializeShelfMenuItems(entity);
   });
   private readonly syncPagedQueryEffect = effect(() => {
     const {entityId, entityType} = this.entityInfo();
@@ -555,17 +555,17 @@ export class BookBrowserComponent implements AfterViewInit {
     const user = this.userService.currentUser();
     if (!user) return;
 
-    this.metadataMenuItems = this.bookMenuService.getMetadataMenuItems(
-      () => this.autoFetchMetadata(),
-      () => this.fetchMetadata(),
-      () => this.bulkEditMetadata(),
-      () => this.multiBookEditMetadata(),
-      () => this.regenerateCoversForSelected(),
-      () => this.generateCustomCoversForSelected(),
+    this.metadataMenuItems = this.bookMenuService.getMetadataMenuItems({
+      autoFetchMetadata: () => this.autoFetchMetadata(),
+      fetchMetadata: () => this.fetchMetadata(),
+      bulkEditMetadata: () => this.bulkEditMetadata(),
+      multiBookEditMetadata: () => this.multiBookEditMetadata(),
+      regenerateCovers: () => this.regenerateCoversForSelected(),
+      generateCustomCovers: () => this.generateCustomCoversForSelected(),
       user,
-      () => this.bulkSmartEnrich(),
-      this.smartEnrichmentAvailable()
-    );
+      smartEnrich: () => this.bulkSmartEnrich(),
+      smartEnrichmentAvailable: this.smartEnrichmentAvailable()
+    });
   });
 
   private setupQueryParamSubscription(): void {

@@ -1,8 +1,9 @@
 import {inject, Injectable, signal} from '@angular/core';
 import {ReaderViewManagerService} from '../../core/view-manager.service';
 
-const EPUB_OPS_NS = 'http://www.idpf.org/2007/ops';
-const NOTE_TYPES = ['noteref', 'footnote', 'endnote', 'rearnote'];
+// This is an EPUB namespace identifier, not a network endpoint; the standard requires this exact URI.
+const EPUB_OPS_NS = 'http://www.idpf.org/2007/ops'; // NOSONAR
+const NOTE_TYPES = new Set(['noteref', 'footnote', 'endnote', 'rearnote']);
 const STRIPPED_TAGS = 'script, style, link, img, svg, video, audio, iframe, object, embed';
 const POPUP_EDGE_MARGIN_PX = 16;
 const POPUP_GAP_PX = 8;
@@ -102,7 +103,7 @@ export class ReaderFootnoteService {
       ?? anchor.getAttribute('epub:type')
       ?? anchor.getAttribute('type')
       ?? '';
-    return value.split(/\s+/).some(token => NOTE_TYPES.includes(token.toLowerCase()));
+    return value.split(/\s+/).some(token => NOTE_TYPES.has(token.toLowerCase()));
   }
 
   private extractHtml(element: Element): string {

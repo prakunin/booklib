@@ -111,7 +111,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
   public stateService = inject(ReaderStateService);
 
   @ViewChild('readerRoot', {static: true}) private readonly readerRoot?: ElementRef<HTMLElement>;
-  @ViewChild(ReaderSettingsDialogComponent) private settingsDialog?: ReaderSettingsDialogComponent;
+  @ViewChild(ReaderSettingsDialogComponent) private readonly settingsDialog?: ReaderSettingsDialogComponent;
 
   protected bookId!: number;
   protected altBookType?: string;

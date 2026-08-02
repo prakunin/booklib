@@ -2,7 +2,9 @@
   position: fixed;
   inset: 0;
   z-index: 99998;
+  padding: 0;
   background: transparent;
+  border: 0;
 }
 
 // a footnote shows book content, so the card follows the reader's page theme
@@ -19,6 +21,7 @@
   width: max-content;
   max-width: min(420px, calc(100vw - 32px));
   max-height: 40vh;
+  margin: 0;
   padding: 12px 14px;
   color: var(--footnote-fg, #e0e0e0);
   background: var(--footnote-bg, #222);

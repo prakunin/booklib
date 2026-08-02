@@ -2,6 +2,7 @@ package org.booklore.service.fileprocessor;
 
 import org.booklore.mapper.BookMapper;
 import org.booklore.model.CoverExtraction;
+import org.booklore.model.document.DocumentBlock;
 import org.booklore.model.document.DocumentContent;
 import org.booklore.model.document.DocumentParseResult;
 import org.booklore.model.dto.settings.LibraryFile;
@@ -81,7 +82,7 @@ public class DocProcessor extends AbstractFileProcessor implements BookFileProce
             }
             if (result.isReadable()) {
                 documentBody = BookUtils.collectDocumentBodySearchText(
-                        content.blocks().stream().map(block -> block.text()));
+                        content.blocks().stream().map(DocumentBlock::text));
             }
         }
         metadata.replaceDocumentBodySearchText(documentBody);

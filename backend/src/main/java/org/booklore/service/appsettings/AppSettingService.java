@@ -150,35 +150,54 @@ public class AppSettingService {
         if (settings == null) {
             throw ApiError.INVALID_INPUT.createException("Recommendation embedding settings are required");
         }
-        if (settings.getOllamaBaseUrl() == null || settings.getOllamaBaseUrl().isBlank()) {
+        settings.setOllamaBaseUrl(normalizeOllamaBaseUrl(settings.getOllamaBaseUrl()));
+        if (settings.getModel() == null || settings.getModel().isBlank()) {
+            throw ApiError.INVALID_INPUT.createException("Embedding model is required");
+        }
+        settings.setModel(settings.getModel().trim());
+        validateEmbeddingDimensions(settings);
+        validateEmbeddingBatchSize(settings);
+        validateMinimumSearchSimilarity(settings.getMinSearchSimilarity());
+    }
+
+    private String normalizeOllamaBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
             throw ApiError.INVALID_INPUT.createException("Ollama base URL is required");
         }
         try {
-            URI uri = URI.create(settings.getOllamaBaseUrl().trim());
+            URI uri = URI.create(baseUrl.trim());
             if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
                 throw ApiError.INVALID_INPUT.createException("Ollama base URL must use HTTP or HTTPS");
             }
             if (uri.getHost() == null || uri.getHost().isBlank()) {
                 throw ApiError.INVALID_INPUT.createException("Ollama base URL must include a host");
             }
-            settings.setOllamaBaseUrl(uri.toString().replaceAll("/+$", ""));
-        } catch (IllegalArgumentException exception) {
+            String normalized = uri.toString();
+            while (normalized.endsWith("/")) {
+                normalized = normalized.substring(0, normalized.length() - 1);
+            }
+            return normalized;
+        } catch (IllegalArgumentException _) {
             throw ApiError.INVALID_INPUT.createException("Ollama base URL is invalid");
         }
-        if (settings.getModel() == null || settings.getModel().isBlank()) {
-            throw ApiError.INVALID_INPUT.createException("Embedding model is required");
-        }
-        settings.setModel(settings.getModel().trim());
+    }
+
+    private void validateEmbeddingDimensions(RecommendationEmbeddingSettings settings) {
         if (settings.getDimensions() != 512) {
             throw ApiError.INVALID_INPUT.createException("The current semantic vector index requires 512 dimensions");
         }
         if ((settings.getModel() + "-" + settings.getDimensions() + "-v1").length() > 48) {
             throw ApiError.INVALID_INPUT.createException("Embedding model name is too long");
         }
+    }
+
+    private void validateEmbeddingBatchSize(RecommendationEmbeddingSettings settings) {
         if (settings.getBatchSize() < 1 || settings.getBatchSize() > 256) {
             throw ApiError.INVALID_INPUT.createException("Embedding batch size must be between 1 and 256");
         }
-        Double minSearchSimilarity = settings.getMinSearchSimilarity();
+    }
+
+    private void validateMinimumSearchSimilarity(Double minSearchSimilarity) {
         if (minSearchSimilarity != null && (minSearchSimilarity < 0 || minSearchSimilarity > 1)) {
             throw ApiError.INVALID_INPUT.createException("Minimum search similarity must be between 0 and 1");
         }

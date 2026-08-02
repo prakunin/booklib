@@ -237,12 +237,6 @@ public class DjvuPdfWriter {
         return binary;
     }
 
-    private int pixel(byte[] pixels, int offset) {
-        return (pixels[offset] & 0xFF) << 16 | (pixels[offset + 1] & 0xFF) << 8 | (pixels[offset + 2] & 0xFF);
-    }
-
-
-
     /**
      * Lays the page's words invisibly over the image. A word whose glyphs the font cannot encode is
      * skipped rather than failing the document: losing one word's searchability is a far smaller

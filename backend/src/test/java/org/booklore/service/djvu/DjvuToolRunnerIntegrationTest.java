@@ -79,10 +79,8 @@ class DjvuToolRunnerIntegrationTest {
     void theCapFitsThePageInsideTheBoxAndKeepsItsAspectRatio() throws Exception {
         int[] size = renderedSize(1, 80);
 
-        assertThat(size[0]).isLessThanOrEqualTo(80);
-        assertThat(size[1]).isLessThanOrEqualTo(80);
         // 120x160 fitted into 80x80 stays 3:4, so the height is the binding edge.
-        assertThat(size[1]).isEqualTo(80);
+        assertThat(size).containsExactly(60, 80);
     }
 
     private int[] renderedSize(int page, int maxEdge) throws Exception {

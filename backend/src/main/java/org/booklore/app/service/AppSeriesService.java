@@ -38,6 +38,9 @@ public class AppSeriesService {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 50;
     private static final String PARAM_USER_ID = "userId";
+    private static final String PARAM_SEARCH_PATTERN = "searchPattern";
+    private static final String GROUP_BY_SERIES_NAME = " GROUP BY m.seriesName";
+    private static final String AND = " AND ";
     private static final String STATUS_IN_PROGRESS = "in-progress";
     private static final String HAVING = " HAVING ";
     private static final String MULTI_BOOK_SERIES_EXPR = "COUNT(b.id) > 1";
@@ -80,7 +83,6 @@ public class AppSeriesService {
 
         // Build WHERE clause fragments
         String libraryClause = buildLibraryClause(libraryAccessScope, libraryId);
-        final String searchParam = "searchPattern";
         String searchPattern = (search != null && !search.trim().isEmpty())
                 ? "%" + search.trim().toLowerCase() + "%"
                 : null;
@@ -111,7 +113,7 @@ public class AppSeriesService {
                 + " AND m.seriesName IS NOT NULL"
                 + libraryClause
                 + searchClause
-                + " GROUP BY m.seriesName"
+                + GROUP_BY_SERIES_NAME
                 + havingClause
                 + " ORDER BY " + orderBy;
 
@@ -121,7 +123,7 @@ public class AppSeriesService {
         }
         setLibraryParams(aggregateQ, libraryAccessScope, libraryId);
         if (searchPattern != null) {
-            aggregateQ.setParameter(searchParam, searchPattern);
+            aggregateQ.setParameter(PARAM_SEARCH_PATTERN, searchPattern);
         }
         aggregateQ.setFirstResult(pageNum * pageSize);
         aggregateQ.setMaxResults(pageSize);
@@ -131,8 +133,9 @@ public class AppSeriesService {
         long totalElements = countSeries(normalizedStatus, libraryAccessScope, libraryId, userId,
                 searchPattern, searchClause, libraryClause);
 
-        return buildSeriesPage(aggregateResults, libraryAccessScope, libraryId, userId,
-                aggregateProgress, pageNum, pageSize, totalElements);
+        SeriesPageContext context = new SeriesPageContext(
+                libraryAccessScope, libraryId, userId, aggregateProgress, pageNum, pageSize, totalElements);
+        return buildSeriesPage(aggregateResults, context);
     }
 
     private long countSeries(String statusFilter, LibraryAccessScope libraryAccessScope, Long libraryId, Long userId,
@@ -155,7 +158,6 @@ public class AppSeriesService {
             return countAllVisibleSeries(searchPattern, searchClause);
         }
 
-        final String searchParam = "searchPattern";
         String havingClause = buildSeriesStatusHavingClause(statusFilter);
         String progressJoin = statusFilter != null
                 ? " LEFT JOIN b.userBookProgress p ON p.user.id = :userId"
@@ -168,7 +170,7 @@ public class AppSeriesService {
                 + " AND m.seriesName IS NOT NULL"
                 + libraryClause
                 + searchClause
-                + " GROUP BY m.seriesName"
+                + GROUP_BY_SERIES_NAME
                 + havingClause
                 + ") groupedSeries";
 
@@ -178,11 +180,13 @@ public class AppSeriesService {
         }
         setLibraryParams(countQ, libraryAccessScope, libraryId);
         if (searchPattern != null) {
-            countQ.setParameter(searchParam, searchPattern);
+            countQ.setParameter(PARAM_SEARCH_PATTERN, searchPattern);
         }
         return countQ.getSingleResult();
     }
 
+    // The query varies only by an internally selected search fragment; search text remains a bound parameter.
+    @SuppressWarnings("java:S2077")
     private long countAllVisibleSeries(String searchPattern, String searchClause) {
         String countQuery = "SELECT COUNT(*) FROM ("
                 + "SELECT m.seriesName AS seriesName FROM BookMetadataEntity m"
@@ -196,23 +200,18 @@ public class AppSeriesService {
 
         var countQ = entityManager.createQuery(countQuery, Long.class);
         if (searchPattern != null) {
-            countQ.setParameter("searchPattern", searchPattern);
+            countQ.setParameter(PARAM_SEARCH_PATTERN, searchPattern);
         }
         return countQ.getSingleResult();
     }
 
     private AppPageResponse<AppSeriesSummary> buildSeriesPage(
             List<Tuple> aggregateResults,
-            LibraryAccessScope libraryAccessScope,
-            Long libraryId,
-            Long userId,
-            boolean aggregateProgress,
-            int pageNum,
-            int pageSize,
-            long totalElements) {
+            SeriesPageContext context) {
 
         if (aggregateResults.isEmpty()) {
-            return AppPageResponse.of(Collections.emptyList(), pageNum, pageSize, totalElements);
+            return AppPageResponse.of(
+                    Collections.emptyList(), context.pageNum(), context.pageSize(), context.totalElements());
         }
 
         List<String> seriesNames = aggregateResults.stream()
@@ -220,7 +219,7 @@ public class AppSeriesService {
                 .toList();
 
         // Phase 2: Fetch books for enrichment (only ToOne joins; collections loaded via @BatchSize)
-        String libraryClause = buildLibraryClause(libraryAccessScope, libraryId);
+        String libraryClause = buildLibraryClause(context.libraryAccessScope(), context.libraryId());
         String booksQuery = "SELECT b FROM BookEntity b"
                 + " JOIN FETCH b.metadata m"
                 + " WHERE m.seriesName IN :seriesNames"
@@ -230,7 +229,7 @@ public class AppSeriesService {
 
         var booksQ = entityManager.createQuery(booksQuery, BookEntity.class);
         booksQ.setParameter("seriesNames", seriesNames);
-        setLibraryParams(booksQ, libraryAccessScope, libraryId);
+        setLibraryParams(booksQ, context.libraryAccessScope(), context.libraryId());
 
         List<BookEntity> books = booksQ.getResultList();
 
@@ -243,9 +242,10 @@ public class AppSeriesService {
         for (Tuple t : aggregateResults) {
             aggregateMap.put(t.get(0, String.class), t);
         }
-        Map<String, SeriesProgressCounts> progressBySeries = aggregateProgress
+        Map<String, SeriesProgressCounts> progressBySeries = context.aggregateProgress()
                 ? Collections.emptyMap()
-                : fetchSeriesProgress(seriesNames, libraryAccessScope, libraryId, userId);
+                : fetchSeriesProgress(
+                        seriesNames, context.libraryAccessScope(), context.libraryId(), context.userId());
 
         // Merge into summaries, preserving Phase 1 order
         List<AppSeriesSummary> summaries = new ArrayList<>();
@@ -280,7 +280,7 @@ public class AppSeriesService {
                     })
                     .toList();
 
-            SeriesProgressCounts progress = aggregateProgress
+            SeriesProgressCounts progress = context.aggregateProgress()
                     ? progressFromAggregate(agg)
                     : progressBySeries.getOrDefault(seriesName, SeriesProgressCounts.EMPTY);
             int booksRead = progress.booksRead();
@@ -303,9 +303,11 @@ public class AppSeriesService {
                     .build());
         }
 
-        return AppPageResponse.of(summaries, pageNum, pageSize, totalElements);
+        return AppPageResponse.of(summaries, context.pageNum(), context.pageSize(), context.totalElements());
     }
 
+    // The only dynamic clause is selected by access scope; all library IDs and series names are bound.
+    @SuppressWarnings("java:S2077")
     private Map<String, SeriesProgressCounts> fetchSeriesProgress(
             List<String> seriesNames,
             LibraryAccessScope libraryAccessScope,
@@ -320,7 +322,7 @@ public class AppSeriesService {
                 + " AND (b.deleted IS NULL OR b.deleted = false)"
                 + " AND (b.hasFiles = true OR b.isPhysical = true)"
                 + libraryClause
-                + " GROUP BY m.seriesName";
+                + GROUP_BY_SERIES_NAME;
 
         var progressQ = entityManager.createQuery(progressQuery, Tuple.class);
         progressQ.setParameter(PARAM_USER_ID, userId);
@@ -425,9 +427,9 @@ public class AppSeriesService {
 
     private String buildLibraryClause(LibraryAccessScope libraryAccessScope, Long libraryId, String bookAlias) {
         if (libraryId != null) {
-            return " AND " + bookAlias + ".library.id = :libraryId";
+            return AND + bookAlias + ".library.id = :libraryId";
         } else if (!libraryAccessScope.allLibraries()) {
-            return " AND " + bookAlias + ".library.id IN :libraryIds";
+            return AND + bookAlias + ".library.id IN :libraryIds";
         }
         return "";
     }
@@ -484,13 +486,13 @@ public class AppSeriesService {
         }
         String abandonedTotalExpr = "(" + ABANDONED_COUNT_EXPR + " + " + WONT_READ_COUNT_EXPR + ")";
         return switch (statusFilter) {
-            case "not-started" -> minimumBookCount + " AND " + READ_COUNT_EXPR + " = 0 AND " + READING_COUNT_EXPR
-                    + " = 0 AND " + abandonedTotalExpr + " = 0";
-            case STATUS_IN_PROGRESS -> minimumBookCount + " AND " + abandonedTotalExpr + " = 0 AND ("
-                    + READING_COUNT_EXPR + " > 0 OR (" + READ_COUNT_EXPR + " > 0 AND "
+            case "not-started" -> minimumBookCount + AND + READ_COUNT_EXPR + " = 0" + AND + READING_COUNT_EXPR
+                    + " = 0" + AND + abandonedTotalExpr + " = 0";
+            case STATUS_IN_PROGRESS -> minimumBookCount + AND + abandonedTotalExpr + " = 0 AND ("
+                    + READING_COUNT_EXPR + " > 0 OR (" + READ_COUNT_EXPR + " > 0" + AND
                     + READ_COUNT_EXPR + " < COUNT(b.id)))";
-            case "completed" -> minimumBookCount + " AND " + READ_COUNT_EXPR + " = COUNT(b.id)";
-            case "abandoned" -> minimumBookCount + " AND " + abandonedTotalExpr + " > 0";
+            case "completed" -> minimumBookCount + AND + READ_COUNT_EXPR + " = COUNT(b.id)";
+            case "abandoned" -> minimumBookCount + AND + abandonedTotalExpr + " > 0";
             default -> minimumBookCount;
         };
     }
@@ -556,6 +558,16 @@ public class AppSeriesService {
     }
 
     private record LibraryAccessScope(boolean allLibraries, Set<Long> libraryIds) {
+    }
+
+    private record SeriesPageContext(
+            LibraryAccessScope libraryAccessScope,
+            Long libraryId,
+            Long userId,
+            boolean aggregateProgress,
+            int pageNum,
+            int pageSize,
+            long totalElements) {
     }
 
     private record SeriesCountKey(

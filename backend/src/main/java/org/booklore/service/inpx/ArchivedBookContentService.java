@@ -131,6 +131,8 @@ public class ArchivedBookContentService {
         }
     }
 
+    // createTempFile uses an atomic, unpredictable name and owner-only permissions on supported filesystems.
+    @SuppressWarnings("java:S5443")
     private void extract(Path archivePath, List<String> entryChain, Path target) throws IOException {
         List<Path> temporaryPaths = new ArrayList<>();
         long[] totalExpanded = {0};

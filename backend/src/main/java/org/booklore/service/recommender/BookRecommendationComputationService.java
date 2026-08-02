@@ -48,9 +48,8 @@ public class BookRecommendationComputationService {
                         .map(BookMetadataEntity::getEmbeddingVector)
                         .orElse(null);
 
-        if (targetVectorJson != null && (!semantic
-                ? vectorService.deserializeVector(targetVectorJson) != null
-                : true)) {
+        if (targetVectorJson != null
+                && (semantic || vectorService.deserializeVector(targetVectorJson) != null)) {
             scoreEmbeddingCandidates(
                     bookId,
                     target,

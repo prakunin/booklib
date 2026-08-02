@@ -203,7 +203,7 @@ export class GlobalPreferencesComponent implements OnInit {
       this.smartEnrichmentEffort.set('');
     } else if (!efforts.includes(this.smartEnrichmentEffort())) {
       // Effort is mandatory once a model offers it, so land on a sensible one rather than blank.
-      this.smartEnrichmentEffort.set(efforts.includes('medium') ? 'medium' : efforts[efforts.length - 1]);
+      this.smartEnrichmentEffort.set(efforts.includes('medium') ? 'medium' : efforts.at(-1)!);
     }
   }
 

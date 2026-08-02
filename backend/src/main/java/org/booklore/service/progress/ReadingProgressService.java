@@ -177,6 +177,9 @@ public class ReadingProgressService {
                     .trackIndex(parseIntOrNull(fileProgress.getPositionHref()))
                     .percentage(roundToOneDecimal(fileProgress.getProgressPercent()))
                     .build());
+            case DOC, OTHER -> {
+                // These formats had no file-to-DTO progress mapping before the switch became exhaustive.
+            }
         }
     }
 
@@ -393,6 +396,9 @@ public class ReadingProgressService {
                 // Audiobook progress is handled via new file-level progress system
                 // No legacy book-level progress columns exist for audiobooks
             }
+            case DOC, OTHER -> {
+                // These formats had no legacy progress mapping before the switch became exhaustive.
+            }
         }
 
         userBookFileProgressRepository.save(entity);
@@ -423,6 +429,9 @@ public class ReadingProgressService {
             case AUDIOBOOK -> {
                 // Audiobook progress is stored only in UserBookFileProgressEntity
                 // No legacy columns in UserBookProgressEntity for audiobooks
+            }
+            case OTHER -> {
+                // Unknown formats have no legacy progress columns.
             }
         }
     }
@@ -492,6 +501,9 @@ public class ReadingProgressService {
             case AUDIOBOOK -> {
                 // Audiobook progress percentage is stored in UserBookFileProgressEntity
                 // No legacy column exists in UserBookProgressEntity for audiobooks
+            }
+            case DOC, OTHER -> {
+                // These formats have no legacy percentage column.
             }
         }
     }

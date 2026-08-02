@@ -103,7 +103,7 @@ public class TaskHistoryService {
     public void updateTaskProgress(String taskId, TaskStatus status, int progressPercentage, String message) {
         taskHistoryRepository.findById(taskId).ifPresent(task -> {
             task.setStatus(status);
-            task.setProgressPercentage(Math.max(0, Math.min(100, progressPercentage)));
+            task.setProgressPercentage(Math.clamp(progressPercentage, 0, 100));
             task.setMessage(message);
             task.setUpdatedAt(LocalDateTime.now(ZoneId.systemDefault()));
 

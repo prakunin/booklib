@@ -126,7 +126,8 @@ class DocumentRenditionServiceTest {
 
             // The reader derives its percentage from these; all-zero sizes make the total zero and
             // the displayed progress NaN.
-            assertThat(info.getManifest()).allSatisfy(item -> assertThat(item.getSize()).isPositive());
+            assertThat(info.getManifest()).isNotEmpty()
+                    .allSatisfy(item -> assertThat(item.getSize()).isPositive());
         }
 
         @Test
@@ -139,7 +140,7 @@ class DocumentRenditionServiceTest {
                     .filter(i -> href.equals(i.getHref()))
                     .findFirst().orElseThrow().getSize();
 
-            assertThat(render(file, href).getBytes(StandardCharsets.UTF_8).length).isEqualTo((int) declared);
+            assertThat(render(file, href).getBytes(StandardCharsets.UTF_8)).hasSize(Math.toIntExact(declared));
         }
     }
 

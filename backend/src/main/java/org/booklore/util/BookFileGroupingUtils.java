@@ -66,7 +66,7 @@ public class BookFileGroupingUtils {
 
     // Bare-number prefix: "1. Title", "01 - Title" (NOT "101 Dalmatians" or "1984")
     private static final Pattern BARE_NUMBER_PREFIX_PATTERN = Pattern.compile(
-            "^(\\d{1,3})(?:\\.|\\s*-)\\s+(.+)$"
+            "^(\\d{1,3})(?:\\.|\\s*+-)\\s++(.+)$"
     );
 
     // Edition/version patterns that should NOT prevent grouping

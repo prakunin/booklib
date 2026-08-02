@@ -92,7 +92,7 @@ public class ProcessDjvuCommandRunner implements DjvuCommandRunner {
             process.destroyForcibly();
             log.debug("Could not read the banner of {}: {}", binary.getFileName(), e.getMessage());
             return Optional.empty();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
             return Optional.empty();

@@ -340,6 +340,8 @@ public class GoogleParser implements BookParser {
      * - "Spider-Man 2099 2"
      * - "Title (Band 5)"
      */
+    // These bounded provider titles require capture-group backtracking to preserve the series prefix.
+    @SuppressWarnings("java:S8786")
     private SeriesData extractSeriesFromTitle(String title) {
         if (title == null || title.isBlank()) {
             return new SeriesData(null, null);
@@ -689,6 +691,5 @@ public class GoogleParser implements BookParser {
         return count;
     }
 }
-
 
 
