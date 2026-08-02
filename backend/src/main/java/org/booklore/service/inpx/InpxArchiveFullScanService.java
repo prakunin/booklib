@@ -91,6 +91,7 @@ public class InpxArchiveFullScanService {
             }, () -> false);
             addedBooks[0] += persist(batch, libraryId, libraryPath.getId(), caches);
             if (candidate.hasNestedContainers()) {
+                archiveReconciliationService.reconcileNestedPublications(libraryId, archiveName);
                 archiveReconciliationService.retireObsoleteGenericContainers(libraryId, List.of(archiveName));
             }
 

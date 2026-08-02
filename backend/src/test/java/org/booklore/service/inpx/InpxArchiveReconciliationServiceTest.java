@@ -2,6 +2,7 @@ package org.booklore.service.inpx;
 
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
+import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.repository.BookRepository;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,8 @@ class InpxArchiveReconciliationServiceTest {
                 bookFileRepository, bookRepository, entryMetadataRecognizer);
         BookEntity legacyBook = BookEntity.builder().id(10L).deleted(false).build();
         BookFileEntity legacyContainer = BookFileEntity.builder()
-                .book(legacyBook).sourceArchive("outer.zip").sourceArchiveEntry("inner.zip").build();
+                .book(legacyBook).bookType(BookFileType.OTHER)
+                .sourceArchive("outer.zip").sourceArchiveEntry("inner.zip").build();
         BookEntity leafBook = BookEntity.builder().id(11L).deleted(false).build();
         BookFileEntity nestedLeaf = BookFileEntity.builder()
                 .book(leafBook).sourceArchive("outer.zip")
@@ -94,11 +96,107 @@ class InpxArchiveReconciliationServiceTest {
                 .book(nonGenericBook).sourceArchive("outer.zip").sourceArchiveEntry("cover.jpg").build();
         when(bookFileRepository.findBookFilesByArchives(7L, List.of("outer.zip")))
                 .thenReturn(List.of(nestedLeaf, deletedContainer, nonGenericContainer));
-        when(entryMetadataRecognizer.isGenericArchive("cover.jpg")).thenReturn(false);
 
         assertThat(service.retireObsoleteGenericContainers(7L, List.of("outer.zip"))).isZero();
         assertThat(deletedBook.getDeleted()).isTrue();
         assertThat(nonGenericBook.getDeleted()).isFalse();
+        verify(bookRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void promotesNestedHtmlAndRetiresItsFormerAssetCards() {
+        InpxArchiveReconciliationService service = service();
+        BookEntity htmlBook = BookEntity.builder().id(20L).deleted(false).build();
+        BookFileEntity html = BookFileEntity.builder()
+                .book(htmlBook)
+                .fileName("letter.html")
+                .bookType(BookFileType.OTHER)
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("publication.zip", "letter.html")))
+                .build();
+        BookEntity imageBook = BookEntity.builder().id(21L).deleted(false).build();
+        BookFileEntity image = BookFileEntity.builder()
+                .book(imageBook)
+                .fileName("00.gif")
+                .bookType(BookFileType.OTHER)
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("publication.zip", "img/00.gif")))
+                .build();
+        imageBook.setBookFiles(List.of(image));
+        when(bookFileRepository.findBookFilesByArchives(7L, List.of("outer.zip")))
+                .thenReturn(List.of(html, image));
+
+        InpxArchiveReconciliationService.ReconciliationResult result =
+                service.reconcileNestedPublications(7L, "outer.zip");
+
+        assertThat(result.promotedHtml()).isOne();
+        assertThat(result.retiredAssets()).isOne();
+        assertThat(html.getBookType()).isEqualTo(BookFileType.HTML);
+        assertThat(imageBook.getDeleted()).isTrue();
+        verify(bookFileRepository).saveAll(List.of(html));
+        verify(bookRepository).saveAll(List.of(imageBook));
+    }
+
+    @Test
+    void promotesLegacyImageContainerToCbxBeforeRetiringItsPages() {
+        InpxArchiveReconciliationService service = service();
+        BookEntity containerBook = BookEntity.builder().id(30L).deleted(false).build();
+        BookFileEntity container = BookFileEntity.builder()
+                .book(containerBook).fileName("comic.zip").bookType(BookFileType.OTHER)
+                .sourceArchive("outer.zip").sourceArchiveEntry("comic.zip").build();
+        BookEntity pageBook = BookEntity.builder().id(31L).deleted(false).build();
+        BookFileEntity page = BookFileEntity.builder()
+                .book(pageBook).fileName("page.jpg").bookType(BookFileType.OTHER)
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("comic.zip", "page.jpg"))).build();
+        pageBook.setBookFiles(List.of(page));
+        BookEntity otherLeafBook = BookEntity.builder().id(32L).deleted(false).build();
+        BookFileEntity otherLeaf = BookFileEntity.builder()
+                .book(otherLeafBook).fileName("book.fb2").bookType(BookFileType.FB2)
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("books.zip", "book.fb2"))).build();
+        when(bookFileRepository.findBookFilesByArchives(7L, List.of("outer.zip")))
+                .thenReturn(List.of(container, page, otherLeaf));
+        when(entryMetadataRecognizer.isGenericArchive("comic.zip")).thenReturn(true);
+
+        InpxArchiveReconciliationService.ReconciliationResult result =
+                service.reconcileNestedPublications(7L, "outer.zip");
+
+        assertThat(container.getBookType()).isEqualTo(BookFileType.CBX);
+        assertThat(pageBook.getDeleted()).isTrue();
+        assertThat(result.retiredAssets()).isOne();
+        verify(bookFileRepository).saveAll(List.of(container));
+
+        assertThat(service.retireObsoleteGenericContainers(7L, List.of("outer.zip"))).isZero();
+        assertThat(containerBook.getDeleted()).isFalse();
+    }
+
+    @Test
+    void doesNotRetireAGroupedBookWhenOnlyOneFileIsAPublicationAsset() {
+        InpxArchiveReconciliationService service = service();
+        BookEntity htmlBook = BookEntity.builder().id(40L).deleted(false).build();
+        BookFileEntity html = BookFileEntity.builder()
+                .book(htmlBook).fileName("letter.html").bookType(BookFileType.HTML)
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("publication.zip", "letter.html")))
+                .build();
+        BookEntity groupedBook = BookEntity.builder().id(41L).deleted(false).build();
+        BookFileEntity image = BookFileEntity.builder()
+                .book(groupedBook).fileName("00.gif").bookType(BookFileType.OTHER)
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("publication.zip", "img/00.gif")))
+                .build();
+        BookFileEntity retained = BookFileEntity.builder()
+                .book(groupedBook).fileName("notes.txt").bookType(BookFileType.OTHER).build();
+        groupedBook.setBookFiles(List.of(image, retained));
+        when(bookFileRepository.findBookFilesByArchives(7L, List.of("outer.zip")))
+                .thenReturn(List.of(html, image));
+
+        InpxArchiveReconciliationService.ReconciliationResult result =
+                service.reconcileNestedPublications(7L, "outer.zip");
+
+        assertThat(result.retiredAssets()).isZero();
+        assertThat(groupedBook.getDeleted()).isFalse();
         verify(bookRepository, never()).saveAll(any());
     }
 

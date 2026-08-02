@@ -5,6 +5,7 @@ import org.booklore.model.MetadataUpdateContext;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
+import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.metadata.BookCoverService;
 import org.booklore.service.metadata.BookMetadataUpdater;
@@ -178,6 +179,44 @@ class InpxArchiveBookRefreshServiceTest {
         verify(archivedBookContentService, never()).resolveRevalidated(any());
         verify(bookMetadataUpdater, never()).setBookMetadata(any());
         verify(bookCoverService, never()).regenerateCover(anyLong());
+    }
+
+    @Test
+    void revalidatesRenditionBackedHtmlEvenWithoutAMetadataExtractor() {
+        BookFileEntity archivedFile = BookFileEntity.builder()
+                .sourceArchive("usr.zip")
+                .sourceArchiveEntry("publication.zip\u001fletter.html")
+                .fileName("letter.html")
+                .bookType(BookFileType.HTML)
+                .build();
+        BookEntity managedBook = BookEntity.builder().id(42L).bookFiles(List.of(archivedFile)).build();
+        when(bookRepository.findByIdForInpxArchiveRefresh(42L)).thenReturn(Optional.of(managedBook));
+        when(entryMetadataRecognizer.hasExtractor("letter.html")).thenReturn(false);
+        when(archivedBookContentService.resolveRevalidated(archivedFile)).thenReturn(Path.of("letter.html"));
+
+        assertThat(service.refresh(42L)).isTrue();
+
+        verify(archivedBookContentService).resolveRevalidated(archivedFile);
+        verify(bookRepository).save(managedBook);
+    }
+
+    @Test
+    void revalidatesImageOnlyGenericContainerStoredAsCbx() {
+        BookFileEntity archivedFile = BookFileEntity.builder()
+                .sourceArchive("usr.zip")
+                .sourceArchiveEntry("comic.zip")
+                .fileName("comic.zip")
+                .bookType(BookFileType.CBX)
+                .build();
+        BookEntity managedBook = BookEntity.builder().id(42L).bookFiles(List.of(archivedFile)).build();
+        when(bookRepository.findByIdForInpxArchiveRefresh(42L)).thenReturn(Optional.of(managedBook));
+        when(entryMetadataRecognizer.hasExtractor("comic.zip")).thenReturn(false);
+        when(entryMetadataRecognizer.isGenericArchive("comic.zip")).thenReturn(true);
+        when(archivedBookContentService.resolveRevalidated(archivedFile)).thenReturn(Path.of("comic.zip"));
+
+        assertThat(service.refresh(42L)).isTrue();
+
+        verify(archivedBookContentService).resolveRevalidated(archivedFile);
     }
 
     @Test

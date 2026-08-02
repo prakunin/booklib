@@ -1,7 +1,7 @@
 import {ChangeDetectionStrategy, computed, Component, DestroyRef, effect, inject, input, linkedSignal, output, untracked} from '@angular/core';
 import {UpperCasePipe} from '@angular/common';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {Book, BookRecommendation, BookType, FileInfo} from '../../../../../book/model/book.model';
+import {Book, BookRecommendation, BookType, FileInfo, isReadableBookType} from '../../../../../book/model/book.model';
 import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
 import {InfiniteScrollDirective} from 'ngx-infinite-scroll';
 import {BookCardLiteComponent} from '../../../../../book/components/book-card-lite/book-card-lite-component';
@@ -162,6 +162,10 @@ export class MetadataTabsComponent {
 
   read(bookId: number, reader?: 'epub-streaming' | 'epub-blob', bookType?: BookType): void {
     this.readBook.emit({ bookId, reader, bookType });
+  }
+
+  isReadableFile(bookType: BookType | undefined): boolean {
+    return isReadableBookType(bookType) && bookType !== 'EPUB' && bookType !== 'AUDIOBOOK';
   }
 
   download(book: Book): void {

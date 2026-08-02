@@ -73,6 +73,7 @@ public class EpubReaderService {
 
     private final BookRepository bookRepository;
     private final DocumentRenditionService documentRenditionService;
+    private final HtmlRenditionService htmlRenditionService;
     private final ArchivedBookContentService archivedBookContentService;
     private final Cache<String, CachedEpubMetadata> metadataCache = Caffeine.newBuilder()
             .maximumSize(MAX_CACHE_ENTRIES)
@@ -112,9 +113,9 @@ public class EpubReaderService {
     }
 
     public EpubBookInfo getBookInfo(Long bookId, String bookType) {
-        Path epubPath = getBookPath(bookId, bookType);
+        ResolvedBook resolvedBook = getBook(bookId, bookType);
         try {
-            CachedEpubMetadata metadata = getCachedMetadata(epubPath);
+            CachedEpubMetadata metadata = getCachedMetadata(resolvedBook);
             return metadata.bookInfo;
         } catch (IOException e) {
             log.error("Failed to read EPUB for book {}", bookId, e);
@@ -127,8 +128,14 @@ public class EpubReaderService {
     }
 
     public void streamFile(Long bookId, String bookType, String filePath, OutputStream outputStream) throws IOException {
-        Path epubPath = getBookPath(bookId, bookType);
-        CachedEpubMetadata metadata = getCachedMetadata(epubPath);
+        ResolvedBook resolvedBook = getBook(bookId, bookType);
+        Path epubPath = resolvedBook.path();
+        CachedEpubMetadata metadata = getCachedMetadata(resolvedBook);
+
+        if (htmlRenditionService.supports(resolvedBook.bookFile())) {
+            htmlRenditionService.streamResource(resolvedBook.bookFile(), filePath, outputStream);
+            return;
+        }
 
         if (documentRenditionService.supports(epubPath)) {
             documentRenditionService.streamResource(epubPath, filePath, outputStream);
@@ -155,9 +162,9 @@ public class EpubReaderService {
     }
 
     public String getContentType(Long bookId, String bookType, String filePath) {
-        Path epubPath = getBookPath(bookId, bookType);
+        ResolvedBook resolvedBook = getBook(bookId, bookType);
         try {
-            CachedEpubMetadata metadata = getCachedMetadata(epubPath);
+            CachedEpubMetadata metadata = getCachedMetadata(resolvedBook);
             String normalizedPath = normalizePath(filePath, metadata.bookInfo.getRootPath());
             EpubManifestItem item = metadata.manifestByHref.get(normalizedPath);
             return item != null ? item.getMediaType() : guessContentType(filePath);
@@ -171,9 +178,9 @@ public class EpubReaderService {
     }
 
     public long getFileSize(Long bookId, String bookType, String filePath) {
-        Path epubPath = getBookPath(bookId, bookType);
+        ResolvedBook resolvedBook = getBook(bookId, bookType);
         try {
-            CachedEpubMetadata metadata = getCachedMetadata(epubPath);
+            CachedEpubMetadata metadata = getCachedMetadata(resolvedBook);
             String normalizedPath = normalizePath(filePath, metadata.bookInfo.getRootPath());
 
             // O(1) lookup instead of O(n) stream filter
@@ -184,27 +191,29 @@ public class EpubReaderService {
         }
     }
 
-    private Path getBookPath(Long bookId, String bookType) {
+    private ResolvedBook getBook(Long bookId, String bookType) {
         BookEntity bookEntity = bookRepository.findByIdForStreaming(bookId)
                 .orElseThrow(() -> ApiError.BOOK_NOT_FOUND.createException(bookId));
+        BookFileEntity bookFile;
         if (bookType != null) {
             BookFileType requestedType = BookFileType.valueOf(bookType.toUpperCase());
-            BookFileEntity bookFile = bookEntity.getBookFiles().stream()
+            bookFile = bookEntity.getBookFiles().stream()
                     .filter(bf -> bf.getBookType() == requestedType)
                     .findFirst()
                     .orElseThrow(() -> ApiError.FILE_NOT_FOUND.createException("No file of type " + bookType + " found for book"));
-            rejectKnownUnreadableDocument(bookFile);
-            return bookFile.isArchivedSource()
-                    ? archivedBookContentService.resolve(bookFile)
-                    : bookFile.getFullFilePath();
+        } else {
+            bookFile = bookEntity.getPrimaryBookFile();
         }
-        // An entry inside an INPX archive has no path of its own: it is materialised into a cached
-        // file first, the same way downloads and metadata extraction already reach archived content.
-        BookFileEntity primaryFile = bookEntity.getPrimaryBookFile();
-        rejectKnownUnreadableDocument(primaryFile);
-        return primaryFile != null && primaryFile.isArchivedSource()
-                ? archivedBookContentService.resolve(primaryFile)
-                : FileUtils.getBookFullPath(bookEntity);
+        rejectKnownUnreadableDocument(bookFile);
+        Path path;
+        if (bookFile == null) {
+            path = FileUtils.getBookFullPath(bookEntity);
+        } else if (bookFile.isArchivedSource()) {
+            path = archivedBookContentService.resolve(bookFile);
+        } else {
+            path = bookFile.getFullFilePath();
+        }
+        return new ResolvedBook(bookFile, path);
     }
 
     private void rejectKnownUnreadableDocument(BookFileEntity bookFile) {
@@ -215,7 +224,8 @@ public class EpubReaderService {
         }
     }
 
-    private CachedEpubMetadata getCachedMetadata(Path epubPath) throws IOException {
+    private CachedEpubMetadata getCachedMetadata(ResolvedBook resolvedBook) throws IOException {
+        Path epubPath = resolvedBook.path();
         String cacheKey = epubPath.toString();
         long currentModified = Files.getLastModifiedTime(epubPath).toMillis();
         CachedEpubMetadata cached = metadataCache.getIfPresent(cacheKey);
@@ -226,12 +236,16 @@ public class EpubReaderService {
         }
 
         log.debug("Cache miss for EPUB: {}, parsing...", epubPath.getFileName());
-        CachedEpubMetadata newMetadata = parseEpubMetadata(epubPath, currentModified);
+        CachedEpubMetadata newMetadata = parseEpubMetadata(resolvedBook, currentModified);
         metadataCache.put(cacheKey, newMetadata);
         return newMetadata;
     }
 
-    private CachedEpubMetadata parseEpubMetadata(Path epubPath, long lastModified) throws IOException {
+    private CachedEpubMetadata parseEpubMetadata(ResolvedBook resolvedBook, long lastModified) throws IOException {
+        Path epubPath = resolvedBook.path();
+        if (htmlRenditionService.supports(resolvedBook.bookFile())) {
+            return new CachedEpubMetadata(htmlRenditionService.buildBookInfo(resolvedBook.bookFile()), lastModified);
+        }
         // A Word document has no archive to open: its spine, manifest and table of contents are
         // synthesised from the parsed text, and the chunks are rendered on request rather than read.
         if (documentRenditionService.supports(epubPath)) {
@@ -244,6 +258,9 @@ public class EpubReaderService {
         } catch (Exception e) {
             throw new IOException("Unable to parse EPUB", e);
         }
+    }
+
+    private record ResolvedBook(BookFileEntity bookFile, Path path) {
     }
 
     private EpubBookInfo mapBookToInfo(Book book) {

@@ -94,6 +94,7 @@ export class UrlHelperService {
         break;
 
       case 'EPUB':
+      case 'HTML':
       case 'FB2':
       case 'MOBI':
       case 'AZW3':

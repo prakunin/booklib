@@ -5,7 +5,7 @@ import {BookService} from '../../../../book/service/book.service';
 import {BookFileService} from '../../../../book/service/book-file.service';
 import {Rating, RatingRateEvent} from 'primeng/rating';
 import {FormsModule} from '@angular/forms';
-import {Book, BookFile, BookMetadata, BookRecommendation, BookType, ComicMetadata, FileInfo, ReadStatus} from '../../../../book/model/book.model';
+import {Book, BookFile, BookMetadata, BookRecommendation, BookType, ComicMetadata, FileInfo, isReadableBookType, ReadStatus} from '../../../../book/model/book.model';
 import {UrlHelperService} from '../../../../../shared/service/url-helper.service';
 import {CoverComponent} from '../../../../../shared/components/cover/cover.component';
 import {UserService} from '../../../../settings/user-management/user.service';
@@ -155,9 +155,7 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
       });
     }
 
-    const readableAlternatives = book.alternativeFormats?.filter(f =>
-      f.bookType && ['PDF', 'EPUB', 'FB2', 'MOBI', 'AZW3', 'CBX', 'AUDIOBOOK'].includes(f.bookType)
-    ) ?? [];
+    const readableAlternatives = book.alternativeFormats?.filter(f => isReadableBookType(f.bookType)) ?? [];
     const uniqueAltTypes = [...new Set(readableAlternatives.map(f => f.bookType))];
 
     if (uniqueAltTypes.length > 0 && items.length > 0) {
@@ -194,6 +192,11 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
 
     return items;
   });
+  isReadable(book: Book): boolean {
+    return isReadableBookType(book.primaryFile?.bookType)
+      && !(book.primaryFile?.bookType === 'DOC' && book.primaryFile.documentParseStatus === 'UNREADABLE');
+  }
+
   readonly downloadMenuItems = computed<MenuItem[]>(() => {
     const book = this.currentBook();
     if (!book || (!book.alternativeFormats?.length && !book.supplementaryFiles?.length)) {
@@ -502,6 +505,17 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
 
   read(bookId: number | undefined, reader?: "epub-streaming" | "epub-blob", bookType?: BookType): void {
     if (bookId) this.bookService.readBook(bookId, reader, bookType);
+  }
+
+  readPreferred(book: Book): void {
+    if (isReadableBookType(book.primaryFile?.bookType)) {
+      this.read(book.id);
+      return;
+    }
+    const alternative = book.alternativeFormats?.find(file => isReadableBookType(file.bookType));
+    if (alternative) {
+      this.read(book.id, undefined, alternative.bookType);
+    }
   }
 
   isInProgressStatus(): boolean {

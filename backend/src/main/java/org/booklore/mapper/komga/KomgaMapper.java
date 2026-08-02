@@ -291,6 +291,7 @@ public class KomgaMapper {
         return switch (bookType) {
             case PDF -> "application/pdf";
             case EPUB -> "application/epub+zip";
+            case HTML -> "text/html";
             case CBX -> "application/x-cbz";
             case FB2 -> "application/fictionbook2+zip";
             case MOBI -> "application/x-mobipocket-ebook";
@@ -314,6 +315,7 @@ public class KomgaMapper {
             case MOBI -> "EPUB";
             case AZW3 -> "EPUB";
             case EPUB -> "EPUB";
+            case HTML -> UNKNOWN_PROFILE;
             case CBX -> "DIVINA"; // DIVINA is for comic books
             case FB2 -> "DIVINA";
             case AUDIOBOOK -> "AUDIOBOOK";

@@ -36,6 +36,8 @@ class ArchiveEntryMetadataRecognizerTest {
         // folder would give it.
         assertThat(recognizer.resolveBookType("x.djvu")).isEqualTo(BookFileType.DJVU);
         assertThat(recognizer.resolveBookType("x.djv")).isEqualTo(BookFileType.DJVU);
+        assertThat(recognizer.resolveBookType("x.html")).isEqualTo(BookFileType.HTML);
+        assertThat(recognizer.resolveBookType("x.htm")).isEqualTo(BookFileType.HTML);
         // Formats that still have no reader stay download-only.
         assertThat(recognizer.resolveBookType("x.rtf")).isEqualTo(BookFileType.OTHER);
     }

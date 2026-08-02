@@ -7,6 +7,7 @@ import org.booklore.model.MetadataUpdateWrapper;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
+import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.MetadataReplaceMode;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.metadata.BookCoverService;
@@ -93,7 +94,7 @@ public class InpxArchiveBookRefreshService {
             }
 
             String entryName = bookFile.getFileName();
-            if (!entryMetadataRecognizer.hasExtractor(entryName)) {
+            if (!requiresRevalidation(bookFile)) {
                 // A download-only format with no extractor (djvu, rtf, …): the filename metadata set
                 // at discovery is all there is. Skip materialising the entry — nothing to extract, no
                 // cover to read — and leave the row as-is.
@@ -122,6 +123,13 @@ public class InpxArchiveBookRefreshService {
             return RefreshResult.REFRESHED;
         };
         return transactionTemplate.execute(work);
+    }
+
+    private boolean requiresRevalidation(BookFileEntity bookFile) {
+        return entryMetadataRecognizer.hasExtractor(bookFile.getFileName())
+                || bookFile.getBookType() == BookFileType.HTML
+                || bookFile.getBookType() == BookFileType.CBX
+                && entryMetadataRecognizer.isGenericArchive(bookFile.getFileName());
     }
 
     private enum RefreshResult {

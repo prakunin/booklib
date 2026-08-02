@@ -146,6 +146,41 @@ class ArchivedBookContentServiceTest {
     }
 
     @Test
+    void listsAndStreamsOnlyExactEntriesFromTheContainingPublicationArchive() throws IOException {
+        Path archiveRoot = Files.createDirectory(tempDir.resolve("archives"));
+        ByteArrayOutputStream nestedBytes = new ByteArrayOutputStream();
+        try (ZipOutputStream nested = new ZipOutputStream(nestedBytes)) {
+            nested.putNextEntry(new ZipEntry("letter.html"));
+            nested.write("html".getBytes(StandardCharsets.UTF_8));
+            nested.closeEntry();
+            nested.putNextEntry(new ZipEntry("img/00.gif"));
+            nested.write("gif".getBytes(StandardCharsets.UTF_8));
+            nested.closeEntry();
+        }
+        try (ZipOutputStream output = new ZipOutputStream(
+                Files.newOutputStream(archiveRoot.resolve("outer.zip")))) {
+            output.putNextEntry(new ZipEntry("publication.zip"));
+            output.write(nestedBytes.toByteArray());
+            output.closeEntry();
+        }
+        AppProperties properties = new AppProperties();
+        properties.setPathConfig(tempDir.resolve("data").toString());
+        ArchivedBookContentService service = new ArchivedBookContentService(properties, new ArchiveService());
+        BookFileEntity file = archivedFile(archiveRoot, "outer.zip",
+                NestedArchiveLocator.encode(List.of("publication.zip", "letter.html")));
+        file.setFileName("letter.html");
+
+        assertThat(service.listPublicationEntries(file))
+                .extracting(ArchivedBookContentService.ArchivedEntry::name)
+                .containsExactly("letter.html", "img/00.gif");
+        ByteArrayOutputStream image = new ByteArrayOutputStream();
+        service.streamPublicationEntry(file, "img/00.gif", image);
+        assertThat(image.toString(StandardCharsets.UTF_8)).isEqualTo("gif");
+        assertThatThrownBy(() -> service.streamPublicationEntry(file, "img/missing.gif",
+                new ByteArrayOutputStream())).isInstanceOf(IOException.class);
+    }
+
+    @Test
     void extractsThroughAMixedLegacyCyrillicNestedLocator() throws IOException {
         Path archiveRoot = Files.createDirectory(tempDir.resolve("archives"));
         byte[] nested = ZipCharsetTestFixtures.bytes("windows-1251", false,

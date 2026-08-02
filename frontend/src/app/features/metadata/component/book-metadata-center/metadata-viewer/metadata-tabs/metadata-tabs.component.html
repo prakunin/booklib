@@ -240,7 +240,7 @@
                           tooltipPosition="top"
                           (onClick)="read(currentBook.id, 'epub-streaming')">
                         </p-button>
-                      } @else if (currentBook.primaryFile.bookType && ['PDF', 'FB2', 'MOBI', 'AZW3', 'CBX'].includes(currentBook.primaryFile.bookType)) {
+                      } @else if (isReadableFile(currentBook.primaryFile.bookType)) {
                         <p-button
                           icon="pi pi-book"
                           size="small"
@@ -328,7 +328,7 @@
                             tooltipPosition="top"
                             (onClick)="read(currentBook.id, 'epub-streaming', format.bookType)">
                           </p-button>
-                        } @else if (format.bookType && ['PDF', 'FB2', 'MOBI', 'AZW3', 'CBX'].includes(format.bookType)) {
+                        } @else if (isReadableFile(format.bookType)) {
                           <p-button
                             icon="pi pi-book"
                             size="small"

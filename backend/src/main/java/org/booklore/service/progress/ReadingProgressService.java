@@ -154,7 +154,7 @@ public class ReadingProgressService {
         if (type == null) return;
 
         switch (type) {
-            case EPUB, FB2, MOBI, AZW3 -> book.setEpubProgress(EpubProgress.builder()
+            case EPUB, HTML, FB2, MOBI, AZW3 -> book.setEpubProgress(EpubProgress.builder()
                     .cfi(fileProgress.getPositionData())
                     .href(fileProgress.getPositionHref())
                     .contentSourceProgressPercent(roundToOneDecimal(fileProgress.getContentSourceProgressPercent()))
@@ -382,7 +382,7 @@ public class ReadingProgressService {
                         String.valueOf(progress.getPdfProgress()) : null);
                 entity.setProgressPercent(progress.getPdfProgressPercent());
             }
-            case EPUB, FB2, MOBI, AZW3 -> {
+            case EPUB, HTML, FB2, MOBI, AZW3 -> {
                 entity.setPositionData(progress.getEpubProgress());
                 entity.setPositionHref(progress.getEpubProgressHref());
                 entity.setProgressPercent(progress.getEpubProgressPercent());
@@ -416,7 +416,7 @@ public class ReadingProgressService {
             }
             // A switch statement, so an unlisted type is skipped silently rather than caught by the
             // compiler: DOC has to be named here explicitly or its legacy progress columns stay empty.
-            case EPUB, FB2, MOBI, AZW3, DOC -> {
+            case EPUB, HTML, FB2, MOBI, AZW3, DOC -> {
                 progress.setEpubProgress(fileProgress.positionData());
                 progress.setEpubProgressHref(fileProgress.positionHref());
                 progress.setEpubProgressPercent(fileProgress.progressPercent());
@@ -441,7 +441,7 @@ public class ReadingProgressService {
     private Float updateProgressByBookType(UserBookProgressEntity progress, BookFileType bookType, ReadProgressRequest request) {
         return switch (bookType) {
             // DOC reads through a synthesised EPUB rendition, so its position is an EPUB CFI like the rest.
-            case EPUB, FB2, MOBI, AZW3, DOC -> updateEbookProgress(progress, request.getEpubProgress());
+            case EPUB, HTML, FB2, MOBI, AZW3, DOC -> updateEbookProgress(progress, request.getEpubProgress());
             case PDF, DJVU -> updatePdfProgress(progress, request.getPdfProgress());
             case CBX -> updateCbxProgress(progress, request.getCbxProgress());
             case AUDIOBOOK -> updateAudiobookProgress(request.getAudiobookProgress());
@@ -495,7 +495,7 @@ public class ReadingProgressService {
     @SuppressWarnings("java:S1874")
     private void setProgressPercent(UserBookProgressEntity progress, BookFileType type, Float percentage) {
         switch (type) {
-            case EPUB, FB2, MOBI, AZW3 -> progress.setEpubProgressPercent(percentage);
+            case EPUB, HTML, FB2, MOBI, AZW3 -> progress.setEpubProgressPercent(percentage);
             case PDF, DJVU -> progress.setPdfProgressPercent(percentage);
             case CBX -> progress.setCbxProgressPercent(percentage);
             case AUDIOBOOK -> {

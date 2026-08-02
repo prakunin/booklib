@@ -76,6 +76,14 @@ public class InpxCoverGenerationListener {
         try {
             generated = bookCoverService.tryGenerateMissingInpxCover(bookId);
             attemptedBooks.put(bookId, generated);
+        } catch (IllegalArgumentException e) {
+            if (e.getMessage() == null || !e.getMessage().startsWith("No processor found for file type:")) {
+                log.warn("Failed to lazily generate INPX cover for book {}: {}", bookId, e.getMessage());
+                log.debug("Lazy INPX cover generation failure for book " + bookId, e);
+                return;
+            }
+            attemptedBooks.put(bookId, false);
+            log.debug("Skipping lazy INPX cover generation for unsupported book {}: {}", bookId, e.getMessage());
         } catch (Exception e) {
             log.warn("Failed to lazily generate INPX cover for book {}: {}", bookId, e.getMessage());
             log.debug("Lazy INPX cover generation failure for book " + bookId, e);

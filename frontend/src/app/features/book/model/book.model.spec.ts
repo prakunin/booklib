@@ -24,6 +24,11 @@ describe('book.model', () => {
     expect(isReadableBookType('OTHER')).toBe(false);
   });
 
+  it('treats HTML as a known, readable type', () => {
+    expect(BOOK_TYPES).toContain('HTML');
+    expect(isReadableBookType('HTML')).toBe(true);
+  });
+
   it('exposes stable additional file and read-status enums', () => {
     expect(AdditionalFileType).toEqual({
       ALTERNATIVE_FORMAT: 'ALTERNATIVE_FORMAT',

@@ -33,7 +33,7 @@ public class MetadataExtractorFactory {
             case AUDIOBOOK -> audiobookMetadataExtractor.extractMetadata(file);
             case DOC -> docMetadataExtractor.extractMetadata(file);
             case DJVU -> djvuMetadataExtractor.extractMetadata(file);
-            case OTHER -> null;
+            case HTML, OTHER -> null;
         };
     }
 
@@ -76,7 +76,7 @@ public class MetadataExtractorFactory {
             case AUDIOBOOK -> audiobookMetadataExtractor;
             case DOC -> docMetadataExtractor;
             case DJVU -> djvuMetadataExtractor;
-            case OTHER -> null;
+            case HTML, OTHER -> null;
         };
     }
 }

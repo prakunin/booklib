@@ -245,7 +245,7 @@ export class BookCardComponent {
     if (book.pdfProgress) return 'PDF';
     if (book.cbxProgress) return 'CBX';
     const alternativeFormat = book.alternativeFormats?.find(f =>
-      f.bookType && ['EPUB', 'PDF', 'CBX', 'FB2', 'MOBI', 'AZW3'].includes(f.bookType)
+      f.bookType && ['EPUB', 'HTML', 'PDF', 'CBX', 'FB2', 'MOBI', 'AZW3'].includes(f.bookType)
     );
     return alternativeFormat?.bookType;
   }
