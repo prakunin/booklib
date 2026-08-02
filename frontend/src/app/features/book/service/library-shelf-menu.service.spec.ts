@@ -1,6 +1,6 @@
 import {TestBed} from '@angular/core/testing';
 import {Router} from '@angular/router';
-import {of} from 'rxjs';
+import {of, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {MenuItem, MenuItemCommandEvent} from 'primeng/api';
 import {ConfirmationService, MessageService} from 'primeng/api';
@@ -19,6 +19,7 @@ import {MetadataRefreshType} from '../../metadata/model/request/metadata-refresh
 import type {Library} from '../model/library.model';
 import type {Shelf} from '../model/shelf.model';
 import type {MagicShelf} from '../../magic-shelf/service/magic-shelf.service';
+import {InpxArchiveService} from '../../inpx-archive-manager/inpx-archive.service';
 
 function buildLibrary(overrides: Partial<Library> = {}): Library {
   return {
@@ -88,8 +89,12 @@ describe('LibraryShelfMenuService', () => {
   };
   const dialogLauncherService = {
     openLibraryEditDialog: vi.fn(() => Promise.resolve(null)),
+    openInpxScanQueueDialog: vi.fn(() => Promise.resolve(null)),
     openShelfEditDialog: vi.fn(() => Promise.resolve(null)),
     openMagicShelfEditDialog: vi.fn(() => Promise.resolve(null)),
+  };
+  const inpxArchiveService = {
+    rescan: vi.fn(() => of(undefined)),
   };
   const magicShelfService = {
     deleteShelf: vi.fn(() => of(undefined)),
@@ -123,6 +128,7 @@ describe('LibraryShelfMenuService', () => {
         {provide: MagicShelfService, useValue: magicShelfService},
         {provide: LoadingService, useValue: loadingService},
         {provide: BookDialogHelperService, useValue: bookDialogHelperService},
+        {provide: InpxArchiveService, useValue: inpxArchiveService},
         {provide: TranslocoService, useValue: translocoService},
       ],
     });
@@ -143,6 +149,7 @@ describe('LibraryShelfMenuService', () => {
     userService.getCurrentUser.mockClear();
     router.navigate.mockClear();
     dialogLauncherService.openLibraryEditDialog.mockClear();
+    dialogLauncherService.openInpxScanQueueDialog.mockClear();
     dialogLauncherService.openShelfEditDialog.mockClear();
     dialogLauncherService.openMagicShelfEditDialog.mockClear();
     magicShelfService.deleteShelf.mockClear();
@@ -152,7 +159,76 @@ describe('LibraryShelfMenuService', () => {
     bookDialogHelperService.openBulkIsbnImportDialog.mockClear();
     bookDialogHelperService.openDuplicateMergerDialog.mockClear();
     bookDialogHelperService.openMetadataRefreshDialogWithContext.mockClear();
+    inpxArchiveService.rescan.mockReset().mockReturnValue(of(undefined));
     translocoService.translate.mockClear();
+  });
+
+  it('offers only archive-scoped actions on an archive page', () => {
+    const items = service.initializeArchiveMenuItems(
+      buildLibrary({id: 42, sourceType: 'INPX'}),
+      'a b (final).zip'
+    );
+    const actionLabels = items.flatMap(item => item.items ?? [item])
+      .filter(item => !item.separator)
+      .map(item => item.label);
+
+    expect(actionLabels).toEqual([
+      'book.shelfMenuService.archive.manageArchives',
+      'book.shelfMenuService.archive.scanQueue',
+      'book.shelfMenuService.archive.recursiveRescan',
+    ]);
+
+    runCommand(findMenuItem(items, 'book.shelfMenuService.archive.manageArchives'));
+    runCommand(findMenuItem(items, 'book.shelfMenuService.archive.scanQueue'));
+    runCommand(findMenuItem(items, 'book.shelfMenuService.archive.recursiveRescan'));
+
+    expect(router.navigate).toHaveBeenCalledWith(['/library', 42, 'archives']);
+    expect(dialogLauncherService.openInpxScanQueueDialog).toHaveBeenCalledWith(42);
+    expect(inpxArchiveService.rescan).not.toHaveBeenCalled();
+
+    const confirmation = confirmationService.confirm.mock.calls.at(-1)?.[0];
+    expect(confirmation).toEqual(expect.objectContaining({
+      message: 'book.shelfMenuService.confirm.recursiveArchiveRescanMessage',
+    }));
+    confirmation?.accept?.();
+
+    expect(inpxArchiveService.rescan).toHaveBeenCalledWith(42, 'a b (final).zip');
+    expect(messageService.add).toHaveBeenCalledWith(expect.objectContaining({
+      severity: 'info',
+      detail: 'book.inpxArchives.scanQueued',
+    }));
+  });
+
+  it('reports archive rescan failures and preserves the exact archive identity', () => {
+    inpxArchiveService.rescan.mockReturnValueOnce(throwError(() => new Error('scan failed')));
+    const items = service.initializeArchiveMenuItems(buildLibrary({id: 8}), 'issue #1.zip');
+
+    runCommand(findMenuItem(items, 'book.shelfMenuService.archive.recursiveRescan'));
+    confirmationService.confirm.mock.calls.at(-1)?.[0]?.accept?.();
+
+    expect(inpxArchiveService.rescan).toHaveBeenCalledWith(8, 'issue #1.zip');
+    expect(messageService.add).toHaveBeenCalledWith(expect.objectContaining({
+      severity: 'error',
+      detail: 'book.inpxArchives.scanFailed',
+    }));
+  });
+
+  it('disables archive commands when their required route identity is missing', () => {
+    const items = service.initializeArchiveMenuItems(buildLibrary({id: undefined}), null);
+
+    for (const label of [
+      'book.shelfMenuService.archive.manageArchives',
+      'book.shelfMenuService.archive.scanQueue',
+      'book.shelfMenuService.archive.recursiveRescan',
+    ]) {
+      const item = findMenuItem(items, label);
+      expect(item.disabled).toBe(true);
+      runCommand(item);
+    }
+
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(dialogLauncherService.openInpxScanQueueDialog).not.toHaveBeenCalled();
+    expect(confirmationService.confirm).not.toHaveBeenCalled();
   });
 
   it('disables and guards library actions when the library id is missing', () => {

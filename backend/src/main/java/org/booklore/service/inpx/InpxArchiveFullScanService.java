@@ -28,6 +28,7 @@ public class InpxArchiveFullScanService {
     private final InpxBatchWriter batchWriter;
     private final BookFileRepository bookFileRepository;
     private final InpxArchiveBookRefreshService bookRefreshService;
+    private final InpxArchiveReconciliationService archiveReconciliationService;
     private final NotificationService notificationService;
     private final TaskExecutor taskExecutor;
 
@@ -36,6 +37,7 @@ public class InpxArchiveFullScanService {
                                       InpxBatchWriter batchWriter,
                                       BookFileRepository bookFileRepository,
                                       InpxArchiveBookRefreshService bookRefreshService,
+                                      InpxArchiveReconciliationService archiveReconciliationService,
                                       NotificationService notificationService,
                                       @Qualifier("inpxArchiveScanExecutor") TaskExecutor taskExecutor) {
         this.catalogService = catalogService;
@@ -43,6 +45,7 @@ public class InpxArchiveFullScanService {
         this.batchWriter = batchWriter;
         this.bookFileRepository = bookFileRepository;
         this.bookRefreshService = bookRefreshService;
+        this.archiveReconciliationService = archiveReconciliationService;
         this.notificationService = notificationService;
         this.taskExecutor = taskExecutor;
     }
@@ -87,6 +90,9 @@ public class InpxArchiveFullScanService {
                 }
             }, () -> false);
             addedBooks[0] += persist(batch, libraryId, libraryPath.getId(), caches);
+            if (candidate.hasNestedContainers()) {
+                archiveReconciliationService.retireObsoleteGenericContainers(libraryId, List.of(archiveName));
+            }
 
             List<Long> bookIds = bookFileRepository.findBookIdsByArchive(libraryId, archiveName);
             catalogService.refreshing(libraryId, archiveName, bookIds.size(), addedBooks[0]);

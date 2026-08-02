@@ -328,6 +328,12 @@
       "findDuplicates": "Find Duplicates",
       "deleteLibrary": "Delete Library"
     },
+    "archive": {
+      "optionsLabel": "Archive actions",
+      "manageArchives": "Back to archives",
+      "scanQueue": "Scan queue",
+      "recursiveRescan": "Recursive rescan"
+    },
     "shelf": {
       "publicShelfPrefix": "Public Shelf - ",
       "readOnly": "Read only",
@@ -343,6 +349,7 @@
     },
     "confirm": {
       "rescanLibraryMessage": "Are you sure you want to refresh library: {{ name }}?",
+      "recursiveArchiveRescanMessage": "Recursively rescan {{ name }} and refresh its books, metadata, and covers?",
       "deleteLibraryMessage": "Are you sure you want to delete library: {{ name }}?",
       "deleteInpxLibraryMessage": "Are you sure you want to delete INPX library: {{ name }}? The .inpx index and book archives will remain on disk.",
       "deleteShelfMessage": "Are you sure you want to delete shelf: {{ name }}?",

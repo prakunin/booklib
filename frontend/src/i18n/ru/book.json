@@ -320,6 +320,12 @@
             "deleteLibrary": "Удалить библиотеку",
             "bulkIsbnImport": ""
         },
+        "archive": {
+            "optionsLabel": "Действия с архивом",
+            "manageArchives": "Назад к архивам",
+            "scanQueue": "Очередь сканирования",
+            "recursiveRescan": "Рекурсивно пересканировать"
+        },
         "shelf": {
             "publicShelfPrefix": "Публичная полка - ",
             "readOnly": "Только для чтения",
@@ -335,6 +341,7 @@
         },
         "confirm": {
             "rescanLibraryMessage": "Вы уверены, что хотите обновить библиотеку: {{ name }}?",
+            "recursiveArchiveRescanMessage": "Рекурсивно пересканировать {{ name }} и обновить его книги, метаданные и обложки?",
             "deleteLibraryMessage": "Вы уверены, что хотите удалить библиотеку: {{ name }}?",
             "deleteInpxLibraryMessage": "Вы уверены, что хотите удалить INPX-библиотеку: {{ name }}? Индекс .inpx и архивы книг останутся на диске.",
             "deleteShelfMessage": "Вы уверены, что хотите удалить полку: {{ name }}?",

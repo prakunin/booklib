@@ -22,6 +22,8 @@ public class InpxBookDto {
     private String language;
     private Double rating;
     private String archiveName;
+    // Exact source identity. Null keeps the legacy direct-entry fileName + extension identity.
+    private String sourceArchiveEntry;
     private Long fileSizeKb;
     // The file type inferred from the entry extension: a readable type (FB2, PDF, …) or the
     // download-only OTHER. Index-sourced books (InpxParser) are always FB2; archive-scanned books

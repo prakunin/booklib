@@ -15,6 +15,7 @@ import { DialogLauncherService } from '../../../shared/services/dialog-launcher.
 import { BookDialogHelperService } from '../components/book-browser/book-dialog-helper.service';
 import { TranslocoService } from '@jsverse/transloco';
 import type { MenuItem } from 'primeng/api';
+import { InpxArchiveService } from '../../inpx-archive-manager/inpx-archive.service';
 
 @Injectable({
   providedIn: 'root',
@@ -32,7 +33,88 @@ export class LibraryShelfMenuService {
   private readonly userService = inject(UserService);
   private readonly loadingService = inject(LoadingService);
   private readonly bookDialogHelperService = inject(BookDialogHelperService);
+  private readonly inpxArchiveService = inject(InpxArchiveService);
   private readonly t = inject(TranslocoService);
+
+  initializeArchiveMenuItems(entity: Library | null, archiveName: string | null): MenuItem[] {
+    const libraryId = entity?.id;
+    const archiveIdentityAvailable = libraryId != null && !!archiveName?.trim();
+
+    return [
+      {
+        label: this.t.translate('book.shelfMenuService.archive.optionsLabel'),
+        items: [
+          {
+            label: this.t.translate('book.shelfMenuService.archive.manageArchives'),
+            icon: 'pi pi-arrow-left',
+            disabled: libraryId == null,
+            command: () => {
+              if (libraryId == null) {
+                return;
+              }
+              void this.router.navigate(['/library', libraryId, 'archives']);
+            }
+          },
+          {
+            label: this.t.translate('book.shelfMenuService.archive.scanQueue'),
+            icon: 'pi pi-list',
+            disabled: libraryId == null,
+            command: () => {
+              if (libraryId == null) {
+                return;
+              }
+              void this.dialogLauncherService.openInpxScanQueueDialog(libraryId).catch(() => undefined);
+            }
+          },
+          {
+            separator: true
+          },
+          {
+            label: this.t.translate('book.shelfMenuService.archive.recursiveRescan'),
+            icon: 'pi pi-refresh',
+            disabled: !archiveIdentityAvailable,
+            command: () => {
+              if (!archiveIdentityAvailable || archiveName == null) {
+                return;
+              }
+              this.confirmationService.confirm({
+                message: this.t.translate('book.shelfMenuService.confirm.recursiveArchiveRescanMessage', {name: archiveName}),
+                header: this.t.translate('book.shelfMenuService.confirm.header'),
+                acceptLabel: this.t.translate('book.shelfMenuService.archive.recursiveRescan'),
+                rejectLabel: this.t.translate('common.cancel'),
+                rejectButtonProps: {
+                  label: this.t.translate('common.cancel'),
+                  severity: 'secondary',
+                },
+                acceptButtonProps: {
+                  label: this.t.translate('book.shelfMenuService.archive.recursiveRescan'),
+                  severity: 'success',
+                },
+                accept: () => {
+                  this.inpxArchiveService.rescan(libraryId, archiveName).subscribe({
+                    next: () => {
+                      this.messageService.add({
+                        severity: 'info',
+                        summary: this.t.translate('common.success'),
+                        detail: this.t.translate('book.inpxArchives.scanQueued', {name: archiveName}),
+                      });
+                    },
+                    error: () => {
+                      this.messageService.add({
+                        severity: 'error',
+                        summary: this.t.translate('common.error'),
+                        detail: this.t.translate('book.inpxArchives.scanFailed'),
+                      });
+                    }
+                  });
+                }
+              });
+            }
+          }
+        ]
+      }
+    ];
+  }
 
   initializeLibraryMenuItems(entity: Library | null): MenuItem[] {
     const libraryId = entity?.id;

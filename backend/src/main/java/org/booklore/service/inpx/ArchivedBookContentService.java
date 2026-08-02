@@ -7,6 +7,7 @@ import org.booklore.config.AppProperties;
 import org.booklore.exception.ApiError;
 import org.booklore.exception.ArchiveEntryMissingException;
 import org.booklore.model.entity.BookFileEntity;
+import org.booklore.service.ArchiveService;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -15,17 +16,22 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
 @Service
 @RequiredArgsConstructor
 public class ArchivedBookContentService {
 
     private static final long MAX_EXTRACTED_SIZE = 1024L * 1024 * 1024;
+    private static final long MAX_TOTAL_EXPANDED_SIZE = 4L * MAX_EXTRACTED_SIZE;
     private final AppProperties appProperties;
+    private final ArchiveService archiveService;
     private final ConcurrentMap<Long, CompletableFuture<Path>> extractionFlights = new ConcurrentHashMap<>();
 
     /** Resolves for reading, serving the extraction cache whenever it looks current. */
@@ -98,7 +104,10 @@ public class ArchivedBookContentService {
         var library = bookFile.getBook().getLibrary();
         Path archiveRoot = Path.of(library.getInpxArchivePath()).toAbsolutePath().normalize();
         String archiveName = safeLeaf(bookFile.getSourceArchive(), ".zip");
-        String entryName = safeEntryLeaf(bookFile.getSourceArchiveEntry());
+        List<String> entryChain = bookFile.getSourceArchiveEntry().equals(bookFile.getFileName())
+                ? List.of(bookFile.getSourceArchiveEntry())
+                : NestedArchiveLocator.decode(bookFile.getSourceArchiveEntry());
+        String entryName = safeEntryLeaf(bookFile.getFileName());
         Path archivePath = archiveRoot.resolve(archiveName).normalize();
         if (!archivePath.startsWith(archiveRoot) || !Files.isRegularFile(archivePath) || !Files.isReadable(archivePath)) {
             throw ApiError.FILE_NOT_FOUND.createException("INPX archive is unavailable: " + archiveName);
@@ -113,7 +122,7 @@ public class ArchivedBookContentService {
                 return cached;
             }
             Files.createDirectories(cacheDirectory);
-            extract(archivePath, entryName, cached);
+            extract(archivePath, entryChain, cached);
             return cached;
         } catch (MissingEntryException _) {
             throw new ArchiveEntryMissingException(entryName);
@@ -122,42 +131,103 @@ public class ArchivedBookContentService {
         }
     }
 
-    private void extract(Path archivePath, String entryName, Path target) throws IOException {
-        // Commons Compress, not java.util.zip: the JDK reader rejects the legacy Flibusta usr ZIPs
-        // outright with "invalid CEN header", so the extraction must use the lenient reader too.
-        try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
-            ZipArchiveEntry entry = archive.getEntry(entryName);
-            if (entry == null || entry.isDirectory()) {
-                throw new MissingEntryException(entryName);
+    private void extract(Path archivePath, List<String> entryChain, Path target) throws IOException {
+        List<Path> temporaryPaths = new ArrayList<>();
+        long[] totalExpanded = {0};
+        Path currentArchive = archivePath;
+        try {
+            for (int index = 0; index < entryChain.size(); index++) {
+                String entryName = entryChain.get(index);
+                boolean finalEntry = index == entryChain.size() - 1;
+                Path output = finalEntry
+                        ? Files.createTempFile(target.getParent(), ".inpx-", ".tmp")
+                        : Files.createTempFile("booklib-inpx-nested-", suffix(entryName));
+                temporaryPaths.add(output);
+                extractEntry(currentArchive, entryName, output, index == 0, totalExpanded);
+                if (!finalEntry) {
+                    currentArchive = output;
+                }
             }
-            Path temporary = Files.createTempFile(target.getParent(), ".inpx-", ".tmp");
+            Path completed = temporaryPaths.getLast();
             try {
-                try (InputStream input = archive.getInputStream(entry);
-                     OutputStream output = Files.newOutputStream(temporary)) {
-                    copyBounded(input, output);
-                }
-                try {
-                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING,
-                            StandardCopyOption.ATOMIC_MOVE);
-                } catch (java.nio.file.AtomicMoveNotSupportedException _) {
-                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
-                }
-            } finally {
-                Files.deleteIfExists(temporary);
+                Files.move(completed, target, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException _) {
+                Files.move(completed, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            for (int index = temporaryPaths.size() - 1; index >= 0; index--) {
+                Files.deleteIfExists(temporaryPaths.get(index));
             }
         }
     }
 
-    private void copyBounded(InputStream input, OutputStream output) throws IOException {
-        byte[] buffer = new byte[64 * 1024];
-        long total = 0;
-        int read;
-        while ((read = input.read(buffer)) != -1) {
-            total += read;
-            if (total > MAX_EXTRACTED_SIZE) {
+    private void extractEntry(Path archivePath, String entryName, Path output, boolean outer,
+                              long[] totalExpanded) throws IOException {
+        if (outer || archivePath.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip")) {
+            try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
+                ZipArchiveEntry entry = ZipEntryNameResolver.findEntry(archive, entryName);
+                if (entry == null || entry.isDirectory()) {
+                    throw new MissingEntryException(entryName);
+                }
+                try (InputStream input = archive.getInputStream(entry);
+                     OutputStream target = Files.newOutputStream(output)) {
+                    copyBounded(input, target, totalExpanded);
+                }
+            }
+        } else {
+            try (OutputStream target = Files.newOutputStream(output)) {
+                archiveService.transferEntryTo(archivePath, entryName,
+                        new BoundedOutputStream(target, totalExpanded));
+            } catch (IOException e) {
+                if (e.getMessage() != null && e.getMessage().contains("Entry not found")) {
+                    throw new MissingEntryException(entryName);
+                }
+                throw e;
+            }
+        }
+    }
+
+    private void copyBounded(InputStream input, OutputStream output, long[] totalExpanded) throws IOException {
+        input.transferTo(new BoundedOutputStream(output, totalExpanded));
+    }
+
+    private String suffix(String entryName) {
+        int dot = entryName.lastIndexOf('.');
+        return dot >= 0 && dot < entryName.length() - 1 ? entryName.substring(dot) : ".archive";
+    }
+
+    private static final class BoundedOutputStream extends OutputStream {
+        private final OutputStream delegate;
+        private final long[] totalExpanded;
+        private long entryBytes;
+
+        private BoundedOutputStream(OutputStream delegate, long[] totalExpanded) {
+            this.delegate = delegate;
+            this.totalExpanded = totalExpanded;
+        }
+
+        @Override
+        public void write(int value) throws IOException {
+            account(1);
+            delegate.write(value);
+        }
+
+        @Override
+        public void write(byte[] bytes, int offset, int length) throws IOException {
+            account(length);
+            delegate.write(bytes, offset, length);
+        }
+
+        private void account(int length) throws IOException {
+            entryBytes += length;
+            totalExpanded[0] += length;
+            if (entryBytes > MAX_EXTRACTED_SIZE) {
                 throw new IOException("Archived book exceeds the 1 GiB cache limit");
             }
-            output.write(buffer, 0, read);
+            if (totalExpanded[0] > MAX_TOTAL_EXPANDED_SIZE) {
+                throw new IOException("Nested archive expanded-byte limit exceeded");
+            }
         }
     }
 

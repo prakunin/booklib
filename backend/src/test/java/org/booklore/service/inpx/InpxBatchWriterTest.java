@@ -127,6 +127,22 @@ class InpxBatchWriterTest {
     }
 
     @Test
+    void persistsNestedIdentitySeparatelyFromTheVisibleLeafName() {
+        when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
+        InpxBookDto nested = book("outer.zip", "book", "Book", null, null);
+        String locator = NestedArchiveLocator.encode(List.of("first.zip", "folder/book.fb2"));
+        nested.setSourceArchiveEntry(locator);
+
+        writer.persist(List.of(nested), 7L, 3L, caches);
+
+        ArgumentCaptor<List<BookEntity>> captor = ArgumentCaptor.forClass(List.class);
+        verify(bookRepository).saveAll(captor.capture());
+        BookFileEntity file = captor.getValue().getFirst().getBookFiles().getFirst();
+        assertThat(file.getFileName()).isEqualTo("book.fb2");
+        assertThat(file.getSourceArchiveEntry()).isEqualTo(locator);
+    }
+
+    @Test
     void storesTheRatingFromTheIndex() {
         when(bookFileRepository.findExistingArchiveEntries(eq(7L), any(), any())).thenReturn(List.of());
 

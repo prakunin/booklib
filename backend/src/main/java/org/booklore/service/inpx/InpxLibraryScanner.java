@@ -32,6 +32,7 @@ public class InpxLibraryScanner {
     private final InpxArchiveScanner archiveScanner;
     private final LibraryRepository libraryRepository;
     private final InpxBatchWriter batchWriter;
+    private final InpxArchiveReconciliationService archiveReconciliationService;
     private final InpxScanControl scanControl;
     private final NotificationService notificationService;
 
@@ -77,6 +78,13 @@ public class InpxLibraryScanner {
                         () -> cancelled[0]);
 
                 flushRemaining(cancelled, batch, scanContext);
+                if (!cancelled[0]) {
+                    List<String> nestedArchives = discovery.candidates().stream()
+                            .filter(InpxArchiveScanner.ArchiveCandidate::hasNestedContainers)
+                            .map(InpxArchiveScanner.ArchiveCandidate::archiveName)
+                            .toList();
+                    archiveReconciliationService.retireObsoleteGenericContainers(libraryId, nestedArchives);
+                }
             }
 
             // An index smaller than BATCH_SIZE never reaches the in-loop check above, and a

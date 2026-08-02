@@ -2,6 +2,8 @@ package org.booklore.service.inpx;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.booklore.config.security.service.LibraryAccessGuard;
 import org.booklore.exception.ApiError;
 import org.booklore.model.dto.inpx.InpxBookDto;
@@ -27,8 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 @Slf4j
 @Service
@@ -128,7 +128,7 @@ public class InpxImportService {
         }
 
         try (ZipFile archive = openArchive(archivePath)) {
-            ZipEntry entry = archive.getEntry(entryName);
+            ZipArchiveEntry entry = ZipEntryNameResolver.findEntry(archive, entryName);
             if (entry == null || entry.isDirectory()) {
                 throw new IOException("Archive entry is missing: " + entryName);
             }
@@ -154,7 +154,7 @@ public class InpxImportService {
     }
 
     ZipFile openArchive(Path archivePath) throws IOException {
-        return new ZipFile(archivePath.toFile());
+        return ZipFile.builder().setFile(archivePath.toFile()).get();
     }
 
     private void copyBounded(InputStream input, OutputStream output) throws IOException {

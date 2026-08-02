@@ -1,14 +1,17 @@
 package org.booklore.service.inpx;
 
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream.UnicodeExtraFieldPolicy;
 import org.booklore.config.AppProperties;
 import org.booklore.exception.ArchiveEntryMissingException;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.entity.LibraryEntity;
+import org.booklore.service.ArchiveService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,7 +46,7 @@ class ArchivedBookContentServiceTest {
 
         AppProperties properties = new AppProperties();
         properties.setPathConfig(tempDir.resolve("data").toString());
-        ArchivedBookContentService service = new ArchivedBookContentService(properties);
+        ArchivedBookContentService service = new ArchivedBookContentService(properties, new ArchiveService());
 
         LibraryEntity library = LibraryEntity.builder()
                 .id(7L)
@@ -76,7 +79,7 @@ class ArchivedBookContentServiceTest {
         writeArchive(archive, "paper.doc", "doc-bytes");
         AppProperties properties = new AppProperties();
         properties.setPathConfig(tempDir.resolve("data").toString());
-        ArchivedBookContentService service = new ArchivedBookContentService(properties);
+        ArchivedBookContentService service = new ArchivedBookContentService(properties, new ArchiveService());
         LibraryEntity library = LibraryEntity.builder().id(7L).inpxArchivePath(archiveRoot.toString()).build();
         BookEntity book = BookEntity.builder().library(library).build();
         BookFileEntity file = BookFileEntity.builder()
@@ -95,6 +98,76 @@ class ArchivedBookContentServiceTest {
     }
 
     @Test
+    void extractsADirectLegacyCyrillicEntryByItsResolvedName() throws IOException {
+        Path archiveRoot = Files.createDirectory(tempDir.resolve("archives"));
+        ZipCharsetTestFixtures.write(archiveRoot.resolve("usr-1.zip"), "IBM866", false,
+                UnicodeExtraFieldPolicy.NEVER,
+                ZipCharsetTestFixtures.entry("Пушкин.fb2", "legacy-content"));
+        AppProperties properties = new AppProperties();
+        properties.setPathConfig(tempDir.resolve("data").toString());
+        ArchivedBookContentService service = new ArchivedBookContentService(properties, new ArchiveService());
+        BookFileEntity file = archivedFile(archiveRoot, "usr-1.zip", "Пушкин.fb2");
+
+        Path resolved = service.resolve(file);
+
+        assertThat(resolved).hasContent("legacy-content");
+        assertThat(resolved.getFileName()).hasToString("Пушкин.fb2");
+    }
+
+    @Test
+    void extractsABookThroughANestedZipLocator() throws IOException {
+        Path archiveRoot = Files.createDirectory(tempDir.resolve("archives"));
+        ByteArrayOutputStream nestedBytes = new ByteArrayOutputStream();
+        try (ZipOutputStream nested = new ZipOutputStream(nestedBytes)) {
+            nested.putNextEntry(new ZipEntry("folder/book.fb2"));
+            nested.write("nested-content".getBytes(StandardCharsets.UTF_8));
+            nested.closeEntry();
+        }
+        Path outer = archiveRoot.resolve("outer.zip");
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(outer))) {
+            output.putNextEntry(new ZipEntry("inner.zip"));
+            output.write(nestedBytes.toByteArray());
+            output.closeEntry();
+        }
+        AppProperties properties = new AppProperties();
+        properties.setPathConfig(tempDir.resolve("data").toString());
+        ArchivedBookContentService service = new ArchivedBookContentService(properties, new ArchiveService());
+        BookFileEntity file = archivedFile(archiveRoot, "outer.zip",
+                NestedArchiveLocator.encode(List.of("inner.zip", "folder/book.fb2")));
+        file.setFileName("book.fb2");
+
+        Path resolved = service.resolve(file);
+
+        assertThat(resolved).hasContent("nested-content");
+        assertThat(resolved.getFileName()).hasToString("book.fb2");
+        try (var files = Files.list(resolved.getParent())) {
+            assertThat(files).containsExactly(resolved);
+        }
+    }
+
+    @Test
+    void extractsThroughAMixedLegacyCyrillicNestedLocator() throws IOException {
+        Path archiveRoot = Files.createDirectory(tempDir.resolve("archives"));
+        byte[] nested = ZipCharsetTestFixtures.bytes("windows-1251", false,
+                UnicodeExtraFieldPolicy.NEVER,
+                ZipCharsetTestFixtures.entry("Толстой.fb2", "nested-legacy-content"));
+        ZipCharsetTestFixtures.write(archiveRoot.resolve("outer.zip"), "IBM866", false,
+                UnicodeExtraFieldPolicy.NEVER,
+                ZipCharsetTestFixtures.entry("Внутри.zip", nested));
+        AppProperties properties = new AppProperties();
+        properties.setPathConfig(tempDir.resolve("data").toString());
+        ArchivedBookContentService service = new ArchivedBookContentService(properties, new ArchiveService());
+        BookFileEntity file = archivedFile(archiveRoot, "outer.zip",
+                NestedArchiveLocator.encode(List.of("Внутри.zip", "Толстой.fb2")));
+        file.setFileName("Толстой.fb2");
+
+        Path resolved = service.resolve(file);
+
+        assertThat(resolved).hasContent("nested-legacy-content");
+        assertThat(resolved.getFileName()).hasToString("Толстой.fb2");
+    }
+
+    @Test
     void revalidatedResolveReportsAVanishedEntryEvenWhenTheCacheLooksFresh() throws IOException {
         Path archiveRoot = Files.createDirectory(tempDir.resolve("archives"));
         Path archive = archiveRoot.resolve("fb2-1-100.zip");
@@ -102,7 +175,7 @@ class ArchivedBookContentServiceTest {
 
         AppProperties properties = new AppProperties();
         properties.setPathConfig(tempDir.resolve("data").toString());
-        ArchivedBookContentService service = new ArchivedBookContentService(properties);
+        ArchivedBookContentService service = new ArchivedBookContentService(properties, new ArchiveService());
         BookFileEntity file = archivedFile(archiveRoot, "fb2-1-100.zip", "42.fb2");
 
         service.resolve(file);
@@ -129,7 +202,7 @@ class ArchivedBookContentServiceTest {
 
         AppProperties properties = new AppProperties();
         properties.setPathConfig(tempDir.resolve("data").toString());
-        ArchivedBookContentService service = new ArchivedBookContentService(properties);
+        ArchivedBookContentService service = new ArchivedBookContentService(properties, new ArchiveService());
         BookFileEntity file = archivedFile(archiveRoot, "fb2-1-100.zip", "42.fb2");
 
         service.resolve(file);
@@ -174,7 +247,7 @@ class ArchivedBookContentServiceTest {
 
         AppProperties properties = new AppProperties();
         properties.setPathConfig(tempDir.resolve("data").toString());
-        ArchivedBookContentService service = new ArchivedBookContentService(properties);
+        ArchivedBookContentService service = new ArchivedBookContentService(properties, new ArchiveService());
         LibraryEntity library = LibraryEntity.builder()
                 .id(7L)
                 .inpxArchivePath(archiveRoot.toString())

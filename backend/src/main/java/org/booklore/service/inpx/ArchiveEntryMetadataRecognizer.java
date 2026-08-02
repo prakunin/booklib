@@ -54,6 +54,11 @@ public class ArchiveEntryMetadataRecognizer {
                 || BookFileType.fromExtension(extension).isPresent();
     }
 
+    public boolean isGenericArchive(String entryName) {
+        String extension = extension(entryName);
+        return "zip".equals(extension) || "rar".equals(extension) || "7z".equals(extension);
+    }
+
     /**
      * Recognises the entry. With a {@code file} the per-format extractor runs and its values win;
      * with {@code null} (or no extractor for the format) only the filename baseline is used.

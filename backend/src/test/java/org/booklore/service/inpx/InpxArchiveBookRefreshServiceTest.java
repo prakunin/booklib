@@ -1,5 +1,6 @@
 package org.booklore.service.inpx;
 
+import org.booklore.exception.ArchiveEntryMissingException;
 import org.booklore.model.MetadataUpdateContext;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.entity.BookEntity;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
@@ -69,6 +71,7 @@ class InpxArchiveBookRefreshServiceTest {
         BookFileEntity archivedFile = BookFileEntity.builder()
                 .sourceArchive("books.zip")
                 .sourceArchiveEntry("book.fb2")
+                .fileName("book.fb2")
                 .build();
         BookEntity managedBook = BookEntity.builder()
                 .id(42L)
@@ -103,6 +106,7 @@ class InpxArchiveBookRefreshServiceTest {
         BookFileEntity archivedFile = BookFileEntity.builder()
                 .sourceArchive("books.zip")
                 .sourceArchiveEntry("book.fb2")
+                .fileName("book.fb2")
                 .build();
         BookEntity managedBook = BookEntity.builder()
                 .id(42L)
@@ -126,6 +130,7 @@ class InpxArchiveBookRefreshServiceTest {
         BookFileEntity archivedFile = BookFileEntity.builder()
                 .sourceArchive("usr.zip")
                 .sourceArchiveEntry("book.pdf")
+                .fileName("book.pdf")
                 .build();
         BookEntity managedBook = BookEntity.builder()
                 .id(42L)
@@ -156,6 +161,7 @@ class InpxArchiveBookRefreshServiceTest {
         BookFileEntity archivedFile = BookFileEntity.builder()
                 .sourceArchive("usr.zip")
                 .sourceArchiveEntry("scan.djvu")
+                .fileName("scan.djvu")
                 .build();
         BookEntity managedBook = BookEntity.builder()
                 .id(42L)
@@ -174,4 +180,29 @@ class InpxArchiveBookRefreshServiceTest {
         verify(bookMetadataUpdater, never()).setBookMetadata(any());
         verify(bookCoverService, never()).regenerateCover(anyLong());
     }
+
+    @Test
+    void doesNotOverwriteMetadataWhenThePreviouslyCorruptedEntryIdentityIsMissing() {
+        BookFileEntity archivedFile = BookFileEntity.builder()
+                .sourceArchive("books.zip")
+                .sourceArchiveEntry("??????.fb2")
+                .fileName("??????.fb2")
+                .build();
+        BookEntity managedBook = BookEntity.builder()
+                .id(42L)
+                .bookFiles(List.of(archivedFile))
+                .build();
+        when(bookRepository.findByIdForInpxArchiveRefresh(42L)).thenReturn(Optional.of(managedBook));
+        when(entryMetadataRecognizer.hasExtractor("??????.fb2")).thenReturn(true);
+        when(archivedBookContentService.resolveRevalidated(archivedFile))
+                .thenThrow(new ArchiveEntryMissingException("??????.fb2"));
+
+        assertThatThrownBy(() -> service.refresh(42L))
+                .isInstanceOf(ArchiveEntryMissingException.class);
+
+        verify(bookMetadataUpdater, never()).setBookMetadata(any());
+        verify(bookRepository, never()).save(managedBook);
+        verify(bookCoverService, never()).regenerateCover(anyLong());
+    }
+
 }

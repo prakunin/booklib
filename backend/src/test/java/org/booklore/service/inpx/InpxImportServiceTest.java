@@ -1,5 +1,7 @@
 package org.booklore.service.inpx;
 
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream.UnicodeExtraFieldPolicy;
+import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.booklore.config.security.service.LibraryAccessGuard;
 import org.booklore.exception.APIException;
 import org.booklore.exception.ApiError;
@@ -25,7 +27,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,6 +87,27 @@ class InpxImportServiceTest {
         assertThat(second.getSkipped()).isEqualTo(1);
         assertThat(imported).hasContent("<FictionBook>selected</FictionBook>");
         assertThat(destination.resolve("INPX/fb2-000001-000999/124.fb2")).doesNotExist();
+    }
+
+    @Test
+    void importsASelectedBookByItsResolvedLegacyCyrillicName() throws IOException {
+        Path source = Files.createDirectory(tempDir.resolve("source"));
+        Path destination = Files.createDirectory(tempDir.resolve("destination"));
+        Path index = createIndex(source,
+                indexEntry("fb2-000001-000999.inp", "Евгений Онегин", "Пушкин_Евгений_Онегин"));
+        ZipCharsetTestFixtures.write(source.resolve("fb2-000001-000999.zip"),
+                "IBM866", false, UnicodeExtraFieldPolicy.NEVER,
+                ZipCharsetTestFixtures.entry("Пушкин_Евгений_Онегин.fb2", "selected"));
+        givenDestinationLibrary(destination, LibrarySourceType.FILESYSTEM);
+        givenResolvedSource(index, source);
+
+        InpxImportResult result = service.importBooks(7L, request(
+                reference("fb2-000001-000999.zip", "Пушкин_Евгений_Онегин")));
+
+        assertThat(result.getImported()).isEqualTo(1);
+        assertThat(result.getFailed()).isZero();
+        assertThat(destination.resolve("INPX/fb2-000001-000999/Пушкин_Евгений_Онегин.fb2"))
+                .hasContent("selected");
     }
 
     @Test
@@ -240,12 +262,13 @@ class InpxImportServiceTest {
     private record IndexEntry(String inpName, String title, String fileName) {
     }
 
+    @SuppressWarnings("deprecation")
     private static class TrackingZipFile extends ZipFile {
         private final AtomicInteger openHandles;
         private boolean closed;
 
         TrackingZipFile(Path path, AtomicInteger openHandles, AtomicInteger maxOpenHandles) throws IOException {
-            super(path.toFile());
+            super(path);
             this.openHandles = openHandles;
             int currentOpen = openHandles.incrementAndGet();
             maxOpenHandles.updateAndGet(currentMax -> Math.max(currentMax, currentOpen));

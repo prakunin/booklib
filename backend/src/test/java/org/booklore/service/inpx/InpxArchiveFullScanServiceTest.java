@@ -11,6 +11,7 @@ import org.booklore.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.task.TaskExecutor;
@@ -47,6 +48,8 @@ class InpxArchiveFullScanServiceTest {
     @Mock
     private InpxArchiveBookRefreshService bookRefreshService;
     @Mock
+    private InpxArchiveReconciliationService archiveReconciliationService;
+    @Mock
     private NotificationService notificationService;
 
     private InpxArchiveFullScanService service;
@@ -55,7 +58,8 @@ class InpxArchiveFullScanServiceTest {
     void setUp() {
         TaskExecutor directExecutor = Runnable::run;
         service = new InpxArchiveFullScanService(catalogService, archiveScanner, batchWriter,
-                bookFileRepository, bookRefreshService, notificationService, directExecutor);
+                bookFileRepository, bookRefreshService, archiveReconciliationService,
+                notificationService, directExecutor);
     }
 
     @Test
@@ -151,6 +155,48 @@ class InpxArchiveFullScanServiceTest {
     }
 
     @Test
+    void fullRescanPersistsTheCorrectedIdentityBeforeRetiringTheReplacementFilledRow() {
+        LibraryEntity library = LibraryEntity.builder()
+                .id(7L)
+                .inpxArchivePath("/books")
+                .libraryPaths(new ArrayList<>(List.of(LibraryPathEntity.builder().id(3L).build())))
+                .build();
+        InpxArchiveScanner.ArchiveCandidate candidate = new InpxArchiveScanner.ArchiveCandidate(
+                Path.of("/books/new.zip"), "new.zip", 1);
+        when(catalogService.requireInpxLibrary(7L)).thenReturn(library);
+        when(archiveScanner.inspectArchive("/books", "new.zip")).thenReturn(candidate);
+        when(archiveScanner.discoveryForArchive(7L, candidate)).thenReturn(
+                new InpxArchiveScanner.Discovery(List.of(candidate), 1, 7L));
+        when(catalogService.queue(7L, "new.zip", 1)).thenReturn(true);
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<InpxBookDto> consumer = invocation.getArgument(1);
+            consumer.accept(book("Пушкин"));
+            return null;
+        }).when(archiveScanner).forEach(any(), any(), any());
+        when(batchWriter.persist(any(), eq(7L), eq(3L), any()))
+                .thenReturn(new InpxBatchWriter.BatchResult(1, 0));
+        when(bookFileRepository.findBookIdsByArchive(7L, "new.zip")).thenReturn(List.of(11L, 12L));
+        doThrow(new ArchiveEntryMissingException("??????.fb2")).when(bookRefreshService).refresh(11L);
+        when(bookRefreshService.refresh(12L)).thenReturn(true);
+
+        service.start(7L, "new.zip");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<InpxBookDto>> batchCaptor = ArgumentCaptor.forClass(List.class);
+        verify(batchWriter).persist(batchCaptor.capture(), eq(7L), eq(3L), any());
+        assertThat(batchCaptor.getValue()).singleElement().satisfies(corrected -> {
+            assertThat(corrected.getFileName()).isEqualTo("Пушкин");
+            assertThat(corrected.getTitle()).isEqualTo("Пушкин");
+        });
+        var ordered = inOrder(batchWriter, bookRefreshService);
+        ordered.verify(batchWriter).persist(any(), eq(7L), eq(3L), any());
+        ordered.verify(bookRefreshService).retireOrphan(11L);
+        verify(bookRefreshService, never()).retireOrphan(12L);
+        verify(catalogService).completed(7L, "new.zip");
+    }
+
+    @Test
     void marksArchiveFailedWhenExecutorRejectsTheTask() {
         LibraryEntity library = LibraryEntity.builder()
                 .id(7L)
@@ -166,7 +212,7 @@ class InpxArchiveFullScanServiceTest {
         };
         InpxArchiveFullScanService rejectingService = new InpxArchiveFullScanService(
                 catalogService, archiveScanner, batchWriter, bookFileRepository,
-                bookRefreshService, notificationService, rejectingExecutor);
+                bookRefreshService, archiveReconciliationService, notificationService, rejectingExecutor);
 
         assertThatThrownBy(() -> rejectingService.start(7L, "new.zip"))
                 .hasMessageContaining("scan queue is full")

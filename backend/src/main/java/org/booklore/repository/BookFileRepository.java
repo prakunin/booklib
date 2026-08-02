@@ -90,11 +90,26 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
     @Query("""
             SELECT bf.sourceArchive, COUNT(bf)
             FROM BookFileEntity bf
-            WHERE bf.book.library.id = :libraryId
+            JOIN bf.book b
+            WHERE b.library.id = :libraryId
             AND bf.sourceArchive IS NOT NULL
+            AND (b.deleted IS NULL OR b.deleted = false)
             GROUP BY bf.sourceArchive
             """)
     List<Object[]> countArchiveEntriesByLibraryId(@Param("libraryId") Long libraryId);
+
+    @Query("""
+            SELECT DISTINCT bf.sourceArchive
+            FROM BookFileEntity bf
+            JOIN bf.book b
+            WHERE b.library.id = :libraryId
+            AND (b.deleted IS NULL OR b.deleted = false)
+            AND bf.bookType = org.booklore.model.enums.BookFileType.OTHER
+            AND (LOWER(bf.fileName) LIKE '%.zip'
+                 OR LOWER(bf.fileName) LIKE '%.rar'
+                 OR LOWER(bf.fileName) LIKE '%.7z')
+            """)
+    List<String> findArchivesWithActiveGenericContainerEntries(@Param("libraryId") Long libraryId);
 
     // Full grouped aggregation over the library's book_file rows; bounded by a per-query timeout
     // (tighter than the global hibernate.query.timeout) so a pathologically slow run cannot hold a
@@ -121,6 +136,16 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
             """)
     List<Long> findBookIdsByArchive(@Param("libraryId") Long libraryId,
                                     @Param("archiveName") String archiveName);
+
+    @Query("""
+            SELECT bf
+            FROM BookFileEntity bf
+            JOIN FETCH bf.book b
+            WHERE b.library.id = :libraryId
+            AND bf.sourceArchive IN :archiveNames
+            """)
+    List<BookFileEntity> findBookFilesByArchives(@Param("libraryId") Long libraryId,
+                                                  @Param("archiveNames") Collection<String> archiveNames);
 
     @Query("""
             SELECT bf FROM BookFileEntity bf

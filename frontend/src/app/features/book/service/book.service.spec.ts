@@ -212,6 +212,26 @@ describe('BookService', () => {
     httpTestingController.expectNone(req => req.url.endsWith('/api/v1/books'));
   });
 
+  it('invalidates every catalog cache when a library scan completes', () => {
+    vi.useFakeTimers();
+    try {
+      setup();
+      const invalidateSpy = vi.spyOn(queryClientHarness.queryClient, 'invalidateQueries').mockResolvedValue(undefined);
+
+      service.handleLibraryScanComplete();
+
+      expect(invalidateSpy).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
+      expect(invalidateSpy).toHaveBeenCalledWith({queryKey: ['app-books']});
+
+      vi.advanceTimersByTime(3_000);
+      expect(invalidateSpy).toHaveBeenCalledWith({queryKey: ['app-filter-options']});
+      expect(invalidateSpy).toHaveBeenCalledWith({queryKey: ['app-catalog-summary']});
+      expect(invalidateSpy).toHaveBeenCalledWith({queryKey: ['app-book-summaries']});
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('disables retries for the legacy flat catalog query', () => {
     setup();
 

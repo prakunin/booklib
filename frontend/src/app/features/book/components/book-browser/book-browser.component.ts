@@ -192,8 +192,11 @@ export class BookBrowserComponent implements AfterViewInit {
       return [];
     }
 
+    const archiveName = this.archiveName();
     const actions = this.entityService.isLibrary(entity)
-      ? this.libraryShelfMenuService.initializeLibraryMenuItems(entity)
+      ? archiveName
+        ? this.libraryShelfMenuService.initializeArchiveMenuItems(entity, archiveName)
+        : this.libraryShelfMenuService.initializeLibraryMenuItems(entity)
       : this.entityService.isMagicShelf(entity)
         ? this.libraryShelfMenuService.initializeMagicShelfMenuItems(entity)
         : this.libraryShelfMenuService.initializeShelfMenuItems(entity);

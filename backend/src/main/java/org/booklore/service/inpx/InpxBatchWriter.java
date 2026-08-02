@@ -215,7 +215,7 @@ public class InpxBatchWriter {
         String entryName = entryName(source);
         BookFileEntity file = BookFileEntity.builder()
                 .book(book)
-                .fileName(entryName)
+                .fileName(source.getFileName() + "." + source.getExtension())
                 .fileSubPath("")
                 .isBookFormat(true)
                 // Index-sourced books carry no type and are always FB2; archive-scanned books bring
@@ -306,7 +306,9 @@ public class InpxBatchWriter {
     }
 
     private String entryName(InpxBookDto source) {
-        return source.getFileName() + "." + source.getExtension();
+        return source.getSourceArchiveEntry() == null
+                ? source.getFileName() + "." + source.getExtension()
+                : source.getSourceArchiveEntry();
     }
 
     private String archiveKey(InpxBookDto source) {

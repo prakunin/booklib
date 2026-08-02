@@ -92,7 +92,7 @@ public class InpxArchiveBookRefreshService {
                 return RefreshResult.NOT_REFRESHED;
             }
 
-            String entryName = bookFile.getSourceArchiveEntry();
+            String entryName = bookFile.getFileName();
             if (!entryMetadataRecognizer.hasExtractor(entryName)) {
                 // A download-only format with no extractor (djvu, rtf, …): the filename metadata set
                 // at discovery is all there is. Skip materialising the entry — nothing to extract, no

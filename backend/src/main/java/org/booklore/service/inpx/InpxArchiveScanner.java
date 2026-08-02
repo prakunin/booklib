@@ -8,6 +8,7 @@ import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.inpx.InpxBookDto;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookFileRepository;
+import org.booklore.service.ArchiveService;
 import org.booklore.service.metadata.extractor.Fb2MetadataExtractor;
 import org.booklore.util.FileUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -38,7 +40,6 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
 
 /**
  * Finds books of any format in ZIP archives that are not yet fully represented by an INPX library.
@@ -46,10 +47,8 @@ import java.util.zip.ZipEntry;
  * to be added without waiting for a new .inpx file. Readable formats (FB2, PDF, …) keep their type;
  * everything else (djvu, doc, …) is ingested as a download-only {@code OTHER} catalog entry.
  * <p>
- * Incremental discovery is <em>additive and count-gated</em>: an archive is only considered when it
- * holds more entries than are persisted for it, and nothing here ever removes a row. Replacing an
- * archive's contents without changing its entry count is therefore invisible to a normal rescan,
- * and books whose entry vanished keep their rows. A per-archive full scan
+ * Flat-archive incremental discovery remains additive and count-gated. Archives containing generic
+ * nested containers are key-reconciled even when their leaf count has not changed. A per-archive full scan
  * ({@link InpxArchiveFullScanService}) is the repair: it re-adds missing entries and retires the
  * orphans.
  */
@@ -58,10 +57,15 @@ import java.util.zip.ZipEntry;
 public class InpxArchiveScanner {
 
     private static final int EXISTING_ENTRY_BATCH_SIZE = 500;
+    private static final int MAX_NESTED_DEPTH = 5;
+    private static final int MAX_VISITED_ENTRIES = 100_000;
+    private static final long MAX_CONTAINER_SIZE = 1024L * 1024 * 1024;
+    private static final long MAX_EXPANDED_SIZE = 4L * 1024 * 1024 * 1024;
 
     private final BookFileRepository bookFileRepository;
     private final Fb2MetadataExtractor fb2MetadataExtractor;
     private final ArchiveEntryMetadataRecognizer entryMetadataRecognizer;
+    private final ArchiveService archiveService;
     private final TaskExecutor archiveInspectionExecutor;
     private final ConcurrentMap<Path, ArchiveFile> archiveFileCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<ArchiveInspectionKey, CompletableFuture<ArchiveFile>> inspections =
@@ -70,22 +74,29 @@ public class InpxArchiveScanner {
     public InpxArchiveScanner(BookFileRepository bookFileRepository,
                               Fb2MetadataExtractor fb2MetadataExtractor,
                               ArchiveEntryMetadataRecognizer entryMetadataRecognizer,
+                              ArchiveService archiveService,
                               @Qualifier("inpxArchiveInspectionExecutor") TaskExecutor archiveInspectionExecutor) {
         this.bookFileRepository = bookFileRepository;
         this.fb2MetadataExtractor = fb2MetadataExtractor;
         this.entryMetadataRecognizer = entryMetadataRecognizer;
+        this.archiveService = archiveService;
         this.archiveInspectionExecutor = archiveInspectionExecutor;
     }
 
     public Discovery discover(long libraryId, String archiveRoot) {
         Map<String, Long> persistedCounts = persistedCounts(libraryId);
+        Set<String> archivesWithLegacyContainers = new HashSet<>(
+                bookFileRepository.findArchivesWithActiveGenericContainerEntries(libraryId));
         List<ArchiveCandidate> candidates = new ArrayList<>();
         long totalEntries = 0;
 
         for (ArchiveFile archive : listArchives(archiveRoot)) {
-            if (archive.entryCount() > persistedCounts.getOrDefault(archive.archiveName(), 0L)) {
-                candidates.add(new ArchiveCandidate(archive.path(), archive.archiveName(), archive.entryCount()));
-                totalEntries += archive.entryCount() - persistedCounts.getOrDefault(archive.archiveName(), 0L);
+            if ((archive.hasNestedContainers() && archivesWithLegacyContainers.contains(archive.archiveName()))
+                    || archive.entryCount() > persistedCounts.getOrDefault(archive.archiveName(), 0L)) {
+                candidates.add(new ArchiveCandidate(archive.path(), archive.archiveName(), archive.entryCount(),
+                        archive.hasNestedContainers()));
+                totalEntries += Math.max(0,
+                        archive.entryCount() - persistedCounts.getOrDefault(archive.archiveName(), 0L));
             }
         }
 
@@ -163,7 +174,7 @@ public class InpxArchiveScanner {
                     && cached.modifiedAt().equals(modifiedAt)
                     ? cached
                     : awaitInspection(inspectInBackground(path, size, modifiedAt));
-            return new ArchiveCandidate(path, archiveName, inspected.entryCount());
+            return new ArchiveCandidate(path, archiveName, inspected.entryCount(), inspected.hasNestedContainers());
         } catch (InvalidPathException _) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Invalid ZIP archive name");
         } catch (IOException e) {
@@ -182,28 +193,28 @@ public class InpxArchiveScanner {
 
     private void scanArchive(ArchiveCandidate candidate, long libraryId, Consumer<InpxBookDto> consumer,
                              BooleanSupplier cancelled) {
-        // Apache Commons Compress rather than java.util.zip: the JDK reader rejects whole archives
-        // whose CEN headers trip its strict validation ("invalid CEN header"), which is exactly what
-        // the legacy Flibusta usr ZIPs do. Commons Compress reads them.
-        try (ZipFile archive = ZipFile.builder().setFile(candidate.path().toFile()).get()) {
-            List<ZipArchiveEntry> entries = Collections.list(archive.getEntries()).stream()
-                    .filter(this::isIngestableEntry).toList();
-            for (int offset = 0; offset < entries.size(); offset += EXISTING_ENTRY_BATCH_SIZE) {
-                List<ZipArchiveEntry> entryBatch = entries.subList(
-                        offset, Math.min(offset + EXISTING_ENTRY_BATCH_SIZE, entries.size()));
-                Set<String> existingEntries = findExistingEntries(libraryId, candidate.archiveName(), entryBatch);
-                for (ZipArchiveEntry entry : entryBatch) {
+        TraversalState state = new TraversalState(cancelled);
+        try {
+            List<InpxBookDto> discovered = new ArrayList<>();
+            traverseZip(candidate.path(), candidate.archiveName(), List.of(), 0, state, discovered, true);
+            for (int offset = 0; offset < discovered.size(); offset += EXISTING_ENTRY_BATCH_SIZE) {
+                List<InpxBookDto> batch = discovered.subList(offset,
+                        Math.min(offset + EXISTING_ENTRY_BATCH_SIZE, discovered.size()));
+                Set<String> existingEntries = findExistingEntries(libraryId, candidate.archiveName(),
+                        batch.stream().map(this::sourceEntry).toList());
+                for (InpxBookDto book : batch) {
                     if (cancelled.getAsBoolean()) {
                         return;
                     }
-                    if (existingEntries.contains(entry.getName())) {
-                        continue;
+                    if (!existingEntries.contains(sourceEntry(book))) {
+                        consumer.accept(book);
                     }
-                    processEntry(archive, candidate, entry, consumer);
                 }
             }
         } catch (IOException e) {
             log.warn("Unable to scan ZIP archive {}: {}", candidate.path(), e.getMessage());
+        } finally {
+            state.close();
         }
     }
 
@@ -213,36 +224,34 @@ public class InpxArchiveScanner {
      * per-format extractors that need a real file on disk (PDF, Word, …) run later, in the full-scan
      * refresh pass, which materialises each entry.
      */
-    private void processEntry(ZipFile archive, ArchiveCandidate candidate, ZipArchiveEntry entry, Consumer<InpxBookDto> consumer) {
-        String entryName = entry.getName();
-        BookFileType bookType = entryMetadataRecognizer.resolveBookType(entryName);
+    private InpxBookDto processEntry(String archiveName, List<String> chain, String entryName, long size,
+                                     InputStream input, boolean extractMetadata) {
+        String leafName = leafName(entryName);
+        BookFileType bookType = entryMetadataRecognizer.resolveBookType(leafName);
         BookMetadata metadata;
-        if (bookType == BookFileType.FB2) {
-            try (InputStream input = archive.getInputStream(entry)) {
-                metadata = fb2MetadataExtractor.extractMetadata(input, candidate.archiveName() + "!" + entryName);
-            } catch (IOException e) {
-                log.warn("Unable to read FB2 entry {} from {}: {}", entryName, candidate.archiveName(), e.getMessage());
-                metadata = null;
-            }
+        if (extractMetadata && bookType == BookFileType.FB2 && input != null) {
+            metadata = fb2MetadataExtractor.extractMetadata(input, archiveName + "!" + entryName);
         } else {
-            metadata = entryMetadataRecognizer.recognize(entryName, null);
+            metadata = entryMetadataRecognizer.recognize(leafName, null);
         }
-        consumer.accept(toBook(candidate.archiveName(), entryName, entry.getSize(), metadata, bookType));
+        List<String> locatorChain = new ArrayList<>(chain);
+        locatorChain.add(entryName);
+        String locator = NestedArchiveLocator.encode(locatorChain);
+        return toBook(archiveName, leafName, locator, size, metadata, bookType);
     }
 
-    private Set<String> findExistingEntries(long libraryId, String archiveName,
-                                            List<? extends ZipEntry> entries) {
+    private Set<String> findExistingEntries(long libraryId, String archiveName, List<String> entries) {
         if (libraryId <= 0 || entries.isEmpty()) {
             return Set.of();
         }
-        Set<String> entryNames = entries.stream().map(ZipEntry::getName).collect(Collectors.toSet());
+        Set<String> entryNames = new HashSet<>(entries);
         return bookFileRepository.findExistingArchiveEntries(
                         libraryId, Set.of(archiveName), entryNames).stream()
                 .map(row -> (String) row[1])
                 .collect(Collectors.toSet());
     }
 
-    private InpxBookDto toBook(String archiveName, String entryName, long sizeBytes,
+    private InpxBookDto toBook(String archiveName, String entryName, String sourceEntry, long sizeBytes,
                               BookMetadata metadata, BookFileType bookType) {
         String extension = extension(entryName);
         String fileName = extension.isEmpty()
@@ -275,6 +284,7 @@ public class InpxArchiveScanner {
                 .language(metadata == null ? null : metadata.getLanguage())
                 .rating(metadata == null ? null : metadata.getRating())
                 .archiveName(archiveName)
+                .sourceArchiveEntry(sourceEntry.equals(entryName) ? null : sourceEntry)
                 .fileSizeKb(toKilobytes(sizeBytes))
                 .build();
     }
@@ -287,6 +297,155 @@ public class InpxArchiveScanner {
         return lastDot > 0 && lastDot < entryName.length() - 1
                 ? entryName.substring(lastDot + 1)
                 : "";
+    }
+
+    private void traverseZip(Path archivePath, String archiveName, List<String> chain, int depth,
+                             TraversalState state, List<InpxBookDto> books, boolean extractMetadata) throws IOException {
+        // Commons Compress remains the reader for the legacy outer ZIPs whose central directory is
+        // rejected by java.util.zip. Nested ZIPs use it too, preserving exact case-sensitive names.
+        try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
+            for (ZipArchiveEntry entry : Collections.list(archive.getEntries())) {
+                if (!state.visit() || state.cancelled()) {
+                    return;
+                }
+                String entryName = ZipEntryNameResolver.resolve(entry);
+                if (!isCandidateEntry(entryName, entry.isDirectory())) {
+                    continue;
+                }
+                if (isGenericArchive(entryName)) {
+                    state.hasNestedContainers = true;
+                    descend(archiveName, chain, depth, state, books, entryName, entry.getSize(),
+                            output -> {
+                                try (InputStream input = archive.getInputStream(entry)) {
+                                    input.transferTo(output);
+                                }
+                            }, extractMetadata);
+                } else {
+                    try (InputStream input = extractMetadata && isFb2(entryName)
+                            ? new CountingInputStream(archive.getInputStream(entry), state) : null) {
+                        addLeaf(archiveName, chain, entryName, entry.getSize(), input, books, extractMetadata);
+                    } catch (RuntimeException | IOException e) {
+                        log.warn("Skipping archive entry {} in {}: {}", entryName, archiveName, e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    private void traverseNative(Path archivePath, String archiveName, List<String> chain, int depth,
+                                TraversalState state, List<InpxBookDto> books, boolean extractMetadata) throws IOException {
+        for (ArchiveService.Entry entry : archiveService.getEntries(archivePath)) {
+            if (!state.visit() || state.cancelled()) {
+                return;
+            }
+            String entryName = entry.name();
+            if (!isCandidateEntry(entryName, entryName.endsWith("/"))) {
+                continue;
+            }
+            if (isGenericArchive(entryName)) {
+                state.hasNestedContainers = true;
+                descend(archiveName, chain, depth, state, books, entryName, entry.size(),
+                        output -> archiveService.transferEntryTo(archivePath, entryName, output), extractMetadata);
+            } else if (extractMetadata && isFb2(entryName)) {
+                if (entry.size() < 0 || entry.size() > MAX_CONTAINER_SIZE) {
+                    log.warn("Skipping archive entry {} in {} because its size is unsafe", entryName, archiveName);
+                    continue;
+                }
+                Path leaf = state.createTemporary(suffix(entryName));
+                try {
+                    try (OutputStream output = Files.newOutputStream(leaf)) {
+                        copyNativeBounded(archivePath, entryName, output, state);
+                    }
+                    try (InputStream input = Files.newInputStream(leaf)) {
+                        addLeaf(archiveName, chain, entryName, entry.size(), input, books, true);
+                    }
+                } catch (RuntimeException | IOException e) {
+                    log.warn("Skipping archive entry {} in {}: {}", entryName, archiveName, e.getMessage());
+                } finally {
+                    state.releaseTemporary(leaf);
+                }
+            } else {
+                addLeaf(archiveName, chain, entryName, entry.size(), null, books, extractMetadata);
+            }
+        }
+    }
+
+    private void descend(String archiveName, List<String> chain, int depth, TraversalState state,
+                         List<InpxBookDto> books, String entryName, long size, EntryTransfer transfer,
+                         boolean extractMetadata) {
+        if (depth >= MAX_NESTED_DEPTH || size < 0 || size > MAX_CONTAINER_SIZE || state.cancelled()) {
+            log.warn("Skipping nested archive {} in {} because a traversal limit was reached", entryName, archiveName);
+            return;
+        }
+        List<String> nestedChain = new ArrayList<>(chain);
+        nestedChain.add(entryName);
+        try {
+            NestedArchiveLocator.encode(nestedChain.size() == 1
+                    ? List.of(nestedChain.getFirst(), "probe") : nestedChain);
+            Path nested = state.createTemporary(suffix(entryName));
+            try (OutputStream output = Files.newOutputStream(nested)) {
+                CountingOutputStream bounded = new CountingOutputStream(output, state);
+                transfer.transfer(bounded);
+            }
+            if (isZip(entryName)) {
+                traverseZip(nested, archiveName, nestedChain, depth + 1, state, books, extractMetadata);
+            } else {
+                traverseNative(nested, archiveName, nestedChain, depth + 1, state, books, extractMetadata);
+            }
+        } catch (Exception e) {
+            log.warn("Skipping unreadable nested archive {} in {}: {}", entryName, archiveName, e.getMessage());
+        }
+    }
+
+    private void addLeaf(String archiveName, List<String> chain, String entryName, long size,
+                         InputStream input, List<InpxBookDto> books, boolean extractMetadata) {
+        try {
+            books.add(processEntry(archiveName, chain, entryName, size, input, extractMetadata));
+        } catch (IllegalArgumentException e) {
+            log.warn("Skipping archive entry {} in {}: {}", entryName, archiveName, e.getMessage());
+        }
+    }
+
+    private void copyNativeBounded(Path archivePath, String entryName, OutputStream output,
+                                   TraversalState state) throws IOException {
+        archiveService.transferEntryTo(archivePath, entryName, new CountingOutputStream(output, state));
+    }
+
+    private String sourceEntry(InpxBookDto book) {
+        return book.getSourceArchiveEntry() == null
+                ? book.getFileName() + "." + book.getExtension()
+                : book.getSourceArchiveEntry();
+    }
+
+    private boolean isCandidateEntry(String name, boolean directory) {
+        if (directory || name == null || name.isBlank() || name.indexOf('\0') >= 0) {
+            return false;
+        }
+        String leaf = leafName(name);
+        try {
+            return !leaf.isBlank() && !FileUtils.shouldIgnore(Path.of(leaf)) && !extension(leaf).isEmpty();
+        } catch (InvalidPathException e) {
+            return false;
+        }
+    }
+
+    private String leafName(String entryName) {
+        int slash = Math.max(entryName.lastIndexOf('/'), entryName.lastIndexOf('\\'));
+        return slash < 0 ? entryName : entryName.substring(slash + 1);
+    }
+
+    private boolean isFb2(String entryName) {
+        return "fb2".equals(extension(entryName).toLowerCase(Locale.ROOT));
+    }
+
+    static boolean isGenericArchive(String entryName) {
+        String lower = entryName.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".zip") || lower.endsWith(".rar") || lower.endsWith(".7z");
+    }
+
+    private String suffix(String entryName) {
+        String extension = extension(entryName);
+        return extension.isEmpty() ? ".archive" : "." + extension;
     }
 
     void populateFileSizes(List<InpxBookDto> books, String archiveRoot) {
@@ -307,8 +466,9 @@ public class InpxArchiveScanner {
                 return;
             }
             try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
+                Map<String, ZipArchiveEntry> entriesByName = ZipEntryNameResolver.indexEntries(archive);
                 for (InpxBookDto book : books) {
-                    ZipArchiveEntry entry = archive.getEntry(book.getFileName() + "." + book.getExtension());
+                    ZipArchiveEntry entry = entriesByName.get(book.getFileName() + "." + book.getExtension());
                     if (entry != null) {
                         book.setFileSizeKb(toKilobytes(entry.getSize()));
                     }
@@ -331,18 +491,6 @@ public class InpxArchiveScanner {
         return counts;
     }
 
-    private long countIngestableEntries(Path path) {
-        try (ZipFile archive = ZipFile.builder()
-                .setFile(path.toFile())
-                .setIgnoreLocalFileHeader(true)
-                .get()) {
-            return Collections.list(archive.getEntries()).stream().filter(this::isIngestableEntry).count();
-        } catch (IOException e) {
-            log.warn("Unable to inspect ZIP archive {}: {}", path, e.getMessage());
-            return 0;
-        }
-    }
-
     private CompletableFuture<ArchiveFile> inspectInBackground(Path path, long size, Instant modifiedAt) {
         ArchiveInspectionKey key = new ArchiveInspectionKey(path, size, modifiedAt);
         CompletableFuture<ArchiveFile> created = new CompletableFuture<>();
@@ -353,8 +501,9 @@ public class InpxArchiveScanner {
         try {
             archiveInspectionExecutor.execute(() -> {
                 try {
+                    InspectionResult result = inspectEntries(path);
                     ArchiveFile inspected = new ArchiveFile(path, path.getFileName().toString(), size,
-                            modifiedAt, countIngestableEntries(path));
+                            modifiedAt, result.entryCount(), result.hasNestedContainers());
                     archiveFileCache.put(path, inspected);
                     created.complete(inspected);
                 } catch (Exception | Error e) {
@@ -381,29 +530,26 @@ public class InpxArchiveScanner {
         }
     }
 
-    /**
-     * Any flat, non-junk file with an extension is a catalog candidate — not just FB2. The format
-     * is resolved per entry: readable types (FB2, PDF, …) open in a reader, everything else becomes a
-     * download-only OTHER book. Directory entries, nested paths and ignored files are skipped.
-     */
-    private boolean isIngestableEntry(ZipEntry entry) {
-        if (entry.isDirectory()) {
-            return false;
-        }
-        String name = entry.getName();
-        try {
-            Path entryPath = Path.of(name);
-            return entryPath.getNameCount() == 1
-                    && entryPath.getFileName().toString().equals(name)
-                    && !FileUtils.shouldIgnore(entryPath)
-                    && !extension(name).isEmpty();
-        } catch (InvalidPathException _) {
-            return false;
-        }
-    }
-
     private boolean isZip(Path path) {
         return path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip");
+    }
+
+    private boolean isZip(String entryName) {
+        return entryName.toLowerCase(Locale.ROOT).endsWith(".zip");
+    }
+
+    private InspectionResult inspectEntries(Path path) {
+        TraversalState state = new TraversalState(() -> false);
+        try {
+            List<InpxBookDto> books = new ArrayList<>();
+            traverseZip(path, path.getFileName().toString(), List.of(), 0, state, books, false);
+            return new InspectionResult(books.size(), state.hasNestedContainers);
+        } catch (IOException e) {
+            log.warn("Unable to inspect ZIP archive {}: {}", path, e.getMessage());
+            return new InspectionResult(0, state.hasNestedContainers);
+        } finally {
+            state.close();
+        }
     }
 
     private Path validateArchiveRoot(String archiveRoot) {
@@ -427,12 +573,153 @@ public class InpxArchiveScanner {
         }
     }
 
-    public record ArchiveCandidate(Path path, String archiveName, long entryCount) {
+    public record ArchiveCandidate(Path path, String archiveName, long entryCount, boolean hasNestedContainers) {
+        public ArchiveCandidate(Path path, String archiveName, long entryCount) {
+            this(path, archiveName, entryCount, false);
+        }
     }
 
-    public record ArchiveFile(Path path, String archiveName, long sizeBytes, Instant modifiedAt, Long entryCount) {
+    public record ArchiveFile(Path path, String archiveName, long sizeBytes, Instant modifiedAt, Long entryCount,
+                              boolean hasNestedContainers) {
+        public ArchiveFile(Path path, String archiveName, long sizeBytes, Instant modifiedAt, Long entryCount) {
+            this(path, archiveName, sizeBytes, modifiedAt, entryCount, false);
+        }
     }
 
     private record ArchiveInspectionKey(Path path, long sizeBytes, Instant modifiedAt) {
+    }
+
+    private record InspectionResult(long entryCount, boolean hasNestedContainers) {
+    }
+
+    @FunctionalInterface
+    private interface EntryTransfer {
+        void transfer(OutputStream output) throws IOException;
+    }
+
+    private static final class TraversalState {
+        private final BooleanSupplier cancellation;
+        private final List<Path> temporaryPaths = new ArrayList<>();
+        private int visitedEntries;
+        private long expandedBytes;
+        private boolean hasNestedContainers;
+
+        private TraversalState(BooleanSupplier cancellation) {
+            this.cancellation = cancellation;
+        }
+
+        private boolean visit() {
+            return ++visitedEntries <= MAX_VISITED_ENTRIES;
+        }
+
+        private boolean cancelled() {
+            return cancellation.getAsBoolean() || visitedEntries > MAX_VISITED_ENTRIES;
+        }
+
+        private Path createTemporary(String suffix) throws IOException {
+            Path path = Files.createTempFile("booklib-inpx-", suffix);
+            temporaryPaths.add(path);
+            return path;
+        }
+
+        private void releaseTemporary(Path path) {
+            temporaryPaths.remove(path);
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException e) {
+                log.warn("Unable to delete nested archive temporary file {}: {}", path, e.getMessage());
+            }
+        }
+
+        private void account(long count) throws IOException {
+            expandedBytes += count;
+            if (expandedBytes > MAX_EXPANDED_SIZE) {
+                throw new IOException("Nested archive expanded-byte limit exceeded");
+            }
+        }
+
+        private void close() {
+            for (int index = temporaryPaths.size() - 1; index >= 0; index--) {
+                try {
+                    Files.deleteIfExists(temporaryPaths.get(index));
+                } catch (IOException e) {
+                    log.warn("Unable to delete nested archive temporary file {}: {}",
+                            temporaryPaths.get(index), e.getMessage());
+                }
+            }
+        }
+    }
+
+    private static final class CountingOutputStream extends OutputStream {
+        private final OutputStream delegate;
+        private final TraversalState state;
+        private long containerBytes;
+
+        private CountingOutputStream(OutputStream delegate, TraversalState state) {
+            this.delegate = delegate;
+            this.state = state;
+        }
+
+        @Override
+        public void write(int value) throws IOException {
+            ensureCapacity(1);
+            delegate.write(value);
+        }
+
+        @Override
+        public void write(byte[] bytes, int offset, int length) throws IOException {
+            ensureCapacity(length);
+            delegate.write(bytes, offset, length);
+        }
+
+        private void ensureCapacity(int length) throws IOException {
+            containerBytes += length;
+            if (containerBytes > MAX_CONTAINER_SIZE) {
+                throw new IOException("Nested archive exceeds the 1 GiB extraction limit");
+            }
+            state.account(length);
+        }
+    }
+
+    private static final class CountingInputStream extends InputStream {
+        private final InputStream delegate;
+        private final TraversalState state;
+        private long entryBytes;
+
+        private CountingInputStream(InputStream delegate, TraversalState state) {
+            this.delegate = delegate;
+            this.state = state;
+        }
+
+        @Override
+        public int read() throws IOException {
+            int value = delegate.read();
+            if (value != -1) {
+                account(1);
+            }
+            return value;
+        }
+
+        @Override
+        public int read(byte[] bytes, int offset, int length) throws IOException {
+            int read = delegate.read(bytes, offset, length);
+            if (read > 0) {
+                account(read);
+            }
+            return read;
+        }
+
+        private void account(int length) throws IOException {
+            entryBytes += length;
+            if (entryBytes > MAX_CONTAINER_SIZE) {
+                throw new IOException("Archive entry exceeds the 1 GiB scan limit");
+            }
+            state.account(length);
+        }
+
+        @Override
+        public void close() throws IOException {
+            delegate.close();
+        }
     }
 }

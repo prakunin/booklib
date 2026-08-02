@@ -47,6 +47,8 @@ class InpxLibraryScannerTest {
     @Mock
     private InpxBatchWriter batchWriter;
     @Mock
+    private InpxArchiveReconciliationService archiveReconciliationService;
+    @Mock
     private InpxScanControl scanControl;
     @Mock
     private NotificationService notificationService;

@@ -140,6 +140,12 @@ interface BookBrowserHarness {
   };
   deselectAll: ReturnType<typeof vi.fn>;
   dialogClosed$: Subject<unknown>;
+  libraryShelfMenuService: {
+    initializeArchiveMenuItems: ReturnType<typeof vi.fn>;
+    initializeLibraryMenuItems: ReturnType<typeof vi.fn>;
+    initializeMagicShelfMenuItems: ReturnType<typeof vi.fn>;
+    initializeShelfMenuItems: ReturnType<typeof vi.fn>;
+  };
 }
 
 function createHarness(options?: {
@@ -150,6 +156,7 @@ function createHarness(options?: {
   translate?: (key: string) => string;
   selectedBookIds?: number[];
   smartEnrichmentAvailable?: boolean;
+  archiveName?: string;
 }): BookBrowserHarness {
   const books = signal<Book[]>(
     options?.books ?? [
@@ -180,7 +187,10 @@ function createHarness(options?: {
   const showFilter = signal(false);
   const seriesCollapsed = signal(false);
   const routerEvents$ = new Subject<unknown>();
-  const paramMap$ = new BehaviorSubject(convertToParamMap({libraryId: '1'}));
+  const initialRouteParams: Record<string, string> = options?.archiveName
+    ? {libraryId: '1', archiveName: options.archiveName}
+    : {libraryId: '1'};
+  const paramMap$ = new BehaviorSubject(convertToParamMap(initialRouteParams));
   const queryParamMap$ = new BehaviorSubject(convertToParamMap({}));
   const url$ = new BehaviorSubject<unknown[]>([]);
   const defaultSort: SortOption = {field: 'addedOn', direction: SortDirection.DESCENDING, label: 'Added On'};
@@ -203,10 +213,18 @@ function createHarness(options?: {
     updateMultiSort: vi.fn(),
   };
   const routeSnapshot = {
-    routeConfig: {path: 'library/:libraryId/books'},
+    routeConfig: {path: options?.archiveName
+      ? 'library/:libraryId/archives/:archiveName/books'
+      : 'library/:libraryId/books'},
     paramMap: paramMap$.value,
     queryParamMap: queryParamMap$.value,
-    params: {libraryId: '1'},
+    params: initialRouteParams,
+  };
+  const libraryShelfMenuService = {
+    initializeArchiveMenuItems: vi.fn(() => []),
+    initializeLibraryMenuItems: vi.fn(() => []),
+    initializeMagicShelfMenuItems: vi.fn(() => []),
+    initializeShelfMenuItems: vi.fn(() => []),
   };
 
   TestBed.resetTestingModule();
@@ -343,11 +361,7 @@ function createHarness(options?: {
       },
       {
         provide: LibraryShelfMenuService,
-        useValue: {
-          initializeLibraryMenuItems: vi.fn(() => []),
-          initializeMagicShelfMenuItems: vi.fn(() => []),
-          initializeShelfMenuItems: vi.fn(() => []),
-        },
+        useValue: libraryShelfMenuService,
       },
       {provide: PageTitleService, useValue: {setPageTitle: vi.fn()}},
       {provide: LoadingService, useValue: {show: vi.fn(), hide: vi.fn()}},
@@ -409,6 +423,7 @@ function createHarness(options?: {
     dialogHelperService,
     deselectAll,
     dialogClosed$,
+    libraryShelfMenuService,
   };
 }
 
@@ -472,6 +487,35 @@ describe('BookBrowserComponent', () => {
     vi.runOnlyPendingTimers();
 
     expect(appBooksApi.setFilters).toHaveBeenLastCalledWith(expect.objectContaining({libraryId: 2}));
+  });
+
+  it('uses archive-scoped actions and the decoded archive filter on an archive route', () => {
+    const {component, appBooksApi, libraryShelfMenuService} = createHarness({
+      archiveName: 'a b (final).zip',
+    });
+
+    TestBed.flushEffects();
+
+    expect(component.entityOptions()).toEqual([]);
+    expect(libraryShelfMenuService.initializeArchiveMenuItems).toHaveBeenCalledWith(
+      expect.objectContaining({id: 1}),
+      'a b (final).zip'
+    );
+    expect(libraryShelfMenuService.initializeLibraryMenuItems).not.toHaveBeenCalled();
+    expect(appBooksApi.setFilters).toHaveBeenLastCalledWith(expect.objectContaining({
+      libraryId: 1,
+      sourceArchive: 'a b (final).zip',
+    }));
+  });
+
+  it('keeps the ordinary library menu on a non-archive route', () => {
+    const {component, libraryShelfMenuService} = createHarness();
+
+    expect(component.entityOptions()).toEqual([]);
+    expect(libraryShelfMenuService.initializeLibraryMenuItems).toHaveBeenCalledWith(
+      expect.objectContaining({id: 1})
+    );
+    expect(libraryShelfMenuService.initializeArchiveMenuItems).not.toHaveBeenCalled();
   });
 
   it('hides loading placeholders when the books query is in an error state', () => {
