@@ -361,6 +361,7 @@ export class BookService {
         break;
 
       case 'EPUB':
+      case 'HTML':
         baseUrl = 'ebook-reader';
         if (reader === 'epub-blob') {
           queryParams['streaming'] = false;

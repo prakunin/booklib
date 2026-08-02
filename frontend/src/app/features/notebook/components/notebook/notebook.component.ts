@@ -242,6 +242,7 @@ export class NotebookComponent implements OnInit {
         void this.router.navigate([`/pdf-reader/book/${entry.bookId}`], {queryParams});
         break;
       case 'EPUB':
+      case 'HTML':
         if (entry.cfi) {
           queryParams['cfi'] = entry.cfi;
         }

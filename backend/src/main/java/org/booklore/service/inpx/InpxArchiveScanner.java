@@ -38,14 +38,15 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * Finds books of any format in ZIP archives that are not yet fully represented by an INPX library.
  * This supplements (rather than replaces) the INPX index, allowing newly downloaded ZIPs
- * to be added without waiting for a new .inpx file. Readable formats (FB2, PDF, …) keep their type;
- * everything else (djvu, doc, …) is ingested as a download-only {@code OTHER} catalog entry.
+ * to be added without waiting for a new .inpx file. Readable formats keep their type, nested HTML
+ * packages become one rendition-backed book, and support assets are not catalogued independently.
  * <p>
  * Flat-archive incremental discovery remains additive and count-gated. Archives containing generic
  * nested containers are key-reconciled even when their leaf count has not changed. A per-archive full scan
@@ -62,6 +63,10 @@ public class InpxArchiveScanner {
     private static final long MAX_CONTAINER_SIZE = 1024L * 1024 * 1024;
     private static final long MAX_EXPANDED_SIZE = 4L * 1024 * 1024 * 1024;
     private static final String SKIP_ENTRY_LOG = "Skipping archive entry {} in {}: {}";
+    private static final Set<String> SUPPORT_EXTENSIONS = Set.of(
+            "css", "js", "gif", "jpg", "jpeg", "png", "webp", "svg", "xml", "xsl", "xslt",
+            "woff", "woff2", "ttf", "otf", "eot");
+    private static final Set<String> IMAGE_EXTENSIONS = Set.of("gif", "jpg", "jpeg", "png", "webp");
 
     private final BookFileRepository bookFileRepository;
     private final Fb2MetadataExtractor fb2MetadataExtractor;
@@ -228,8 +233,15 @@ public class InpxArchiveScanner {
      */
     private InpxBookDto processEntry(String archiveName, List<String> chain, String entryName, long size,
                                      InputStream input, boolean extractMetadata) {
+        return processEntry(archiveName, chain, entryName, size, input, extractMetadata, null);
+    }
+
+    private InpxBookDto processEntry(String archiveName, List<String> chain, String entryName, long size,
+                                     InputStream input, boolean extractMetadata, BookFileType forcedType) {
         String leafName = leafName(entryName);
-        BookFileType bookType = entryMetadataRecognizer.resolveBookType(leafName);
+        BookFileType bookType = forcedType == null
+                ? entryMetadataRecognizer.resolveBookType(leafName)
+                : forcedType;
         BookMetadata metadata;
         if (extractMetadata && bookType == BookFileType.FB2 && input != null) {
             metadata = fb2MetadataExtractor.extractMetadata(input, archiveName + "!" + entryName);
@@ -306,7 +318,12 @@ public class InpxArchiveScanner {
         // Commons Compress remains the reader for the legacy outer ZIPs whose central directory is
         // rejected by java.util.zip. Nested ZIPs use it too, preserving exact case-sensitive names.
         try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
-            for (ZipArchiveEntry entry : Collections.list(archive.getEntries())) {
+            List<ZipArchiveEntry> entries = Collections.list(archive.getEntries());
+            Set<String> htmlEntrypoints = htmlEntrypoints(entries.stream()
+                    .filter(Predicate.not(ZipArchiveEntry::isDirectory))
+                    .map(ZipEntryNameResolver::resolve)
+                    .toList());
+            for (ZipArchiveEntry entry : entries) {
                 if (!context.state().visit() || context.state().cancelled()) {
                     return;
                 }
@@ -322,7 +339,7 @@ public class InpxArchiveScanner {
                                     input.transferTo(output);
                                 }
                             });
-                } else {
+                } else if (!isSupportAsset(entryName) && (!isHtml(entryName) || htmlEntrypoints.contains(entryName))) {
                     addZipLeaf(archive, entry, entryName, chain, context);
                 }
             }
@@ -342,7 +359,12 @@ public class InpxArchiveScanner {
 
     private void traverseNative(Path archivePath, List<String> chain, int depth,
                                 TraversalContext context) throws IOException {
-        for (ArchiveService.Entry entry : archiveService.getEntries(archivePath)) {
+        List<ArchiveService.Entry> entries = archiveService.getEntries(archivePath);
+        Set<String> htmlEntrypoints = htmlEntrypoints(entries.stream()
+                .filter(entry -> !entry.name().endsWith("/"))
+                .map(ArchiveService.Entry::name)
+                .toList());
+        for (ArchiveService.Entry entry : entries) {
             if (!context.state().visit() || context.state().cancelled()) {
                 return;
             }
@@ -354,6 +376,8 @@ public class InpxArchiveScanner {
                 context.state().hasNestedContainers = true;
                 descend(chain, depth, context, entryName, entry.size(),
                         output -> archiveService.transferEntryTo(archivePath, entryName, output));
+            } else if (isSupportAsset(entryName) || (isHtml(entryName) && !htmlEntrypoints.contains(entryName))) {
+                continue;
             } else if (context.extractMetadata() && isFb2(entryName)) {
                 addNativeFb2Leaf(archivePath, chain, entry, context);
             } else {
@@ -403,7 +427,10 @@ public class InpxArchiveScanner {
                 CountingOutputStream bounded = new CountingOutputStream(output, context.state());
                 transfer.transfer(bounded);
             }
-            if (isZip(entryName)) {
+            if (isImageOnlyContainer(nested, entryName)) {
+                context.books().add(processEntry(context.archiveName(), chain, entryName, size,
+                        null, false, BookFileType.CBX));
+            } else if (isZip(entryName)) {
                 traverseZip(nested, nestedChain, depth + 1, context);
             } else {
                 traverseNative(nested, nestedChain, depth + 1, context);
@@ -453,6 +480,94 @@ public class InpxArchiveScanner {
 
     private boolean isFb2(String entryName) {
         return "fb2".equals(extension(entryName).toLowerCase(Locale.ROOT));
+    }
+
+    private boolean isHtml(String entryName) {
+        String extension = extension(entryName).toLowerCase(Locale.ROOT);
+        return "html".equals(extension) || "htm".equals(extension);
+    }
+
+    private boolean isSupportAsset(String entryName) {
+        return SUPPORT_EXTENSIONS.contains(extension(entryName).toLowerCase(Locale.ROOT));
+    }
+
+    private Set<String> htmlEntrypoints(List<String> entryNames) {
+        List<String> html = entryNames.stream().filter(this::isHtml).toList();
+        if (html.size() <= 1) {
+            return Set.copyOf(html);
+        }
+        List<String> rootEntrypoints = html.stream()
+                .filter(name -> !name.contains("/") && !name.contains("\\"))
+                .filter(name -> {
+                    String lower = name.toLowerCase(Locale.ROOT);
+                    return lower.equals("index.html") || lower.equals("index.htm")
+                            || lower.equals("default.html") || lower.equals("default.htm");
+                })
+                .toList();
+        return rootEntrypoints.size() == 1 ? Set.of(rootEntrypoints.getFirst()) : Set.copyOf(html);
+    }
+
+    private boolean isImageOnlyContainer(Path archivePath, String entryName) throws IOException {
+        if (isZip(entryName)) {
+            try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
+                boolean hasImage = false;
+                int visited = 0;
+                var entries = archive.getEntries();
+                while (entries.hasMoreElements()) {
+                    ZipArchiveEntry entry = entries.nextElement();
+                    if (entry.isDirectory()) {
+                        continue;
+                    }
+                    if (++visited > MAX_VISITED_ENTRIES) {
+                        return false;
+                    }
+                    ImageEntryKind kind = classifyImageContainerEntry(ZipEntryNameResolver.resolve(entry));
+                    if (kind == ImageEntryKind.UNSUPPORTED) {
+                        return false;
+                    }
+                    hasImage |= kind == ImageEntryKind.IMAGE;
+                }
+                return hasImage;
+            }
+        }
+        List<ArchiveService.Entry> entries = archiveService.getEntries(archivePath);
+        if (entries.size() > MAX_VISITED_ENTRIES) {
+            return false;
+        }
+        boolean hasImage = false;
+        for (ArchiveService.Entry entry : entries) {
+            if (entry.name().endsWith("/")) {
+                continue;
+            }
+            ImageEntryKind kind = classifyImageContainerEntry(entry.name());
+            if (kind == ImageEntryKind.UNSUPPORTED) {
+                return false;
+            }
+            hasImage |= kind == ImageEntryKind.IMAGE;
+        }
+        return hasImage;
+    }
+
+    private ImageEntryKind classifyImageContainerEntry(String name) {
+        String ext = extension(name).toLowerCase(Locale.ROOT);
+        if (IMAGE_EXTENSIONS.contains(ext)) {
+            return ImageEntryKind.IMAGE;
+        }
+        String leaf = leafName(name);
+        try {
+            if ("xml".equals(ext) || FileUtils.shouldIgnore(Path.of(leaf))) {
+                return ImageEntryKind.IGNORED;
+            }
+        } catch (InvalidPathException _) {
+            return ImageEntryKind.UNSUPPORTED;
+        }
+        return ImageEntryKind.UNSUPPORTED;
+    }
+
+    private enum ImageEntryKind {
+        IMAGE,
+        IGNORED,
+        UNSUPPORTED
     }
 
     static boolean isGenericArchive(String entryName) {

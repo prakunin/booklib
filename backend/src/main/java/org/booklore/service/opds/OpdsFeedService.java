@@ -680,6 +680,7 @@ public class OpdsFeedService {
         return switch (bookFile.getBookType()) {
             case PDF -> "application/pdf";
             case EPUB -> "application/epub+zip";
+            case HTML -> "text/html";
             case FB2 -> fb2MimeType(bookFile);
             case MOBI -> "application/x-mobipocket-ebook";
             case AZW3 -> "application/vnd.amazon.ebook";

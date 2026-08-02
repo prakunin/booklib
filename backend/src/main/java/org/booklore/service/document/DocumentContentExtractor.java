@@ -143,7 +143,7 @@ public class DocumentContentExtractor {
     public DocumentContent extract(File file) throws IOException {
         DocumentParseResult result = parse(file);
         if (!result.isReadable()) {
-            throw new IOException("Document cannot be read");
+            throw new UnreadableDocumentException();
         }
         return result.content();
     }

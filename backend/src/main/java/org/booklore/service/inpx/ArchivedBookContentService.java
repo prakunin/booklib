@@ -19,6 +19,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Function;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,9 +31,17 @@ public class ArchivedBookContentService {
 
     private static final long MAX_EXTRACTED_SIZE = 1024L * 1024 * 1024;
     private static final long MAX_TOTAL_EXPANDED_SIZE = 4L * MAX_EXTRACTED_SIZE;
+    private static final int MAX_PUBLICATION_ENTRIES = 100_000;
     private final AppProperties appProperties;
     private final ArchiveService archiveService;
     private final ConcurrentMap<Long, CompletableFuture<Path>> extractionFlights = new ConcurrentHashMap<>();
+
+    public record ArchivedEntry(String name, long size) {
+    }
+
+    public String publicationEntryName(BookFileEntity bookFile) {
+        return source(bookFile).entryChain().getLast();
+    }
 
     /** Resolves for reading, serving the extraction cache whenever it looks current. */
     public Path resolve(BookFileEntity bookFile) {
@@ -49,6 +58,61 @@ public class ArchivedBookContentService {
      */
     public Path resolveRevalidated(BookFileEntity bookFile) {
         return resolve(bookFile, true);
+    }
+
+    /** Lists entries beside an archived publication without exposing them through an API. */
+    public List<ArchivedEntry> listPublicationEntries(BookFileEntity bookFile) {
+        try {
+            return withContainingArchive(bookFile, archivePath -> {
+                try {
+                    if (archivePath.outer() || isZip(archivePath.path())) {
+                        try (ZipFile archive = ZipFile.builder().setFile(archivePath.path().toFile()).get()) {
+                            List<ArchivedEntry> entries = new ArrayList<>();
+                            var archiveEntries = archive.getEntries();
+                            while (archiveEntries.hasMoreElements()) {
+                                ZipArchiveEntry entry = archiveEntries.nextElement();
+                                if (!entry.isDirectory()) {
+                                    if (entries.size() >= MAX_PUBLICATION_ENTRIES) {
+                                        throw new IOException("Publication archive has too many entries");
+                                    }
+                                    entries.add(new ArchivedEntry(ZipEntryNameResolver.resolve(entry), entry.getSize()));
+                                }
+                            }
+                            return List.copyOf(entries);
+                        }
+                    }
+                    List<ArchiveService.Entry> archiveEntries = archiveService.getEntries(archivePath.path());
+                    if (archiveEntries.size() > MAX_PUBLICATION_ENTRIES) {
+                        throw new IOException("Publication archive has too many entries");
+                    }
+                    return archiveEntries.stream()
+                            .filter(entry -> !entry.name().endsWith("/"))
+                            .map(entry -> new ArchivedEntry(entry.name(), entry.size()))
+                            .toList();
+                } catch (IOException e) {
+                    throw new ArchiveAccessException(e);
+                }
+            });
+        } catch (ArchiveAccessException e) {
+            throw ApiError.FILE_READ_ERROR.createException("Unable to list publication resources: "
+                    + e.getCause().getMessage());
+        }
+    }
+
+    /** Streams one exact sibling selected from {@link #listPublicationEntries(BookFileEntity)}. */
+    public void streamPublicationEntry(BookFileEntity bookFile, String entryName, OutputStream output) throws IOException {
+        try {
+            withContainingArchive(bookFile, archivePath -> {
+                try {
+                    streamExactEntry(archivePath, entryName, output);
+                    return null;
+                } catch (IOException e) {
+                    throw new ArchiveAccessException(e);
+                }
+            });
+        } catch (ArchiveAccessException e) {
+            throw (IOException) e.getCause();
+        }
     }
 
     @SuppressWarnings("java:S1181") // Error is rethrown unchanged after completing the CompletableFuture and freeing the dedup slot - not swallowed
@@ -128,6 +192,86 @@ public class ArchivedBookContentService {
             throw new ArchiveEntryMissingException(entryName);
         } catch (IOException e) {
             throw ApiError.FILE_READ_ERROR.createException("Unable to read archived book: " + e.getMessage());
+        }
+    }
+
+    private <T> T withContainingArchive(BookFileEntity bookFile, Function<ContainingArchive, T> action) {
+        Source source = source(bookFile);
+        List<Path> temporaryPaths = new ArrayList<>();
+        long[] totalExpanded = {0};
+        Path currentArchive = source.archivePath();
+        boolean outer = true;
+        try {
+            List<String> chain = source.entryChain();
+            for (int index = 0; index < chain.size() - 1; index++) {
+                String entryName = chain.get(index);
+                Path nested = Files.createTempFile("booklib-inpx-publication-", suffix(entryName));
+                temporaryPaths.add(nested);
+                extractEntry(currentArchive, entryName, nested, outer, totalExpanded);
+                currentArchive = nested;
+                outer = false;
+            }
+            return action.apply(new ContainingArchive(currentArchive, outer));
+        } catch (IOException e) {
+            throw new ArchiveAccessException(e);
+        } finally {
+            for (int index = temporaryPaths.size() - 1; index >= 0; index--) {
+                try {
+                    Files.deleteIfExists(temporaryPaths.get(index));
+                } catch (IOException _) {
+                    // The ordinary extraction path has the same best-effort cleanup semantics.
+                }
+            }
+        }
+    }
+
+    private Source source(BookFileEntity bookFile) {
+        if (!bookFile.isArchivedSource() || bookFile.getBook() == null || bookFile.getBook().getLibrary() == null) {
+            throw ApiError.FILE_NOT_FOUND.createException("Archived publication source is incomplete");
+        }
+        var library = bookFile.getBook().getLibrary();
+        Path archiveRoot = Path.of(library.getInpxArchivePath()).toAbsolutePath().normalize();
+        String archiveName = safeLeaf(bookFile.getSourceArchive(), ".zip");
+        Path archivePath = archiveRoot.resolve(archiveName).normalize();
+        if (!archivePath.startsWith(archiveRoot) || !Files.isRegularFile(archivePath) || !Files.isReadable(archivePath)) {
+            throw ApiError.FILE_NOT_FOUND.createException("INPX archive is unavailable: " + archiveName);
+        }
+        List<String> entryChain = bookFile.getSourceArchiveEntry().equals(bookFile.getFileName())
+                ? List.of(bookFile.getSourceArchiveEntry())
+                : NestedArchiveLocator.decode(bookFile.getSourceArchiveEntry());
+        return new Source(archivePath, entryChain);
+    }
+
+    private void streamExactEntry(ContainingArchive archivePath, String entryName, OutputStream output) throws IOException {
+        long[] expanded = {0};
+        if (archivePath.outer() || isZip(archivePath.path())) {
+            try (ZipFile archive = ZipFile.builder().setFile(archivePath.path().toFile()).get()) {
+                ZipArchiveEntry entry = ZipEntryNameResolver.findEntry(archive, entryName);
+                if (entry == null || entry.isDirectory()) {
+                    throw new MissingEntryException(entryName);
+                }
+                try (InputStream input = archive.getInputStream(entry)) {
+                    copyBounded(input, output, expanded);
+                }
+            }
+        } else {
+            archiveService.transferEntryTo(archivePath.path(), entryName, new BoundedOutputStream(output, expanded));
+        }
+    }
+
+    private boolean isZip(Path path) {
+        return path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip");
+    }
+
+    private record Source(Path archivePath, List<String> entryChain) {
+    }
+
+    private record ContainingArchive(Path path, boolean outer) {
+    }
+
+    private static final class ArchiveAccessException extends RuntimeException {
+        private ArchiveAccessException(IOException cause) {
+            super(cause);
         }
     }
 

@@ -326,6 +326,17 @@ describe('BookService', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/ebook-reader/book/43'], {queryParams: {streaming: false}});
   });
 
+  it('opens HTML renditions in the ebook reader', () => {
+    setup();
+    queryClientHarness.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [
+      buildBook(46, {primaryFile: {id: 1, bookId: 46, bookType: 'HTML'}}),
+    ]);
+
+    service.readBook(46);
+
+    expect(router.navigate).toHaveBeenCalledWith(['/ebook-reader/book/46'], undefined);
+  });
+
   it('opens DjVu in the page reader, which serves its server-rendered pages', () => {
     setup();
     queryClientHarness.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [

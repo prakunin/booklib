@@ -11,6 +11,9 @@ public enum BookFileType {
 
     PDF(Set.of("pdf")),
     EPUB(Set.of("epub")),
+    // HTML is currently produced only by bounded INPX package discovery. Keeping extensions empty
+    // prevents ordinary filesystem and BookDrop ingestion from selecting a type with no processor.
+    HTML(Set.of()),
     CBX(Set.of("cbz", "cbr", "cb7")),
     FB2(Set.of("fb2")),
     MOBI(Set.of("mobi")),

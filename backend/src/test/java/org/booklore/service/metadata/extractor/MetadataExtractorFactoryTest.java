@@ -260,8 +260,9 @@ class MetadataExtractorFactoryTest {
         }
 
         @ParameterizedTest
-        // OTHER is the download-only catch-all: it has no reader and, by design, no extractor.
-        @EnumSource(value = BookFileType.class, names = "OTHER", mode = EnumSource.Mode.EXCLUDE)
+        // HTML metadata comes from its synthetic rendition; OTHER is download-only. Neither uses
+        // the regular file extractor registry.
+        @EnumSource(value = BookFileType.class, names = {"HTML", "OTHER"}, mode = EnumSource.Mode.EXCLUDE)
         void allReadableFileTypesReturnNonNull(BookFileType type) {
             assertThat(factory.getExtractor(type)).isNotNull();
         }
@@ -274,6 +275,11 @@ class MetadataExtractorFactoryTest {
         @Test
         void returnsNoExtractorForTheDownloadOnlyOtherType() {
             assertThat(factory.getExtractor(BookFileType.OTHER)).isNull();
+        }
+
+        @Test
+        void returnsNoRegularExtractorForHtmlRenditions() {
+            assertThat(factory.getExtractor(BookFileType.HTML)).isNull();
         }
     }
 }

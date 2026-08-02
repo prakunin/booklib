@@ -20,8 +20,8 @@ import java.util.Locale;
  * filename baseline.
  * <p>
  * The extractor is chosen by the entry's extension, not by the stored {@link BookFileType}: a Word
- * document is stored as {@link BookFileType#OTHER} (no reader) yet still has a
- * {@link DocMetadataExtractor}. Whatever the extractor leaves blank is filled from the filename
+ * document and HTML publication types may be rendition-backed without a regular extractor.
+ * Whatever an available extractor leaves blank is filled from the filename
  * baseline, and Smart Enrichment refines the result later. Formats with no extractor (djvu, rtf, …)
  * are recognised from the filename alone.
  */
@@ -42,6 +42,10 @@ public class ArchiveEntryMetadataRecognizer {
      * extension so that library folders and archive entries reach the same reader.
      */
     public BookFileType resolveBookType(String entryName) {
+        String extension = extension(entryName);
+        if ("html".equals(extension) || "htm".equals(extension)) {
+            return BookFileType.HTML;
+        }
         return BookFileExtension.fromFileName(entryName)
                 .map(BookFileExtension::getType)
                 .orElse(BookFileType.OTHER);

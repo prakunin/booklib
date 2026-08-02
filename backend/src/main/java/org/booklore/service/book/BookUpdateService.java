@@ -51,7 +51,7 @@ public class BookUpdateService {
         }
         switch (primaryFile.getBookType()) {
             case PDF -> updatePdfViewerSettings(bookId, user.getId(), bookViewerSettings);
-            case EPUB, FB2, MOBI, AZW3 -> updateEbookViewerSettings(bookId, user.getId(), bookViewerSettings);
+            case EPUB, HTML, FB2, MOBI, AZW3 -> updateEbookViewerSettings(bookId, user.getId(), bookViewerSettings);
             case CBX -> updateCbxViewerSettings(bookId, user.getId(), bookViewerSettings);
             // A DjVu book is read in both the page reader and, once its rendition exists, the PDF
             // one, so it legitimately carries either kind of setting and which one arrives decides

@@ -69,4 +69,31 @@ class InpxCoverGenerationListenerTest {
 
         verify(bookCoverService, times(2)).tryGenerateMissingInpxCover(42L);
     }
+
+    @Test
+    void doesNotRetryAnUnsupportedFileType() {
+        when(bookCoverService.tryGenerateMissingInpxCover(42L))
+                .thenThrow(new IllegalArgumentException("No processor found for file type: OTHER"));
+        InpxCoverGenerationRequestedEvent event =
+                new InpxCoverGenerationRequestedEvent(Set.of(42L), "alice");
+
+        listener.handle(event);
+        listener.handle(event);
+
+        verify(bookCoverService).tryGenerateMissingInpxCover(42L);
+        verifyNoInteractions(bookRepository, notificationService);
+    }
+
+    @Test
+    void retriesUnrelatedIllegalArgumentFailures() {
+        when(bookCoverService.tryGenerateMissingInpxCover(42L))
+                .thenThrow(new IllegalArgumentException("Corrupt cover dimensions"));
+        InpxCoverGenerationRequestedEvent event =
+                new InpxCoverGenerationRequestedEvent(Set.of(42L), "alice");
+
+        listener.handle(event);
+        listener.handle(event);
+
+        verify(bookCoverService, times(2)).tryGenerateMissingInpxCover(42L);
+    }
 }

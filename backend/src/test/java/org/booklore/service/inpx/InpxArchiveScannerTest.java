@@ -46,6 +46,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class InpxArchiveScannerTest {
 
+    private static final Path RAR5_FIXTURE = Path.of("src/test/resources/cbx/test-rar5.cbr");
+
     @Mock
     private BookFileRepository bookFileRepository;
     @Mock
@@ -292,6 +294,56 @@ class InpxArchiveScannerTest {
     }
 
     @Test
+    void discoversNestedHtmlPackageWithoutCataloguingItsAssets(@TempDir Path root) throws IOException {
+        ByteArrayOutputStream nestedBytes = new ByteArrayOutputStream();
+        try (ZipOutputStream nested = new ZipOutputStream(nestedBytes)) {
+            putEntry(nested, "letter_to_an_angel.html", "<html><img src=\"img/00.gif\"></html>"
+                    .getBytes(StandardCharsets.UTF_8));
+            putEntry(nested, "img/00.gif", "gif".getBytes(StandardCharsets.UTF_8));
+            putEntry(nested, "img/01.jpg", "jpg".getBytes(StandardCharsets.UTF_8));
+            putEntry(nested, "style.css", "body{}".getBytes(StandardCharsets.UTF_8));
+        }
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(root.resolve("outer.zip")))) {
+            putEntry(output, "publication.zip", nestedBytes.toByteArray());
+        }
+        when(bookFileRepository.countArchiveEntriesByLibraryId(7L)).thenReturn(List.of());
+
+        List<InpxBookDto> books = new ArrayList<>();
+        scanner.forEach(scanner.discover(7L, root.toString()), books::add, () -> false);
+
+        assertThat(books).singleElement().satisfies(book -> {
+            assertThat(book.getFileName()).isEqualTo("letter_to_an_angel");
+            assertThat(book.getBookType()).isEqualTo(BookFileType.HTML);
+            assertThat(NestedArchiveLocator.decode(book.getSourceArchiveEntry()))
+                    .containsExactly("publication.zip", "letter_to_an_angel.html");
+        });
+    }
+
+    @Test
+    void keepsImageOnlyGenericArchiveAsOneComic(@TempDir Path root) throws IOException {
+        ByteArrayOutputStream nestedBytes = new ByteArrayOutputStream();
+        try (ZipOutputStream nested = new ZipOutputStream(nestedBytes)) {
+            putEntry(nested, "ComicInfo.xml", "<ComicInfo/>".getBytes(StandardCharsets.UTF_8));
+            putEntry(nested, ".DS_Store", "metadata".getBytes(StandardCharsets.UTF_8));
+            putEntry(nested, "page-1.jpg", "jpg".getBytes(StandardCharsets.UTF_8));
+            putEntry(nested, "page-2.png", "png".getBytes(StandardCharsets.UTF_8));
+        }
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(root.resolve("outer.zip")))) {
+            putEntry(output, "comic.zip", nestedBytes.toByteArray());
+        }
+        when(bookFileRepository.countArchiveEntriesByLibraryId(7L)).thenReturn(List.of());
+
+        List<InpxBookDto> books = new ArrayList<>();
+        scanner.forEach(scanner.discover(7L, root.toString()), books::add, () -> false);
+
+        assertThat(books).singleElement().satisfies(book -> {
+            assertThat(book.getFileName()).isEqualTo("comic");
+            assertThat(book.getExtension()).isEqualTo("zip");
+            assertThat(book.getBookType()).isEqualTo(BookFileType.CBX);
+        });
+    }
+
+    @Test
     void stopsAnOverDepthBranchWithoutAbortingItsSiblings(@TempDir Path root) throws IOException {
         byte[] tooDeep = zipBytes("book.pdf", "pdf");
         for (int depth = 6; depth >= 1; depth--) {
@@ -343,6 +395,33 @@ class InpxArchiveScannerTest {
             assertThat(book.getBookType()).isEqualTo(BookFileType.PDF);
             assertThat(NestedArchiveLocator.decode(book.getSourceArchiveEntry()))
                     .containsExactly("nested.7z", "folder/book.pdf");
+        });
+    }
+
+    @Test
+    @EnabledIf("org.booklore.service.ArchiveService#isAvailable")
+    void discoversLeavesInsideNestedRar(@TempDir Path root) throws IOException {
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(root.resolve("outer.zip")))) {
+            putEntry(output, "nested.rar", Files.readAllBytes(RAR5_FIXTURE));
+        }
+        when(bookFileRepository.countArchiveEntriesByLibraryId(7L)).thenReturn(List.of());
+        ArchiveEntryMetadataRecognizer recognizer = new ArchiveEntryMetadataRecognizer(
+                metadataExtractorFactory, docMetadataExtractor, new InpxFilenameMetadataParser());
+        InpxArchiveScanner nativeScanner = new InpxArchiveScanner(bookFileRepository, fb2MetadataExtractor,
+                recognizer, new ArchiveService(), Runnable::run);
+
+        InpxArchiveScanner.Discovery discovery = nativeScanner.discover(7L, root.toString());
+        List<InpxBookDto> books = new ArrayList<>();
+        nativeScanner.forEach(discovery, books::add, () -> false);
+
+        assertThat(discovery.candidates()).singleElement()
+                .satisfies(candidate -> assertThat(candidate.hasNestedContainers()).isTrue());
+        assertThat(discovery.totalEntries()).isEqualTo(1);
+        assertThat(books).extracting(InpxBookDto::getArchiveName).containsOnly("outer.zip");
+        assertThat(books).singleElement().satisfies(book -> {
+            assertThat(book.getBookType()).isEqualTo(BookFileType.CBX);
+            assertThat(book.getFileName()).isEqualTo("nested");
+            assertThat(book.getSourceArchiveEntry()).isNull();
         });
     }
 
