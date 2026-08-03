@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -113,6 +114,23 @@ class LibraryServiceDeletionTest {
             verify(fileService).deleteBookCovers(bookIds);
             verify(libraryWatchService, never()).registerLibrary(any());
         }
+
+        @Test
+        void containsCoverCleanupFailureInsideExecutorTask() {
+            List<Long> bookIds = List.of(10L, 11L);
+            stubExistingLibrary(bookIds);
+            doAnswer(invocation -> {
+                throw new IllegalStateException("cover cleanup failed");
+            }).when(fileService).deleteBookCovers(bookIds);
+            runSubmittedTasksInline();
+
+            libraryService.deleteLibrary(LIBRARY_ID);
+
+            assertThatCode(() -> TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit))
+                    .doesNotThrowAnyException();
+            verify(fileService).deleteBookCovers(bookIds);
+        }
     }
 
     @Nested
@@ -145,6 +163,7 @@ class LibraryServiceDeletionTest {
                     .isInstanceOf(APIException.class)
                     .hasMessage("Library not found with ID: 8");
 
+            verify(libraryWatchService).unregisterLibrary(LIBRARY_ID);
             runSubmittedTasksInline();
             TransactionSynchronizationManager.getSynchronizations()
                     .forEach(synchronization -> synchronization.afterCompletion(

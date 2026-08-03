@@ -352,7 +352,13 @@ public class LibraryService {
 
     private void submitDeletionSideEffect(Runnable action, String description) {
         try {
-            taskExecutor.execute(action);
+            taskExecutor.execute(() -> {
+                try {
+                    action.run();
+                } catch (RuntimeException e) {
+                    log.error("Post-deletion action failed: {}", description, e);
+                }
+            });
         } catch (RuntimeException e) {
             log.error("Failed to schedule post-deletion action: {}", description, e);
         }
