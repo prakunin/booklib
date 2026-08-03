@@ -65,8 +65,15 @@ class InpxLibraryScannerTest {
                 .libraryPaths(new ArrayList<>(List.of(LibraryPathEntity.builder().id(3L).path("/books").build())))
                 .build();
         when(libraryRepository.findByIdWithPaths(LIBRARY_ID)).thenReturn(Optional.of(library));
+        lenient().when(archiveScanner.listArchiveMetadata("/books"))
+                .thenReturn(List.of(new InpxArchiveScanner.ArchiveFile(
+                        java.nio.file.Path.of("/books/fb2-1.zip"), "fb2-1.zip", 1,
+                        java.time.Instant.EPOCH, null)));
         lenient().when(archiveScanner.discover(LIBRARY_ID, "/books"))
                 .thenReturn(new InpxArchiveScanner.Discovery(List.of(), 0));
+        lenient().when(archiveReconciliationService.removeBooksFromMissingArchives(
+                        eq(LIBRARY_ID), any(), any()))
+                .thenReturn(new InpxArchiveReconciliationService.RemovalResult(0, false));
     }
 
     private void givenIndexOf(int records) {
@@ -147,6 +154,8 @@ class InpxLibraryScannerTest {
         verify(batchWriter, times(1)).persist(any(), eq(LIBRARY_ID), eq(3L), any());
         assertThat(result.cancelled()).isTrue();
         assertThat(result.processed()).isEqualTo(500);
+        verify(archiveReconciliationService, never()).removeBooksFromMissingArchives(
+                anyLong(), any(), any());
 
         ArgumentCaptor<InpxScanProgress> captor = ArgumentCaptor.forClass(InpxScanProgress.class);
         verify(notificationService, times(2)).sendMessage(eq(Topic.LIBRARY_SCAN_PROGRESS), captor.capture());
@@ -168,6 +177,22 @@ class InpxLibraryScannerTest {
         ArgumentCaptor<InpxScanProgress> captor = ArgumentCaptor.forClass(InpxScanProgress.class);
         verify(notificationService).sendMessage(eq(Topic.LIBRARY_SCAN_PROGRESS), captor.capture());
         assertThat(captor.getValue().status()).isEqualTo(InpxScanStatus.COMPLETED);
+    }
+
+    @Test
+    void doesNotReimportIndexBooksWhoseOuterArchiveIsMissing() {
+        givenLibrary();
+        givenIndexOf(3);
+        when(archiveScanner.listArchiveMetadata("/books"))
+                .thenReturn(List.of(new InpxArchiveScanner.ArchiveFile(
+                        java.nio.file.Path.of("/books/present.zip"), "present.zip", 1,
+                        java.time.Instant.EPOCH, null)));
+
+        InpxLibraryScanner.ScanResult result = scanner.scan(LIBRARY_ID);
+
+        assertThat(result.processed()).isEqualTo(3);
+        assertThat(result.skipped()).isEqualTo(3);
+        verify(batchWriter, never()).persist(any(), anyLong(), anyLong(), any());
     }
 
     @Test
@@ -195,6 +220,8 @@ class InpxLibraryScannerTest {
         assertThat(result.processed()).isEqualTo(3);
         assertThat(result.added()).isEqualTo(3);
         verify(batchWriter, times(2)).persist(any(), eq(LIBRARY_ID), eq(3L), any());
+        verify(archiveReconciliationService).removeBooksFromMissingArchives(
+                eq(LIBRARY_ID), eq(java.util.Set.of("new.zip")), any());
     }
 
     private InpxBookDto archiveBook(String fileName) {

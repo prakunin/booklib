@@ -84,6 +84,8 @@ class InpxArchiveScannerTest {
         assertThat(discovery.candidates())
                 .extracting(InpxArchiveScanner.ArchiveCandidate::archiveName)
                 .containsExactly("new.ZIP", "partial.zip");
+        assertThat(discovery.presentArchiveNames())
+                .containsExactlyInAnyOrder("complete.zip", "partial.zip", "new.ZIP");
         assertThat(discovery.totalEntries()).isEqualTo(2);
     }
 

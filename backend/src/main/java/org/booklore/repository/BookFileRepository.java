@@ -110,6 +110,47 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
     List<Object[]> countArchiveEntriesByLibraryId(@Param("libraryId") Long libraryId);
 
     @Query("""
+            SELECT bf.id, bf.sourceArchive
+            FROM BookFileEntity bf
+            JOIN bf.book b
+            WHERE b.library.id = :libraryId
+            AND bf.id > :afterId
+            AND bf.isBookFormat = true
+            AND bf.sourceArchive IS NOT NULL
+            AND bf.sourceArchive <> ''
+            ORDER BY bf.id
+            """)
+    List<Object[]> findArchiveSourcesAfterId(
+            @Param("libraryId") Long libraryId,
+            @Param("afterId") long afterId,
+            Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT b.id
+            FROM BookFileEntity bf
+            JOIN bf.book b
+            WHERE b.library.id = :libraryId
+            AND b.id > :afterId
+            AND bf.isBookFormat = true
+            AND bf.sourceArchive IN :missingArchives
+            ORDER BY b.id
+            """)
+    List<Long> findBookIdsWithSourceArchivesAfterId(
+            @Param("libraryId") Long libraryId,
+            @Param("missingArchives") Collection<String> missingArchives,
+            @Param("afterId") long afterId,
+            Pageable pageable);
+
+    @Query("""
+            SELECT b.id, bf.sourceArchive
+            FROM BookFileEntity bf
+            JOIN bf.book b
+            WHERE b.id IN :bookIds
+            AND bf.isBookFormat = true
+            """)
+    List<Object[]> findBookFormatArchiveSourcesByBookIds(@Param("bookIds") Collection<Long> bookIds);
+
+    @Query("""
             SELECT DISTINCT bf.sourceArchive
             FROM BookFileEntity bf
             JOIN bf.book b

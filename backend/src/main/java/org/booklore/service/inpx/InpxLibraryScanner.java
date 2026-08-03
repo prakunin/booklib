@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Orchestrates an INPX scan. Deliberately NOT transactional: {@link InpxBatchWriter}
@@ -58,10 +60,22 @@ public class InpxLibraryScanner {
             InpxScanCaches caches = new InpxScanCaches();
             List<InpxBookDto> batch = new ArrayList<>(BATCH_SIZE);
             boolean[] cancelled = {false};
+            InpxArchiveScanner.Discovery discovery = null;
             ScanContext scanContext = new ScanContext(libraryId, libraryPathId, library.getInpxArchivePath(),
                     caches, counters, libraryNameHolder[0]);
+            Set<String> presentArchiveNames = archiveScanner.listArchiveMetadata(
+                            library.getInpxArchivePath()).stream()
+                    .map(InpxArchiveScanner.ArchiveFile::archiveName)
+                    .collect(Collectors.toUnmodifiableSet());
 
-            inpxParser.forEach(inpxPath, book -> processScannedBook(book, cancelled, batch, scanContext));
+            inpxParser.forEach(inpxPath, book -> {
+                if (presentArchiveNames.contains(book.getArchiveName())) {
+                    processScannedBook(book, cancelled, batch, scanContext);
+                } else if (!cancelled[0]) {
+                    counters.processed++;
+                    counters.skipped++;
+                }
+            });
 
             // Flush index records first. Discovery can then compare each ZIP's FB2 entry
             // count with the freshly committed database count, so archives already covered
@@ -70,8 +84,7 @@ public class InpxLibraryScanner {
 
             if (!cancelled[0]) {
                 counters.total = Math.max(counters.total, counters.processed);
-                InpxArchiveScanner.Discovery discovery = archiveScanner.discover(
-                        libraryId, library.getInpxArchivePath());
+                discovery = archiveScanner.discover(libraryId, library.getInpxArchivePath());
                 counters.total += discovery.totalEntries();
 
                 archiveScanner.forEach(discovery, book -> processScannedBook(book, cancelled, batch, scanContext),
@@ -94,6 +107,13 @@ public class InpxLibraryScanner {
             // status changes.
             if (!cancelled[0] && scanControl.isCancelRequested(libraryId)) {
                 cancelled[0] = true;
+            }
+            if (!cancelled[0] && discovery != null) {
+                InpxArchiveReconciliationService.RemovalResult removal =
+                        archiveReconciliationService.removeBooksFromMissingArchives(
+                                libraryId, discovery.presentArchiveNames(),
+                                () -> scanControl.isCancelRequested(libraryId));
+                cancelled[0] = removal.cancelled();
             }
 
             InpxScanStatus status = cancelled[0] ? InpxScanStatus.CANCELLED : InpxScanStatus.COMPLETED;

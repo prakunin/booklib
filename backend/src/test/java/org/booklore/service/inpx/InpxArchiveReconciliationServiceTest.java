@@ -9,12 +9,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -27,11 +29,98 @@ class InpxArchiveReconciliationServiceTest {
     private BookRepository bookRepository;
     @Mock
     private ArchiveEntryMetadataRecognizer entryMetadataRecognizer;
+    @Mock
+    private InpxArchiveRemovalBatchService archiveRemovalBatchService;
+
+    @Test
+    void removesBooksFromMissingArchivesInBoundedBatches() {
+        InpxArchiveReconciliationService service = service();
+        givenPersistedArchives("present.zip", "missing.zip");
+        when(archiveRemovalBatchService.removeNext(
+                7L, java.util.Set.of("missing.zip"), java.util.Set.of("missing.zip"), 0))
+                .thenReturn(new InpxArchiveRemovalBatchService.RemovalBatch(500, 500, 800L));
+        when(archiveRemovalBatchService.removeNext(
+                7L, java.util.Set.of("missing.zip"), java.util.Set.of("missing.zip"), 800L))
+                .thenReturn(new InpxArchiveRemovalBatchService.RemovalBatch(12, 12, 820L));
+        when(archiveRemovalBatchService.removeNext(
+                7L, java.util.Set.of("missing.zip"), java.util.Set.of("missing.zip"), 820L))
+                .thenReturn(new InpxArchiveRemovalBatchService.RemovalBatch(0, 0, 0));
+
+        InpxArchiveReconciliationService.RemovalResult result = service.removeBooksFromMissingArchives(
+                7L, java.util.Set.of("present.zip"), () -> false);
+
+        assertThat(result.removed()).isEqualTo(512);
+        assertThat(result.cancelled()).isFalse();
+        verify(archiveRemovalBatchService, times(3)).removeNext(
+                org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.eq(java.util.Set.of("missing.zip")),
+                org.mockito.ArgumentMatchers.eq(java.util.Set.of("missing.zip")),
+                org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void skipsRemovalWhenTheArchiveSnapshotIsEmpty() {
+        InpxArchiveReconciliationService service = service();
+        givenPersistedArchives("missing.zip");
+
+        assertThat(service.removeBooksFromMissingArchives(
+                7L, java.util.Set.of(), () -> false).removed()).isZero();
+
+        verify(archiveRemovalBatchService, never()).removeNext(
+                org.mockito.ArgumentMatchers.anyLong(), any(), any(),
+                org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void doesNothingWhenEveryPersistedArchiveIsPresent() {
+        InpxArchiveReconciliationService service = service();
+        givenPersistedArchives("present.zip");
+
+        assertThat(service.removeBooksFromMissingArchives(
+                7L, java.util.Set.of("present.zip"), () -> false).removed()).isZero();
+
+        verify(archiveRemovalBatchService, never()).removeNext(
+                org.mockito.ArgumentMatchers.anyLong(), any(), any(),
+                org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void keepsCaseDistinctArchiveNamesFromThePagedSourceRows() {
+        InpxArchiveReconciliationService service = service();
+        givenPersistedArchives("Archive.zip", "archive.zip");
+        when(archiveRemovalBatchService.removeNext(
+                7L, java.util.Set.of("archive.zip"), java.util.Set.of("archive.zip"), 0))
+                .thenReturn(new InpxArchiveRemovalBatchService.RemovalBatch(0, 0, 0));
+
+        service.removeBooksFromMissingArchives(
+                7L, java.util.Set.of("Archive.zip"), () -> false);
+
+        verify(archiveRemovalBatchService).removeNext(
+                7L, java.util.Set.of("archive.zip"), java.util.Set.of("archive.zip"), 0);
+    }
+
+    @Test
+    void stopsBetweenRemovalBatchesWhenCancelled() {
+        InpxArchiveReconciliationService service = service();
+        givenPersistedArchives("present.zip", "missing.zip");
+        when(archiveRemovalBatchService.removeNext(
+                7L, java.util.Set.of("missing.zip"), java.util.Set.of("missing.zip"), 0))
+                .thenReturn(new InpxArchiveRemovalBatchService.RemovalBatch(500, 500, 800L));
+        java.util.concurrent.atomic.AtomicInteger checks = new java.util.concurrent.atomic.AtomicInteger();
+
+        InpxArchiveReconciliationService.RemovalResult result = service.removeBooksFromMissingArchives(
+                7L, java.util.Set.of("present.zip"), () -> checks.incrementAndGet() > 1);
+
+        assertThat(result.removed()).isEqualTo(500);
+        assertThat(result.cancelled()).isTrue();
+        verify(archiveRemovalBatchService).removeNext(
+                7L, java.util.Set.of("missing.zip"), java.util.Set.of("missing.zip"), 0);
+    }
 
     @Test
     void retiresLegacyContainerOnlyAfterANestedLeafHasBeenPersisted() {
         InpxArchiveReconciliationService service = new InpxArchiveReconciliationService(
-                bookFileRepository, bookRepository, entryMetadataRecognizer);
+                bookFileRepository, bookRepository, entryMetadataRecognizer, archiveRemovalBatchService);
         BookEntity legacyBook = BookEntity.builder().id(10L).deleted(false).build();
         BookFileEntity legacyContainer = BookFileEntity.builder()
                 .book(legacyBook).bookType(BookFileType.OTHER)
@@ -202,6 +291,18 @@ class InpxArchiveReconciliationServiceTest {
 
     private InpxArchiveReconciliationService service() {
         return new InpxArchiveReconciliationService(
-                bookFileRepository, bookRepository, entryMetadataRecognizer);
+                bookFileRepository, bookRepository, entryMetadataRecognizer, archiveRemovalBatchService);
+    }
+
+    private void givenPersistedArchives(String... archiveNames) {
+        List<Object[]> rows = new java.util.ArrayList<>();
+        for (int index = 0; index < archiveNames.length; index++) {
+            rows.add(new Object[]{(long) index + 1, archiveNames[index]});
+        }
+        when(bookFileRepository.findArchiveSourcesAfterId(
+                org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(rows, List.of());
     }
 }

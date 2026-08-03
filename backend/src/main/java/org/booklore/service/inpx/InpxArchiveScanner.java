@@ -21,6 +21,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -95,8 +96,9 @@ public class InpxArchiveScanner {
                 bookFileRepository.findArchivesWithActiveGenericContainerEntries(libraryId));
         List<ArchiveCandidate> candidates = new ArrayList<>();
         long totalEntries = 0;
+        List<ArchiveFile> archives = listArchives(archiveRoot);
 
-        for (ArchiveFile archive : listArchives(archiveRoot)) {
+        for (ArchiveFile archive : archives) {
             if ((archive.hasNestedContainers() && archivesWithLegacyContainers.contains(archive.archiveName()))
                     || archive.entryCount() > persistedCounts.getOrDefault(archive.archiveName(), 0L)) {
                 candidates.add(new ArchiveCandidate(archive.path(), archive.archiveName(), archive.entryCount(),
@@ -106,7 +108,10 @@ public class InpxArchiveScanner {
             }
         }
 
-        return new Discovery(List.copyOf(candidates), totalEntries, libraryId);
+        Set<String> presentArchiveNames = archives.stream()
+                .map(ArchiveFile::archiveName)
+                .collect(Collectors.toUnmodifiableSet());
+        return new Discovery(List.copyOf(candidates), totalEntries, libraryId, presentArchiveNames);
     }
 
     public Discovery discoveryForArchive(long libraryId, ArchiveCandidate candidate) {
@@ -127,7 +132,7 @@ public class InpxArchiveScanner {
         try (Stream<Path> paths = Files.list(root)) {
             List<ArchiveFile> archives = new ArrayList<>();
             Set<Path> seenArchives = new HashSet<>();
-            for (Path path : paths.filter(Files::isRegularFile)
+            for (Path path : paths.filter(this::isRegularFile)
                     .filter(this::isZip)
                     .sorted(Comparator.comparing(item -> item.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
                     .toList()) {
@@ -147,6 +152,15 @@ public class InpxArchiveScanner {
             return List.copyOf(archives);
         } catch (IOException e) {
             throw ApiError.FILE_READ_ERROR.createException("Unable to scan INPX archive folder: " + e.getMessage());
+        }
+    }
+
+    private boolean isRegularFile(Path path) {
+        try {
+            return Files.readAttributes(path, BasicFileAttributes.class).isRegularFile();
+        } catch (IOException e) {
+            throw ApiError.FILE_READ_ERROR.createException(
+                    "Unable to inspect INPX archive folder entry " + path + ": " + e.getMessage());
         }
     }
 
@@ -702,9 +716,25 @@ public class InpxArchiveScanner {
         }
     }
 
-    public record Discovery(List<ArchiveCandidate> candidates, long totalEntries, long libraryId) {
+    public record Discovery(List<ArchiveCandidate> candidates, long totalEntries, long libraryId,
+                            Set<String> presentArchiveNames) {
         public Discovery(List<ArchiveCandidate> candidates, long totalEntries) {
-            this(candidates, totalEntries, 0);
+            this(candidates, totalEntries, 0, archiveNames(candidates));
+        }
+
+        public Discovery(List<ArchiveCandidate> candidates, long totalEntries, long libraryId) {
+            this(candidates, totalEntries, libraryId, archiveNames(candidates));
+        }
+
+        public Discovery {
+            candidates = List.copyOf(candidates);
+            presentArchiveNames = Set.copyOf(presentArchiveNames);
+        }
+
+        private static Set<String> archiveNames(List<ArchiveCandidate> candidates) {
+            return candidates.stream()
+                    .map(ArchiveCandidate::archiveName)
+                    .collect(Collectors.toUnmodifiableSet());
         }
     }
 

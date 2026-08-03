@@ -1,28 +1,34 @@
 package org.booklore.service.inpx;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.repository.BookRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.Set;
-import java.util.HashSet;
+import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class InpxArchiveReconciliationService {
 
+    private static final int ARCHIVE_SOURCE_BATCH_SIZE = 2_000;
+    private static final int ARCHIVE_QUERY_BATCH_SIZE = 500;
     private static final Set<String> SUPPORT_EXTENSIONS = Set.of(
             "css", "js", "gif", "jpg", "jpeg", "png", "webp", "svg", "xml", "xsl", "xslt",
             "woff", "woff2", "ttf", "otf", "eot");
@@ -30,6 +36,67 @@ public class InpxArchiveReconciliationService {
     private final BookFileRepository bookFileRepository;
     private final BookRepository bookRepository;
     private final ArchiveEntryMetadataRecognizer entryMetadataRecognizer;
+    private final InpxArchiveRemovalBatchService archiveRemovalBatchService;
+
+    public RemovalResult removeBooksFromMissingArchives(long libraryId, Set<String> presentArchiveNames,
+                                                        BooleanSupplier cancellation) {
+        Set<String> persistedArchiveNames = loadPersistedArchiveNames(libraryId);
+        if (persistedArchiveNames.isEmpty()) {
+            return RemovalResult.EMPTY;
+        }
+        if (presentArchiveNames.isEmpty()) {
+            log.warn("Skipping removal of books from {} archived sources in INPX library {} because the archive snapshot is empty",
+                    persistedArchiveNames.size(), libraryId);
+            return RemovalResult.EMPTY;
+        }
+
+        Set<String> missingArchiveNames = new HashSet<>(persistedArchiveNames);
+        missingArchiveNames.removeAll(presentArchiveNames);
+        if (missingArchiveNames.isEmpty()) {
+            return RemovalResult.EMPTY;
+        }
+
+        int removed = 0;
+        List<String> missingArchives = List.copyOf(missingArchiveNames);
+        for (int start = 0; start < missingArchives.size(); start += ARCHIVE_QUERY_BATCH_SIZE) {
+            Set<String> queryArchives = Set.copyOf(missingArchives.subList(
+                    start, Math.min(start + ARCHIVE_QUERY_BATCH_SIZE, missingArchives.size())));
+            long afterId = 0;
+            while (true) {
+                if (cancellation.getAsBoolean()) {
+                    return new RemovalResult(removed, true);
+                }
+                InpxArchiveRemovalBatchService.RemovalBatch batch = archiveRemovalBatchService.removeNext(
+                        libraryId, queryArchives, missingArchiveNames, afterId);
+                if (batch.scanned() == 0) {
+                    break;
+                }
+                removed += batch.removed();
+                afterId = batch.lastBookId();
+            }
+        }
+        log.info("Removed {} books from {} missing archives in INPX library {}",
+                removed, missingArchiveNames.size(), libraryId);
+        return new RemovalResult(removed, cancellation.getAsBoolean());
+    }
+
+    private Set<String> loadPersistedArchiveNames(long libraryId) {
+        Set<String> archiveNames = new HashSet<>();
+        long afterId = 0;
+        while (true) {
+            List<Object[]> rows = bookFileRepository.findArchiveSourcesAfterId(
+                    libraryId, afterId, PageRequest.of(0, ARCHIVE_SOURCE_BATCH_SIZE));
+            if (rows.isEmpty()) {
+                return archiveNames;
+            }
+            rows.forEach(row -> archiveNames.add((String) row[1]));
+            afterId = (Long) rows.getLast()[0];
+        }
+    }
+
+    public record RemovalResult(int removed, boolean cancelled) {
+        private static final RemovalResult EMPTY = new RemovalResult(0, false);
+    }
 
     /** Retires legacy archive cards only after at least one descendant locator is persisted. */
     @Transactional
