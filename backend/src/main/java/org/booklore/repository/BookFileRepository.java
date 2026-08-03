@@ -243,4 +243,30 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
     List<String> findTitleBySourceArchiveEntry(@Param("libraryId") long libraryId,
                                                @Param("archive") String archive,
                                                @Param("entry") String entry);
+
+    /**
+     * Books of a library that came out of an archive, in archive order.
+     * <p>
+     * The ordering is a performance contract, not tidiness: {@code FlibustaCatalogSource} caches
+     * parsed annotations per archive with room for six, so walking books grouped by archive
+     * decompresses each of the 218 documents once. Walking them by id would re-decompress a ~2.4 MB
+     * document per book.
+     */
+    @Query("""
+            SELECT bf.book.id, bf.sourceArchive, bf.sourceArchiveEntry
+            FROM BookFileEntity bf
+            WHERE bf.book.library.id = :libraryId
+            AND bf.sourceArchive IS NOT NULL
+            AND bf.sourceArchive <> ''
+            AND bf.sourceArchiveEntry IS NOT NULL
+            AND bf.sourceArchiveEntry <> ''
+            AND (bf.book.deleted IS NULL OR bf.book.deleted = false)
+            AND (bf.sourceArchive > :afterArchive
+                 OR (bf.sourceArchive = :afterArchive AND bf.sourceArchiveEntry > :afterEntry))
+            ORDER BY bf.sourceArchive, bf.sourceArchiveEntry
+            """)
+    List<Object[]> findArchivedBooksForBackfill(@Param("libraryId") long libraryId,
+                                                @Param("afterArchive") String afterArchive,
+                                                @Param("afterEntry") String afterEntry,
+                                                Pageable pageable);
 }
