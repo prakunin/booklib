@@ -10,6 +10,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -801,6 +802,243 @@ class Fb2MetadataExtractorTest {
                     """);
 
             assertThat(extractor.extractCover(file)).isNull();
+        }
+    }
+
+    /**
+     * A recurring shape in the Flibusta FB2 archives: the bytes are UTF-16 and carry a byte order
+     * mark, but the XML declaration still claims {@code encoding="UTF-8"}. Xerces auto-detects UTF-16
+     * from the BOM, reads the declaration, then honours the declared encoding for the rest of the
+     * document, so everything after line 1 decodes to garbage and the parse dies with
+     * "Content is not allowed in prolog" at [2,1]. The BOM is the authority on how the bytes are
+     * encoded, so it has to win over the declaration.
+     */
+    @Nested
+    class ByteOrderMarkOutranksALyingEncodingDeclaration {
+
+        private static final String TITLE_INFO = """
+                <description>
+                  <title-info>
+                    <book-title>Перед смертью не накрасишься</book-title>
+                    <author><first-name>Полина</first-name><last-name>Дашкова</last-name></author>
+                    <lang>ru</lang>
+                  </title-info>
+                </description>
+                """;
+
+        private byte[] fb2Bytes(String xmlBody, Charset charset, byte[] bom) {
+            String xml = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <FictionBook xmlns="%s" xmlns:l="%s">
+                    %s
+                    </FictionBook>
+                    """.formatted(NS, XLINK, xmlBody);
+            byte[] body = xml.getBytes(charset);
+            byte[] bytes = new byte[bom.length + body.length];
+            System.arraycopy(bom, 0, bytes, 0, bom.length);
+            System.arraycopy(body, 0, bytes, bom.length, body.length);
+            return bytes;
+        }
+
+        private File writeFb2(String xmlBody, Charset charset, byte[] bom) throws IOException {
+            Path file = tempDir.resolve("bom.fb2");
+            Files.write(file, fb2Bytes(xmlBody, charset, bom));
+            return file.toFile();
+        }
+
+        @Test
+        void utf16LeFileIsParsedRatherThanFailingInTheProlog() throws IOException {
+            File file = writeFb2(TITLE_INFO, StandardCharsets.UTF_16LE, new byte[]{(byte) 0xFF, (byte) 0xFE});
+
+            BookMetadata metadata = extractor.extractMetadata(file);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Перед смертью не накрасишься");
+            assertThat(metadata.getAuthors()).containsExactly("Полина Дашкова");
+            assertThat(metadata.getLanguage()).isEqualTo("ru");
+        }
+
+        @Test
+        void utf16BeFileIsParsedRatherThanFailingInTheProlog() throws IOException {
+            File file = writeFb2(TITLE_INFO, StandardCharsets.UTF_16BE, new byte[]{(byte) 0xFE, (byte) 0xFF});
+
+            BookMetadata metadata = extractor.extractMetadata(file);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Перед смертью не накрасишься");
+        }
+
+        /**
+         * The INPX scanner reads FB2 straight out of the ZIP stream, so the stream overload has to
+         * detect the BOM on a stream it does not own and cannot re-open.
+         */
+        @Test
+        void utf16ArchiveEntryStreamIsParsed() throws IOException {
+            byte[] bytes = fb2Bytes(TITLE_INFO, StandardCharsets.UTF_16LE, new byte[]{(byte) 0xFF, (byte) 0xFE});
+
+            BookMetadata metadata;
+            try (InputStream input = new ByteArrayInputStream(bytes)) {
+                metadata = extractor.extractMetadata(input, "f.fb2-177718-183065.zip!182116.fb2");
+            }
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Перед смертью не накрасишься");
+        }
+
+        @Test
+        void utf16CoverIsExtracted() throws IOException {
+            byte[] imageData = {0x10, 0x20, 0x30, 0x40};
+            String base64 = Base64.getEncoder().encodeToString(imageData);
+            File file = writeFb2("""
+                    <description><title-info/></description>
+                    <binary id="cover.png" content-type="image/png">%s</binary>
+                    """.formatted(base64), StandardCharsets.UTF_16LE, new byte[]{(byte) 0xFF, (byte) 0xFE});
+
+            assertThat(extractor.extractCover(file)).isEqualTo(imageData);
+        }
+
+        @Test
+        void utf16OpeningTextIsExtracted() throws IOException {
+            File file = writeFb2("""
+                    <description><title-info/></description>
+                    <body><section><p>Первая страница</p></section></body>
+                    """, StandardCharsets.UTF_16LE, new byte[]{(byte) 0xFF, (byte) 0xFE});
+
+            assertThat(extractor.extractOpeningText(file, 200)).contains("Первая страница");
+        }
+
+        /**
+         * A UTF-8 BOM must not be mistaken for a UTF-16 one, and the far more common BOM-less UTF-8
+         * file must keep going through plain stream auto-detection.
+         */
+        @Test
+        void utf8BomFileStillParses() throws IOException {
+            File file = writeFb2(TITLE_INFO, StandardCharsets.UTF_8,
+                    new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+
+            BookMetadata metadata = extractor.extractMetadata(file);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Перед смертью не накрасишься");
+        }
+
+        @Test
+        void bomlessUtf8FileStillParses() throws IOException {
+            File file = writeFb2(TITLE_INFO, StandardCharsets.UTF_8, new byte[0]);
+
+            BookMetadata metadata = extractor.extractMetadata(file);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Перед смертью не накрасишься");
+        }
+    }
+
+    /**
+     * The INPX archive scan inflates every FB2 entry through this parser, so whatever the parser
+     * reads, the scan pays for in decompression. Everything after the first body - and a cover
+     * binary is usually the bulk of an FB2 - is dead weight: {@code description} plus the opening
+     * paragraphs are all this method can use. Measured against the real Flibusta archives before
+     * the early exit, the parser consumed 100% of 320 MB across 400 books to keep at most 40
+     * paragraphs each.
+     */
+    @Nested
+    class StopsReadingOnceTheUsefulPartIsBehindIt {
+
+        private byte[] fb2WithTrailingBinary(String bodyXml, int binaryChars) {
+            String xml = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <FictionBook xmlns="%s" xmlns:l="%s">
+                    <description>
+                      <title-info>
+                        <book-title>Ранний выход</book-title>
+                      </title-info>
+                    </description>
+                    %s
+                    <binary id="cover.png" content-type="image/png">%s</binary>
+                    </FictionBook>
+                    """.formatted(NS, XLINK, bodyXml, "A".repeat(binaryChars));
+            return xml.getBytes(StandardCharsets.UTF_8);
+        }
+
+        private long consumedBytes(byte[] document) {
+            CountingInputStream counting = new CountingInputStream(new ByteArrayInputStream(document));
+            BookMetadata metadata = extractor.extractMetadata(counting, "archive.zip!early.fb2");
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Ранний выход");
+            return counting.count;
+        }
+
+        @Test
+        void theTrailingCoverBinaryIsNotStreamedThroughTheParser() {
+            byte[] document = fb2WithTrailingBinary(
+                    "<body><section><p>Первый абзац</p></section></body>", 2_000_000);
+
+            long consumed = consumedBytes(document);
+
+            // Only the prologue plus the small body is needed; the 2 MB payload behind it is not.
+            assertThat(consumed).isLessThan(document.length / 4L);
+        }
+
+        @Test
+        void readingStopsOnceTheParagraphBudgetIsSpent() {
+            StringBuilder body = new StringBuilder("<body><section>");
+            for (int i = 0; i < 500; i++) {
+                body.append("<p>Абзац номер ").append(i).append("</p>");
+            }
+            body.append("</section></body>");
+            byte[] document = fb2WithTrailingBinary(body.toString(), 2_000_000);
+
+            long consumed = consumedBytes(document);
+
+            assertThat(consumed).isLessThan(document.length / 4L);
+        }
+
+        /**
+         * The early exit must not cost the body fallback its input: a placeholder title still has to
+         * be recovered from the title page that sits inside the body.
+         */
+        @Test
+        void theBodyTitlePageFallbackStillWorks() throws IOException {
+            File file = writeFb2("""
+                    <description>
+                      <title-info>
+                        <book-title>.</book-title>
+                      </title-info>
+                    </description>
+                    <body><section><p>«Настоящее название»</p></section></body>
+                    <binary id="cover.png" content-type="image/png">%s</binary>
+                    """.formatted("A".repeat(1000)));
+
+            BookMetadata metadata = extractor.extractMetadata(file);
+
+            assertThat(metadata).isNotNull();
+            assertThat(metadata.getTitle()).isEqualTo("Настоящее название");
+        }
+
+        private static final class CountingInputStream extends FilterInputStream {
+            private long count;
+
+            private CountingInputStream(InputStream in) {
+                super(in);
+            }
+
+            @Override
+            public int read() throws IOException {
+                int value = super.read();
+                if (value >= 0) {
+                    count++;
+                }
+                return value;
+            }
+
+            @Override
+            public int read(byte[] bytes, int offset, int length) throws IOException {
+                int read = super.read(bytes, offset, length);
+                if (read > 0) {
+                    count += read;
+                }
+                return read;
+            }
         }
     }
 
