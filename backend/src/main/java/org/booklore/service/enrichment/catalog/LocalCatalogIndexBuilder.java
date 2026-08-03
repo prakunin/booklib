@@ -122,6 +122,14 @@ public class LocalCatalogIndexBuilder {
         return total;
     }
 
+    /**
+     * {@link FlibustaCompilationParser#parse}, like {@link FlibustaContentsParser#parse}, wraps its
+     * whole read loop in a broad {@code catch (Exception)}, so a real failure from {@link #flush} (a
+     * database error, not a parsing problem) thrown out of the consumer would otherwise be swallowed
+     * there and logged only as a parse warning — the pass would then look complete when it is not.
+     * {@code saveFailure} recovers that failure once {@code parse} returns so a partial index is never
+     * mistaken for a finished one.
+     */
     private long indexCompilations(long libraryId, Path catalogRoot) {
         Path container = layout.compilations(catalogRoot);
         if (!Files.isReadable(container)) {
@@ -132,8 +140,10 @@ public class LocalCatalogIndexBuilder {
             return 0;
         }
         indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.COMPILATION);
+        indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.COMPILATION_PART);
 
         List<LocalCatalogIndexEntity> batch = new ArrayList<>(BATCH_SIZE);
+        AtomicReference<RuntimeException> saveFailure = new AtomicReference<>();
         int indexed = compilationParser.parse(new ByteArrayInputStream(json), (key, parts) -> {
             String entryKey = layout.bookKey(key.archiveName(), key.entryName());
             if (entryKey == null) {
@@ -145,10 +155,33 @@ public class LocalCatalogIndexBuilder {
                     .entryKey(entryKey)
                     .payload(writeParts(parts))
                     .build());
+            for (CompilationPart part : parts) {
+                String partKey = layout.bookKey(part.archiveName(), part.entryName());
+                if (partKey == null) {
+                    continue;
+                }
+                batch.add(LocalCatalogIndexEntity.builder()
+                        .libraryId(libraryId)
+                        .sourceType(LocalCatalogSourceType.COMPILATION_PART)
+                        .entryKey(partKey)
+                        .payload(writeMembership(new CompilationMembership(
+                                key.archiveName(), key.entryName(), part.part())))
+                        .build());
+            }
             if (batch.size() >= BATCH_SIZE) {
-                flush(batch);
+                try {
+                    flush(batch);
+                } catch (RuntimeException e) {
+                    saveFailure.set(e);
+                    throw e;
+                }
             }
         });
+        RuntimeException failure = saveFailure.get();
+        if (failure != null) {
+            throw new IllegalStateException(
+                    "Could not save local catalog compilation rows: " + failure.getMessage(), failure);
+        }
         flush(batch);
         return indexed;
     }
@@ -250,6 +283,15 @@ public class LocalCatalogIndexBuilder {
             return objectMapper.writeValueAsString(parts);
         } catch (JacksonException e) {
             log.warn("Could not serialise compilation parts: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String writeMembership(CompilationMembership membership) {
+        try {
+            return objectMapper.writeValueAsString(membership);
+        } catch (JacksonException e) {
+            log.warn("Could not serialise compilation membership: {}", e.getMessage());
             return null;
         }
     }

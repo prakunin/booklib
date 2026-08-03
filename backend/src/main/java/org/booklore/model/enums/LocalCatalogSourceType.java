@@ -16,5 +16,11 @@ public enum LocalCatalogSourceType {
      * The language a book is listed under in {@code contents.7z}. Payload is the language code taken
      * from the listing's file name; there is no language column in the rows themselves.
      */
-    LANGUAGE
+    LANGUAGE,
+    /**
+     * The reverse of {@link #COMPILATION}: filed under a constituent work's key, naming the omnibus
+     * it belongs to and its position. {@code COMPILATION} answers "what is in this omnibus";
+     * this answers "which omnibus is this part of", which is what setting a series needs.
+     */
+    COMPILATION_PART
 }

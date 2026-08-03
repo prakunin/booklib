@@ -129,6 +129,19 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
                 .filter(payload -> payload != null && !payload.isBlank());
     }
 
+    @Override
+    public Optional<CompilationMembership> lookupContainingCompilation(
+            long libraryId, String archiveName, String entryName) {
+        String key = layout.bookKey(archiveName, entryName);
+        if (key == null) {
+            return Optional.empty();
+        }
+        return findIndexed(libraryId, LocalCatalogSourceType.COMPILATION_PART, key)
+                .map(LocalCatalogIndexEntity::getPayload)
+                .filter(payload -> payload != null && !payload.isBlank())
+                .flatMap(this::readMembership);
+    }
+
     /**
      * The catalog directory configured on the library, if it exists and matches this layout.
      * Cached briefly rather than permanently: the path is a library setting and can be re-pointed
@@ -175,6 +188,15 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
         } catch (JacksonException e) {
             log.warn("Could not read indexed compilation payload: {}", e.getMessage());
             return List.of();
+        }
+    }
+
+    private Optional<CompilationMembership> readMembership(String payload) {
+        try {
+            return Optional.ofNullable(objectMapper.readValue(payload, CompilationMembership.class));
+        } catch (JacksonException e) {
+            log.warn("Could not read a compilation membership payload: {}", e.getMessage());
+            return Optional.empty();
         }
     }
 

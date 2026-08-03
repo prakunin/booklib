@@ -39,4 +39,12 @@ public interface LocalCatalogSource {
     default Optional<String> lookupLanguage(long libraryId, String archiveName, String entryName) {
         return Optional.empty();
     }
+
+    /**
+     * The omnibus this book is a part of, when the catalog says it is one.
+     */
+    default Optional<CompilationMembership> lookupContainingCompilation(
+            long libraryId, String archiveName, String entryName) {
+        return Optional.empty();
+    }
 }
