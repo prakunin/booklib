@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -1067,7 +1068,7 @@ public class FileService {
         bookMetadataEntity.setCoverUpdatedOn(Instant.now());
     }
 
-    public void deleteBookCovers(Set<Long> bookIds) {
+    public void deleteBookCovers(Collection<Long> bookIds) {
         for (Long bookId : bookIds) {
             String bookCoverFolder = getImagesFolder(bookId);
             Path folderPath = Paths.get(bookCoverFolder);
