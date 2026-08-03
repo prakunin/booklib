@@ -280,7 +280,7 @@ public class MetadataRefreshService {
         }
     }
 
-    MetadataRefreshOptions resolveMetadataRefreshOptions(Long libraryId, AppSettings appSettings) {
+    public MetadataRefreshOptions resolveMetadataRefreshOptions(Long libraryId, AppSettings appSettings) {
         MetadataRefreshOptions defaultOptions = appSettings.getDefaultMetadataRefreshOptions();
         List<MetadataRefreshOptions> libraryOptions = appSettings.getLibraryMetadataRefreshOptions();
 
@@ -443,6 +443,10 @@ public class MetadataRefreshService {
             case Douban -> settings.getDouban() != null && settings.getDouban().isEnabled();
             case Lubimyczytac -> settings.getLubimyczytac() != null && settings.getLubimyczytac().isEnabled();
             case Audible -> settings.getAudible() != null && settings.getAudible().isEnabled();
+            // Parser-less providers: the enrichment pipeline supplies their contributions directly.
+            // Treating them as enabled here would put them into prepareProviders() and then fail in
+            // getParser() the moment a user ranked one in the per-field priority table.
+            case FlibustaLocal, Agent -> false;
             default -> true;
         };
     }
