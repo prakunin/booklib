@@ -60,6 +60,7 @@ public class LocalCatalogBackfillService {
 
         String afterArchive = "";
         String afterEntry = "";
+        long afterId = 0;
         long processed = 0;
         long failed = 0;
 
@@ -69,7 +70,7 @@ public class LocalCatalogBackfillService {
                 return new BackfillResult(processed, failed, true);
             }
             List<Object[]> page = bookFileRepository.findArchivedBooksForBackfill(
-                    libraryId, afterArchive, afterEntry, PageRequest.of(0, PAGE_SIZE));
+                    libraryId, afterArchive, afterEntry, afterId, PageRequest.of(0, PAGE_SIZE));
             if (page.isEmpty()) {
                 break;
             }
@@ -86,6 +87,7 @@ public class LocalCatalogBackfillService {
             Object[] last = page.getLast();
             afterArchive = (String) last[1];
             afterEntry = (String) last[2];
+            afterId = ((Number) last[0]).longValue();
             progress.accept(processed);
         }
 

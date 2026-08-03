@@ -36,9 +36,9 @@ class LocalCatalogBackfillServiceTest {
 
     @Test
     void enrichesEveryArchivedBookAndStops() {
-        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), any(Pageable.class)))
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), eq(0L), any(Pageable.class)))
                 .thenReturn(List.of(row(1L, "a.zip", "1.fb2"), row(2L, "a.zip", "2.fb2")));
-        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq("a.zip"), eq("2.fb2"), any(Pageable.class)))
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq("a.zip"), eq("2.fb2"), eq(2L), any(Pageable.class)))
                 .thenReturn(List.of());
 
         var result = service.run(7L, "task-1", () -> false, progress -> { });
@@ -52,7 +52,7 @@ class LocalCatalogBackfillServiceTest {
 
     @Test
     void indexesBeforeWalkingBooks() {
-        when(bookFileRepository.findArchivedBooksForBackfill(anyLong(), any(), any(), any(Pageable.class)))
+        when(bookFileRepository.findArchivedBooksForBackfill(anyLong(), any(), any(), anyLong(), any(Pageable.class)))
                 .thenReturn(List.of());
 
         service.run(7L, "task-1", () -> false, progress -> { });
@@ -62,9 +62,9 @@ class LocalCatalogBackfillServiceTest {
 
     @Test
     void pinsLocalStepsAndAutoIfEmpty() {
-        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), any(Pageable.class)))
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), eq(0L), any(Pageable.class)))
                 .thenReturn(List.<Object[]>of(row(1L, "a.zip", "1.fb2")));
-        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq("a.zip"), eq("1.fb2"), any(Pageable.class)))
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq("a.zip"), eq("1.fb2"), eq(1L), any(Pageable.class)))
                 .thenReturn(List.of());
 
         service.run(7L, "task-1", () -> false, progress -> { });
@@ -83,7 +83,7 @@ class LocalCatalogBackfillServiceTest {
 
     @Test
     void stopsWhenCancelled() {
-        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), any(Pageable.class)))
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), eq(0L), any(Pageable.class)))
                 .thenReturn(List.<Object[]>of(row(1L, "a.zip", "1.fb2")));
         AtomicBoolean cancelled = new AtomicBoolean(true);
 
@@ -95,9 +95,9 @@ class LocalCatalogBackfillServiceTest {
 
     @Test
     void countsAFailedBookAndKeepsGoing() {
-        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), any(Pageable.class)))
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), eq(0L), any(Pageable.class)))
                 .thenReturn(List.of(row(1L, "a.zip", "1.fb2"), row(2L, "a.zip", "2.fb2")));
-        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq("a.zip"), eq("2.fb2"), any(Pageable.class)))
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq("a.zip"), eq("2.fb2"), eq(2L), any(Pageable.class)))
                 .thenReturn(List.of());
         when(pipeline.enrich(eq(1L), any(EnrichmentRequest.class)))
                 .thenThrow(new IllegalStateException("boom"));
@@ -107,5 +107,27 @@ class LocalCatalogBackfillServiceTest {
         assertThat(result.processed()).isEqualTo(2);
         assertThat(result.failed()).isEqualTo(1);
         verify(pipeline).enrich(eq(2L), any(EnrichmentRequest.class));
+    }
+
+    @Test
+    void doesNotSkipATiedArchiveAndEntryGroupSplitAcrossAPageBoundary() {
+        // Page 1 ends mid-tie: rows 1 and 2 share the same (archive, entry), and the tie group has a
+        // third member, row 3, that the LIMIT boundary cut off. Without the book id as a third key in
+        // the cursor, the next page's strict ">" on (archive, entry) alone would permanently exclude
+        // row 3 — a silent skip, since nothing here looks like an error.
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), eq(0L), any(Pageable.class)))
+                .thenReturn(List.of(row(1L, "a.zip", "5.fb2"), row(2L, "a.zip", "5.fb2")));
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq("a.zip"), eq("5.fb2"), eq(2L), any(Pageable.class)))
+                .thenReturn(List.<Object[]>of(row(3L, "a.zip", "5.fb2")));
+        when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq("a.zip"), eq("5.fb2"), eq(3L), any(Pageable.class)))
+                .thenReturn(List.of());
+
+        var result = service.run(7L, "task-1", () -> false, progress -> { });
+
+        assertThat(result.processed()).isEqualTo(3);
+        assertThat(result.failed()).isZero();
+        verify(pipeline).enrich(eq(1L), any(EnrichmentRequest.class));
+        verify(pipeline).enrich(eq(2L), any(EnrichmentRequest.class));
+        verify(pipeline).enrich(eq(3L), any(EnrichmentRequest.class));
     }
 }
