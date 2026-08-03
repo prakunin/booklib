@@ -24,6 +24,10 @@ class EnrichmentContextTest {
         return EnrichmentRequest.builder().scope(EnrichmentRequest.Scope.BOOK).build();
     }
 
+    private EnrichmentContext context() {
+        return context(null, request());
+    }
+
     @Nested
     class StepSelection {
 
@@ -113,6 +117,63 @@ class EnrichmentContextTest {
         void treatsBlankIdentifiersAsAbsent() {
             assertThat(context(BookMetadata.builder().isbn13("  ").isbn10("").build(), request())
                     .hasIdentifier()).isFalse();
+        }
+    }
+
+    @Nested
+    class RepeatedContributionsFromOneProvider {
+
+        @Test
+        void laterFieldsJoinEarlierOnesInsteadOfReplacingThem() {
+            EnrichmentContext context = context();
+
+            context.addContribution(MetadataProvider.FlibustaLocal,
+                    BookMetadata.builder().bookId(42L).description("аннотация").build(),
+                    EnrichmentConfidence.HIGH);
+            context.addContribution(MetadataProvider.FlibustaLocal,
+                    BookMetadata.builder().bookId(42L).language("ru").build(),
+                    EnrichmentConfidence.HIGH);
+            context.addContribution(MetadataProvider.FlibustaLocal,
+                    BookMetadata.builder().bookId(42L).seriesName("Антология").seriesNumber(3f).build(),
+                    EnrichmentConfidence.HIGH);
+
+            BookMetadata merged = context.getContributions().get(MetadataProvider.FlibustaLocal);
+            assertThat(merged.getDescription()).isEqualTo("аннотация");
+            assertThat(merged.getLanguage()).isEqualTo("ru");
+            assertThat(merged.getSeriesName()).isEqualTo("Антология");
+            assertThat(merged.getSeriesNumber()).isEqualTo(3f);
+        }
+
+        @Test
+        void aLaterValueForTheSameFieldWins() {
+            EnrichmentContext context = context();
+
+            context.addContribution(MetadataProvider.FlibustaLocal,
+                    BookMetadata.builder().bookId(42L).language("en").build(),
+                    EnrichmentConfidence.HIGH);
+            context.addContribution(MetadataProvider.FlibustaLocal,
+                    BookMetadata.builder().bookId(42L).language("ru").build(),
+                    EnrichmentConfidence.HIGH);
+
+            assertThat(context.getContributions().get(MetadataProvider.FlibustaLocal).getLanguage())
+                    .isEqualTo("ru");
+        }
+
+        @Test
+        void differentProvidersStaySeparate() {
+            EnrichmentContext context = context();
+
+            context.addContribution(MetadataProvider.FlibustaLocal,
+                    BookMetadata.builder().bookId(42L).description("локально").build(),
+                    EnrichmentConfidence.HIGH);
+            context.addContribution(MetadataProvider.GoodReads,
+                    BookMetadata.builder().bookId(42L).description("goodreads").build(),
+                    EnrichmentConfidence.HIGH);
+
+            assertThat(context.getContributions().get(MetadataProvider.FlibustaLocal).getDescription())
+                    .isEqualTo("локально");
+            assertThat(context.getContributions().get(MetadataProvider.GoodReads).getDescription())
+                    .isEqualTo("goodreads");
         }
     }
 }
