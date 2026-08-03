@@ -175,6 +175,33 @@ class BookReviewUpdateServiceTest {
     }
 
     @Nested
+    class ProviderScopedReplacement {
+
+        @Test
+        void reRunningTheSameProviderReplacesRatherThanAccumulates() {
+            BookMetadataEntity entity = entityWithReviews(new HashSet<>());
+            List<BookReview> reviews = List.of(review(MetadataProvider.FlibustaLocal, "r1", Instant.now()));
+
+            service.addReviewsToBook(reviews, entity);
+            service.addReviewsToBook(reviews, entity);
+
+            assertThat(entity.getReviews()).hasSize(1);
+        }
+
+        @Test
+        void aProviderReplacesOnlyItsOwnReviews() {
+            BookMetadataEntity entity = entityWithReviews(new HashSet<>());
+
+            service.addReviewsToBook(List.of(review(MetadataProvider.GoodReads, "goodreads", Instant.now())), entity);
+            service.addReviewsToBook(List.of(review(MetadataProvider.FlibustaLocal, "flibusta", Instant.now())), entity);
+
+            assertThat(entity.getReviews())
+                    .extracting(BookReviewEntity::getMetadataProvider)
+                    .containsExactlyInAnyOrder(MetadataProvider.GoodReads, MetadataProvider.FlibustaLocal);
+        }
+    }
+
+    @Nested
     class PerProviderLimit {
 
         @Test
