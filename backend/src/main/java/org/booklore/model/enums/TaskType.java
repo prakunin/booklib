@@ -66,6 +66,15 @@ public enum TaskType {
             false,
             "Recompute Facet Counts",
             "Recomputes the materialized per-library facet counts that power the filter panel and library stats, so those aggregates are served from a table instead of scanning the whole catalog per request."
+    ),
+    LOCAL_CATALOG_BACKFILL(
+            false,
+            true,
+            false,
+            false,
+            "Backfill From Local Catalog",
+            "Fills in descriptions, languages, reviews, author biographies and compilation series "
+                    + "for an INPX library from the catalog shipped next to its archives."
     );
 
     @Getter
