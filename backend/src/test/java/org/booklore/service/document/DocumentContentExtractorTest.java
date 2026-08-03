@@ -16,10 +16,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -148,6 +150,27 @@ class DocumentContentExtractorTest {
     }
 
     @Test
+    void readsWord6DocumentsWithTheLegacyExtractor() throws Exception {
+        Path file = writeWord6Fixture();
+
+        var result = extractor.parse(file.toFile());
+
+        assertThat(result.status()).isEqualTo(DocumentParseStatus.READABLE);
+        assertThat(result.content().blocks())
+                .extracting(DocumentBlock::text)
+                .contains("The quick brown fox jumps over the lazy dog");
+    }
+
+    @Test
+    void appliesTheRetainedTextLimitToWord6Documents() throws Exception {
+        Path file = writeWord6Fixture();
+        DocumentContentExtractor bounded = boundedExtractor(
+                Duration.ofSeconds(1), 1024 * 1024, 1024 * 1024, 1);
+
+        assertThat(bounded.parse(file.toFile()).status()).isEqualTo(DocumentParseStatus.UNREADABLE);
+    }
+
+    @Test
     void protectedDocxReturnsUnreadableOutcome() throws Exception {
         Path source = writeDocx("plain.docx", doc -> paragraph(doc, null, "private"));
         Path encrypted = tempDir.resolve("protected.docx");
@@ -261,5 +284,20 @@ class DocumentContentExtractorTest {
         testExecutor = Executors.newSingleThreadExecutor();
         return new DocumentContentExtractor(
                 testExecutor, timeout, maxDocBytes, maxDocxExpandedBytes, maxTextBytes);
+    }
+
+    private Path writeWord6Fixture() throws IOException {
+        Path file = tempDir.resolve("word6.doc");
+        try (InputStream input = getClass().getResourceAsStream("/document/apache-poi-word6.doc.base64")) {
+            if (input == null) {
+                throw new IOException("Word 6 test fixture is missing");
+            }
+            String encoded = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+                    .lines()
+                    .filter(line -> !line.startsWith("#"))
+                    .collect(java.util.stream.Collectors.joining());
+            Files.write(file, Base64.getDecoder().decode(encoded));
+        }
+        return file;
     }
 }

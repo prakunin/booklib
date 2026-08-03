@@ -18,10 +18,13 @@ import org.springframework.stereotype.Service;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.CoderResult;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,6 +47,7 @@ public class HtmlRenditionService {
     private static final long MAX_HTML_BYTES = 16L * 1024 * 1024;
     private static final long MAX_CACHE_WEIGHT = 64L * 1024 * 1024;
     private static final int RESOURCE_WEIGHT_BYTES = 4 * 1024;
+    private static final Charset WINDOWS_1251 = Charset.forName("windows-1251");
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("gif", "jpg", "jpeg", "png", "webp");
     private static final Set<String> UNSAFE_ELEMENTS = Set.of(
             "script", "style", "link", "base", "iframe", "frame", "frameset", "object", "embed",
@@ -109,10 +113,7 @@ public class HtmlRenditionService {
         String htmlEntry = archivedBookContentService.publicationEntryName(bookFile);
         String baseDirectory = directoryOf(htmlEntry);
 
-        Document document;
-        try (InputStream input = Files.newInputStream(htmlPath)) {
-            document = Jsoup.parse(input, null, "");
-        }
+        Document document = parseHtml(htmlPath);
         sanitizeElements(document);
 
         Map<String, Resource> resources = new LinkedHashMap<>();
@@ -149,6 +150,76 @@ public class HtmlRenditionService {
         CachedRendition fresh = new CachedRendition(lastModified, xhtml, Map.copyOf(resources), info, title);
         cache.put(bookFile.getId(), fresh);
         return fresh;
+    }
+
+    private Document parseHtml(Path htmlPath) throws IOException {
+        byte[] bytes;
+        try (var input = Files.newInputStream(htmlPath)) {
+            bytes = input.readNBytes(Math.toIntExact(MAX_HTML_BYTES + 1));
+        }
+        if (bytes.length > MAX_HTML_BYTES) {
+            throw new IOException("HTML publication exceeds the rendition size limit");
+        }
+        Document detected = Jsoup.parse(new java.io.ByteArrayInputStream(bytes), null, "");
+        if (isValidUtf8(bytes) || decodingProbe(detected).indexOf('\uFFFD') < 0) {
+            return detected;
+        }
+
+        String windows1251Text;
+        try {
+            windows1251Text = WINDOWS_1251.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(java.nio.ByteBuffer.wrap(bytes))
+                    .toString();
+        } catch (CharacterCodingException _) {
+            return detected;
+        }
+        Document windows1251 = Jsoup.parse(windows1251Text, "");
+        String text = decodingProbe(windows1251);
+        long cyrillicCount = text.codePoints()
+                .filter(codePoint -> Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.CYRILLIC)
+                .count();
+        if (cyrillicCount > 0) {
+            return windows1251;
+        }
+        return detected;
+    }
+
+    private boolean isValidUtf8(byte[] bytes) {
+        try {
+            var decoder = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT);
+            var input = java.nio.ByteBuffer.wrap(bytes);
+            var output = java.nio.CharBuffer.allocate(8192);
+            while (true) {
+                CoderResult result = decoder.decode(input, output, true);
+                if (result.isError()) {
+                    result.throwException();
+                }
+                if (result.isUnderflow()) {
+                    break;
+                }
+                output.clear();
+            }
+            return true;
+        } catch (CharacterCodingException _) {
+            return false;
+        }
+    }
+
+    private String decodingProbe(Document document) {
+        StringBuilder probe = new StringBuilder(document.text());
+        for (Element element : document.getAllElements()) {
+            for (Attribute attribute : element.attributes()) {
+                String value = attribute.getValue();
+                if (value.codePoints().anyMatch(codePoint -> codePoint >= 0x80)) {
+                    probe.append(' ').append(value);
+                }
+            }
+        }
+        return probe.toString();
     }
 
     private void sanitizeElements(Document document) {

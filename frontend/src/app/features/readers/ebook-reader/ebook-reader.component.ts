@@ -38,6 +38,7 @@ import {RelocateProgressData} from './state/progress.service';
 import {WakeLockService} from '../../../shared/service/wake-lock.service';
 import {ViewEvent} from './core/view-manager.service';
 import {ReaderFullscreenService} from '../shared/reader-fullscreen.service';
+import {shouldUseStreamingRendition} from './streaming-book-type.util';
 
 interface PendingInitialChapterRestore {
   href: string;
@@ -287,11 +288,10 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
         this.headerService.initialize(this.bookId, book.metadata?.title || '');
 
         const useStreaming = this.route.snapshot.queryParamMap.get('streaming') !== 'false';
-        // DOC must stream: the blob branch hands the raw file to foliate, which parses FB2, MOBI and
-        // AZW3 natively but has no idea what a Word document is. Streaming is the only path that goes
-        // through the server-side rendition.
-        const streamable = bookType === 'EPUB' || bookType === 'DOC';
-        const loadBook$ = streamable && useStreaming
+        // DOC and HTML must stream: the blob branch hands the raw file to Foliate, which parses FB2,
+        // MOBI and AZW3 natively but has no idea how to open these server-side renditions.
+        const shouldStream = shouldUseStreamingRendition(bookType, useStreaming);
+        const loadBook$ = shouldStream
           ? this.viewManager.loadEpubStreaming(this.bookId, this.altBookType)
           : this.loadBookBlob(bookType);
 

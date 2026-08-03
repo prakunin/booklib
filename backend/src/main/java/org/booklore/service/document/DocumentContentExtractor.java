@@ -5,6 +5,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.hpsf.PropertySetFactory;
 import org.apache.poi.hpsf.SummaryInformation;
 import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.OldWordFileFormatException;
+import org.apache.poi.hwpf.extractor.Word6Extractor;
 import org.apache.poi.hwpf.usermodel.Paragraph;
 import org.apache.poi.hwpf.usermodel.Range;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
@@ -189,6 +191,30 @@ public class DocumentContentExtractor {
                 ensureNotInterrupted();
                 Paragraph paragraph = range.getParagraph(i);
                 textBytes = addBlock(blocks, i, styleNameOf(doc, paragraph), paragraph.text(), textBytes);
+            }
+            SummaryInformation summary = readSummaryInformation(fs);
+            BoundedText title = boundedText(summary == null ? null : summary.getTitle(), textBytes);
+            BoundedText author = boundedText(summary == null ? null : summary.getAuthor(), title.totalBytes());
+            return new DocumentContent(
+                    blocks,
+                    title.value(),
+                    author.value(),
+                    summary == null ? null : toLocalDate(summary.getCreateDateTime()));
+        } catch (OldWordFileFormatException _) {
+            return extractOldWord(file);
+        }
+    }
+
+    private DocumentContent extractOldWord(File file) throws IOException {
+        try (POIFSFileSystem fs = new POIFSFileSystem(file, true);
+             Word6Extractor extractor = new Word6Extractor(fs)) {
+            extractor.setCloseFilesystem(false);
+            List<String> paragraphs = LegacyWordTextNormalizer.normalize(extractor.getParagraphText());
+            List<DocumentBlock> blocks = new ArrayList<>(paragraphs.size());
+            long textBytes = 0;
+            for (int i = 0; i < paragraphs.size(); i++) {
+                ensureNotInterrupted();
+                textBytes = addBlock(blocks, i, null, paragraphs.get(i), textBytes);
             }
             SummaryInformation summary = readSummaryInformation(fs);
             BoundedText title = boundedText(summary == null ? null : summary.getTitle(), textBytes);

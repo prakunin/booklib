@@ -2,6 +2,8 @@ package org.booklore.service.reader;
 
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.booklore.model.document.DocumentBlock;
+import org.booklore.model.document.DocumentContent;
 import org.booklore.model.dto.response.EpubBookInfo;
 import org.booklore.model.dto.response.EpubTocItem;
 import org.booklore.service.document.DocumentContentExtractor;
@@ -10,10 +12,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -184,6 +189,32 @@ class DocumentRenditionServiceTest {
 
             assertThat(render(file, info.getSpine().getFirst().getHref()))
                     .contains("a &lt; b &amp; c &gt; d");
+        }
+
+        @Test
+        void removesXmlControlCharactersWithoutDroppingValidWhitespace() throws Exception {
+            Path file = tempDir.resolve("controls.doc");
+            Files.write(file, new byte[]{0});
+            DocumentContentExtractor controlCharacterExtractor = new DocumentContentExtractor() {
+                @Override
+                public DocumentContent extract(File ignored) throws IOException {
+                    return new DocumentContent(
+                            List.of(new DocumentBlock(0, 0, "before\u000Eafter\tline\nnext")),
+                            null,
+                            null,
+                            null);
+                }
+            };
+            DocumentRenditionService controlCharacterService =
+                    new DocumentRenditionService(controlCharacterExtractor);
+
+            EpubBookInfo info = controlCharacterService.buildBookInfo(file);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            controlCharacterService.streamResource(file, info.getSpine().getFirst().getHref(), output);
+
+            assertThat(output.toString(StandardCharsets.UTF_8))
+                    .contains("before after\tline\nnext")
+                    .doesNotContain("\u000E");
         }
 
         @Test

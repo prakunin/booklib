@@ -349,8 +349,34 @@ public class DocumentRenditionService {
     }
 
     private String escape(String text) {
-        return text.replace("&", "&amp;")
+        StringBuilder xmlText = new StringBuilder(text.length());
+        boolean needsSeparator = false;
+        for (int index = 0; index < text.length();) {
+            int codePoint = text.codePointAt(index);
+            index += Character.charCount(codePoint);
+            if (!isValidXmlCodePoint(codePoint)) {
+                needsSeparator = true;
+                continue;
+            }
+            if (needsSeparator && !xmlText.isEmpty()
+                    && !Character.isWhitespace(xmlText.codePointBefore(xmlText.length()))
+                    && !Character.isWhitespace(codePoint)) {
+                xmlText.append(' ');
+            }
+            needsSeparator = false;
+            xmlText.appendCodePoint(codePoint);
+        }
+        return xmlText.toString().replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;");
+    }
+
+    private static boolean isValidXmlCodePoint(int codePoint) {
+        return codePoint == 0x9
+                || codePoint == 0xA
+                || codePoint == 0xD
+                || codePoint >= 0x20 && codePoint <= 0xD7FF
+                || codePoint >= 0xE000 && codePoint <= 0xFFFD
+                || codePoint >= 0x10000 && codePoint <= 0x10FFFF;
     }
 }
