@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Walks a local catalog once and records where each key lives.
@@ -155,6 +156,12 @@ public class LocalCatalogIndexBuilder {
     /**
      * The language is the listing's file name — {@code ru.txt} means every row in it is Russian — so
      * one pass over the 75 listings produces a language for every book the catalog knows.
+     * <p>
+     * {@link FlibustaContentsParser#parse} wraps its own read loop in a broad {@code catch (Exception)},
+     * so a real failure from {@link #flush} (a database error, not a parsing problem) thrown out of the
+     * consumer would otherwise be swallowed there and logged only as a row-read warning — the pass would
+     * then look complete when it is not. {@code saveFailure} recovers that failure once {@code parse}
+     * returns so an incomplete index for a listing is never mistaken for a finished one.
      */
     private long indexLanguages(long libraryId, Path catalogRoot) {
         Path container = layout.contents(catalogRoot);
@@ -174,6 +181,7 @@ public class LocalCatalogIndexBuilder {
             if (listing.length == 0) {
                 continue;
             }
+            AtomicReference<RuntimeException> saveFailure = new AtomicReference<>();
             total += contentsParser.parse(new ByteArrayInputStream(listing), (archive, entry) -> {
                 String entryKey = layout.bookKey(archive, entry);
                 if (entryKey == null) {
@@ -186,9 +194,20 @@ public class LocalCatalogIndexBuilder {
                         .payload(language)
                         .build());
                 if (batch.size() >= BATCH_SIZE) {
-                    flush(batch);
+                    try {
+                        flush(batch);
+                    } catch (RuntimeException e) {
+                        saveFailure.set(e);
+                        throw e;
+                    }
                 }
             });
+            RuntimeException failure = saveFailure.get();
+            if (failure != null) {
+                throw new IllegalStateException(
+                        "Could not save local catalog language rows from '" + entryName
+                                + "': " + failure.getMessage(), failure);
+            }
         }
         flush(batch);
         return total;
@@ -204,11 +223,7 @@ public class LocalCatalogIndexBuilder {
         if (batch.isEmpty()) {
             return;
         }
-        // A defensive copy, not the live buffer: the buffer is reused and cleared right after this
-        // call so a huge container never accumulates in memory, but the repository (and anything
-        // capturing what was saved, e.g. tests) must see a stable snapshot rather than a list that
-        // is about to be emptied out from under it.
-        indexRepository.saveAll(List.copyOf(batch));
+        indexRepository.saveAll(batch);
         batch.clear();
     }
 
