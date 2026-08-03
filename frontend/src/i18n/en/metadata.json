@@ -653,5 +653,69 @@
     "appliedDetail": "{{count}} field(s) applied",
     "applyErrorSummary": "Could not apply metadata",
     "genericError": "Smart enrichment failed"
+  },
+  "enrichment": {
+    "title": "Enrich",
+    "subtitle": "Fill in what is missing, from the cheapest source that can answer",
+    "submit": "Start enrichment",
+    "summary": "{{count}} book(s) will be queued.",
+    "queued": {
+      "summary": "Enrichment queued",
+      "detail": "{{count}} book(s) queued. Progress appears as they are processed."
+    },
+    "failed": {
+      "summary": "Could not queue enrichment",
+      "detail": "The request was rejected. Check that the selection is still valid."
+    },
+    "steps": {
+      "title": "Sources",
+      "hint": "Each source runs only when it has something to add, cheapest first.",
+      "LOCAL_CATALOG": {
+        "label": "Local catalog",
+        "hint": "Descriptions from the catalog shipped with the library, matched on the exact file."
+      },
+      "WORK_CACHE": {
+        "label": "Known works",
+        "hint": "Reuse an identity already resolved for another edition of the same book."
+      },
+      "PROVIDERS": {
+        "label": "Metadata providers",
+        "hint": "Amazon, Goodreads, Google and the rest, as configured per field."
+      },
+      "REVIEWS": {
+        "label": "Reader reviews",
+        "hint": "Reviews from the local catalog."
+      },
+      "AUTHOR_BIO": {
+        "label": "Author biographies",
+        "hint": "Fills an empty author biography; never overwrites one you wrote."
+      }
+    },
+    "policy": {
+      "title": "What may be written",
+      "hint": "Only high-confidence results are ever written. Anything less certain becomes a suggestion to review.",
+      "AUTO_IF_EMPTY": {
+        "label": "Fill empty fields only",
+        "hint": "Nothing you already have is touched."
+      },
+      "AUTO": {
+        "label": "Replace with confident results",
+        "hint": "High-confidence values replace existing ones. Locked fields and manual edits still win."
+      },
+      "PROPOSE": {
+        "label": "Suggest only",
+        "hint": "Write nothing; collect everything for review."
+      }
+    },
+    "agent": {
+      "title": "Agent",
+      "label": "Let the agent identify unrecognised books",
+      "hint": "Used only when nothing cheaper found an identifier. Takes minutes per book and is rate-limited. Its answers are always suggestions, never written automatically.",
+      "scaleWarning": "With {{count}} books this can run for days. It is resumable and can be cancelled at any time."
+    },
+    "progress": {
+      "running": "Enriching: {{completed}} of {{total}}",
+      "finished": "Enrichment finished: {{completed}} of {{total}} books processed"
+    }
   }
 }

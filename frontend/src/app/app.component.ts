@@ -11,6 +11,8 @@ import {AuthInitializationService} from './core/security/auth-initialization-ser
 import {AppThemeService} from './shared/service/app-theme.service';
 import {MetadataBatchProgressNotification} from './shared/model/metadata-batch-progress.model';
 import {MetadataProgressService} from './shared/service/metadata-progress.service';
+import {EnrichmentProgressService} from './features/metadata/service/enrichment-progress.service';
+import {EnrichmentProgressEvent} from './features/metadata/model/enrichment.model';
 import {BookdropFileNotification, BookdropFileService} from './features/bookdrop/service/bookdrop-file.service';
 import {Subscription} from 'rxjs';
 import {TaskProgressPayload, TaskService} from './features/settings/task-management/task.service';
@@ -42,6 +44,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly rxStompService = inject(RxStompService);
   private readonly notificationEventService = inject(NotificationEventService);
   private readonly metadataProgressService = inject(MetadataProgressService);
+  private readonly enrichmentProgressService = inject(EnrichmentProgressService);
   private readonly bookdropFileService = inject(BookdropFileService);
   private readonly taskService = inject(TaskService);
   private readonly libraryHealthService = inject(LibraryHealthService);
@@ -157,6 +160,11 @@ export class AppComponent implements OnInit, OnDestroy {
     this.subscriptions.push(
       this.rxStompService.watch('/user/queue/book-recommendations-update').subscribe(msg =>
         this.bookService.handleBookRecommendationsUpdate(JSON.parse(msg.body) as number)
+      )
+    );
+    this.subscriptions.push(
+      this.rxStompService.watch('/user/queue/enrichment-progress').subscribe(msg =>
+        this.enrichmentProgressService.handleProgress(JSON.parse(msg.body) as EnrichmentProgressEvent)
       )
     );
     this.subscriptions.push(

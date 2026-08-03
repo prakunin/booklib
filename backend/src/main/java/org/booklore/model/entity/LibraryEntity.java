@@ -59,6 +59,13 @@ public class LibraryEntity {
     @Column(name = "inpx_archive_path", length = 1000)
     private String inpxArchivePath;
 
+    /**
+     * Directory of a local metadata catalog shipping alongside the library — for INPX libraries the
+     * sibling {@code *.FLibrary.etc} folder. Null when the library has none.
+     */
+    @Column(name = "metadata_sidecar_path", length = 1000)
+    private String metadataSidecarPath;
+
     private String icon;
 
     @Enumerated(EnumType.STRING)

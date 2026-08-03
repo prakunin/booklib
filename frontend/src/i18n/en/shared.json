@@ -107,6 +107,8 @@
     "loadingDirectories": "Loading directories...",
     "noMatchesFound": "No Matches Found",
     "directoryEmpty": "Directory is Empty",
+    "directoryUnavailable": "Directory Not Available",
+    "directoryUnavailableDescription": "This folder could not be listed. It may be outside the directories this server allows browsing, or unreadable by the container.",
     "noMatchesDescription": "No folders match your search criteria.<br/>Try adjusting your search terms.",
     "emptyDescription": "This directory doesn't contain any subfolders.",
     "folderAvailable": "{{ count }} folder available",

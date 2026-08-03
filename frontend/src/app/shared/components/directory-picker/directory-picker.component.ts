@@ -43,6 +43,11 @@ export class DirectoryPickerComponent implements OnInit {
   selectedFoldersMap: Record<string, boolean> = {};
   searchQuery: string = '';
   isLoading = signal(false);
+  /**
+   * A rejected listing used to render as "Directory is Empty", which sent people looking for
+   * missing folders instead of at the reason the request was refused.
+   */
+  loadError = signal(false);
   breadcrumbItems: MenuItem[] = [];
   home: MenuItem = {icon: 'pi pi-home', command: () => this.navigateToRoot()};
 
@@ -56,6 +61,7 @@ export class DirectoryPickerComponent implements OnInit {
 
   getFolders(path: string): void {
     this.isLoading.set(true);
+    this.loadError.set(false);
     this.filteredPaths = [];
     this.utilityService.getFolders(path).subscribe({
       next: (folders: string[]) => {
@@ -71,7 +77,11 @@ export class DirectoryPickerComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error fetching folders:', error);
+        this.paths = [];
+        this.filteredPaths = [];
+        this.loadError.set(true);
         this.isLoading.set(false);
+        this.updateBreadcrumb(path);
       }
     });
   }

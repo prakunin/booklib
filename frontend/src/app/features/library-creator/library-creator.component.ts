@@ -5,6 +5,7 @@ import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
 import { MessageService } from 'primeng/api';
 import { Router } from '@angular/router';
 import { LibraryService } from '../book/service/library.service';
+import {EnrichmentService} from '../metadata/service/enrichment.service';
 import { FormsModule } from '@angular/forms';
 import { InputText } from 'primeng/inputtext';
 import { Library, LibrarySourceType, MetadataSource, OrganizationMode } from '../book/model/library.model';
@@ -49,6 +50,7 @@ export class LibraryCreatorComponent {
   private readonly router = inject(Router);
   private readonly iconPicker = inject(IconPickerService);
   private readonly t = inject(TranslocoService);
+  private readonly enrichmentService = inject(EnrichmentService);
   private readonly libraryImportProgressService = inject(LibraryImportProgressService);
   private readonly utilityService = inject(UtilityService);
 
@@ -80,6 +82,13 @@ export class LibraryCreatorComponent {
   readonly organizationMode = signal<OrganizationMode>('BOOK_PER_FILE');
   readonly sourceType = signal<LibrarySourceType>('FILESYSTEM');
   readonly inpxPath = signal<string>('');
+  /**
+   * The local metadata catalog that ships next to the archives. Suggested from the archive folder,
+   * never applied without the user seeing it — a catalog belonging to different archives would join
+   * on keys that do not exist and quietly find nothing.
+   */
+  readonly metadataSidecarPath = signal<string>('');
+  readonly sidecarDetected = signal(false);
   readonly inpxIndexOptions = signal<InpxIndexOption[]>([]);
   readonly isDetectingInpx = signal<boolean>(false);
   readonly inpxManualEntry = signal<boolean>(false);
@@ -200,6 +209,7 @@ export class LibraryCreatorComponent {
     this.folders.set(paths.map(p => p.path));
     this.sourceType.set(library.sourceType ?? 'FILESYSTEM');
     this.inpxPath.set(library.inpxPath ?? '');
+    this.metadataSidecarPath.set(library.metadataSidecarPath ?? '');
 
     if (icon != null && iconType) {
       this.selectedIcon.set(toIconSelection(icon, iconType));
@@ -280,8 +290,21 @@ export class LibraryCreatorComponent {
     ref?.onClose.subscribe((selectedFolders: string[] | null) => {
       if (selectedFolders && selectedFolders.length > 0) {
         if (this.sourceType() === 'INPX') {
-          this.folders.set([selectedFolders[0]]);
-          this.detectInpxIndexes(selectedFolders[0]);
+          const archiveFolder = selectedFolders[0];
+          this.folders.set([archiveFolder]);
+          // An INPX library has exactly one archive directory. Saying so beats silently keeping the
+          // first of several and leaving the user to wonder where the rest went.
+          if (selectedFolders.length > 1) {
+            this.messageService.add({
+              severity: 'info',
+              summary: this.t.translate('libraryCreator.creator.inpxSingleFolder.summary'),
+              detail: this.t.translate('libraryCreator.creator.inpxSingleFolder.detail', {
+                folder: archiveFolder,
+              }),
+            });
+          }
+          this.detectInpxIndexes(archiveFolder);
+          this.detectMetadataSidecar(archiveFolder);
           return;
         }
         this.folders.update(current => {
@@ -294,6 +317,25 @@ export class LibraryCreatorComponent {
 
   private detectInpxIndexes(folder: string): void {
     this.inpxFolderRequested.next(folder);
+  }
+
+  /**
+   * Offers the catalog sitting next to the archives. Only fills a field the user has not set, so a
+   * path they typed is never overwritten by a guess.
+   */
+  private detectMetadataSidecar(archiveFolder: string): void {
+    if (this.metadataSidecarPath().trim()) {
+      return;
+    }
+    this.enrichmentService.detectLocalCatalog(archiveFolder).subscribe({
+      next: (result) => {
+        if (result.path) {
+          this.metadataSidecarPath.set(result.path);
+          this.sidecarDetected.set(true);
+        }
+      },
+      error: () => this.sidecarDetected.set(false),
+    });
   }
 
   private applyInpxDetectionResult(options: InpxIndexOption[], failed: boolean): void {
@@ -397,6 +439,7 @@ export class LibraryCreatorComponent {
       sourceType: this.sourceType(),
       inpxPath: this.sourceType() === 'INPX' ? (this.inpxPath().trim() || null) : null,
       inpxArchivePath: this.sourceType() === 'INPX' ? this.folders()[0] : null,
+      metadataSidecarPath: this.metadataSidecarPath().trim() || null,
       formatPriority: this.formatPriority().map(f => f.type),
       allowedFormats: this.allowAllFormats() ? [] : Array.from(this.selectedAllowedFormats()),
       metadataSource: this.metadataSource(),

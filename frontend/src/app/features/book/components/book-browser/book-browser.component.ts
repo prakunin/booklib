@@ -564,7 +564,8 @@ export class BookBrowserComponent implements AfterViewInit {
       generateCustomCovers: () => this.generateCustomCoversForSelected(),
       user,
       smartEnrich: () => this.bulkSmartEnrich(),
-      smartEnrichmentAvailable: this.smartEnrichmentAvailable()
+      smartEnrichmentAvailable: this.smartEnrichmentAvailable(),
+      enrich: () => this.enrichSelected()
     });
   });
 
@@ -935,6 +936,20 @@ export class BookBrowserComponent implements AfterViewInit {
     this.dynamicDialogRef = await this.dialogHelperService.openBulkSmartEnrichmentDialog(selectedBooks);
     this.dynamicDialogRef?.onClose.pipe(take(1)).subscribe(result => {
       if (result?.completed) {
+        this.bookSelectionService.deselectAll();
+      }
+    });
+  }
+
+  async enrichSelected(): Promise<void> {
+    const selectedBooks = this.selectedBooks();
+    if (selectedBooks.size === 0) return;
+
+    this.dynamicDialogRef = await this.dialogHelperService.openEnrichmentDialog(selectedBooks);
+    this.dynamicDialogRef?.onClose.pipe(take(1)).subscribe(result => {
+      // Only clear the selection once the work is actually queued; a cancelled dialog should leave
+      // the user exactly where they were.
+      if (result?.jobId) {
         this.bookSelectionService.deselectAll();
       }
     });

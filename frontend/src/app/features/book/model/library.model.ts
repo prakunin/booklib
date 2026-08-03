@@ -16,6 +16,11 @@ export interface Library {
   sourceType?: LibrarySourceType;
   inpxPath?: string | null;
   inpxArchivePath?: string | null;
+  /**
+   * Directory of a local metadata catalog shipping alongside the library — for INPX libraries the
+   * sibling "*.FLibrary.etc" folder holding annotations, reviews and author biographies.
+   */
+  metadataSidecarPath?: string | null;
   fileNamingPattern?: string;
   sort?: SortOption;
   paths: LibraryPath[];

@@ -131,6 +131,31 @@ describe('DirectoryPickerComponent', () => {
     expect(console.error).toHaveBeenCalled();
   });
 
+  /**
+   * A refused listing used to render as "Directory is Empty", which sent people looking for missing
+   * folders instead of at the reason the request was refused.
+   */
+  it('reports a refused listing as an error rather than an empty directory', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    utilityService.getFolders.mockReturnValueOnce(throwError(() => new Error('forbidden')));
+
+    component.getFolders('/not-allowed');
+
+    expect(component.loadError()).toBe(true);
+    expect(component.filteredPaths).toEqual([]);
+  });
+
+  it('clears the error once a later listing succeeds', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    utilityService.getFolders.mockReturnValueOnce(throwError(() => new Error('forbidden')));
+    component.getFolders('/not-allowed');
+    expect(component.loadError()).toBe(true);
+
+    component.getFolders('/books');
+
+    expect(component.loadError()).toBe(false);
+  });
+
   it('extracts the final folder name from a path', () => {
     expect(component.getFolderName('/books/scifi')).toBe('scifi');
     expect(component.getFolderName('/')).toBe('/');
