@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -42,6 +43,7 @@ public class LocalCatalogIndexBuilder {
     private final LocalCatalogIndexRepository indexRepository;
     private final FlibustaCatalogLayout layout;
     private final FlibustaCompilationParser compilationParser;
+    private final FlibustaContentsParser contentsParser;
     private final ArchiveService archiveService;
     private final ObjectMapper objectMapper;
 
@@ -60,15 +62,18 @@ public class LocalCatalogIndexBuilder {
         long reviews = indexContainers(libraryId, layout.reviewContainers(catalogRoot), LocalCatalogSourceType.REVIEW);
         long authors = indexContainers(libraryId, layout.authorBuckets(catalogRoot), LocalCatalogSourceType.AUTHOR_BIO);
         long compilations = indexCompilations(libraryId, catalogRoot);
+        long languages = indexLanguages(libraryId, catalogRoot);
 
-        log.info("Indexed local catalog for library {}: {} reviews, {} author biographies, {} compilations",
-                libraryId, reviews, authors, compilations);
-        return new IndexResult(reviews, authors, compilations);
+        log.info("Indexed local catalog for library {}: {} reviews, {} author biographies, "
+                        + "{} compilations, {} languages",
+                libraryId, reviews, authors, compilations, languages);
+        return new IndexResult(reviews, authors, compilations, languages);
     }
 
     public boolean isIndexed(long libraryId) {
         return indexRepository.countByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.REVIEW) > 0
-                || indexRepository.countByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.AUTHOR_BIO) > 0;
+                || indexRepository.countByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.AUTHOR_BIO) > 0
+                || indexRepository.countByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.LANGUAGE) > 0;
     }
 
     private Optional<Path> catalogRoot(long libraryId) {
@@ -147,11 +152,63 @@ public class LocalCatalogIndexBuilder {
         return indexed;
     }
 
+    /**
+     * The language is the listing's file name — {@code ru.txt} means every row in it is Russian — so
+     * one pass over the 75 listings produces a language for every book the catalog knows.
+     */
+    private long indexLanguages(long libraryId, Path catalogRoot) {
+        Path container = layout.contents(catalogRoot);
+        if (!Files.isReadable(container)) {
+            return 0;
+        }
+        indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.LANGUAGE);
+
+        List<LocalCatalogIndexEntity> batch = new ArrayList<>(BATCH_SIZE);
+        long total = 0;
+        for (String entryName : entryNames(container)) {
+            String language = languageCode(entryName);
+            if (language.isEmpty()) {
+                continue;
+            }
+            byte[] listing = readEntry(container, entryName);
+            if (listing.length == 0) {
+                continue;
+            }
+            total += contentsParser.parse(new ByteArrayInputStream(listing), (archive, entry) -> {
+                String entryKey = layout.bookKey(archive, entry);
+                if (entryKey == null) {
+                    return;
+                }
+                batch.add(LocalCatalogIndexEntity.builder()
+                        .libraryId(libraryId)
+                        .sourceType(LocalCatalogSourceType.LANGUAGE)
+                        .entryKey(entryKey)
+                        .payload(language)
+                        .build());
+                if (batch.size() >= BATCH_SIZE) {
+                    flush(batch);
+                }
+            });
+        }
+        flush(batch);
+        return total;
+    }
+
+    private String languageCode(String entryName) {
+        String leaf = layout.leafName(entryName);
+        int dot = leaf.lastIndexOf('.');
+        return dot <= 0 ? "" : leaf.substring(0, dot).toLowerCase(Locale.ROOT);
+    }
+
     private void flush(List<LocalCatalogIndexEntity> batch) {
         if (batch.isEmpty()) {
             return;
         }
-        indexRepository.saveAll(batch);
+        // A defensive copy, not the live buffer: the buffer is reused and cleared right after this
+        // call so a huge container never accumulates in memory, but the repository (and anything
+        // capturing what was saved, e.g. tests) must see a stable snapshot rather than a list that
+        // is about to be emptied out from under it.
+        indexRepository.saveAll(List.copyOf(batch));
         batch.clear();
     }
 
@@ -182,14 +239,14 @@ public class LocalCatalogIndexBuilder {
         }
     }
 
-    public record IndexResult(long reviews, long authorBios, long compilations) {
+    public record IndexResult(long reviews, long authorBios, long compilations, long languages) {
 
         static IndexResult empty() {
-            return new IndexResult(0, 0, 0);
+            return new IndexResult(0, 0, 0, 0);
         }
 
         public long total() {
-            return reviews + authorBios + compilations;
+            return reviews + authorBios + compilations + languages;
         }
     }
 }

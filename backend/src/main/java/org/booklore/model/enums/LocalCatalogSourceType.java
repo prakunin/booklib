@@ -11,5 +11,10 @@ public enum LocalCatalogSourceType {
     /** Key is the MD5 of the normalized author name, container is the bucket archive. */
     AUTHOR_BIO,
     /** Key is {@code <archive>.zip#<entry>.fb2}, payload holds the parts as JSON. */
-    COMPILATION
+    COMPILATION,
+    /**
+     * The language a book is listed under in {@code contents.7z}. Payload is the language code taken
+     * from the listing's file name; there is no language column in the rows themselves.
+     */
+    LANGUAGE
 }

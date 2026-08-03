@@ -32,4 +32,11 @@ public interface LocalCatalogSource {
     Optional<String> lookupAuthorBio(long libraryId, String authorName);
 
     List<CompilationPart> lookupCompilation(long libraryId, String archiveName, String entryName);
+
+    /**
+     * The language the catalog lists this book under, as a lower-case code such as {@code "ru"}.
+     */
+    default Optional<String> lookupLanguage(long libraryId, String archiveName, String entryName) {
+        return Optional.empty();
+    }
 }

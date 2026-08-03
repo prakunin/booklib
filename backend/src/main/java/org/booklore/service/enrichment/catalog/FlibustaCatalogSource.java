@@ -118,6 +118,17 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
                 .orElseGet(List::of);
     }
 
+    @Override
+    public Optional<String> lookupLanguage(long libraryId, String archiveName, String entryName) {
+        String key = layout.bookKey(archiveName, entryName);
+        if (key == null) {
+            return Optional.empty();
+        }
+        return findIndexed(libraryId, LocalCatalogSourceType.LANGUAGE, key)
+                .map(LocalCatalogIndexEntity::getPayload)
+                .filter(payload -> payload != null && !payload.isBlank());
+    }
+
     /**
      * The catalog directory configured on the library, if it exists and matches this layout.
      * Cached briefly rather than permanently: the path is a library setting and can be re-pointed
