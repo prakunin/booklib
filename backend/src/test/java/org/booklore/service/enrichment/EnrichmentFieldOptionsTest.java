@@ -82,4 +82,67 @@ class EnrichmentFieldOptionsTest {
 
         assertThat(result.getFieldOptions().getDescription().getP1()).isEqualTo(MetadataProvider.FlibustaLocal);
     }
+
+    @Test
+    void ranksLocalCatalogForAllSupportedFields() {
+        MetadataRefreshOptions options = MetadataRefreshOptions.builder()
+                .fieldOptions(MetadataRefreshOptions.FieldOptions.builder()
+                        .description(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Amazon).build())
+                        .language(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Google).build())
+                        .seriesName(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.GoodReads).build())
+                        .seriesNumber(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Hardcover).build())
+                        .build())
+                .build();
+
+        MetadataRefreshOptions result = fieldOptions.withLocalCatalog(options);
+
+        assertThat(result.getFieldOptions().getDescription().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
+        assertThat(result.getFieldOptions().getLanguage().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
+        assertThat(result.getFieldOptions().getSeriesName().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
+        assertThat(result.getFieldOptions().getSeriesNumber().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
+    }
+
+    @Test
+    void doesNotDisplaceAFilledChainForAnyField() {
+        MetadataRefreshOptions options = MetadataRefreshOptions.builder()
+                .fieldOptions(MetadataRefreshOptions.FieldOptions.builder()
+                        .description(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Amazon)
+                                .p2(MetadataProvider.Google)
+                                .p3(MetadataProvider.GoodReads)
+                                .p4(MetadataProvider.Hardcover)
+                                .build())
+                        .language(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Amazon)
+                                .p2(MetadataProvider.Google)
+                                .p3(MetadataProvider.GoodReads)
+                                .p4(MetadataProvider.Hardcover)
+                                .build())
+                        .seriesName(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Amazon)
+                                .p2(MetadataProvider.Google)
+                                .p3(MetadataProvider.GoodReads)
+                                .p4(MetadataProvider.Hardcover)
+                                .build())
+                        .seriesNumber(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Amazon)
+                                .p2(MetadataProvider.Google)
+                                .p3(MetadataProvider.GoodReads)
+                                .p4(MetadataProvider.Hardcover)
+                                .build())
+                        .build())
+                .build();
+
+        MetadataRefreshOptions result = fieldOptions.withLocalCatalog(options);
+
+        // All chains should remain unchanged
+        assertThat(result.getFieldOptions().getDescription().getP4()).isEqualTo(MetadataProvider.Hardcover);
+        assertThat(result.getFieldOptions().getLanguage().getP4()).isEqualTo(MetadataProvider.Hardcover);
+        assertThat(result.getFieldOptions().getSeriesName().getP4()).isEqualTo(MetadataProvider.Hardcover);
+        assertThat(result.getFieldOptions().getSeriesNumber().getP4()).isEqualTo(MetadataProvider.Hardcover);
+    }
 }

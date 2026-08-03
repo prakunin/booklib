@@ -27,12 +27,18 @@ import java.util.function.Function;
 public class EnrichmentFieldOptions {
 
     /**
-     * Fields the local catalog can supply. Deliberately short: the catalog holds annotations, and an
-     * annotation is a description.
+     * Fields the local catalog can supply: annotations (descriptions), per-language listings,
+     * and compilation membership (series).
      */
     private static final List<FieldSlot> LOCAL_CATALOG_FIELDS = List.of(
             new FieldSlot(MetadataRefreshOptions.FieldOptions::getDescription,
-                    MetadataRefreshOptions.FieldOptions::setDescription));
+                    MetadataRefreshOptions.FieldOptions::setDescription),
+            new FieldSlot(MetadataRefreshOptions.FieldOptions::getLanguage,
+                    MetadataRefreshOptions.FieldOptions::setLanguage),
+            new FieldSlot(MetadataRefreshOptions.FieldOptions::getSeriesName,
+                    MetadataRefreshOptions.FieldOptions::setSeriesName),
+            new FieldSlot(MetadataRefreshOptions.FieldOptions::getSeriesNumber,
+                    MetadataRefreshOptions.FieldOptions::setSeriesNumber));
 
     private final ObjectMapper objectMapper;
 
