@@ -13,6 +13,7 @@ import org.booklore.model.entity.AppSettingEntity;
 import org.booklore.model.enums.AuditAction;
 import org.booklore.model.enums.PermissionType;
 import org.booklore.service.audit.AuditService;
+import org.booklore.service.enrichment.steps.AgentRateLimiter;
 import org.booklore.util.UserPermissionUtils;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.cache.annotation.CacheEvict;
@@ -425,6 +426,7 @@ public class AppSettingService {
                 .model(smartEnrichmentProperties.getModel() == null ? "" : smartEnrichmentProperties.getModel())
                 .effort(smartEnrichmentProperties.getEffort() == null ? "" : smartEnrichmentProperties.getEffort())
                 .deepSearch(smartEnrichmentProperties.isDeepSearch())
+                .maxAgentCallsPerHour(AgentRateLimiter.DEFAULT_LIMIT)
                 .build();
     }
 

@@ -38,4 +38,15 @@ public class SmartEnrichmentSettings {
      * because it is told not to produce one without a page to quote.
      */
     private boolean deepSearch;
+
+    /**
+     * Sliding-window ceiling on agent invocations. A library-wide enrichment run would otherwise
+     * spend quota as fast as the machine allows, so this is cost control rather than throughput
+     * tuning — which is why it sits here, next to the model choice, and not in a YAML file.
+     * <p>
+     * Unset reads as {@link org.booklore.service.enrichment.steps.AgentRateLimiter#DEFAULT_LIMIT}
+     * rather than as "unlimited": a settings row written before this field existed must not
+     * silently uncap spending. A negative value is the explicit way to remove the cap.
+     */
+    private int maxAgentCallsPerHour;
 }

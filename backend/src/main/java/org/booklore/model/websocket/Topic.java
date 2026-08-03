@@ -20,7 +20,8 @@ public enum Topic {
     LIBRARY_HEALTH("/topic/library-health"),
     LIBRARY_SCAN_COMPLETE("/queue/library-scan-complete"),
     LIBRARY_SCAN_PROGRESS("/queue/library-scan-progress"),
-    SESSION_REVOKED("/queue/session-revoked");
+    SESSION_REVOKED("/queue/session-revoked"),
+    ENRICHMENT_PROGRESS("/queue/enrichment-progress");
 
     private final String path;
 
