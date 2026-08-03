@@ -10,6 +10,7 @@ import {AuthService} from '../../../shared/service/auth.service';
 import {BOOKS_QUERY_KEY} from './book-query-keys';
 import {LIBRARIES_QUERY_KEY, libraryFormatCountsQueryKey} from './library-query-keys';
 import {AppBooksApiService} from './app-books-api.service';
+import {invalidateBooksQuery} from './book-query-cache';
 
 @Injectable({providedIn: 'root'})
 export class LibraryService {
@@ -92,8 +93,12 @@ export class LibraryService {
   deleteLibrary(id: number): Observable<void> {
     return this.http.delete<void>(`${this.url}/${id}`).pipe(
       tap(() => {
+        this.queryClient.setQueryData<Library[]>(
+          LIBRARIES_QUERY_KEY,
+          libraries => libraries?.filter(library => library.id !== id)
+        );
         this.queryClient.invalidateQueries({queryKey: LIBRARIES_QUERY_KEY, exact: true});
-        this.queryClient.invalidateQueries({queryKey: BOOKS_QUERY_KEY, exact: true});
+        invalidateBooksQuery(this.queryClient);
         this.queryClient.removeQueries({queryKey: libraryFormatCountsQueryKey(id), exact: true});
       })
     );

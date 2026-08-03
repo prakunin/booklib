@@ -1,9 +1,12 @@
 package org.booklore.repository;
 
+import jakarta.persistence.LockModeType;
 import org.booklore.model.entity.LibraryEntity;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -23,6 +26,15 @@ public interface LibraryRepository extends JpaRepository<LibraryEntity, Long>, J
     @EntityGraph(attributePaths = {"libraryPaths"})
     @Query("SELECT l FROM LibraryEntity l WHERE l.id = :id")
     Optional<LibraryEntity> findByIdWithPaths(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"libraryPaths"})
+    @Query("SELECT l FROM LibraryEntity l WHERE l.id = :id")
+    Optional<LibraryEntity> findByIdWithPathsForUpdate(@Param("id") Long id);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM LibraryEntity l WHERE l.id = :id")
+    int deleteDirectlyById(@Param("id") Long id);
 
     @EntityGraph(attributePaths = {"libraryPaths"})
     @Query("SELECT l FROM LibraryEntity l")

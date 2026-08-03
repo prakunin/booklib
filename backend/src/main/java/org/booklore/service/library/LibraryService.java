@@ -304,15 +304,64 @@ public class LibraryService {
 
     @Transactional
     public void deleteLibrary(long id) {
-        LibraryEntity library = libraryRepository.findById(id)
+        LibraryEntity library = libraryRepository.findByIdWithPathsForUpdate(id)
                 .orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(id));
+        Library libraryForWatcher = libraryMapper.toLibrary(library);
         libraryWatchService.unregisterLibrary(id);
-        Set<Long> bookIds = bookRepository.findBookIdsByLibraryId(id);
-        fileService.deleteBookCovers(bookIds);
+        restoreWatcherAfterRollback(libraryForWatcher);
+
+        List<Long> bookIds = bookRepository.findAllBookIdsByLibraryId(id);
         String libraryName = library.getName();
-        libraryRepository.deleteById(id);
+        if (libraryRepository.deleteDirectlyById(id) != 1) {
+            throw ApiError.LIBRARY_NOT_FOUND.createException(id);
+        }
         auditService.log(AuditAction.LIBRARY_DELETED, AUDIT_ENTITY_LIBRARY, id, "Deleted library: " + libraryName);
+        deleteBookCoversAfterCommit(bookIds);
         log.info("Library deleted successfully: {}", id);
+    }
+
+    private void restoreWatcherAfterRollback(Library library) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    submitDeletionSideEffect(() -> libraryWatchService.registerLibrary(library),
+                            "restore monitoring for library " + library.getId());
+                }
+            }
+        });
+    }
+
+    private void deleteBookCoversAfterCommit(List<Long> bookIds) {
+        Runnable cleanup = () -> submitDeletionSideEffect(() -> fileService.deleteBookCovers(bookIds),
+                "delete covers for " + bookIds.size() + " books");
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    cleanup.run();
+                }
+            });
+        } else {
+            cleanup.run();
+        }
+    }
+
+    private void submitDeletionSideEffect(Runnable action, String description) {
+        try {
+            taskExecutor.execute(() -> {
+                try {
+                    action.run();
+                } catch (RuntimeException e) {
+                    log.error("Post-deletion action failed: {}", description, e);
+                }
+            });
+        } catch (RuntimeException e) {
+            log.error("Failed to schedule post-deletion action: {}", description, e);
+        }
     }
 
     public Book getBook(long libraryId, long bookId) {

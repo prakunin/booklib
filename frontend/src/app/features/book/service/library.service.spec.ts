@@ -83,7 +83,7 @@ describe('LibraryService', () => {
     expect(queryClientHarness.queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: LIBRARIES_QUERY_KEY, exact: true});
   });
 
-  it('invalidates library and book caches after update and delete flows', () => {
+  it('removes a deleted library immediately and invalidates both book caches', () => {
     httpTestingController.expectOne(req => req.url.endsWith('/api/v1/libraries')).flush([]);
 
     service.updateLibrary(buildLibrary({name: 'Updated'}), 4).subscribe();
@@ -91,13 +91,20 @@ describe('LibraryService', () => {
     expect(updateRequest.request.method).toBe('PUT');
     updateRequest.flush(buildLibrary({id: 4, name: 'Updated'}));
 
+    queryClientHarness.queryClient.setQueryData<Library[]>(LIBRARIES_QUERY_KEY, [
+      buildLibrary({id: 4, name: 'Deleted'}),
+      buildLibrary({id: 5, name: 'Kept'}),
+    ]);
     service.deleteLibrary(4).subscribe();
     const deleteRequest = httpTestingController.expectOne(req => req.url.endsWith('/api/v1/libraries/4'));
     expect(deleteRequest.request.method).toBe('DELETE');
     deleteRequest.flush(null);
 
+    expect(queryClientHarness.queryClient.getQueryData<Library[]>(LIBRARIES_QUERY_KEY))
+      .toEqual([buildLibrary({id: 5, name: 'Kept'})]);
     expect(queryClientHarness.queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: LIBRARIES_QUERY_KEY, exact: true});
     expect(queryClientHarness.queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: BOOKS_QUERY_KEY, exact: true});
+    expect(queryClientHarness.queryClient.invalidateQueries).toHaveBeenCalledWith({queryKey: ['app-books']});
     expect(queryClientHarness.queryClient.removeQueries).toHaveBeenCalledWith({queryKey: libraryFormatCountsQueryKey(4), exact: true});
   });
 
