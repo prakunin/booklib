@@ -185,6 +185,23 @@
               <small>{{ t('inpxOptionalHint') }}</small>
             }
           </div>
+
+          <div class="form-field">
+            <label for="metadata-sidecar-path">{{ t('sidecarPath') }}</label>
+            <input
+              id="metadata-sidecar-path"
+              pInputText
+              [ngModel]="metadataSidecarPath()"
+              (ngModelChange)="metadataSidecarPath.set($event)"
+              [placeholder]="t('sidecarPathPlaceholder')"
+              class="input-full"
+            />
+            @if (sidecarDetected()) {
+              <small>{{ t('sidecarDetected') }}</small>
+            } @else {
+              <small>{{ t('sidecarHint') }}</small>
+            }
+          </div>
         }
       </section>
 

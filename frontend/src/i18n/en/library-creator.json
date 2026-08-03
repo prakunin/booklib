@@ -29,6 +29,10 @@
     "inpxEnterManually": "Enter path manually",
     "inpxUseDetected": "Choose from found files",
     "inpxOptionalHint": "Optional. Without an index the library is created empty — add the index later and it will be scanned.",
+    "sidecarPath": "Metadata Catalog (optional)",
+    "sidecarPathPlaceholder": "/books/fb2.Flibusta.Net.FLibrary.etc",
+    "sidecarHint": "A folder shipped alongside the archives holding annotations, reader reviews and author biographies. Used to fill in descriptions without any network lookup.",
+    "sidecarDetected": "Found next to the archives. Clear the field if you do not want it used.",
     "inpxScanBehavior": "Normal folder scanning and watching are disabled. Metadata comes from INPX; a book is extracted to cache only while it is being opened.",
     "bookFolders": "Book Folders",
     "addFolder": "Add folder",
@@ -79,6 +83,10 @@
       "createdLargeDetail": "Library created with {{count}} files. Loading in progress...",
       "createFailedSummary": "Creation Failed",
       "createFailedDetail": "An error occurred while creating the library. Please try again."
+    },
+    "inpxSingleFolder": {
+      "summary": "One archive folder kept",
+      "detail": "An INPX library uses a single archive directory. Using {{folder}}."
     }
   },
   "loading": {
