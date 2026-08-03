@@ -26,6 +26,7 @@ public class AppMigrationStartup {
     private final PopulateAuthorNormalizedNameMigration populateAuthorNormalizedNameMigration;
     private final PromoteWordDocumentsFromOtherMigration promoteWordDocumentsFromOtherMigration;
     private final PromoteDjvuFilesFromOtherMigration promoteDjvuFilesFromOtherMigration;
+    private final ResetUnreadableWordDocumentsMigration resetUnreadableWordDocumentsMigration;
 
     @EventListener(ApplicationReadyEvent.class)
     public void runMigrationsOnce() {
@@ -44,5 +45,6 @@ public class AppMigrationStartup {
         appMigrationService.executeMigration(populateAuthorNormalizedNameMigration);
         appMigrationService.executeMigration(promoteWordDocumentsFromOtherMigration);
         appMigrationService.executeMigration(promoteDjvuFilesFromOtherMigration);
+        appMigrationService.executeMigration(resetUnreadableWordDocumentsMigration);
     }
 }

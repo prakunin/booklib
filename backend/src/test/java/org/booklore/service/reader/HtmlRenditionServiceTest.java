@@ -79,4 +79,84 @@ class HtmlRenditionServiceTest {
         assertThatThrownBy(() -> service.streamResource(bookFile, "resources/../../secret.jpg",
                 new ByteArrayOutputStream())).isInstanceOf(java.io.FileNotFoundException.class);
     }
+
+    @Test
+    void fallsBackToWindows1251WhenLegacyHtmlHasNoCharset(@TempDir Path root) throws Exception {
+        BookFileEntity bookFile = BookFileEntity.builder()
+                .id(43L)
+                .fileName("legacy.html")
+                .bookType(BookFileType.HTML)
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry("legacy locator")
+                .build();
+        String html = "<html><head><title>Письмо</title></head><body>"
+                + "Это достаточно длинный русский текст без объявления кодировки."
+                + "</body></html>";
+        Path materialized = root.resolve("legacy.html");
+        Files.write(materialized, html.getBytes(Charset.forName("windows-1251")));
+        when(archivedBookContentService.resolve(bookFile)).thenReturn(materialized);
+        when(archivedBookContentService.publicationEntryName(bookFile)).thenReturn("legacy.html");
+        when(archivedBookContentService.listPublicationEntries(bookFile)).thenReturn(List.of(
+                new ArchivedBookContentService.ArchivedEntry("legacy.html", Files.size(materialized))));
+        HtmlRenditionService service = new HtmlRenditionService(archivedBookContentService);
+
+        ByteArrayOutputStream content = new ByteArrayOutputStream();
+        service.streamResource(bookFile, "content.xhtml", content);
+        String xhtml = content.toString(java.nio.charset.StandardCharsets.UTF_8);
+
+        assertThat(xhtml).contains("Письмо", "длинный русский текст")
+                .doesNotContain("�");
+    }
+
+    @Test
+    void fallsBackToWindows1251ForShortTextAndCyrillicImagePaths(@TempDir Path root) throws Exception {
+        BookFileEntity bookFile = BookFileEntity.builder()
+                .id(44L)
+                .fileName("short.html")
+                .bookType(BookFileType.HTML)
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry("short locator")
+                .build();
+        String html = "<html><body><p>Привет</p><img src=\"картинка.gif\" alt=\"Обложка\"></body></html>";
+        Path materialized = root.resolve("short.html");
+        Files.write(materialized, html.getBytes(Charset.forName("windows-1251")));
+        when(archivedBookContentService.resolve(bookFile)).thenReturn(materialized);
+        when(archivedBookContentService.publicationEntryName(bookFile)).thenReturn("short.html");
+        when(archivedBookContentService.listPublicationEntries(bookFile)).thenReturn(List.of(
+                new ArchivedBookContentService.ArchivedEntry("short.html", Files.size(materialized)),
+                new ArchivedBookContentService.ArchivedEntry("картинка.gif", 3)));
+        HtmlRenditionService service = new HtmlRenditionService(archivedBookContentService);
+
+        ByteArrayOutputStream content = new ByteArrayOutputStream();
+        service.streamResource(bookFile, "content.xhtml", content);
+        String xhtml = content.toString(java.nio.charset.StandardCharsets.UTF_8);
+
+        assertThat(xhtml).contains("Привет", "Обложка", "src=\"resources/0001.gif\"")
+                .doesNotContain("�");
+    }
+
+    @Test
+    void preservesAReplacementCharacterInValidUtf8(@TempDir Path root) throws Exception {
+        BookFileEntity bookFile = BookFileEntity.builder()
+                .id(45L)
+                .fileName("utf8.html")
+                .bookType(BookFileType.HTML)
+                .sourceArchive("outer.zip")
+                .sourceArchiveEntry("utf8 locator")
+                .build();
+        String html = "<html><body>Русский текст с намеренным символом �.</body></html>";
+        Path materialized = root.resolve("utf8.html");
+        Files.writeString(materialized, html);
+        when(archivedBookContentService.resolve(bookFile)).thenReturn(materialized);
+        when(archivedBookContentService.publicationEntryName(bookFile)).thenReturn("utf8.html");
+        when(archivedBookContentService.listPublicationEntries(bookFile)).thenReturn(List.of(
+                new ArchivedBookContentService.ArchivedEntry("utf8.html", Files.size(materialized))));
+        HtmlRenditionService service = new HtmlRenditionService(archivedBookContentService);
+
+        ByteArrayOutputStream content = new ByteArrayOutputStream();
+        service.streamResource(bookFile, "content.xhtml", content);
+
+        assertThat(content.toString(java.nio.charset.StandardCharsets.UTF_8))
+                .contains("Русский текст с намеренным символом �.");
+    }
 }

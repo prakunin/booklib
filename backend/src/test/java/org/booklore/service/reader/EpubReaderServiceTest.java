@@ -255,6 +255,43 @@ class EpubReaderServiceTest {
     }
 
     @Test
+    void successfullyParsedDocumentIsPersistedAsReadable() throws Exception {
+        BookFileEntity file = mock(BookFileEntity.class);
+        Path documentPath = tempDir.resolve("legacy.doc");
+        Files.writeString(documentPath, "document");
+        EpubBookInfo expected = EpubBookInfo.builder().manifest(List.of()).spine(List.of()).build();
+        when(file.getBookType()).thenReturn(BookFileType.DOC);
+        when(file.getFullFilePath()).thenReturn(documentPath);
+        bookEntity.setBookFiles(List.of(file));
+        when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
+        when(documentRenditionService.supports(documentPath)).thenReturn(true);
+        when(documentRenditionService.buildBookInfo(documentPath)).thenReturn(expected);
+
+        assertSame(expected, epubReaderService.getBookInfo(1L));
+
+        verify(file).setDocumentParseStatus(DocumentParseStatus.READABLE);
+        verify(bookFileRepository).save(file);
+    }
+
+    @Test
+    void readableStatusPersistenceFailureDoesNotFailSuccessfulReaderRequest() throws Exception {
+        BookFileEntity file = mock(BookFileEntity.class);
+        Path documentPath = tempDir.resolve("legacy.doc");
+        Files.writeString(documentPath, "document");
+        EpubBookInfo expected = EpubBookInfo.builder().manifest(List.of()).spine(List.of()).build();
+        when(file.getId()).thenReturn(42L);
+        when(file.getBookType()).thenReturn(BookFileType.DOC);
+        when(file.getFullFilePath()).thenReturn(documentPath);
+        bookEntity.setBookFiles(List.of(file));
+        when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
+        when(documentRenditionService.supports(documentPath)).thenReturn(true);
+        when(documentRenditionService.buildBookInfo(documentPath)).thenReturn(expected);
+        when(bookFileRepository.save(file)).thenThrow(new IllegalStateException("database unavailable"));
+
+        assertSame(expected, epubReaderService.getBookInfo(1L));
+    }
+
+    @Test
     void testGetBookInfo_CacheHit() throws Exception {
         when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
 

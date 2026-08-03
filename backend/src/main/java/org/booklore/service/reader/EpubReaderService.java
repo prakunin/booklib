@@ -119,6 +119,7 @@ public class EpubReaderService {
         ResolvedBook resolvedBook = getBook(bookId, bookType);
         try {
             CachedEpubMetadata metadata = getCachedMetadata(resolvedBook);
+            markDocumentReadable(resolvedBook.bookFile());
             return metadata.bookInfo;
         } catch (UnreadableDocumentException _) {
             markDocumentUnreadable(resolvedBook.bookFile());
@@ -136,6 +137,19 @@ public class EpubReaderService {
         }
         bookFile.setDocumentParseStatus(DocumentParseStatus.UNREADABLE);
         bookFileRepository.save(bookFile);
+    }
+
+    private void markDocumentReadable(BookFileEntity bookFile) {
+        if (bookFile == null || bookFile.getBookType() != BookFileType.DOC
+                || bookFile.getDocumentParseStatus() == DocumentParseStatus.READABLE) {
+            return;
+        }
+        try {
+            bookFile.setDocumentParseStatus(DocumentParseStatus.READABLE);
+            bookFileRepository.save(bookFile);
+        } catch (RuntimeException e) {
+            log.warn("Failed to persist readable document status for book file {}", bookFile.getId(), e);
+        }
     }
 
     public void streamFile(Long bookId, String filePath, OutputStream outputStream) throws IOException {

@@ -78,6 +78,17 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
 
     @Query("""
             SELECT bf FROM BookFileEntity bf
+            WHERE bf.bookType = org.booklore.model.enums.BookFileType.DOC
+            AND bf.documentParseStatus = org.booklore.model.enums.DocumentParseStatus.UNREADABLE
+            AND LOWER(bf.fileName) LIKE '%.doc'
+            AND bf.id > :afterId
+            ORDER BY bf.id
+            """)
+    List<BookFileEntity> findUnreadableLegacyWordCandidatesAfterId(
+            @Param("afterId") long afterId, Pageable pageable);
+
+    @Query("""
+            SELECT bf FROM BookFileEntity bf
             JOIN bf.book b
             WHERE bf.id > :afterId
             AND bf.bookType = org.booklore.model.enums.BookFileType.OTHER
