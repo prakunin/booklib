@@ -231,4 +231,16 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
             WHERE bf.id = :id
             """)
     Optional<BookFileEntity> findByIdWithBookAndLibraryPath(@Param("id") Long id);
+
+    @Query("""
+            SELECT bf.book.metadata.title
+            FROM BookFileEntity bf
+            WHERE bf.book.library.id = :libraryId
+            AND bf.sourceArchive = :archive
+            AND bf.sourceArchiveEntry = :entry
+            AND (bf.book.deleted IS NULL OR bf.book.deleted = false)
+            """)
+    List<String> findTitleBySourceArchiveEntry(@Param("libraryId") long libraryId,
+                                               @Param("archive") String archive,
+                                               @Param("entry") String entry);
 }

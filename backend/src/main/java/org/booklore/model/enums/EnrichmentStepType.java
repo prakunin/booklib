@@ -16,6 +16,9 @@ public enum EnrichmentStepType {
     /** The language the local catalog lists a book under. Local, exact-key, no network. */
     LOCAL_LANGUAGE,
 
+    /** The omnibus a constituent work belongs to, mapped onto series name and number. */
+    LOCAL_COMPILATION,
+
     /** Identity already resolved for this work, reused across its editions. */
     WORK_CACHE,
 
