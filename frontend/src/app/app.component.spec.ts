@@ -11,6 +11,7 @@ import { BookService } from "./features/book/service/book.service";
 import { NotificationEventService } from "./shared/websocket/notification-event.service";
 import { AppThemeService } from "./shared/service/app-theme.service";
 import { MetadataProgressService } from "./shared/service/metadata-progress.service";
+import { EnrichmentProgressService } from "./features/metadata/service/enrichment-progress.service";
 import { BookdropFileService } from "./features/bookdrop/service/bookdrop-file.service";
 import { TaskService } from "./features/settings/task-management/task.service";
 import { LibraryHealthService } from "./features/book/service/library-health.service";
@@ -46,6 +47,9 @@ describe("AppComponent", () => {
   };
   let metadataProgressService: {
     handleIncomingProgress: ReturnType<typeof vi.fn>;
+  };
+  let enrichmentProgressService: {
+    handleProgress: ReturnType<typeof vi.fn>;
   };
   let bookdropFileService: { handleIncomingFile: ReturnType<typeof vi.fn> };
   let taskService: { handleTaskProgress: ReturnType<typeof vi.fn> };
@@ -89,6 +93,7 @@ describe("AppComponent", () => {
     authorService = { handleNewlyCreatedBook: vi.fn() };
     notificationEventService = { handleNewNotification: vi.fn() };
     metadataProgressService = { handleIncomingProgress: vi.fn() };
+    enrichmentProgressService = { handleProgress: vi.fn() };
     bookdropFileService = { handleIncomingFile: vi.fn() };
     taskService = { handleTaskProgress: vi.fn() };
     libraryHealthService = { initWebsocket: vi.fn(), fetchHealth: vi.fn() };
@@ -121,6 +126,7 @@ describe("AppComponent", () => {
         },
         { provide: AppThemeService, useValue: {} },
         { provide: MetadataProgressService, useValue: metadataProgressService },
+        { provide: EnrichmentProgressService, useValue: enrichmentProgressService },
         { provide: BookdropFileService, useValue: bookdropFileService },
         { provide: TaskService, useValue: taskService },
         { provide: LibraryHealthService, useValue: libraryHealthService },
@@ -211,6 +217,9 @@ describe("AppComponent", () => {
     topics
       .get("/user/queue/book-recommendations-update")
       ?.next({ body: JSON.stringify(42) });
+    topics
+      .get("/user/queue/enrichment-progress")
+      ?.next({ body: JSON.stringify({ jobId: "job-1", bookId: 7 }) });
 
     expect(bookService.handleBookUpdate).toHaveBeenCalledWith({ id: 1 });
     expect(bookService.handleMultipleBookCoverPatches).toHaveBeenCalledWith([
@@ -221,6 +230,10 @@ describe("AppComponent", () => {
     expect(metadataProgressService.handleIncomingProgress).toHaveBeenCalledWith(
       { taskId: "task-1" },
     );
+    expect(enrichmentProgressService.handleProgress).toHaveBeenCalledWith({
+      jobId: "job-1",
+      bookId: 7,
+    });
     expect(notificationEventService.handleNewNotification).toHaveBeenCalledWith(
       {
         message: "info",

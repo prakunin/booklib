@@ -196,6 +196,24 @@ export class BookDialogHelperService {
     });
   }
 
+  /**
+   * The unified enrichment dialog. Unlike the smart-enrichment one it does not show results — the
+   * run is queued and can outlive any dialog, so progress arrives over the websocket instead.
+   */
+  async openEnrichmentDialog(bookIds: Set<number>): Promise<DynamicDialogRef | null> {
+    return this.dialogLauncherService.launchLazyDialog(async () => {
+      const {EnrichmentComponent} = await import('../../../metadata/component/enrichment/enrichment.component');
+      return this.openDialog(EnrichmentComponent, {
+        showHeader: false,
+        styleClass: `${DialogSize.MD} ${DialogStyle.MINIMAL}`,
+        data: {
+          scope: bookIds.size === 1 ? 'BOOK' : 'BOOKS',
+          bookIds: Array.from(bookIds),
+        },
+      });
+    });
+  }
+
   async openAdditionalFileUploaderDialog(book: Book): Promise<DynamicDialogRef | null> {
     return this.dialogLauncherService.launchLazyDialog(async () => {
       const {AdditionalFileUploaderComponent} = await import('../additional-file-uploader/additional-file-uploader.component');

@@ -197,6 +197,7 @@
       "autoFetchMetadata": "Auto Fetch Metadata",
       "customFetchMetadata": "Custom Fetch Metadata",
       "smartEnrich": "Smart Enrich",
+      "enrich": "Enrich…",
       "bulkMetadataEditor": "Bulk Metadata Editor",
       "multiBookMetadataEditor": "Multi-Book Metadata Editor",
       "regenerateCovers": "Regenerate Covers",

@@ -1,0 +1,10 @@
+.enrichment-dialog {
+  min-width: 22rem;
+  max-width: 34rem;
+}
+
+/* Uses the app's own tokens rather than a Prime severity class: the app's custom properties are the
+   source of truth for theming, and a hard-coded colour would not follow the light/dark switch. */
+.enrichment-warning {
+  color: var(--app-color-warning, var(--p-orange-400));
+}

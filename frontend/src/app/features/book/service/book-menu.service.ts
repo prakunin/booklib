@@ -22,6 +22,8 @@ export interface MetadataMenuOptions {
   user: User | null;
   smartEnrich?: () => void;
   smartEnrichmentAvailable?: boolean;
+  /** Opens the unified enrichment dialog: local catalog, providers and optionally the agent. */
+  enrich?: () => void;
 }
 
 @Injectable({
@@ -46,7 +48,8 @@ export class BookMenuService {
       generateCustomCovers,
       user,
       smartEnrich,
-      smartEnrichmentAvailable = false
+      smartEnrichmentAvailable = false,
+      enrich
     } = options;
 
     const permissions = user?.permissions;
@@ -69,6 +72,15 @@ export class BookMenuService {
     }
 
     if (permissions?.canBulkEditMetadata) {
+      // Added alongside the older actions rather than replacing them: this one covers every source
+      // in one run, but the existing entries are what users have in their fingers.
+      if (enrich) {
+        items.push({
+          label: this.t.translate('book.menuService.menu.enrich'),
+          icon: 'pi pi-wand',
+          command: enrich
+        });
+      }
       if (smartEnrichmentAvailable && smartEnrich) {
         items.push({
           label: this.t.translate('book.menuService.menu.smartEnrich'),
