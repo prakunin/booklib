@@ -191,6 +191,7 @@ public class LibraryService {
                 .sourceType(sourceType)
                 .inpxPath(sourceType == LibrarySourceType.INPX ? normalizedOrNull(request.getInpxPath()) : null)
                 .inpxArchivePath(sourceType == LibrarySourceType.INPX ? normalized(request.getInpxArchivePath()) : null)
+                .metadataSidecarPath(normalizedOrNull(request.getMetadataSidecarPath()))
                 .formatPriority(request.getFormatPriority())
                 .allowedFormats(request.getAllowedFormats())
                 .metadataSource(request.getMetadataSource())
@@ -469,6 +470,9 @@ public class LibraryService {
         library.setSourceType(sourceType);
         library.setInpxPath(sourceType == LibrarySourceType.INPX ? normalizedOrNull(request.getInpxPath()) : null);
         library.setInpxArchivePath(sourceType == LibrarySourceType.INPX ? normalized(request.getInpxArchivePath()) : null);
+        // Not gated on INPX: the layout happens to ship with INPX libraries, but a local catalog is
+        // a property of the library, not of how its books were indexed.
+        library.setMetadataSidecarPath(normalizedOrNull(request.getMetadataSidecarPath()));
     }
 
     private void validateSource(CreateLibraryRequest request, LibrarySourceType sourceType) {

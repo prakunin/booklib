@@ -35,6 +35,7 @@ public class CreateLibraryRequest {
     private LibrarySourceType sourceType;
     private String inpxPath;
     private String inpxArchivePath;
+    private String metadataSidecarPath;
     private List<BookFileType> formatPriority;
     private List<BookFileType> allowedFormats;
     private MetadataSource metadataSource;

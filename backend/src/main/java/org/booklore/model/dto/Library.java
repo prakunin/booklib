@@ -29,6 +29,7 @@ public class Library {
     private LibrarySourceType sourceType;
     private String inpxPath;
     private String inpxArchivePath;
+    private String metadataSidecarPath;
     private List<LibraryPath> paths;
     private List<BookFileType> formatPriority;
     private List<BookFileType> allowedFormats;
