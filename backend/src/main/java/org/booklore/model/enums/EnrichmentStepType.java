@@ -13,6 +13,9 @@ public enum EnrichmentStepType {
     /** Descriptions from a library's local catalog. Milliseconds, exact-key match. */
     LOCAL_CATALOG,
 
+    /** The language the local catalog lists a book under. Local, exact-key, no network. */
+    LOCAL_LANGUAGE,
+
     /** Identity already resolved for this work, reused across its editions. */
     WORK_CACHE,
 
