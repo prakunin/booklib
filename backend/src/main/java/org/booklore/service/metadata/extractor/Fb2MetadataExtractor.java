@@ -10,10 +10,14 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.Month;
 import java.util.ArrayList;
@@ -36,6 +40,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     private static final Pattern KEYWORD_SEPARATOR_PATTERN = Pattern.compile("[,;]");
     private static final Pattern ISBN_CLEANER_PATTERN = Pattern.compile("[^0-9Xx]");
     private static final Pattern ISO_DATE_PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+    private static final int MAX_BODY_PARAGRAPHS = 40;
     private static final String TITLE_INFO_ELEMENT = "title-info";
     private static final String BODY_ELEMENT = "body";
     private static final String BINARY_ELEMENT = "binary";
@@ -254,11 +259,20 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
                         // truncated <binary> elements). Only a document body is useful
                         // for the fallback title-page recovery.
                         break;
+                    } else if (event == XMLStreamConstants.END_ELEMENT && inBody
+                            && BODY_ELEMENT.equals(reader.getLocalName())) {
+                        // The title page lives in the first body; everything past it - further
+                        // bodies, and above all the base64 <binary> cover payloads that make up
+                        // the bulk of an FB2 - would only be decompressed and scanned for nothing.
+                        break;
                     } else if (event == XMLStreamConstants.START_ELEMENT && inBody
-                            && "p".equals(reader.getLocalName()) && bodyParagraphs.size() < 40) {
+                            && "p".equals(reader.getLocalName())) {
                         String paragraph = readElementText(reader);
                         if (StringUtils.isNotBlank(paragraph)) {
                             bodyParagraphs.add(paragraph.trim());
+                        }
+                        if (bodyParagraphs.size() >= MAX_BODY_PARAGRAPHS) {
+                            break;
                         }
                     }
                 }
@@ -700,12 +714,44 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         return null;
     }
 
-    private XMLStreamReader createXmlStreamReader(InputStream inputStream) throws XMLStreamException {
+    /**
+     * A recurring shape in catalog FB2 archives is a UTF-16 file whose XML declaration still claims
+     * {@code encoding="UTF-8"}. Given the raw stream, Xerces auto-detects UTF-16 from the byte order
+     * mark, reads the declaration, then switches to the declared encoding for the rest of the
+     * document - so everything past the declaration decodes to garbage and the parse dies with
+     * "Content is not allowed in prolog" at [2,1]. Handing the parser a {@link java.io.Reader} that
+     * is already decoding with the BOM's charset takes the declaration out of the decision: the
+     * bytes decide how the bytes are read. Streams without a UTF-16 BOM - including the far more
+     * common UTF-8 with and without a BOM - keep going through normal stream auto-detection.
+     */
+    private XMLStreamReader createXmlStreamReader(InputStream inputStream) throws XMLStreamException, IOException {
+        InputStream stream = inputStream.markSupported() ? inputStream : new BufferedInputStream(inputStream);
+        Charset bomCharset = consumeUtf16ByteOrderMark(stream);
         XMLInputFactory factory = XMLInputFactory.newFactory();
         factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
         factory.setProperty("javax.xml.stream.isSupportingExternalEntities", false);
         setXmlProperty(factory, XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
-        return factory.createXMLStreamReader(inputStream);
+        return bomCharset == null
+                ? factory.createXMLStreamReader(stream)
+                : factory.createXMLStreamReader(new InputStreamReader(stream, bomCharset));
+    }
+
+    /**
+     * Returns the charset of a leading UTF-16 byte order mark and leaves the stream positioned just
+     * past it, or {@code null} - stream unchanged - when there is no UTF-16 BOM. The mark is consumed
+     * because a {@code Reader}-based parser would otherwise see U+FEFF as content in the prolog.
+     */
+    private Charset consumeUtf16ByteOrderMark(InputStream stream) throws IOException {
+        stream.mark(2);
+        byte[] prefix = stream.readNBytes(2);
+        if (prefix.length == 2 && (prefix[0] & 0xFF) == 0xFF && (prefix[1] & 0xFF) == 0xFE) {
+            return StandardCharsets.UTF_16LE;
+        }
+        if (prefix.length == 2 && (prefix[0] & 0xFF) == 0xFE && (prefix[1] & 0xFF) == 0xFF) {
+            return StandardCharsets.UTF_16BE;
+        }
+        stream.reset();
+        return null;
     }
 
     private void setXmlProperty(XMLInputFactory factory, String property, Object value) {
