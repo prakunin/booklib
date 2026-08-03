@@ -1,6 +1,9 @@
 app:
   path-config: ${APP_PATH_CONFIG:/app/data}
   bookdrop-folder: ${APP_BOOKDROP_FOLDER:/bookdrop}
+  # Where the library path picker may browse. /books is what every shipped deployment mounts the
+  # library at — the Unraid template, the Helm chart, the compose file and the podman quadlet.
+  library-roots: ${APP_LIBRARY_ROOTS:/books}
   api-docs:
     enabled: ${API_DOCS_ENABLED:false}
 

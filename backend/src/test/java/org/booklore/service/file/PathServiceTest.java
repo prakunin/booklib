@@ -23,16 +23,19 @@ class PathServiceTest {
 
     private Path configRoot;
     private Path bookdropRoot;
+    private Path libraryRoot;
     private PathService pathService;
 
     @BeforeEach
     void setUp() throws IOException {
         configRoot = Files.createDirectory(tempDir.resolve("config"));
         bookdropRoot = Files.createDirectory(tempDir.resolve("bookdrop"));
+        libraryRoot = Files.createDirectory(tempDir.resolve("books"));
 
         AppProperties appProperties = new AppProperties();
         appProperties.setPathConfig(configRoot.toString());
         appProperties.setBookdropFolder(bookdropRoot.toString());
+        appProperties.setLibraryRoots(List.of(libraryRoot.toString()));
         pathService = new PathService(appProperties);
     }
 
@@ -85,6 +88,45 @@ class PathServiceTest {
 
             assertThat(pathService.getFoldersAtPath(bookdropRoot.toString()))
                     .containsExactly(bookdropRoot.resolve("incoming").toString());
+        }
+
+        /**
+         * Every shipped deployment mounts the book library somewhere of its own — /books in the
+         * Unraid template, the Helm chart, the compose file and the podman quadlet. Confining
+         * browsing to the config and bookdrop directories made the one place libraries actually live
+         * unreachable, so no library folder could be picked at all.
+         */
+        @Test
+        void allowsAConfiguredLibraryRoot() throws IOException {
+            Files.createDirectory(libraryRoot.resolve("fb2.Flibusta.Net"));
+
+            assertThat(pathService.getFoldersAtPath(libraryRoot.toString()))
+                    .containsExactly(libraryRoot.resolve("fb2.Flibusta.Net").toString());
+        }
+
+        /**
+         * The picker opens on "/", which is outside every configured root, so the confinement check
+         * rejected the very first request in every deployment — and the UI rendered that rejection
+         * as "Directory is Empty". Listing the roots there gives the picker somewhere to start
+         * without widening what may be browsed.
+         */
+        @Test
+        void listsTheConfiguredRootsAtTheFilesystemRoot() {
+            assertThat(pathService.getFoldersAtPath("/"))
+                    .containsExactlyInAnyOrder(
+                            configRoot.toString(),
+                            bookdropRoot.toString(),
+                            libraryRoot.toString());
+        }
+
+        @Test
+        void omitsConfiguredRootsThatDoNotExist() {
+            AppProperties properties = new AppProperties();
+            properties.setPathConfig(configRoot.toString());
+            properties.setLibraryRoots(List.of(tempDir.resolve("never-mounted").toString()));
+
+            assertThat(new PathService(properties).getFoldersAtPath("/"))
+                    .containsExactly(configRoot.toString());
         }
     }
 

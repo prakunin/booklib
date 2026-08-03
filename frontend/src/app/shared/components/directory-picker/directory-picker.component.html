@@ -104,6 +104,14 @@
         />
         <p class="loading-text">{{ t('loadingDirectories') }}</p>
       </div>
+    } @else if (loadError()) {
+      <div class="empty-state">
+        <div class="empty-icon-wrapper">
+          <i class="pi pi-exclamation-triangle empty-icon"></i>
+        </div>
+        <h3 class="empty-title">{{ t('directoryUnavailable') }}</h3>
+        <p class="empty-description">{{ t('directoryUnavailableDescription') }}</p>
+      </div>
     } @else if (filteredPaths.length === 0) {
       <div class="empty-state">
         <div class="empty-icon-wrapper">

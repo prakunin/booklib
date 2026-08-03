@@ -30,9 +30,14 @@ public class PathService {
 
     private static final String INPX_EXTENSION = ".inpx";
 
+    private static final String ROOT_PATH = "/";
+
     private final AppProperties appProperties;
 
     public List<String> getFoldersAtPath(String path) {
+        if (isFilesystemRoot(path)) {
+            return browsableRoots();
+        }
         Path directory = resolveDirectory(path);
         if (directory == null) {
             return Collections.emptyList();
@@ -50,6 +55,10 @@ public class PathService {
     }
 
     public List<InpxIndexOption> getInpxFilesAtPath(String path) {
+        if (isFilesystemRoot(path)) {
+            // The virtual root holds configured mount points, not files.
+            return Collections.emptyList();
+        }
         Path directory = resolveDirectory(path);
         if (directory == null) {
             return Collections.emptyList();
@@ -103,12 +112,42 @@ public class PathService {
         return directory;
     }
 
+    /**
+     * The picker opens on the filesystem root, which is outside every configured root by
+     * definition. Rejecting it made the very first request of every session fail, and the UI
+     * reported that as an empty directory. Listing the configured roots there gives the picker
+     * somewhere to start without widening what may actually be browsed.
+     */
+    private boolean isFilesystemRoot(String path) {
+        return path != null && ROOT_PATH.equals(path.trim());
+    }
+
+    private List<String> browsableRoots() {
+        return configuredRoots().stream()
+                .filter(Files::isDirectory)
+                .map(Path::toString)
+                .sorted()
+                .toList();
+    }
+
     private boolean isAllowedConfiguredRoot(Path directory) {
         return configuredRoots().stream().anyMatch(root -> directory.equals(root) || directory.startsWith(root));
     }
 
+    /**
+     * Where browsing is permitted: the application data directory, the bookdrop folder, and the
+     * directories libraries are mounted under.
+     * <p>
+     * The library roots are the point. Without them this list holds only the two directories that
+     * are not where anyone keeps books, which left the picker unable to reach a single real library
+     * folder in any shipped deployment.
+     */
     private List<Path> configuredRoots() {
-        return Stream.of(appProperties.getPathConfig(), appProperties.getBookdropFolder())
+        return Stream.concat(
+                        Stream.of(appProperties.getPathConfig(), appProperties.getBookdropFolder()),
+                        appProperties.getLibraryRoots() == null
+                                ? Stream.<String>empty()
+                                : appProperties.getLibraryRoots().stream())
                 .filter(value -> value != null && !value.isBlank())
                 .map(value -> Paths.get(value.trim()).toAbsolutePath().normalize())
                 .distinct()
