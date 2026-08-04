@@ -180,8 +180,13 @@ configurations {
 
 val openApiExportRuntimeOnly by configurations.creating
 
-// --- Book & Image Processing --- pinned version, "+" (latest local) when useLocalLibs.
-val pdfium4jVersion = if (useLocalLibs) "+" else libs.versions.pdfium4j.get()
+// --- Book & Image Processing ---
+// No one keeps a local pdfium4j build in mavenLocal today, so "+" bought nothing but an
+// unpinned reach into mavenCentral's latest release -- it silently drifted useLocalLibs builds
+// from the locked 1.2.0 to a newer remote version with different behavior. Pin it exactly like
+// epub4j below; a future local pdfium4j build should get its own exact-version pin here (or the
+// pin moved to that version), not a bare "+".
+val pdfium4jVersion = libs.versions.pdfium4j.get()
 
 // epub4j-grimmory fork publishes as org.grimmory:epub4j-core.
 // useLocalLibs pins to this exact locally-published version rather than "+": mavenCentral also
