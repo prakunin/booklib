@@ -10,6 +10,7 @@ import org.booklore.service.enrichment.EnrichmentPipeline;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -35,12 +36,17 @@ public class LocalCatalogBackfillService {
 
     private static final int PAGE_SIZE = 500;
 
-    private static final Set<EnrichmentStepType> LOCAL_STEPS = EnumSet.of(
+    /**
+     * The local-catalog step set. Public so {@code InpxBatchWriter} can queue the same steps for
+     * newly scanned books through the ordinary {@code enrichment_queue} instead of duplicating the
+     * list. {@code EnumSet.of(...)} is mutable, so it is wrapped unmodifiable before being exposed.
+     */
+    public static final Set<EnrichmentStepType> LOCAL_STEPS = Collections.unmodifiableSet(EnumSet.of(
             EnrichmentStepType.LOCAL_CATALOG,
             EnrichmentStepType.LOCAL_LANGUAGE,
             EnrichmentStepType.LOCAL_COMPILATION,
             EnrichmentStepType.REVIEWS,
-            EnrichmentStepType.AUTHOR_BIO);
+            EnrichmentStepType.AUTHOR_BIO));
 
     private final BookFileRepository bookFileRepository;
     private final EnrichmentPipeline pipeline;
