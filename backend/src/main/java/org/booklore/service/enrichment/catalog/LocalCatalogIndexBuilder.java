@@ -16,8 +16,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -128,7 +130,19 @@ public class LocalCatalogIndexBuilder {
      * database error, not a parsing problem) thrown out of the consumer would otherwise be swallowed
      * there and logged only as a parse warning — the pass would then look complete when it is not.
      * {@code saveFailure} recovers that failure once {@code parse} returns so a partial index is never
-     * mistaken for a finished one.
+     * mistaken for a finished one. That guard only covers the forward {@code COMPILATION} rows, which
+     * are still written from inside the parser's callback; the reverse {@code COMPILATION_PART} rows
+     * are written afterwards, in plain code the parser's swallow-all catch never sees, so no such guard
+     * is needed for them.
+     * <p>
+     * A part key legitimately belongs to more than one omnibus — 45% of the 78,907 keys in the shipped
+     * catalog do, one of them 46 times — and the unique index allows only one row per key, so a key's
+     * memberships cannot be finalised the first time it is seen. The parse is streaming (one callback
+     * per compilation), so {@code membershipsByPartKey} accumulates every membership for every key
+     * across the whole pass and the reverse rows are written once, after it completes. That map holds
+     * at most 78,907 small (archive, entry, part) records — a few tens of megabytes — alongside the
+     * ~30 MB {@code compilations.json} document already held in memory for the parse itself, so the
+     * extra cost is small relative to what this pass already keeps resident.
      */
     private long indexCompilations(long libraryId, Path catalogRoot) {
         Path container = layout.compilations(catalogRoot);
@@ -143,6 +157,7 @@ public class LocalCatalogIndexBuilder {
         indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.COMPILATION_PART);
 
         List<LocalCatalogIndexEntity> batch = new ArrayList<>(BATCH_SIZE);
+        Map<String, List<CompilationMembership>> membershipsByPartKey = new LinkedHashMap<>();
         AtomicReference<RuntimeException> saveFailure = new AtomicReference<>();
         int indexed = compilationParser.parse(new ByteArrayInputStream(json), (key, parts) -> {
             String entryKey = layout.bookKey(key.archiveName(), key.entryName());
@@ -160,13 +175,8 @@ public class LocalCatalogIndexBuilder {
                 if (partKey == null) {
                     continue;
                 }
-                batch.add(LocalCatalogIndexEntity.builder()
-                        .libraryId(libraryId)
-                        .sourceType(LocalCatalogSourceType.COMPILATION_PART)
-                        .entryKey(partKey)
-                        .payload(writeMembership(new CompilationMembership(
-                                key.archiveName(), key.entryName(), part.part())))
-                        .build());
+                membershipsByPartKey.computeIfAbsent(partKey, unused -> new ArrayList<>())
+                        .add(new CompilationMembership(key.archiveName(), key.entryName(), part.part()));
             }
             if (batch.size() >= BATCH_SIZE) {
                 try {
@@ -181,6 +191,19 @@ public class LocalCatalogIndexBuilder {
         if (failure != null) {
             throw new IllegalStateException(
                     "Could not save local catalog compilation rows: " + failure.getMessage(), failure);
+        }
+        flush(batch);
+
+        for (Map.Entry<String, List<CompilationMembership>> entry : membershipsByPartKey.entrySet()) {
+            batch.add(LocalCatalogIndexEntity.builder()
+                    .libraryId(libraryId)
+                    .sourceType(LocalCatalogSourceType.COMPILATION_PART)
+                    .entryKey(entry.getKey())
+                    .payload(writeMemberships(entry.getValue()))
+                    .build());
+            if (batch.size() >= BATCH_SIZE) {
+                flush(batch);
+            }
         }
         flush(batch);
         return indexed;
@@ -287,11 +310,11 @@ public class LocalCatalogIndexBuilder {
         }
     }
 
-    private String writeMembership(CompilationMembership membership) {
+    private String writeMemberships(List<CompilationMembership> memberships) {
         try {
-            return objectMapper.writeValueAsString(membership);
+            return objectMapper.writeValueAsString(memberships);
         } catch (JacksonException e) {
-            log.warn("Could not serialise compilation membership: {}", e.getMessage());
+            log.warn("Could not serialise compilation memberships: {}", e.getMessage());
             return null;
         }
     }

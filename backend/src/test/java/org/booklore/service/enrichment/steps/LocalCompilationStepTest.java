@@ -12,10 +12,13 @@ import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LocalCompilationStepTest {
@@ -33,10 +36,10 @@ class LocalCompilationStepTest {
     }
 
     @Test
-    void contributesTheOmnibusTitleAsSeriesAndThePartAsNumber() {
+    void contributesTheOmnibusTitleAsSeriesAndThePartAsNumberWhenThereIsExactlyOne() {
         when(catalogSource.isAvailable(7L)).thenReturn(true);
-        when(catalogSource.lookupContainingCompilation(7L, "a.zip", "13023.fb2"))
-                .thenReturn(Optional.of(new CompilationMembership("omnibus.zip", "13026.fb2", 3)));
+        when(catalogSource.lookupContainingCompilations(7L, "a.zip", "13023.fb2"))
+                .thenReturn(List.of(new CompilationMembership("omnibus.zip", "13026.fb2", 3)));
         when(bookFileRepository.findTitleBySourceArchiveEntry(7L, "omnibus.zip", "13026.fb2"))
                 .thenReturn(List.of("Антология фантастики"));
         EnrichmentContext context = context();
@@ -51,8 +54,8 @@ class LocalCompilationStepTest {
     @Test
     void contributesNothingWhenTheOmnibusIsNotInTheLibrary() {
         when(catalogSource.isAvailable(7L)).thenReturn(true);
-        when(catalogSource.lookupContainingCompilation(7L, "a.zip", "13023.fb2"))
-                .thenReturn(Optional.of(new CompilationMembership("omnibus.zip", "13026.fb2", 3)));
+        when(catalogSource.lookupContainingCompilations(7L, "a.zip", "13023.fb2"))
+                .thenReturn(List.of(new CompilationMembership("omnibus.zip", "13026.fb2", 3)));
         when(bookFileRepository.findTitleBySourceArchiveEntry(7L, "omnibus.zip", "13026.fb2"))
                 .thenReturn(List.of());
         EnrichmentContext context = context();
@@ -65,12 +68,33 @@ class LocalCompilationStepTest {
     @Test
     void contributesNothingWhenTheBookIsNotPartOfAnyCompilation() {
         when(catalogSource.isAvailable(7L)).thenReturn(true);
-        when(catalogSource.lookupContainingCompilation(7L, "a.zip", "13023.fb2"))
-                .thenReturn(Optional.empty());
+        when(catalogSource.lookupContainingCompilations(7L, "a.zip", "13023.fb2"))
+                .thenReturn(List.of());
         EnrichmentContext context = context();
 
         step.run(context);
 
         assertThat(context.getContributions()).isEmpty();
+    }
+
+    /**
+     * The product rule (2026-08-04): when a work belongs to more than one omnibus, the step must not
+     * guess a winner and must contribute no series at all. Three distinct omnibus names are used, not
+     * two, so a fix that only special-cases "exactly two" would still fail this.
+     */
+    @Test
+    void contributesNothingWhenTheBookBelongsToSeveralOmnibuses() {
+        when(catalogSource.isAvailable(7L)).thenReturn(true);
+        when(catalogSource.lookupContainingCompilations(7L, "a.zip", "13023.fb2"))
+                .thenReturn(List.of(
+                        new CompilationMembership("anthology-alpha.zip", "201.fb2", 4),
+                        new CompilationMembership("anthology-beta.zip", "202.fb2", 9),
+                        new CompilationMembership("anthology-gamma.zip", "203.fb2", 2)));
+        EnrichmentContext context = context();
+
+        step.run(context);
+
+        assertThat(context.getContributions()).isEmpty();
+        verify(bookFileRepository, never()).findTitleBySourceArchiveEntry(anyLong(), any(), any());
     }
 }

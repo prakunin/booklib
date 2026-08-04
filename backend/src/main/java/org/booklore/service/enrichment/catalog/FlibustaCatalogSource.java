@@ -130,16 +130,16 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
     }
 
     @Override
-    public Optional<CompilationMembership> lookupContainingCompilation(
+    public List<CompilationMembership> lookupContainingCompilations(
             long libraryId, String archiveName, String entryName) {
         String key = layout.bookKey(archiveName, entryName);
         if (key == null) {
-            return Optional.empty();
+            return List.of();
         }
         return findIndexed(libraryId, LocalCatalogSourceType.COMPILATION_PART, key)
                 .map(LocalCatalogIndexEntity::getPayload)
-                .filter(payload -> payload != null && !payload.isBlank())
-                .flatMap(this::readMembership);
+                .map(this::readMemberships)
+                .orElseGet(List::of);
     }
 
     /**
@@ -191,12 +191,23 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
         }
     }
 
-    private Optional<CompilationMembership> readMembership(String payload) {
+    /**
+     * The payload is a JSON array of {@link CompilationMembership} — one entry per omnibus the work
+     * belongs to. That shape is itself the format guard: a row written before this change held a
+     * single membership *object*, not an array, so decoding it as {@code List<CompilationMembership>}
+     * fails cleanly here and falls back to an empty list rather than misreading it, the same way
+     * {@link #readParts} already does for the forward direction.
+     */
+    private List<CompilationMembership> readMemberships(String payload) {
+        if (payload == null || payload.isBlank()) {
+            return List.of();
+        }
         try {
-            return Optional.ofNullable(objectMapper.readValue(payload, CompilationMembership.class));
+            return objectMapper.readValue(payload, new TypeReference<List<CompilationMembership>>() {
+            });
         } catch (JacksonException e) {
-            log.warn("Could not read a compilation membership payload: {}", e.getMessage());
-            return Optional.empty();
+            log.warn("Could not read indexed compilation membership payload: {}", e.getMessage());
+            return List.of();
         }
     }
 

@@ -15,7 +15,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Turns catalog compilation membership into a series: the omnibus becomes the series name and the
@@ -26,6 +25,11 @@ import java.util.Optional;
  * policy for bulk runs is {@code AUTO_IF_EMPTY} — the name lands solely where no series exists. The
  * step never invents a name: if the omnibus is not in the library, there is nothing to call the
  * series and it contributes nothing.
+ * <p>
+ * A work belonging to several omnibuses at once is common — 45% of compilation part keys in the
+ * shipped catalog repeat — and there is no confident way to pick a winner among them, so the step
+ * contributes nothing rather than guess. The memberships themselves stay in the local catalog index
+ * either way, for a future UI to offer as a choice.
  */
 @Slf4j
 @Component
@@ -51,12 +55,17 @@ public class LocalCompilationStep implements EnrichmentStepHandler {
 
     @Override
     public void run(EnrichmentContext context) {
-        Optional<CompilationMembership> membership = catalogSource.lookupContainingCompilation(
+        List<CompilationMembership> memberships = catalogSource.lookupContainingCompilations(
                 context.getLibraryId(), context.getSourceArchive(), context.getSourceArchiveEntry());
-        if (membership.isEmpty()) {
+        if (memberships.isEmpty()) {
             return;
         }
-        CompilationMembership found = membership.get();
+        if (memberships.size() > 1) {
+            log.debug("Book {} belongs to {} omnibuses; leaving series unset rather than guessing one",
+                    context.bookId(), memberships.size());
+            return;
+        }
+        CompilationMembership found = memberships.get(0);
         List<String> titles = bookFileRepository.findTitleBySourceArchiveEntry(
                 context.getLibraryId(), found.compilationArchive(), found.compilationEntry());
         String seriesName = titles.stream()

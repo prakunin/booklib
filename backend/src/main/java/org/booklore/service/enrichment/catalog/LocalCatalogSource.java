@@ -41,10 +41,11 @@ public interface LocalCatalogSource {
     }
 
     /**
-     * The omnibus this book is a part of, when the catalog says it is one.
+     * Every omnibus the catalog says this book is a part of. A work legitimately belongs to more than
+     * one — the caller decides what, if anything, to do with ambiguity; this method only reports it.
      */
-    default Optional<CompilationMembership> lookupContainingCompilation(
+    default List<CompilationMembership> lookupContainingCompilations(
             long libraryId, String archiveName, String entryName) {
-        return Optional.empty();
+        return List.of();
     }
 }
