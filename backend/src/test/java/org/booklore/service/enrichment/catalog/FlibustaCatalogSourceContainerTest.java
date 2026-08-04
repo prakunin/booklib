@@ -20,6 +20,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -270,11 +272,67 @@ class FlibustaCatalogSourceContainerTest {
         }
 
         /**
-         * The stored order is the catalog's own order, so it wins whenever it resolves — the rotation
-         * must not be able to replace a biography the exact key already found.
+         * 126 of the library's authors reach one catalog key by their stored order and a different key
+         * by the rotation — 110 of those two keys holding genuinely different text, as
+         * {@code md5("рюноскэ акутагава")} and {@code md5("акутагава рюноскэ")} do in the shipped
+         * catalog. The stored order wins: it assumes nothing about which token is the surname, while
+         * the rotation asserts one.
          */
         @Test
-        void prefersTheStoredOrderOverTheRotation() throws Exception {
+        void writesTheStoredOrderBiographyWhenTheRotationReachesADifferentOne() throws Exception {
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, storedKey(AKUTAGAWA), "1.7z");
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, rotatedKey(AKUTAGAWA), "2.7z");
+            when(archiveService.getEntryBytes(authors.resolve("1.7z"), storedKey(AKUTAGAWA)))
+                    .thenReturn("Рюноскэ Акутагава, японский писатель".getBytes(StandardCharsets.UTF_8));
+            when(archiveService.getEntryBytes(authors.resolve("2.7z"), rotatedKey(AKUTAGAWA)))
+                    .thenReturn("Акутагава Рюноскэ (Riunoske Akutagava) 1892-1927, Япония"
+                            .getBytes(StandardCharsets.UTF_8));
+
+            assertThat(source.lookupAuthorBio(LIBRARY, AKUTAGAWA))
+                    .contains("Рюноскэ Акутагава, японский писатель");
+        }
+
+        /**
+         * The walk stops at the first candidate that resolves, so a decompression the answer does not
+         * need must not happen — uncached 7z reads are the dominant cost of this lookup.
+         */
+        @Test
+        void neverReadsTheRotationOnceTheStoredOrderHasResolved() throws Exception {
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, storedKey(AKUTAGAWA), "1.7z");
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, rotatedKey(AKUTAGAWA), "2.7z");
+            when(archiveService.getEntryBytes(authors.resolve("1.7z"), storedKey(AKUTAGAWA)))
+                    .thenReturn("Рюноскэ Акутагава, японский писатель".getBytes(StandardCharsets.UTF_8));
+
+            source.lookupAuthorBio(LIBRARY, AKUTAGAWA);
+
+            verify(archiveService, never()).getEntryBytes(authors.resolve("2.7z"), rotatedKey(AKUTAGAWA));
+        }
+
+        /**
+         * The bucket rule is a separate mechanism and this change must not leak into it: an author key
+         * whose own buckets disagree still yields nothing, and the rotation is not consulted as a way
+         * around it — an ambiguous key is an answer, not a miss. The gate measured 0 of 25
+         * ambiguous-key authors receiving a biography and that has to stay true.
+         */
+        @Test
+        void doesNotUseTheRotationToEscapeAKeyWhoseBucketsDisagree() throws Exception {
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, storedKey(AKUTAGAWA), "1.7z", "2.7z");
+            when(archiveService.getEntryBytes(authors.resolve("1.7z"), storedKey(AKUTAGAWA)))
+                    .thenReturn("Рюноскэ Акутагава, японский писатель".getBytes(StandardCharsets.UTF_8));
+            when(archiveService.getEntryBytes(authors.resolve("2.7z"), storedKey(AKUTAGAWA)))
+                    .thenReturn("Рюноскэ Акутагава, другой человек".getBytes(StandardCharsets.UTF_8));
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, rotatedKey(AKUTAGAWA), "1.7z");
+            when(archiveService.getEntryBytes(authors.resolve("1.7z"), rotatedKey(AKUTAGAWA)))
+                    .thenReturn("Акутагава Рюноскэ (Riunoske Akutagava)".getBytes(StandardCharsets.UTF_8));
+
+            assertThat(source.lookupAuthorBio(LIBRARY, AKUTAGAWA)).isEmpty();
+        }
+
+        /**
+         * Two candidates reaching the same text is not a disagreement at all.
+         */
+        @Test
+        void returnsTheBiographyWhenBothCandidatesAgree() throws Exception {
             indexed(LocalCatalogSourceType.AUTHOR_BIO, storedKey(AKUTAGAWA), "1.7z");
             indexed(LocalCatalogSourceType.AUTHOR_BIO, rotatedKey(AKUTAGAWA), "2.7z");
             String same = "Рюноскэ Акутагава (1892—1927), японский писатель";
@@ -284,25 +342,6 @@ class FlibustaCatalogSourceContainerTest {
                     .thenReturn(same.getBytes(StandardCharsets.UTF_8));
 
             assertThat(source.lookupAuthorBio(LIBRARY, AKUTAGAWA)).contains(same);
-        }
-
-        /**
-         * 126 of the library's authors reach one key by their stored order and a different key by the
-         * rotation. Different people share a name, so picking either would attach one person's life to
-         * another: when the candidates disagree, nothing is written — the same rule that already
-         * governs two buckets of one key.
-         */
-        @Test
-        void returnsNothingWhenTheStoredOrderAndTheRotationReachDifferentBiographies() throws Exception {
-            indexed(LocalCatalogSourceType.AUTHOR_BIO, storedKey(AKUTAGAWA), "1.7z");
-            indexed(LocalCatalogSourceType.AUTHOR_BIO, rotatedKey(AKUTAGAWA), "2.7z");
-            when(archiveService.getEntryBytes(authors.resolve("1.7z"), storedKey(AKUTAGAWA)))
-                    .thenReturn("Рюноскэ Акутагава, японский писатель".getBytes(StandardCharsets.UTF_8));
-            when(archiveService.getEntryBytes(authors.resolve("2.7z"), rotatedKey(AKUTAGAWA)))
-                    .thenReturn("Акутагава Рюноскэ (Riunoske Akutagava) 1892-1927, Япония"
-                            .getBytes(StandardCharsets.UTF_8));
-
-            assertThat(source.lookupAuthorBio(LIBRARY, AKUTAGAWA)).isEmpty();
         }
 
         @Test

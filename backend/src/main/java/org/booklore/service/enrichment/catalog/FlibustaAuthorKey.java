@@ -78,9 +78,18 @@ public final class FlibustaAuthorKey {
      * </ol>
      *
      * The order is fixed here rather than left to a caller or to a collection's iteration order,
-     * because it decides which biography wins when both candidates resolve. It stops at two: every
-     * further normalisation measured either drops a token, and with it the distinction between
-     * different people who share a surname and a given name, or reached fewer than 50 authors.
+     * because the caller stops at the first candidate that resolves. 126 authors reach a
+     * <em>different</em> catalog key under each candidate — 110 of those two keys holding genuinely
+     * different text — and this order is what settles them: the stored-order biography is written and
+     * the rotation is never read. That is a precedence and not a guess. The stored name assumes nothing
+     * about which token is the surname; the rotation asserts one, so it is the weaker evidence of the
+     * two. Both of the 110 that were read in full ({@code Рюноскэ Акутагава}, {@code Ба Цзинь}) turned
+     * out to be one person the catalog files twice under both orders, which is what that precedence
+     * predicts.
+     * <p>
+     * The list stops at two: every further normalisation measured either drops a token, and with it the
+     * distinction between different people who share a surname and a given name, or reached fewer than
+     * 50 authors.
      * <p>
      * A rotation is always offered, even for a name already in the catalog's order — nothing in the
      * stored string says which order it is in. For those names the rotation is simply a key the

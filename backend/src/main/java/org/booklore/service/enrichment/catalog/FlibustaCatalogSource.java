@@ -120,27 +120,27 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
      * one writer described twice; others are two different people who happen to share a name, such as
      * Jean Stone the novelist and Gene Stone the editor. The buckets are numbered rather than dated, so
      * there is no later document to prefer, and attaching one person's life to another is worse than
-     * attaching none: when the buckets disagree, nothing is returned.
+     * attaching none: when the buckets disagree, nothing is returned — and the remaining candidates are
+     * not tried, because an ambiguous key is an answer rather than a miss.
      * <p>
-     * The same rule governs the candidate keys. {@link FlibustaAuthorKey#candidates(String)} offers the
-     * stored name first and its surname-first rotation second, because 21,689 of this library's authors
-     * are stored given-name first; the candidates are walked in that order and the first one that
-     * resolves is the biography used. The rest are still resolved, because a second candidate reaching
-     * a <em>different</em> biography means two people share this name in the catalog — measured at 126
-     * authors — and there is no defensible way to pick between them, so nothing is returned.
+     * That rule is about one key's buckets and stays exactly as it is. It is <em>not</em> the rule for
+     * the candidate keys, which are a precedence rather than a tie.
+     * {@link FlibustaAuthorKey#candidates(String)} offers the stored name first and its surname-first
+     * rotation second, because 21,689 of this library's authors are stored given-name first. The
+     * candidates are walked in that order and the walk stops at the first one that resolves: for the
+     * 126 authors that reach a different key under each candidate, the stored-order biography is the
+     * one written. The stored name assumes nothing about which token is the surname while the rotation
+     * asserts one, so stored-order is the more specific evidence and preferring it is a documented
+     * precedence, not a guess between two people. The rotation is never read in that case.
      */
     @Override
     public Optional<String> lookupAuthorBio(long libraryId, String authorName) {
-        List<String> keys = FlibustaAuthorKey.candidates(authorName);
-        if (keys.isEmpty()) {
-            return Optional.empty();
-        }
         Optional<Path> root = catalogRoot(libraryId);
         if (root.isEmpty()) {
             return Optional.empty();
         }
-        Set<String> distinct = new LinkedHashSet<>();
-        for (String key : keys) {
+        for (String key : FlibustaAuthorKey.candidates(authorName)) {
+            Set<String> distinct = new LinkedHashSet<>();
             for (String bucket : indexedContainers(libraryId, LocalCatalogSourceType.AUTHOR_BIO, key)) {
                 String bio = new String(readEntry(layout.authorBucket(root.get(), bucket), key),
                         StandardCharsets.UTF_8);
@@ -149,12 +149,15 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
                 }
             }
             if (distinct.size() > 1) {
-                log.debug("Author '{}' reaches {} different biographies across catalog keys {}; too "
-                        + "ambiguous to attach one", authorName, distinct.size(), keys);
+                log.debug("Author key {} has {} different biographies in the local catalog; too "
+                        + "ambiguous to attach one", key, distinct.size());
                 return Optional.empty();
             }
+            if (!distinct.isEmpty()) {
+                return distinct.stream().findFirst();
+            }
         }
-        return distinct.stream().findFirst();
+        return Optional.empty();
     }
 
     @Override
