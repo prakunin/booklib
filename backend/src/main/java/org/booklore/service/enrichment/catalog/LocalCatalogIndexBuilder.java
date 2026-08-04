@@ -66,10 +66,11 @@ public class LocalCatalogIndexBuilder {
 
         long reviews = indexContainers(libraryId, layout.reviewContainers(catalogRoot), LocalCatalogSourceType.REVIEW);
         long authors = indexContainers(libraryId, layout.authorBuckets(catalogRoot), LocalCatalogSourceType.AUTHOR_BIO);
-        long compilations = indexCompilations(libraryId, catalogRoot);
+        CompilationCounts compilations = indexCompilations(libraryId, catalogRoot);
         long languages = indexLanguages(libraryId, catalogRoot);
 
-        IndexResult result = new IndexResult(reviews, authors, compilations, languages);
+        IndexResult result = new IndexResult(reviews, authors, compilations.forward(),
+                compilations.reverse(), languages);
         logSummary(libraryId, result);
         return result;
     }
@@ -79,14 +80,21 @@ public class LocalCatalogIndexBuilder {
      * becomes a silent no-op, and a backfill over such an index is indistinguishable from a successful
      * one. Two whole measurement attempts were spent before anyone thought to query the table, so an
      * empty source type is reported as loudly as the pass can report anything.
+     * <p>
+     * All five source types are covered, {@code COMPILATION_PART} included: it is written in its own
+     * pass from its own accumulator and can come out empty while the forward {@code COMPILATION} rows
+     * do not, so folding the two into one number would leave exactly the blind spot this reporting
+     * exists to close.
      */
     private void logSummary(long libraryId, IndexResult result) {
         log.info("Indexed local catalog for library {}: {} reviews, {} author biographies, "
-                        + "{} compilations, {} languages",
-                libraryId, result.reviews(), result.authorBios(), result.compilations(), result.languages());
+                        + "{} compilations, {} compilation parts, {} languages",
+                libraryId, result.reviews(), result.authorBios(), result.compilations(),
+                result.compilationParts(), result.languages());
         warnWhenEmpty(libraryId, LocalCatalogSourceType.REVIEW, result.reviews());
         warnWhenEmpty(libraryId, LocalCatalogSourceType.AUTHOR_BIO, result.authorBios());
         warnWhenEmpty(libraryId, LocalCatalogSourceType.COMPILATION, result.compilations());
+        warnWhenEmpty(libraryId, LocalCatalogSourceType.COMPILATION_PART, result.compilationParts());
         warnWhenEmpty(libraryId, LocalCatalogSourceType.LANGUAGE, result.languages());
     }
 
@@ -194,14 +202,14 @@ public class LocalCatalogIndexBuilder {
      * ~30 MB {@code compilations.json} document already held in memory for the parse itself, so the
      * extra cost is small relative to what this pass already keeps resident.
      */
-    private long indexCompilations(long libraryId, Path catalogRoot) {
+    private CompilationCounts indexCompilations(long libraryId, Path catalogRoot) {
         Path container = layout.compilations(catalogRoot);
         if (!Files.isReadable(container)) {
-            return 0;
+            return CompilationCounts.none();
         }
         byte[] json = readEntry(container, layout.compilationsEntry());
         if (json.length == 0) {
-            return 0;
+            return CompilationCounts.none();
         }
         indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.COMPILATION);
         indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.COMPILATION_PART);
@@ -256,7 +264,7 @@ public class LocalCatalogIndexBuilder {
             }
         }
         flush(batch);
-        return indexed;
+        return new CompilationCounts(indexed, membershipsByPartKey.size());
     }
 
     /**
@@ -404,14 +412,27 @@ public class LocalCatalogIndexBuilder {
         }
     }
 
-    public record IndexResult(long reviews, long authorBios, long compilations, long languages) {
+    /**
+     * The two row counts one pass over {@code compilations.json} produces: forward
+     * {@code COMPILATION} rows and reverse {@code COMPILATION_PART} rows. They are not the same
+     * number and do not go empty together, so they are carried separately rather than summed.
+     */
+    private record CompilationCounts(long forward, long reverse) {
+
+        static CompilationCounts none() {
+            return new CompilationCounts(0, 0);
+        }
+    }
+
+    public record IndexResult(long reviews, long authorBios, long compilations, long compilationParts,
+                              long languages) {
 
         static IndexResult empty() {
-            return new IndexResult(0, 0, 0, 0);
+            return new IndexResult(0, 0, 0, 0, 0);
         }
 
         public long total() {
-            return reviews + authorBios + compilations + languages;
+            return reviews + authorBios + compilations + compilationParts + languages;
         }
     }
 }

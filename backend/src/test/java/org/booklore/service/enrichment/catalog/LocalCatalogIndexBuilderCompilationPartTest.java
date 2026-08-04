@@ -1,5 +1,9 @@
 package org.booklore.service.enrichment.catalog;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.entity.LocalCatalogIndexEntity;
 import org.booklore.model.enums.LocalCatalogSourceType;
@@ -9,6 +13,7 @@ import org.booklore.service.ArchiveService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
 import tools.jackson.core.type.TypeReference;
@@ -184,6 +189,67 @@ class LocalCatalogIndexBuilderCompilationPartTest {
 
         assertThat(result.compilations()).isPositive();
         assertThat(savedRowsOfType(LocalCatalogSourceType.COMPILATION_PART)).isNotEmpty();
+    }
+
+    /**
+     * The reverse rows are a source type of their own — 78,907 of them in the shipped catalog — and
+     * they can zero out independently of the forward rows: a document of compilations that names no
+     * usable part keys writes {@code COMPILATION} rows and no {@code COMPILATION_PART} rows at all.
+     * They are therefore counted separately rather than folded into {@code compilations()}.
+     */
+    @Test
+    void countsReverseRowsSeparatelyFromForwardOnes() {
+        LocalCatalogIndexBuilder.IndexResult result = builder.rebuild(7L);
+
+        assertThat(result.compilations()).isEqualTo(1);
+        assertThat(result.compilationParts()).isEqualTo(2);
+    }
+
+    /**
+     * The blind spot the four-field summary had: {@code COMPILATION_PART} is 78,907 rows in the shipped
+     * catalog and nothing reported on it, so a rebuild that produced none of them looked identical to
+     * one that produced them all. It is warned about in its own right now, distinctly from the forward
+     * {@code COMPILATION} rows — a substring check would not tell the two warnings apart, so both are
+     * asserted on exactly.
+     * <p>
+     * A compilations document that yields nothing is the reachable way to get here: with the parser's
+     * present guards a compilation is only accepted when its own key and at least one of its parts are
+     * usable, so forward-positive-and-reverse-zero cannot currently occur. The two counts are still
+     * carried and warned about separately, because they are separate source types and nothing but that
+     * guard keeps them in step.
+     */
+    @Test
+    void warnsAboutReverseRowsInTheirOwnRight() throws Exception {
+        when(archiveService.getEntryBytes(catalogRoot.resolve("compilations.7z"), "compilations.json"))
+                .thenReturn("[]".getBytes(StandardCharsets.UTF_8));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(LocalCatalogIndexBuilder.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            LocalCatalogIndexBuilder.IndexResult result = builder.rebuild(7L);
+
+            assertThat(result.compilations()).isZero();
+            assertThat(result.compilationParts()).isZero();
+            assertThat(warningsMentioning(appender, LocalCatalogSourceType.COMPILATION_PART)).isNotEmpty();
+            assertThat(warningsMentioning(appender, LocalCatalogSourceType.COMPILATION)).isNotEmpty();
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    /**
+     * Warnings naming exactly this source type. {@code COMPILATION_PART} contains {@code COMPILATION},
+     * so a plain {@code contains} would let one warning satisfy an assertion about the other.
+     */
+    private List<String> warningsMentioning(ListAppender<ILoggingEvent> appender, LocalCatalogSourceType type) {
+        return appender.list.stream()
+                .filter(event -> event.getLevel() == Level.WARN)
+                .map(ILoggingEvent::getFormattedMessage)
+                .filter(message -> message.matches(".*\\b" + type.name() + "\\b.*"))
+                .toList();
     }
 
     /**

@@ -118,6 +118,47 @@ class FlibustaCatalogSourceContainerTest {
                     .containsExactly("latest");
         }
 
+        /**
+         * The disjointness of monthly archives is measured, not guaranteed: 40 of the 78,646 duplicated
+         * keys were sampled. If any pair does overlap, the concatenation would hand the same review to
+         * the caller twice — and the very next thing that runs is a gate measuring whether a second
+         * backfill duplicates reviews, which would then blame the wrong code. Reviews are identified by
+         * reviewer, timestamp and text, so a repeat collapses.
+         */
+        @Test
+        void doesNotReturnTheSameReviewTwiceWhenTwoArchivesOverlap() throws Exception {
+            indexed(LocalCatalogSourceType.REVIEW, REVIEW_KEY, "200801.7z", "201003.7z");
+            String shared = """
+                    {"name": "shared", "text": "carried over", "time": "2008-01-05 10:00:00"}""";
+            when(archiveService.getEntryBytes(reviews.resolve("200801.7z"), REVIEW_KEY))
+                    .thenReturn(("[" + shared + "]").getBytes(StandardCharsets.UTF_8));
+            when(archiveService.getEntryBytes(reviews.resolve("201003.7z"), REVIEW_KEY))
+                    .thenReturn(("[" + shared + """
+                            , {"name": "later", "text": "read it in 2010", "time": "2010-03-05 10:00:00"}]""")
+                            .getBytes(StandardCharsets.UTF_8));
+
+            List<CatalogReview> found = source.lookupReviews(LIBRARY, ARCHIVE, ENTRY);
+
+            assertThat(found).extracting(CatalogReview::reviewerName).containsExactly("shared", "later");
+        }
+
+        /**
+         * Two different people posting the same words at different times, or the same person twice in a
+         * month, are distinct reviews and must both survive — the dedup keys on identity, not on text.
+         */
+        @Test
+        void keepsReviewsThatShareTextButDifferInReviewerOrTime() throws Exception {
+            indexed(LocalCatalogSourceType.REVIEW, REVIEW_KEY, "200801.7z");
+            when(archiveService.getEntryBytes(reviews.resolve("200801.7z"), REVIEW_KEY))
+                    .thenReturn("""
+                            [{"name": "anna", "text": "excellent", "time": "2008-01-05 10:00:00"},
+                             {"name": "boris", "text": "excellent", "time": "2008-01-05 10:00:00"},
+                             {"name": "anna", "text": "excellent", "time": "2008-01-19 22:00:00"}]
+                            """.getBytes(StandardCharsets.UTF_8));
+
+            assertThat(source.lookupReviews(LIBRARY, ARCHIVE, ENTRY)).hasSize(3);
+        }
+
         @Test
         void returnsNothingForAKeyThatIsNotIndexed() {
             when(indexRepository.findByLibraryIdAndSourceTypeAndEntryKey(

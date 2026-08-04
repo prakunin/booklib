@@ -255,22 +255,29 @@ class LocalCatalogIndexBuilderContainerTest {
         void warnsForEverySourceTypeThatIndexedNothing() {
             builder.rebuild(7L);
 
-            assertThat(warnings()).anyMatch(message -> message.contains("COMPILATION"));
-            assertThat(warnings()).anyMatch(message -> message.contains("LANGUAGE"));
+            assertThat(warningsMentioning(LocalCatalogSourceType.COMPILATION)).isNotEmpty();
+            assertThat(warningsMentioning(LocalCatalogSourceType.COMPILATION_PART)).isNotEmpty();
+            assertThat(warningsMentioning(LocalCatalogSourceType.LANGUAGE)).isNotEmpty();
         }
 
         @Test
         void staysQuietForSourceTypesThatIndexedRows() {
             builder.rebuild(7L);
 
-            assertThat(warnings()).noneMatch(message -> message.contains("REVIEW"));
-            assertThat(warnings()).noneMatch(message -> message.contains("AUTHOR_BIO"));
+            assertThat(warningsMentioning(LocalCatalogSourceType.REVIEW)).isEmpty();
+            assertThat(warningsMentioning(LocalCatalogSourceType.AUTHOR_BIO)).isEmpty();
         }
 
-        private List<String> warnings() {
+        /**
+         * Warnings naming exactly this source type. {@code COMPILATION_PART} contains
+         * {@code COMPILATION}, so a plain {@code contains} would let one warning satisfy an assertion
+         * about the other.
+         */
+        private List<String> warningsMentioning(LocalCatalogSourceType type) {
             return appender.list.stream()
                     .filter(event -> event.getLevel() == Level.WARN)
                     .map(ILoggingEvent::getFormattedMessage)
+                    .filter(message -> message.matches(".*\\b" + type.name() + "\\b.*"))
                     .toList();
         }
     }

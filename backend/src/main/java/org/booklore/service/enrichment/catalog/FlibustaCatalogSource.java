@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +86,16 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
      * order. They are increments rather than snapshots: a book reviewed in nine different months has
      * nine archives holding nine disjoint sets of reviews, so reading only one of them would return a
      * single month's worth and quietly drop the rest.
+     * <p>
+     * The archives were measured to be disjoint on a sample — 40 of the 78,646 keys that span several
+     * of them — not proven to be so for all of them, and the result is collected into a set rather
+     * than a list so that an overlap cannot turn into a duplicated review. {@link CatalogReview} is a
+     * record, so identity is reviewer, body and timestamp together: two people posting the same words,
+     * or one person posting twice, remain two reviews. The insertion-ordered set keeps the oldest
+     * archive's reviews first.
+     * <p>
+     * That guard also covers the index side, where a key listed twice inside one archive would record
+     * that archive's name twice: the second read returns the same reviews and collapses here.
      */
     @Override
     public List<CatalogReview> lookupReviews(long libraryId, String archiveName, String entryName) {
@@ -98,11 +107,11 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
         if (root.isEmpty()) {
             return List.of();
         }
-        List<CatalogReview> reviews = new ArrayList<>();
+        Set<CatalogReview> reviews = new LinkedHashSet<>();
         for (String container : indexedContainers(libraryId, LocalCatalogSourceType.REVIEW, key)) {
             reviews.addAll(reviewParser.parse(readEntry(layout.reviewContainer(root.get(), container), key)));
         }
-        return reviews;
+        return List.copyOf(reviews);
     }
 
     /**
