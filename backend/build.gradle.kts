@@ -183,12 +183,17 @@ val openApiExportRuntimeOnly by configurations.creating
 // --- Book & Image Processing --- pinned version, "+" (latest local) when useLocalLibs.
 val pdfium4jVersion = if (useLocalLibs) "+" else libs.versions.pdfium4j.get()
 
-// epub4j-grimmory fork publishes as org.grimmory:epub4j-core
-val epub4jCoords = if (useLocalLibs) "org.grimmory:epub4j-core:+" else "org.grimmory:epub4j-core:${libs.versions.epub4j.get()}"
+// epub4j-grimmory fork publishes as org.grimmory:epub4j-core.
+// useLocalLibs pins to this exact locally-published version rather than "+": mavenCentral also
+// publishes newer epub4j releases, and "+" resolves the highest version across ALL configured
+// repositories (mavenLocal does not win just because it's declared first) -- so a bare "+" here
+// would silently skip mavenLocal and pull a remote artifact instead of the local build under test.
+val epub4jLocalVersion = "1.4.1"
+val epub4jCoords = if (useLocalLibs) "org.grimmory:epub4j-core:$epub4jLocalVersion" else "org.grimmory:epub4j-core:${libs.versions.epub4j.get()}"
 
 // epub4j-native for native archive parsing
 val epub4jNativeVersion = libs.versions.epub4j.get()
-val epub4jNativeCoords = if (useLocalLibs) "org.grimmory:epub4j-native:+" else "org.grimmory:epub4j-native:$epub4jNativeVersion"
+val epub4jNativeCoords = if (useLocalLibs) "org.grimmory:epub4j-native:$epub4jLocalVersion" else "org.grimmory:epub4j-native:$epub4jNativeVersion"
 
 dependencies {
     // --- Spring Boot ---
@@ -316,8 +321,14 @@ dependencyManagement {
     }
 }
 
-dependencyLocking {
-    lockAllConfigurations()
+// Dependency locking pins every configuration to backend/gradle.lockfile, which records the
+// normal (mavenCentral) epub4j/pdfium4j coordinates. A useLocalLibs build intentionally resolves
+// different versions from mavenLocal, so it would fail lock verification through no fault of its
+// own; skip locking for that opt-in local-dev mode rather than let the lockfile fight the override.
+if (!useLocalLibs) {
+    dependencyLocking {
+        lockAllConfigurations()
+    }
 }
 
 hibernate {
