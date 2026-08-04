@@ -46,6 +46,12 @@ public interface AuthorRepository extends JpaRepository<AuthorEntity, Long> {
     @Query("SELECT bm.bookId AS bookId, a.name AS authorName FROM AuthorEntity a JOIN a.bookMetadataEntityList bm WHERE bm.bookId IN :bookIds ORDER BY a.name")
     List<AuthorBookProjection> findAuthorNamesByBookIds(@Param("bookIds") Set<Long> bookIds);
 
+    /**
+     * Authors with a non-blank description. Global — authors are not library-scoped in this schema.
+     */
+    @Query("SELECT COUNT(a) FROM AuthorEntity a WHERE a.description IS NOT NULL AND TRIM(a.description) <> ''")
+    long countWithNonBlankDescription();
+
     interface AuthorBookProjection {
         Long getBookId();
         String getAuthorName();

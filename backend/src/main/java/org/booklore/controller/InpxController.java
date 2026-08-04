@@ -10,7 +10,9 @@ import org.booklore.model.dto.inpx.InpxArchiveDto;
 import org.booklore.model.dto.inpx.InpxArchiveRescanRequest;
 import org.booklore.model.dto.inpx.InpxArchiveScanTaskDto;
 import org.booklore.model.dto.inpx.InpxSearchResult;
+import org.booklore.model.dto.inpx.LocalCatalogStatusDto;
 import org.booklore.config.security.annotation.CheckLibraryAccess;
+import org.booklore.service.enrichment.catalog.LocalCatalogStatusService;
 import org.booklore.service.inpx.InpxArchiveCatalogService;
 import org.booklore.service.inpx.InpxArchiveFullScanService;
 import org.booklore.service.inpx.InpxImportService;
@@ -43,6 +45,7 @@ public class InpxController {
     private final InpxArchiveCatalogService archiveCatalogService;
     private final InpxArchiveFullScanService archiveFullScanService;
     private final InpxSourceResolver inpxSourceResolver;
+    private final LocalCatalogStatusService localCatalogStatusService;
 
     @GetMapping("/books")
     @PreAuthorize("@securityUtil.isAdmin() or @securityUtil.canUpload()")
@@ -84,6 +87,14 @@ public class InpxController {
     @Operation(summary = "List queued, active, and completed INPX archive scans")
     public ResponseEntity<List<InpxArchiveScanTaskDto>> getArchiveScans(@PathVariable long libraryId) {
         return ResponseEntity.ok(archiveCatalogService.listTasks(libraryId));
+    }
+
+    @GetMapping("/libraries/{libraryId}/local-catalog")
+    @CheckLibraryAccess(libraryIdParam = "libraryId")
+    @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
+    @Operation(summary = "Report what the local catalog for a library has indexed and how much of the library it has filled")
+    public ResponseEntity<LocalCatalogStatusDto> getLocalCatalogStatus(@PathVariable long libraryId) {
+        return ResponseEntity.ok(localCatalogStatusService.getStatus(libraryId));
     }
 
     @PostMapping("/libraries/{libraryId}/archives/rescan")
