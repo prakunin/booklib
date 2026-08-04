@@ -37,10 +37,19 @@ public class BookFileEntity {
     @Column(name = "file_sub_path", length = 512, nullable = false)
     private String fileSubPath;
 
-    @Column(name = "source_archive", length = 1000)
+    /**
+     * The name of the archive this file came out of, and the name of the entry inside it.
+     * <p>
+     * Narrower than the {@code VARCHAR(1000)} V146 created, because the local-catalog backfill's
+     * keyset cursor orders by these two columns and InnoDB cannot index 4000 bytes of utf8mb4 in
+     * full — only by prefix, and a prefix index cannot establish an ordering, so every page of the
+     * walk sorted the whole table. See {@code V173__Index_book_file_archive_cursor.sql}. Both hold a
+     * single file name; the longest measured over 704,575 rows are 23 and 120 characters.
+     */
+    @Column(name = "source_archive", length = 255)
     private String sourceArchive;
 
-    @Column(name = "source_archive_entry", length = 1000)
+    @Column(name = "source_archive_entry", length = 500)
     private String sourceArchiveEntry;
 
     @Column(name = "is_book", nullable = false)
