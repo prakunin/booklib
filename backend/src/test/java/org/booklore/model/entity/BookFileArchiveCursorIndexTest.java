@@ -72,7 +72,7 @@ class BookFileArchiveCursorIndexTest {
     }
 
     @Nested
-    class TheColumnsTheMigrationsProduce {
+    class TheColumnsTheMigrationsDeclare {
 
         @Test
         void endUpAtTheSameWidthsTheEntityDeclares() throws IOException {

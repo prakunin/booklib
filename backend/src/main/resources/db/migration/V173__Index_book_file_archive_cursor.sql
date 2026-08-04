@@ -41,6 +41,27 @@
 -- is truncated and nothing fails to start. On a MariaDB running the default STRICT_TRANS_TABLES the
 -- ALTER would have errored rather than truncated, but a migration that refuses to start the
 -- application is a worse outcome than a migration that declines to speed it up.
+--
+-- The skip used to be silent: Flyway would still record V173 as success=1, so it would never run
+-- again even after the offending row was fixed, and nothing in any log said why the backfill was
+-- still slow. Two changes close that: (1) the ELSE branch below now CALLs a throwaway stored
+-- procedure that SIGNALs SQLSTATE '01000' ("warning", not an error, so it cannot abort the
+-- migration or fail startup) — read via `java.sql.Statement.getWarnings()`, which Flyway's
+-- `JdbcTemplate.extractWarnings` always drains after every statement into a `Warning` whose SQLSTATE
+-- ("01000" != "00000") makes `ErrorOverridesSupportStub.printWarning` (the only ServiceLoader-
+-- registered `ErrorOverridesSupport`, confirmed against the flyway-core 12.11.0 jar this project
+-- pins) log it at WARN through Flyway's own logger — so a skip now writes a WARN line to the
+-- application's ordinary startup log instead of nothing. (2) V175 retries this same guarded
+-- narrowing, so a database that trips this guard today gets a second, later chance once the
+-- offending row is fixed, rather than being stuck on the slow plan forever behind a success=1 row.
+--
+-- Narrowing a VARCHAR forces InnoDB's copying algorithm — a full table rebuild that holds a
+-- metadata lock for its duration — so, matching V150's precedent of stating the algorithm and lock
+-- explicitly rather than letting the server pick, the ALTER below declares ALGORITHM=COPY,
+-- LOCK=SHARED: readers may keep reading book_file for the rebuild's duration, writers block. This
+-- cannot be ALGORITHM=INSTANT like V150's — narrowing is not an instant metadata-only change.
+-- Measured 7.9 s on the dev database's 704,575-row book_file; expect it to scale with table size,
+-- and expect writers to book_file to block for that long.
 
 SET @book_file_archive_fits = (
     SELECT COUNT(*) = 0
@@ -52,7 +73,8 @@ SET @book_file_archive_fits = (
 SET @narrow_sql = IF(@book_file_archive_fits,
     'ALTER TABLE book_file
         MODIFY COLUMN source_archive VARCHAR(255) NULL,
-        MODIFY COLUMN source_archive_entry VARCHAR(500) NULL',
+        MODIFY COLUMN source_archive_entry VARCHAR(500) NULL,
+        ALGORITHM = COPY, LOCK = SHARED',
     'SELECT 1');
 PREPARE narrow_stmt FROM @narrow_sql;
 EXECUTE narrow_stmt;
@@ -76,3 +98,18 @@ SET @drop_sql = IF(@book_file_archive_fits,
 PREPARE drop_stmt FROM @drop_sql;
 EXECUTE drop_stmt;
 DEALLOCATE PREPARE drop_stmt;
+
+-- Make the skip visible. A CREATE-CALL-DROP throwaway procedure is required because SIGNAL is only
+-- legal inside a stored program, not as a bare statement.
+DROP PROCEDURE IF EXISTS book_file_archive_narrowing_skipped_v173;
+
+CREATE PROCEDURE book_file_archive_narrowing_skipped_v173()
+BEGIN
+    IF NOT @book_file_archive_fits THEN
+        SIGNAL SQLSTATE '01000'
+            SET MESSAGE_TEXT = 'V173: book_file archive/entry column narrowing skipped (row too wide); cursor filesort stays; see V175';
+    END IF;
+END;
+
+CALL book_file_archive_narrowing_skipped_v173();
+DROP PROCEDURE book_file_archive_narrowing_skipped_v173;
