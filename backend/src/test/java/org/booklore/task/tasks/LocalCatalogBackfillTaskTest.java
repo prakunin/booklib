@@ -7,9 +7,8 @@ import org.booklore.service.NotificationService;
 import org.booklore.service.enrichment.catalog.LocalCatalogBackfillService;
 import org.booklore.task.TaskCancellationManager;
 import org.booklore.task.TaskStatus;
+import org.booklore.task.options.LocalCatalogBackfillOptions;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,7 +41,8 @@ class LocalCatalogBackfillTaskTest {
         when(backfillService.run(eq(19L), eq("task-1"), any(), any()))
                 .thenReturn(new LocalCatalogBackfillService.BackfillResult(10, 0, false));
 
-        TaskCreateResponse response = task.execute(request(Map.of("libraryId", 19)));
+        TaskCreateResponse response = task.execute(
+                request(LocalCatalogBackfillOptions.builder().libraryId(19L).build()));
 
         assertThat(response.getStatus()).isEqualTo(TaskStatus.COMPLETED);
         verify(backfillService).run(eq(19L), eq("task-1"), any(), any());
@@ -53,14 +53,22 @@ class LocalCatalogBackfillTaskTest {
         when(backfillService.run(anyLong(), any(), any(), any()))
                 .thenReturn(new LocalCatalogBackfillService.BackfillResult(3, 0, true));
 
-        TaskCreateResponse response = task.execute(request(Map.of("libraryId", 19)));
+        TaskCreateResponse response = task.execute(
+                request(LocalCatalogBackfillOptions.builder().libraryId(19L).build()));
 
         assertThat(response.getStatus()).isEqualTo(TaskStatus.CANCELLED);
     }
 
     @Test
     void refusesToRunWithoutALibraryId() {
-        assertThatThrownBy(() -> task.execute(request(Map.of())))
+        assertThatThrownBy(() -> task.execute(request(LocalCatalogBackfillOptions.builder().build())))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("libraryId");
+    }
+
+    @Test
+    void refusesToRunWithoutAnyOptions() {
+        assertThatThrownBy(() -> task.execute(request(null)))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("libraryId");
     }

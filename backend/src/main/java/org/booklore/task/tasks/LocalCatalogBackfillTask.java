@@ -14,9 +14,8 @@ import org.booklore.service.NotificationService;
 import org.booklore.service.enrichment.catalog.LocalCatalogBackfillService;
 import org.booklore.task.TaskCancellationManager;
 import org.booklore.task.TaskStatus;
+import org.booklore.task.options.LocalCatalogBackfillOptions;
 import org.springframework.stereotype.Component;
-
-import java.util.Map;
 
 /**
  * Drives {@link LocalCatalogBackfillService} for a single library, chosen by the caller via the
@@ -83,9 +82,9 @@ public class LocalCatalogBackfillTask implements Task {
      * no sensible "all libraries" run.
      */
     private long requireLibraryId(TaskCreateRequest request) {
-        if (request.getOptions() instanceof Map<?, ?> options
-                && options.get("libraryId") instanceof Number libraryId) {
-            return libraryId.longValue();
+        LocalCatalogBackfillOptions options = request.getOptionsAs(LocalCatalogBackfillOptions.class);
+        if (options != null && options.getLibraryId() != null) {
+            return options.getLibraryId();
         }
         throw ApiError.GENERIC_BAD_REQUEST.createException(
                 "Local catalog backfill requires a libraryId option");
