@@ -193,6 +193,16 @@ val pdfium4jVersion = libs.versions.pdfium4j.get()
 // publishes newer epub4j releases, and "+" resolves the highest version across ALL configured
 // repositories (mavenLocal does not win just because it's declared first) -- so a bare "+" here
 // would silently skip mavenLocal and pull a remote artifact instead of the local build under test.
+// 1.4.1 is a hand-patched build of the upstream 1.4.0 release that hides the vendored libarchive's
+// archive_* symbols so they stop colliding with the system libarchive at runtime -- see the
+// workspace's .superpowers/sdd/2026-08-03-local-catalog-backfill/task-11a-fix-report.md (this repo
+// checkout's parent directory, not tracked in this repo) for the diagnosis and the exact rebuild
+// steps. It exists ONLY in a dev container's
+// ~/.m2/repository/org/grimmory/{epub4j-core,epub4j-native}/1.4.1 -- there is no public release and
+// no CI equivalent. If that local repo is ever cleared, a useLocalLibs build fails with a bare
+// "could not find org.grimmory:epub4j-core:1.4.1"; recover by re-cloning/rebuilding per the fix
+// report (clone at ~/epub4j, branch fix/hide-vendored-symbols, then
+// `./gradlew :epub4j-native:publishToMavenLocal :epub4j-core:publishToMavenLocal -x verifyNativeClassifiers -x test -x check`).
 val epub4jLocalVersion = "1.4.1"
 val epub4jCoords = if (useLocalLibs) "org.grimmory:epub4j-core:$epub4jLocalVersion" else "org.grimmory:epub4j-core:${libs.versions.epub4j.get()}"
 
@@ -330,6 +340,10 @@ dependencyManagement {
 // normal (mavenCentral) epub4j/pdfium4j coordinates. A useLocalLibs build intentionally resolves
 // different versions from mavenLocal, so it would fail lock verification through no fault of its
 // own; skip locking for that opt-in local-dev mode rather than let the lockfile fight the override.
+// NOTE: this disables lock verification for the WHOLE classpath under useLocalLibs, not just
+// epub4j/pdfium4j -- today those are the only two dependencies with a dynamic/local-override
+// version, but any dependency added later that resolves a version under useLocalLibs gets no
+// lock protection and no warning while this flag is set.
 if (!useLocalLibs) {
     dependencyLocking {
         lockAllConfigurations()
