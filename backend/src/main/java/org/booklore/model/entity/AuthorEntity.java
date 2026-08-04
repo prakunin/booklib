@@ -33,7 +33,13 @@ public class AuthorEntity {
     @Column(name = "sort_name_locked", nullable = false)
     private boolean sortNameLocked;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    /**
+     * MEDIUMTEXT, not TEXT: a biography is long-form prose from a catalog rather than a typed-in
+     * blurb, TEXT's 65,535 is a byte budget, and Cyrillic spends two bytes a character. Overflowing
+     * it rolled back the whole enrichment transaction the biography was written in, costing the book
+     * its description and reviews too. See V172__Widen_author_description.sql.
+     */
+    @Column(name = "description", columnDefinition = "MEDIUMTEXT")
     private String description;
 
     @Column(name = "asin", length = 20)
