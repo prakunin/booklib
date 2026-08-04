@@ -2,7 +2,6 @@ package org.booklore.service.enrichment.catalog;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.booklore.exception.ApiError;
 import org.booklore.model.dto.inpx.LocalCatalogStatusDto;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.enums.LocalCatalogSourceType;
@@ -10,7 +9,6 @@ import org.booklore.model.enums.MetadataProvider;
 import org.booklore.repository.AuthorRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.BookReviewRepository;
-import org.booklore.repository.LibraryRepository;
 import org.booklore.repository.LocalCatalogIndexRepository;
 import org.springframework.stereotype.Service;
 
@@ -24,22 +22,24 @@ import java.util.Map;
  * This holds no state, decodes nothing, and opens no archive — it only reads
  * {@link LocalCatalogIndexRepository}, built by {@link LocalCatalogIndexBuilder}, which is already the
  * answer to "what does the catalog hold".
+ * <p>
+ * Takes an already-resolved {@link LibraryEntity} rather than a bare id: whether the library exists and
+ * is eligible at all (an INPX library, in {@code InpxController}'s case) is a validation concern that
+ * belongs to the caller, not to an aggregator in the {@code enrichment} package — this class must not
+ * depend on {@code service.inpx}.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class LocalCatalogStatusService {
 
-    private final LibraryRepository libraryRepository;
     private final LocalCatalogIndexRepository localCatalogIndexRepository;
     private final BookRepository bookRepository;
     private final BookReviewRepository bookReviewRepository;
     private final AuthorRepository authorRepository;
 
-    public LocalCatalogStatusDto getStatus(long libraryId) {
-        LibraryEntity library = libraryRepository.findById(libraryId)
-                .orElseThrow(() -> ApiError.LIBRARY_NOT_FOUND.createException(libraryId));
-
+    public LocalCatalogStatusDto getStatus(LibraryEntity library) {
+        long libraryId = library.getId();
         String catalogPath = library.getMetadataSidecarPath();
         boolean configured = catalogPath != null && !catalogPath.isBlank();
 

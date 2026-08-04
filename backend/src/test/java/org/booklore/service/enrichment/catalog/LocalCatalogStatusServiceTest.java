@@ -1,7 +1,5 @@
 package org.booklore.service.enrichment.catalog;
 
-import org.booklore.exception.APIException;
-import org.booklore.exception.ApiError;
 import org.booklore.model.dto.inpx.LocalCatalogStatusDto;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.enums.LocalCatalogSourceType;
@@ -9,17 +7,12 @@ import org.booklore.model.enums.MetadataProvider;
 import org.booklore.repository.AuthorRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.BookReviewRepository;
-import org.booklore.repository.LibraryRepository;
 import org.booklore.repository.LocalCatalogIndexRepository;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -28,14 +21,13 @@ class LocalCatalogStatusServiceTest {
 
     private static final long LIBRARY_ID = 19L;
 
-    private final LibraryRepository libraryRepository = mock(LibraryRepository.class);
     private final LocalCatalogIndexRepository localCatalogIndexRepository = mock(LocalCatalogIndexRepository.class);
     private final BookRepository bookRepository = mock(BookRepository.class);
     private final BookReviewRepository bookReviewRepository = mock(BookReviewRepository.class);
     private final AuthorRepository authorRepository = mock(AuthorRepository.class);
 
     private final LocalCatalogStatusService service = new LocalCatalogStatusService(
-            libraryRepository, localCatalogIndexRepository, bookRepository, bookReviewRepository, authorRepository);
+            localCatalogIndexRepository, bookRepository, bookReviewRepository, authorRepository);
 
     private LibraryEntity library(String sidecarPath) {
         return LibraryEntity.builder().id(LIBRARY_ID).metadataSidecarPath(sidecarPath).build();
@@ -46,7 +38,6 @@ class LocalCatalogStatusServiceTest {
 
         @Test
         void reportsNotConfiguredWithNullPathAndStillReturnsCounts() {
-            when(libraryRepository.findById(LIBRARY_ID)).thenReturn(Optional.of(library(null)));
             when(localCatalogIndexRepository.countByLibraryIdAndSourceType(eq(LIBRARY_ID), any()))
                     .thenReturn(0L);
             when(bookRepository.countByLibraryIdNonDeleted(LIBRARY_ID)).thenReturn(5L);
@@ -55,7 +46,7 @@ class LocalCatalogStatusServiceTest {
                     MetadataProvider.FlibustaLocal, LIBRARY_ID)).thenReturn(0L);
             when(authorRepository.countWithNonBlankDescription()).thenReturn(0L);
 
-            LocalCatalogStatusDto status = service.getStatus(LIBRARY_ID);
+            LocalCatalogStatusDto status = service.getStatus(library(null));
 
             assertThat(status.configured()).isFalse();
             assertThat(status.catalogPath()).isNull();
@@ -64,7 +55,6 @@ class LocalCatalogStatusServiceTest {
 
         @Test
         void blankSidecarPathAlsoCountsAsUnconfigured() {
-            when(libraryRepository.findById(LIBRARY_ID)).thenReturn(Optional.of(library("   ")));
             when(localCatalogIndexRepository.countByLibraryIdAndSourceType(eq(LIBRARY_ID), any()))
                     .thenReturn(0L);
             when(bookRepository.countByLibraryIdNonDeleted(LIBRARY_ID)).thenReturn(0L);
@@ -73,7 +63,7 @@ class LocalCatalogStatusServiceTest {
                     MetadataProvider.FlibustaLocal, LIBRARY_ID)).thenReturn(0L);
             when(authorRepository.countWithNonBlankDescription()).thenReturn(0L);
 
-            LocalCatalogStatusDto status = service.getStatus(LIBRARY_ID);
+            LocalCatalogStatusDto status = service.getStatus(library("   "));
 
             assertThat(status.configured()).isFalse();
         }
@@ -84,8 +74,6 @@ class LocalCatalogStatusServiceTest {
 
         @Test
         void everySourceTypeKeyIsPresentWithZero() {
-            when(libraryRepository.findById(LIBRARY_ID))
-                    .thenReturn(Optional.of(library("/data/catalog/fb2.Flibusta.Net.FLibrary.etc")));
             when(localCatalogIndexRepository.countByLibraryIdAndSourceType(eq(LIBRARY_ID), any()))
                     .thenReturn(0L);
             when(bookRepository.countByLibraryIdNonDeleted(LIBRARY_ID)).thenReturn(10L);
@@ -94,7 +82,8 @@ class LocalCatalogStatusServiceTest {
                     MetadataProvider.FlibustaLocal, LIBRARY_ID)).thenReturn(0L);
             when(authorRepository.countWithNonBlankDescription()).thenReturn(0L);
 
-            LocalCatalogStatusDto status = service.getStatus(LIBRARY_ID);
+            LocalCatalogStatusDto status = service.getStatus(
+                    library("/data/catalog/fb2.Flibusta.Net.FLibrary.etc"));
 
             assertThat(status.configured()).isTrue();
             assertThat(status.catalogPath()).isEqualTo("/data/catalog/fb2.Flibusta.Net.FLibrary.etc");
@@ -113,8 +102,6 @@ class LocalCatalogStatusServiceTest {
 
         @Test
         void eachCountComesFromItsOwnRepositoryCall() {
-            when(libraryRepository.findById(LIBRARY_ID))
-                    .thenReturn(Optional.of(library("/data/catalog/fb2.Flibusta.Net.FLibrary.etc")));
             when(localCatalogIndexRepository.countByLibraryIdAndSourceType(LIBRARY_ID, LocalCatalogSourceType.REVIEW))
                     .thenReturn(101L);
             when(localCatalogIndexRepository.countByLibraryIdAndSourceType(LIBRARY_ID, LocalCatalogSourceType.AUTHOR_BIO))
@@ -131,7 +118,8 @@ class LocalCatalogStatusServiceTest {
                     MetadataProvider.FlibustaLocal, LIBRARY_ID)).thenReturn(6003L);
             when(authorRepository.countWithNonBlankDescription()).thenReturn(5004L);
 
-            LocalCatalogStatusDto status = service.getStatus(LIBRARY_ID);
+            LocalCatalogStatusDto status = service.getStatus(
+                    library("/data/catalog/fb2.Flibusta.Net.FLibrary.etc"));
 
             assertThat(status.configured()).isTrue();
             assertThat(status.catalogPath()).isEqualTo("/data/catalog/fb2.Flibusta.Net.FLibrary.etc");
@@ -145,19 +133,6 @@ class LocalCatalogStatusServiceTest {
             assertThat(status.booksWithDescription()).isEqualTo(7002L);
             assertThat(status.localReviews()).isEqualTo(6003L);
             assertThat(status.authorsWithBiography()).isEqualTo(5004L);
-        }
-    }
-
-    @Nested
-    class UnknownLibrary {
-
-        @Test
-        void throwsLibraryNotFound() {
-            when(libraryRepository.findById(LIBRARY_ID)).thenReturn(Optional.empty());
-
-            assertThatExceptionOfType(APIException.class)
-                    .isThrownBy(() -> service.getStatus(LIBRARY_ID))
-                    .satisfies(ex -> assertThat(ex.getStatus()).isEqualTo(ApiError.LIBRARY_NOT_FOUND.getStatus()));
         }
     }
 }

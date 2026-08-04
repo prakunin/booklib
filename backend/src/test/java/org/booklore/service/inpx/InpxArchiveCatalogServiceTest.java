@@ -1,5 +1,7 @@
 package org.booklore.service.inpx;
 
+import org.booklore.exception.APIException;
+import org.booklore.exception.ApiError;
 import org.booklore.model.dto.inpx.InpxArchiveDto;
 import org.booklore.model.entity.LibraryEntity;
 import org.booklore.model.enums.InpxArchiveScanPhase;
@@ -8,6 +10,7 @@ import org.booklore.model.enums.LibrarySourceType;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.repository.LibraryRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -19,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -184,6 +188,32 @@ class InpxArchiveCatalogServiceTest {
 
         verify(bookFileRepository, times(2)).findArchiveStatistics(7L); // invalidated
         verify(bookFileRepository, times(1)).findArchiveStatistics(8L); // untouched
+    }
+
+    @Nested
+    class RequireInpxLibrary {
+
+        @Test
+        void throwsLibraryNotFoundWhenTheLibraryDoesNotExist() {
+            when(libraryRepository.findByIdWithPaths(42L)).thenReturn(Optional.empty());
+
+            assertThatExceptionOfType(APIException.class)
+                    .isThrownBy(() -> service.requireInpxLibrary(42L))
+                    .satisfies(ex -> assertThat(ex.getStatus()).isEqualTo(ApiError.LIBRARY_NOT_FOUND.getStatus()));
+        }
+
+        @Test
+        void throwsBadRequestForALibraryThatIsNotInpxSourced() {
+            when(libraryRepository.findByIdWithPaths(7L)).thenReturn(Optional.of(LibraryEntity.builder()
+                    .id(7L)
+                    .name("Folder")
+                    .sourceType(LibrarySourceType.FILESYSTEM)
+                    .build()));
+
+            assertThatExceptionOfType(APIException.class)
+                    .isThrownBy(() -> service.requireInpxLibrary(7L))
+                    .satisfies(ex -> assertThat(ex.getStatus()).isEqualTo(ApiError.GENERIC_BAD_REQUEST.getStatus()));
+        }
     }
 
     private void givenLibrary() {
