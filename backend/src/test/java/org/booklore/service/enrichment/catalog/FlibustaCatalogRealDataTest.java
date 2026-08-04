@@ -77,6 +77,23 @@ class FlibustaCatalogRealDataTest {
     }
 
     /**
+     * The measured reason a second candidate exists, checked against the shipped buckets rather than
+     * argued: {@code authors/5.7z} files Kevin Mitnick under {@code md5("митник кевин")} and holds no
+     * key at all for the {@code "Кевин Митник"} this library stores. He is one of 21,689 authors whose
+     * biography the stored order alone can never reach.
+     */
+    @Test
+    @EnabledIf("catalogReadable")
+    void theSurnameFirstCandidateReachesAnAuthorTheStoredOrderCannot() throws Exception {
+        List<String> keys = archiveService.getEntryNames(layout.authorBucket(CATALOG_ROOT, "5.7z"));
+        List<String> candidates = FlibustaAuthorKey.candidates("Кевин Митник");
+
+        assertThat(keys).isNotEmpty();
+        assertThat(keys).doesNotContain(candidates.getFirst());
+        assertThat(keys).contains(candidates.get(1));
+    }
+
+    /**
      * The assumption the whole {@code REVIEW} index shape rests on, checked rather than believed: a
      * monthly review archive holds only that month's reviews, so a later archive adds to an earlier one
      * instead of superseding it. The index therefore records every archive a key was seen in and the

@@ -237,4 +237,82 @@ class FlibustaCatalogSourceContainerTest {
             assertThat(source.lookupAuthorBio(LIBRARY, AUTHOR)).isEmpty();
         }
     }
+
+    /**
+     * 21,689 of this library's authors are stored given-name first — {@code Анатолий Владимирович
+     * Афанасьев} where the catalog files {@code Афанасьев Анатолий Владимирович} — so the stored name
+     * alone reaches no key for them. {@link FlibustaAuthorKey#candidates(String)} offers the rotation
+     * as a second candidate; these tests pin what the read side does with two candidates.
+     */
+    @Nested
+    class AuthorBiographyCandidates {
+
+        private static final String GIVEN_NAME_FIRST = "Анатолий Владимирович Афанасьев";
+        private static final String AKUTAGAWA = "Рюноскэ Акутагава";
+
+        private String storedKey(String name) {
+            return FlibustaAuthorKey.candidates(name).getFirst();
+        }
+
+        private String rotatedKey(String name) {
+            return FlibustaAuthorKey.candidates(name).get(1);
+        }
+
+        @Test
+        void fallsBackToTheRotationWhenTheStoredOrderReachesNothing() throws Exception {
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, rotatedKey(GIVEN_NAME_FIRST), "1.7z");
+            when(archiveService.getEntryBytes(authors.resolve("1.7z"), rotatedKey(GIVEN_NAME_FIRST)))
+                    .thenReturn("Афанасьев Анатолий Владимирович, русский писатель"
+                            .getBytes(StandardCharsets.UTF_8));
+
+            assertThat(source.lookupAuthorBio(LIBRARY, GIVEN_NAME_FIRST))
+                    .contains("Афанасьев Анатолий Владимирович, русский писатель");
+        }
+
+        /**
+         * The stored order is the catalog's own order, so it wins whenever it resolves — the rotation
+         * must not be able to replace a biography the exact key already found.
+         */
+        @Test
+        void prefersTheStoredOrderOverTheRotation() throws Exception {
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, storedKey(AKUTAGAWA), "1.7z");
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, rotatedKey(AKUTAGAWA), "2.7z");
+            String same = "Рюноскэ Акутагава (1892—1927), японский писатель";
+            when(archiveService.getEntryBytes(authors.resolve("1.7z"), storedKey(AKUTAGAWA)))
+                    .thenReturn(same.getBytes(StandardCharsets.UTF_8));
+            when(archiveService.getEntryBytes(authors.resolve("2.7z"), rotatedKey(AKUTAGAWA)))
+                    .thenReturn(same.getBytes(StandardCharsets.UTF_8));
+
+            assertThat(source.lookupAuthorBio(LIBRARY, AKUTAGAWA)).contains(same);
+        }
+
+        /**
+         * 126 of the library's authors reach one key by their stored order and a different key by the
+         * rotation. Different people share a name, so picking either would attach one person's life to
+         * another: when the candidates disagree, nothing is written — the same rule that already
+         * governs two buckets of one key.
+         */
+        @Test
+        void returnsNothingWhenTheStoredOrderAndTheRotationReachDifferentBiographies() throws Exception {
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, storedKey(AKUTAGAWA), "1.7z");
+            indexed(LocalCatalogSourceType.AUTHOR_BIO, rotatedKey(AKUTAGAWA), "2.7z");
+            when(archiveService.getEntryBytes(authors.resolve("1.7z"), storedKey(AKUTAGAWA)))
+                    .thenReturn("Рюноскэ Акутагава, японский писатель".getBytes(StandardCharsets.UTF_8));
+            when(archiveService.getEntryBytes(authors.resolve("2.7z"), rotatedKey(AKUTAGAWA)))
+                    .thenReturn("Акутагава Рюноскэ (Riunoske Akutagava) 1892-1927, Япония"
+                            .getBytes(StandardCharsets.UTF_8));
+
+            assertThat(source.lookupAuthorBio(LIBRARY, AKUTAGAWA)).isEmpty();
+        }
+
+        @Test
+        void returnsNothingWhenNeitherCandidateIsIndexed() {
+            assertThat(source.lookupAuthorBio(LIBRARY, GIVEN_NAME_FIRST)).isEmpty();
+        }
+
+        @Test
+        void returnsNothingForAMissingName() {
+            assertThat(source.lookupAuthorBio(LIBRARY, "  ")).isEmpty();
+        }
+    }
 }
