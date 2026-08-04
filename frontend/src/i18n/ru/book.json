@@ -291,6 +291,26 @@
         "queuedAt": "Поставлен",
         "startedAt": "Начат",
         "completedAt": "Завершён",
+        "localCatalog": {
+            "title": "Локальный каталог",
+            "configuredAt": "Обнаружен локальный каталог: {{ path }}",
+            "notConfigured": "Для этой библиотеки не настроен локальный каталог.",
+            "loadFailed": "Не удалось загрузить статус локального каталога.",
+            "retry": "Повторить",
+            "holdsTitle": "Что проиндексировано в каталоге",
+            "reviews": "Отзывы",
+            "authorBios": "Биографии авторов",
+            "compilations": "Сборники",
+            "compilationsValue": "{{ compilations }} (частей: {{ parts }})",
+            "languages": "Языки",
+            "filledTitle": "Что заполнено",
+            "descriptionCoverage": "Описание есть у {{ withDescription }} из {{ total }} книг",
+            "localReviewsCoverage": "Отзывов из локального каталога: {{ count }}",
+            "authorsWithBiographyCoverage": "Авторов с биографией: {{ count }} (общий показатель, не только по этой библиотеке)",
+            "runBackfill": "Запустить дозаполнение из локального каталога",
+            "backfillQueued": "Дозаполнение из локального каталога поставлено в очередь.",
+            "backfillFailed": "Не удалось запустить дозаполнение из локального каталога."
+        },
         "phases": {
             "QUEUED": "Ожидает",
             "IMPORTING": "Чтение ZIP",
@@ -444,6 +464,9 @@
             "showSpoiler": "Показать спойлер",
             "anonymous": "Аноним",
             "spoiler": "Спойлер"
+        },
+        "providers": {
+            "flibustaLocal": "Локальный каталог"
         },
         "empty": {
             "noReviews": "Нет доступных отзывов для этой книги",

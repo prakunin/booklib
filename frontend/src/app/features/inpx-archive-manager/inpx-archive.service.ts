@@ -2,7 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {API_CONFIG} from '../../core/config/api-config';
-import {InpxArchive, InpxArchiveScanTask} from './inpx-archive.model';
+import {InpxArchive, InpxArchiveScanTask, LocalCatalogStatus} from './inpx-archive.model';
 
 @Injectable({providedIn: 'root'})
 export class InpxArchiveService {
@@ -19,5 +19,9 @@ export class InpxArchiveService {
 
   rescan(libraryId: number, archiveName: string): Observable<void> {
     return this.http.post<void>(`${this.url}/${libraryId}/archives/rescan`, {archiveName});
+  }
+
+  getLocalCatalogStatus(libraryId: number): Observable<LocalCatalogStatus> {
+    return this.http.get<LocalCatalogStatus>(`${this.url}/${libraryId}/local-catalog`);
   }
 }

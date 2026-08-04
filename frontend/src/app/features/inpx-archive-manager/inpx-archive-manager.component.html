@@ -9,6 +9,70 @@
     </div>
   </header>
 
+  <section class="local-catalog-panel">
+    <h3>{{ t('localCatalog.title') }}</h3>
+    @if (localCatalogLoading()) {
+      <div class="state"><p-progress-spinner strokeWidth="4"/></div>
+    } @else if (localCatalogLoadFailed()) {
+      <div class="state error-state">
+        <span>{{ t('localCatalog.loadFailed') }}</span>
+        <p-button [label]="t('localCatalog.retry')" icon="pi pi-refresh" (onClick)="loadLocalCatalogStatus()"/>
+      </div>
+    } @else if (localCatalogStatus(); as status) {
+      @if (status.configured) {
+        <p class="local-catalog-state">{{ t('localCatalog.configuredAt', {path: status.catalogPath}) }}</p>
+
+        <div class="local-catalog-section">
+          <h4>{{ t('localCatalog.holdsTitle') }}</h4>
+          <dl class="local-catalog-stats">
+            <div class="stat-row">
+              <dt>{{ t('localCatalog.reviews') }}</dt>
+              <dd>{{ status.indexedEntries.REVIEW }}</dd>
+            </div>
+            <div class="stat-row">
+              <dt>{{ t('localCatalog.authorBios') }}</dt>
+              <dd>{{ status.indexedEntries.AUTHOR_BIO }}</dd>
+            </div>
+            <div class="stat-row">
+              <dt>{{ t('localCatalog.compilations') }}</dt>
+              <dd>{{ t('localCatalog.compilationsValue', {compilations: status.indexedEntries.COMPILATION, parts: status.indexedEntries.COMPILATION_PART}) }}</dd>
+            </div>
+            <div class="stat-row">
+              <dt>{{ t('localCatalog.languages') }}</dt>
+              <dd>{{ status.indexedEntries.LANGUAGE }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="local-catalog-section">
+          <h4>{{ t('localCatalog.filledTitle') }}</h4>
+          <ul class="local-catalog-coverage">
+            <li>{{ t('localCatalog.descriptionCoverage', {withDescription: status.booksWithDescription, total: status.totalBooks}) }}</li>
+            <li>{{ t('localCatalog.localReviewsCoverage', {count: status.localReviews}) }}</li>
+            <li>{{ t('localCatalog.authorsWithBiographyCoverage', {count: status.authorsWithBiography}) }}</li>
+          </ul>
+        </div>
+
+        <div class="local-catalog-actions">
+          <app-button
+            buttonId="run-local-catalog-backfill"
+            [label]="t('localCatalog.runBackfill')"
+            [loading]="backfillStarting() || backfillRunning()"
+            [disabled]="backfillStarting() || backfillRunning()"
+            (clicked)="startBackfill()"/>
+          @if (backfillRunning()) {
+            <span class="backfill-progress">
+              <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+              {{ backfillProgress()?.message }}
+            </span>
+          }
+        </div>
+      } @else {
+        <p class="local-catalog-state">{{ t('localCatalog.notConfigured') }}</p>
+      }
+    }
+  </section>
+
   <main class="page-content">
     @if (loading()) {
       <div class="state"><p-progress-spinner strokeWidth="4"/></div>

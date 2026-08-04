@@ -6,8 +6,9 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {getTranslocoModule} from '../../core/testing/transloco-testing';
 import {InpxArchiveManagerComponent} from './inpx-archive-manager.component';
 import {InpxArchiveService} from './inpx-archive.service';
-import type {InpxArchive, InpxArchiveScanTask} from './inpx-archive.model';
+import type {InpxArchive, InpxArchiveScanTask, LocalCatalogStatus} from './inpx-archive.model';
 import {DialogLauncherService} from '../../shared/services/dialog-launcher.service';
+import {TaskService, TaskType} from '../settings/task-management/task.service';
 
 describe('InpxArchiveManagerComponent', () => {
   const archive: InpxArchive = {
@@ -22,16 +23,39 @@ describe('InpxArchiveManagerComponent', () => {
     status: 'IDLE',
     errorMessage: null,
   };
+  const configuredCatalogStatus: LocalCatalogStatus = {
+    configured: true,
+    catalogPath: '/mnt/flibusta/catalog.zip',
+    indexedEntries: {REVIEW: 4600, AUTHOR_BIO: 1200, COMPILATION: 300, COMPILATION_PART: 900, LANGUAGE: 15},
+    totalBooks: 615000,
+    booksWithDescription: 5200,
+    localReviews: 4600,
+    authorsWithBiography: 8000,
+  };
+  const unconfiguredCatalogStatus: LocalCatalogStatus = {
+    configured: false,
+    catalogPath: null,
+    indexedEntries: {REVIEW: 0, AUTHOR_BIO: 0, COMPILATION: 0, COMPILATION_PART: 0, LANGUAGE: 0},
+    totalBooks: 0,
+    booksWithDescription: 0,
+    localReviews: 0,
+    authorsWithBiography: 0,
+  };
   const archiveService = {
     getArchives: vi.fn(() => of([archive])),
     getScanQueue: vi.fn(() => of([] as InpxArchiveScanTask[])),
     rescan: vi.fn(() => of(undefined)),
+    getLocalCatalogStatus: vi.fn(() => of(configuredCatalogStatus)),
   };
   const dialogLauncher = {
     openInpxScanQueueDialog: vi.fn(() => Promise.resolve(null)),
   };
   const router = {
     navigate: vi.fn(() => Promise.resolve(true)),
+  };
+  const taskService = {
+    startTask: vi.fn(() => of({taskId: 't1', taskType: 'LOCAL_CATALOG_BACKFILL', status: 'ACCEPTED'})),
+    taskProgress$: of(null),
   };
 
   afterEach(() => {
@@ -43,7 +67,10 @@ describe('InpxArchiveManagerComponent', () => {
     archiveService.getArchives.mockReset().mockReturnValue(of([archive]));
     archiveService.getScanQueue.mockReset().mockReturnValue(of([]));
     archiveService.rescan.mockReset().mockReturnValue(of(undefined));
+    archiveService.getLocalCatalogStatus.mockReset().mockReturnValue(of(configuredCatalogStatus));
     router.navigate.mockClear();
+    taskService.startTask.mockReset().mockReturnValue(of({taskId: 't1', taskType: 'LOCAL_CATALOG_BACKFILL', status: 'ACCEPTED'}));
+    taskService.taskProgress$ = of(null);
     TestBed.configureTestingModule({
       imports: [InpxArchiveManagerComponent, getTranslocoModule()],
       providers: [
@@ -52,8 +79,50 @@ describe('InpxArchiveManagerComponent', () => {
         {provide: Router, useValue: router},
         {provide: MessageService, useValue: {add: vi.fn()}},
         {provide: DialogLauncherService, useValue: dialogLauncher},
+        {provide: TaskService, useValue: taskService},
       ],
     });
+  });
+
+  it('shows the local catalog as unconfigured and hides the run button', () => {
+    archiveService.getLocalCatalogStatus.mockReturnValue(of(unconfiguredCatalogStatus));
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('No local catalog configured for this library.');
+    expect(fixture.nativeElement.querySelector('#run-local-catalog-backfill')).toBeNull();
+    fixture.destroy();
+  });
+
+  it('shows indexed counts and coverage figures when the local catalog is configured', () => {
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Local catalog detected at /mnt/flibusta/catalog.zip');
+    expect(text).toContain('300 (900 parts)');
+    expect(text).toContain('5200 of 615000 books have a description');
+    expect(text).toContain('4600 reviews recorded from the local catalog');
+    expect(text).toContain('8000 authors have a biography (global figure, not limited to this library)');
+    fixture.destroy();
+  });
+
+  it('starts the local catalog backfill for the current library exactly once', () => {
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.detectChanges();
+
+    const runButton = fixture.nativeElement.querySelector('#run-local-catalog-backfill') as HTMLButtonElement;
+    expect(runButton).not.toBeNull();
+    runButton.click();
+
+    expect(taskService.startTask).toHaveBeenCalledTimes(1);
+    expect(taskService.startTask).toHaveBeenCalledWith({
+      taskType: TaskType.LOCAL_CATALOG_BACKFILL,
+      triggeredByCron: false,
+      options: {libraryId: 7},
+    });
+    fixture.destroy();
   });
 
   it('opens the scan queue for the current library', () => {

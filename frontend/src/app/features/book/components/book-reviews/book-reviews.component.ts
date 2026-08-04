@@ -358,12 +358,20 @@ export class BookReviewsComponent implements OnInit, OnChanges {
     this.reviewDownloadEnabled = settings?.metadataPublicReviewsSettings?.downloadEnabled ?? true;
   }
 
-  getProviderSeverity(provider: string): 'success' | 'warn' {
+  getProviderSeverity(provider: string): 'success' | 'warn' | 'info' {
     switch (provider?.toLowerCase()) {
       case 'amazon':
         return 'warn';
+      case 'flibustalocal':
+        return 'info';
       default:
         return 'success';
     }
+  }
+
+  getProviderLabel(provider: string): string {
+    return provider?.toLowerCase() === 'flibustalocal'
+      ? this.t.translate('book.reviews.providers.flibustaLocal')
+      : provider;
   }
 }

@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, DestroyRef, inject, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DatePipe} from '@angular/common';
 import {ActivatedRoute, Router} from '@angular/router';
@@ -9,9 +9,11 @@ import {ProgressSpinner} from 'primeng/progressspinner';
 import {MessageService} from 'primeng/api';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {catchError, EMPTY, exhaustMap, filter, finalize, map, Subscription, take, tap, timer} from 'rxjs';
-import {InpxArchive, InpxArchiveScanStatus, InpxArchiveScanTask} from './inpx-archive.model';
+import {InpxArchive, InpxArchiveScanStatus, InpxArchiveScanTask, LocalCatalogStatus} from './inpx-archive.model';
 import {InpxArchiveService} from './inpx-archive.service';
 import {DialogLauncherService} from '../../shared/services/dialog-launcher.service';
+import {TaskProgressPayload, TaskService, TaskStatus, TaskType} from '../settings/task-management/task.service';
+import {AppButtonComponent} from '../../shared/ui/button/app-button.component';
 
 @Component({
   selector: 'app-inpx-archive-manager',
@@ -19,7 +21,7 @@ import {DialogLauncherService} from '../../shared/services/dialog-launcher.servi
   templateUrl: './inpx-archive-manager.component.html',
   styleUrl: './inpx-archive-manager.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, TableModule, Button, Tag, ProgressSpinner, TranslocoDirective],
+  imports: [DatePipe, TableModule, Button, Tag, ProgressSpinner, TranslocoDirective, AppButtonComponent],
 })
 export class InpxArchiveManagerComponent {
   private readonly service = inject(InpxArchiveService);
@@ -29,6 +31,7 @@ export class InpxArchiveManagerComponent {
   private readonly t = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialogLauncher = inject(DialogLauncherService);
+  private readonly taskService = inject(TaskService);
   readonly libraryId = Number(this.route.snapshot.paramMap.get('libraryId'));
 
   readonly archives = signal<InpxArchive[]>([]);
@@ -38,8 +41,69 @@ export class InpxArchiveManagerComponent {
   private calculationPollSubscription: Subscription | null = null;
   private rescanVersion = 0;
 
+  readonly localCatalogStatus = signal<LocalCatalogStatus | null>(null);
+  readonly localCatalogLoading = signal(true);
+  readonly localCatalogLoadFailed = signal(false);
+  readonly backfillStarting = signal(false);
+  readonly backfillProgress = signal<TaskProgressPayload | null>(null);
+  readonly backfillRunning = computed(() => this.backfillProgress()?.taskStatus === TaskStatus.IN_PROGRESS);
+
   constructor() {
     this.load();
+    this.loadLocalCatalogStatus();
+    this.taskService.taskProgress$.pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(progress => {
+      if (progress?.taskType !== TaskType.LOCAL_CATALOG_BACKFILL) {
+        return;
+      }
+      this.backfillProgress.set(progress);
+      if (progress.taskStatus !== TaskStatus.IN_PROGRESS) {
+        this.loadLocalCatalogStatus();
+      }
+    });
+  }
+
+  loadLocalCatalogStatus(): void {
+    this.localCatalogLoading.set(true);
+    this.localCatalogLoadFailed.set(false);
+    this.service.getLocalCatalogStatus(this.libraryId).pipe(
+      finalize(() => this.localCatalogLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: status => this.localCatalogStatus.set(status),
+      error: () => this.localCatalogLoadFailed.set(true),
+    });
+  }
+
+  startBackfill(): void {
+    if (this.backfillStarting() || this.backfillRunning()) {
+      return;
+    }
+    this.backfillStarting.set(true);
+    this.taskService.startTask({
+      taskType: TaskType.LOCAL_CATALOG_BACKFILL,
+      triggeredByCron: false,
+      options: {libraryId: this.libraryId},
+    }).pipe(
+      finalize(() => this.backfillStarting.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => {
+        this.messages.add({
+          severity: 'info',
+          summary: this.t.translate('common.success'),
+          detail: this.t.translate('book.inpxArchives.localCatalog.backfillQueued'),
+        });
+      },
+      error: () => {
+        this.messages.add({
+          severity: 'error',
+          summary: this.t.translate('common.error'),
+          detail: this.t.translate('book.inpxArchives.localCatalog.backfillFailed'),
+        });
+      },
+    });
   }
 
   openScanQueue(): void {

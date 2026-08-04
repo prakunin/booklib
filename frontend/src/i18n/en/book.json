@@ -300,6 +300,26 @@
     "queuedAt": "Queued",
     "startedAt": "Started",
     "completedAt": "Finished",
+    "localCatalog": {
+      "title": "Local catalog",
+      "configuredAt": "Local catalog detected at {{ path }}",
+      "notConfigured": "No local catalog configured for this library.",
+      "loadFailed": "Could not load local catalog status.",
+      "retry": "Retry",
+      "holdsTitle": "What the catalog holds",
+      "reviews": "Reviews",
+      "authorBios": "Author biographies",
+      "compilations": "Compilations",
+      "compilationsValue": "{{ compilations }} ({{ parts }} parts)",
+      "languages": "Languages",
+      "filledTitle": "What has been filled",
+      "descriptionCoverage": "{{ withDescription }} of {{ total }} books have a description",
+      "localReviewsCoverage": "{{ count }} reviews recorded from the local catalog",
+      "authorsWithBiographyCoverage": "{{ count }} authors have a biography (global figure, not limited to this library)",
+      "runBackfill": "Run local catalog backfill",
+      "backfillQueued": "Local catalog backfill queued.",
+      "backfillFailed": "Could not start the local catalog backfill."
+    },
     "phases": {
       "QUEUED": "Waiting",
       "IMPORTING": "Reading ZIP",
@@ -453,6 +473,9 @@
       "showSpoiler": "Show Spoiler",
       "anonymous": "Anonymous",
       "spoiler": "Spoiler"
+    },
+    "providers": {
+      "flibustaLocal": "Local catalog"
     },
     "empty": {
       "noReviews": "No reviews available for this book",
