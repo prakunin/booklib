@@ -19,9 +19,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The {@code *.FLibrary.etc} catalog that ships next to the fb2.Flibusta.Net INPX libraries.
@@ -79,31 +82,60 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
                 .filter(description -> !description.isBlank());
     }
 
+    /**
+     * Every monthly archive the book was reviewed in, oldest first — the index row lists them in that
+     * order. They are increments rather than snapshots: a book reviewed in nine different months has
+     * nine archives holding nine disjoint sets of reviews, so reading only one of them would return a
+     * single month's worth and quietly drop the rest.
+     */
     @Override
     public List<CatalogReview> lookupReviews(long libraryId, String archiveName, String entryName) {
         String key = layout.bookKey(archiveName, entryName);
         if (key == null) {
             return List.of();
         }
-        return findIndexed(libraryId, LocalCatalogSourceType.REVIEW, key)
-                .flatMap(row -> catalogRoot(libraryId)
-                        .map(root -> layout.reviewContainer(root, row.getContainer())))
-                .map(container -> reviewParser.parse(readEntry(container, key)))
-                .orElseGet(List::of);
+        Optional<Path> root = catalogRoot(libraryId);
+        if (root.isEmpty()) {
+            return List.of();
+        }
+        List<CatalogReview> reviews = new ArrayList<>();
+        for (String container : indexedContainers(libraryId, LocalCatalogSourceType.REVIEW, key)) {
+            reviews.addAll(reviewParser.parse(readEntry(layout.reviewContainer(root.get(), container), key)));
+        }
+        return reviews;
     }
 
+    /**
+     * Author biographies are keyed by a hash of the author's name, and 296 keys in the shipped catalog
+     * land in more than one bucket — 286 of them holding genuinely different text. Some of those are
+     * one writer described twice; others are two different people who happen to share a name, such as
+     * Jean Stone the novelist and Gene Stone the editor. The buckets are numbered rather than dated, so
+     * there is no later document to prefer, and attaching one person's life to another is worse than
+     * attaching none: when the buckets disagree, nothing is returned.
+     */
     @Override
     public Optional<String> lookupAuthorBio(long libraryId, String authorName) {
         String key = FlibustaAuthorKey.of(authorName);
         if (key == null) {
             return Optional.empty();
         }
-        return findIndexed(libraryId, LocalCatalogSourceType.AUTHOR_BIO, key)
-                .flatMap(row -> catalogRoot(libraryId)
-                        .map(root -> layout.authorBucket(root, row.getContainer())))
-                .map(bucket -> readEntry(bucket, key))
-                .map(bytes -> new String(bytes, StandardCharsets.UTF_8))
-                .filter(bio -> !bio.isBlank());
+        Optional<Path> root = catalogRoot(libraryId);
+        if (root.isEmpty()) {
+            return Optional.empty();
+        }
+        Set<String> distinct = new LinkedHashSet<>();
+        for (String bucket : indexedContainers(libraryId, LocalCatalogSourceType.AUTHOR_BIO, key)) {
+            String bio = new String(readEntry(layout.authorBucket(root.get(), bucket), key), StandardCharsets.UTF_8);
+            if (!bio.isBlank()) {
+                distinct.add(bio);
+            }
+        }
+        if (distinct.size() > 1) {
+            log.debug("Author key {} has {} different biographies in the local catalog; too ambiguous "
+                    + "to attach one", key, distinct.size());
+            return Optional.empty();
+        }
+        return distinct.stream().findFirst();
     }
 
     @Override
@@ -162,6 +194,32 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
 
     private Optional<LocalCatalogIndexEntity> findIndexed(long libraryId, LocalCatalogSourceType type, String key) {
         return indexRepository.findByLibraryIdAndSourceTypeAndEntryKey(libraryId, type, key);
+    }
+
+    /**
+     * The containers a key was indexed in, in the order the index recorded them. The payload is a JSON
+     * array of container names; that shape is itself the format guard, exactly as it is for
+     * {@link #readMemberships} — a row written before this change kept the container in its own column
+     * and left the payload null, so it decodes to nothing here rather than being misread.
+     */
+    private List<String> indexedContainers(long libraryId, LocalCatalogSourceType type, String key) {
+        return findIndexed(libraryId, type, key)
+                .map(LocalCatalogIndexEntity::getPayload)
+                .map(this::readContainers)
+                .orElseGet(List::of);
+    }
+
+    private List<String> readContainers(String payload) {
+        if (payload == null || payload.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(payload, new TypeReference<List<String>>() {
+            });
+        } catch (JacksonException e) {
+            log.warn("Could not read indexed catalog container payload: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private byte[] readEntry(Path container, String entryName) {

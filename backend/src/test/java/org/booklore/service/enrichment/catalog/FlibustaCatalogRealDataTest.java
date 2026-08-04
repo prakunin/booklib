@@ -4,6 +4,10 @@ import org.booklore.service.ArchiveService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
+import tools.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -70,5 +74,38 @@ class FlibustaCatalogRealDataTest {
         assertThat(keys).isNotEmpty();
         assertThat(keys).contains(FlibustaAuthorKey.of("Хэндлер Дэниел"));
         assertThat(keys).allSatisfy(key -> assertThat(key).hasSize(32).matches("[0-9a-f]+"));
+    }
+
+    /**
+     * The assumption the whole {@code REVIEW} index shape rests on, checked rather than believed: a
+     * monthly review archive holds only that month's reviews, so a later archive adds to an earlier one
+     * instead of superseding it. The index therefore records every archive a key was seen in and the
+     * read side reads all of them. If this ever turns red — later archive containing the earlier one —
+     * then monthly archives have become cumulative snapshots and keeping only the last would be correct.
+     * <p>
+     * {@code fb2-091841-104214.zip#102773.fb2} is the catalog's most-reviewed book, present in 99 of the
+     * 228 monthly archives.
+     */
+    @Test
+    @EnabledIf("catalogReadable")
+    void monthlyReviewArchivesAreIncrementsNotSnapshots() {
+        String key = "fb2-091841-104214.zip#102773.fb2";
+        FlibustaReviewParser parser = new FlibustaReviewParser(new ObjectMapper());
+
+        List<CatalogReview> earliest = reviewsIn("200806.7z", key, parser);
+        List<CatalogReview> latest = reviewsIn("202601.7z", key, parser);
+
+        assertThat(earliest).isNotEmpty();
+        assertThat(latest).isNotEmpty();
+        assertThat(latest).doesNotContainAnyElementsOf(earliest);
+    }
+
+    private List<CatalogReview> reviewsIn(String container, String key, FlibustaReviewParser parser) {
+        try {
+            return parser.parse(archiveService.getEntryBytes(
+                    layout.reviewContainer(CATALOG_ROOT, container), key));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

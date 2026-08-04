@@ -103,6 +103,67 @@ class LocalCatalogIndexBuilderLanguageTest {
     }
 
     /**
+     * The only duplication the shipped catalog actually has: 75 keys are listed twice inside one
+     * language listing, as byte-identical rows. Every one of those rows used to become its own index
+     * row and collide on {@code uk_local_catalog_index}. Nothing is lost by keeping one — the two rows
+     * carry the same language.
+     */
+    @Test
+    void aBookListedTwiceInOneListingProducesOneRow() throws Exception {
+        when(archiveService.getEntryNames(catalogRoot.resolve("contents.7z"))).thenReturn(List.of("ru.txt"));
+        when(archiveService.getEntryBytes(catalogRoot.resolve("contents.7z"), "ru.txt"))
+                .thenReturn(("Толстой\tВойна и мир\t\tf.fb2-173909-177717.zip\t174393.fb2\n"
+                        + "Толстой\tВойна и мир\t\tf.fb2-173909-177717.zip\t174393.fb2\n")
+                        .getBytes(StandardCharsets.UTF_8));
+
+        LocalCatalogIndexBuilder.IndexResult result = builder.rebuild(7L);
+
+        assertThat(result.languages()).isEqualTo(1);
+        assertThat(savedRows.stream().filter(row -> row.getSourceType() == LocalCatalogSourceType.LANGUAGE).toList())
+                .extracting(LocalCatalogIndexEntity::getEntryKey, LocalCatalogIndexEntity::getPayload)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("f.fb2-173909-177717.zip#174393.fb2", "ru"));
+    }
+
+    /**
+     * No key in the shipped catalog is listed under two languages — measured across all 75 listings,
+     * zero of the 702,291 keys cross a language boundary — so this shape is defensive rather than
+     * observed. Should the data ever change, the first listing wins deterministically instead of the
+     * rebuild aborting, and the conflict is logged rather than swallowed. The listings deliberately
+     * carry different languages so an implementation that kept the later one fails here.
+     */
+    @Test
+    void keepsTheFirstListingWhenAKeyIsListedUnderTwoLanguages() throws Exception {
+        when(archiveService.getEntryBytes(catalogRoot.resolve("contents.7z"), "zh.txt"))
+                .thenReturn("Толстой\tWar and Peace\t\tf.fb2-173909-177717.zip\t174393.fb2\n"
+                        .getBytes(StandardCharsets.UTF_8));
+
+        LocalCatalogIndexBuilder.IndexResult result = builder.rebuild(7L);
+
+        assertThat(result.languages()).isEqualTo(1);
+        assertThat(savedRows.stream().filter(row -> row.getSourceType() == LocalCatalogSourceType.LANGUAGE).toList())
+                .extracting(LocalCatalogIndexEntity::getEntryKey, LocalCatalogIndexEntity::getPayload)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("f.fb2-173909-177717.zip#174393.fb2", "ru"));
+    }
+
+    @Test
+    void rebuildingTwiceLeavesTheSameLanguageRowsNotDuplicates() {
+        builder.rebuild(7L);
+        List<String> firstRunKeys = savedRows.stream()
+                .filter(row -> row.getSourceType() == LocalCatalogSourceType.LANGUAGE)
+                .map(LocalCatalogIndexEntity::getEntryKey)
+                .toList();
+        savedRows.clear();
+
+        builder.rebuild(7L);
+
+        assertThat(savedRows.stream().filter(row -> row.getSourceType() == LocalCatalogSourceType.LANGUAGE).toList())
+                .extracting(LocalCatalogIndexEntity::getEntryKey)
+                .containsExactlyInAnyOrderElementsOf(firstRunKeys);
+    }
+
+    /**
      * {@link FlibustaContentsParser#parse} wraps its whole read loop in a broad {@code catch (Exception)},
      * so a {@code saveAll} failure thrown from inside the consumer it drives would otherwise be swallowed
      * there and logged only as a row-read warning, with the pass reporting success regardless. This drives
