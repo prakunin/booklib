@@ -105,10 +105,36 @@ public class LocalCatalogIndexBuilder {
         }
     }
 
+    /**
+     * Whether this library's catalog has ever been walked.
+     * <p>
+     * Asked once per enriched book — {@link LocalCatalogIndexService#ensureIndexed} is called at the
+     * top of every book's enrichment, not only by the backfill — so it must be the cheapest question
+     * the database can answer, and {@code COUNT(*)} is not that question. Both forms are served by
+     * {@code uk_local_catalog_index} and both are covering, but a count has to walk every matching
+     * index entry, and on the dev library the first source type it asks about has 176,334 of them:
+     * <pre>
+     * SELECT count(*) … WHERE library_id=19 AND source_type='REVIEW'            41.6 / 40.0 / 45.8 ms
+     * SELECT 1        … WHERE library_id=19 AND source_type='REVIEW' LIMIT 1     0.25 / 0.12 / 0.11 ms
+     * </pre>
+     * The old form cost 45.4 ms per book, 57.7% of a measured 14,000-book backfill's wall clock, to
+     * establish something a single row settles. Spring Data's {@code exists} projection emits
+     * {@code LIMIT 1}.
+     * <p>
+     * The answer is deliberately <em>not</em> remembered between calls. A per-library memo would
+     * remove the query entirely, but it would also mean an index that later goes away — a rebuild
+     * that fails part-way, a manual truncate, a library repointed at another catalog — is never
+     * noticed, and every subsequent book silently enriches to nothing. Re-asking costs 0.16 ms and
+     * bounds that staleness at a single book.
+     * <p>
+     * The three source types are the ones a walk of the containers produces. {@code COMPILATION} is
+     * excluded on purpose: it comes from a single JSON document and can be present when the archive
+     * walk found nothing at all.
+     */
     public boolean isIndexed(long libraryId) {
-        return indexRepository.countByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.REVIEW) > 0
-                || indexRepository.countByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.AUTHOR_BIO) > 0
-                || indexRepository.countByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.LANGUAGE) > 0;
+        return indexRepository.existsByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.REVIEW)
+                || indexRepository.existsByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.AUTHOR_BIO)
+                || indexRepository.existsByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.LANGUAGE);
     }
 
     private Optional<Path> catalogRoot(long libraryId) {
