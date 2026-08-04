@@ -70,6 +70,19 @@ repositories {
     if (useLocalLibs) mavenLocal()
     mavenCentral()
     maven(url = "https://jitpack.io")
+    // Static, credential-free GitHub Pages Maven repo publishing the symbol-hidden epub4j build
+    // (see the epub4j comment block below for why that build exists). Declared for ALL builds, not
+    // just useLocalLibs ones, so CI and a fresh checkout resolve the same artifact.
+    //
+    // content { includeGroup(...) } is a guard, not a convenience: this is a third-party host
+    // serving unsigned artifacts, so it must never be consulted for anything but the group it
+    // exists to serve. It does NOT make org.grimmory exclusive to this repo -- mavenCentral is
+    // still allowed to serve that group, which is exactly why the declaration order below matters:
+    // org.grimmory:pdfium4j is found in an earlier repository, so this one is never contacted for
+    // it, and a prakunin.github.io outage cannot take pdfium4j resolution down with it.
+    maven(url = "https://prakunin.github.io/epub4j/maven/") {
+        content { includeGroup("org.grimmory") }
+    }
 }
 
 fun pdfiumNativesClassifier(): String {
@@ -188,27 +201,28 @@ val openApiExportRuntimeOnly by configurations.creating
 // pin moved to that version), not a bare "+".
 val pdfium4jVersion = libs.versions.pdfium4j.get()
 
-// epub4j-grimmory fork publishes as org.grimmory:epub4j-core.
-// useLocalLibs pins to this exact locally-published version rather than "+": mavenCentral also
-// publishes newer epub4j releases, and "+" resolves the highest version across ALL configured
-// repositories (mavenLocal does not win just because it's declared first) -- so a bare "+" here
-// would silently skip mavenLocal and pull a remote artifact instead of the local build under test.
-// 1.4.1 is a hand-patched build of the upstream 1.4.0 release that hides the vendored libarchive's
-// archive_* symbols so they stop colliding with the system libarchive at runtime -- see the
+// epub4j-grimmory fork publishes as org.grimmory:epub4j-core / :epub4j-native (native archive
+// parsing). The pinned version is NOT a plain upstream release: `1.4.0-symbols-hidden.1` is a
+// rebuild of the upstream 1.4.0 sources with hidden symbol visibility.
+//
+// WHY: upstream's libepub4j_native.so statically links its own libarchive, built without
+// lzma/bz2/zstd, and exports all 270 archive_* symbols globally. nightcompress can then bind to
+// that stripped copy instead of the system libarchive. It is a per-JVM coin flip, and in an
+// affected process every lzma-compressed catalog archive is unreadable. The rebuild exports 0
+// archive_* symbols, so no collision is possible. Diagnosis and the rebuild steps are in the
 // workspace's .superpowers/sdd/2026-08-03-local-catalog-backfill/task-11a-fix-report.md (this repo
-// checkout's parent directory, not tracked in this repo) for the diagnosis and the exact rebuild
-// steps. It exists ONLY in a dev container's
-// ~/.m2/repository/org/grimmory/{epub4j-core,epub4j-native}/1.4.1 -- there is no public release and
-// no CI equivalent. If that local repo is ever cleared, a useLocalLibs build fails with a bare
-// "could not find org.grimmory:epub4j-core:1.4.1"; recover by re-cloning/rebuilding per the fix
-// report (clone at ~/epub4j, branch fix/hide-vendored-symbols, then
-// `./gradlew :epub4j-native:publishToMavenLocal :epub4j-core:publishToMavenLocal -x verifyNativeClassifiers -x test -x check`).
-val epub4jLocalVersion = "1.4.1"
-val epub4jCoords = if (useLocalLibs) "org.grimmory:epub4j-core:$epub4jLocalVersion" else "org.grimmory:epub4j-core:${libs.versions.epub4j.get()}"
-
-// epub4j-native for native archive parsing
-val epub4jNativeVersion = libs.versions.epub4j.get()
-val epub4jNativeCoords = if (useLocalLibs) "org.grimmory:epub4j-native:$epub4jLocalVersion" else "org.grimmory:epub4j-native:$epub4jNativeVersion"
+// checkout's parent directory, not tracked in this repo).
+//
+// WHERE: published to https://prakunin.github.io/epub4j/maven/ (declared in `repositories` above)
+// from the fork github.com/prakunin/epub4j, branch fix/hide-vendored-symbols, tag
+// v1.4.0-symbols-hidden.1. The artifacts are unsigned and the host is a personal GitHub Pages site.
+//
+// RETIRES WHEN: upstream PR grimmory-tools/epub4j#39 is merged AND released. At that point set this
+// version to that upstream release and delete the prakunin.github.io repository declaration above;
+// nothing else here depends on the fork.
+val epub4jVersion = libs.versions.epub4j.get()
+val epub4jCoords = "org.grimmory:epub4j-core:$epub4jVersion"
+val epub4jNativeCoords = "org.grimmory:epub4j-native:$epub4jVersion"
 
 dependencies {
     // --- Spring Boot ---
@@ -336,18 +350,19 @@ dependencyManagement {
     }
 }
 
-// Dependency locking pins every configuration to backend/gradle.lockfile, which records the
-// normal (mavenCentral) epub4j/pdfium4j coordinates. A useLocalLibs build intentionally resolves
-// different versions from mavenLocal, so it would fail lock verification through no fault of its
-// own; skip locking for that opt-in local-dev mode rather than let the lockfile fight the override.
-// NOTE: this disables lock verification for the WHOLE classpath under useLocalLibs, not just
-// epub4j/pdfium4j -- today those are the only two dependencies with a dynamic/local-override
-// version, but any dependency added later that resolves a version under useLocalLibs gets no
-// lock protection and no warning while this flag is set.
-if (!useLocalLibs) {
-    dependencyLocking {
-        lockAllConfigurations()
-    }
+// Dependency locking pins every configuration to backend/gradle.lockfile. This used to be scoped to
+// !useLocalLibs builds, because useLocalLibs deliberately resolved a different epub4j version from
+// mavenLocal and so could not satisfy the lock through no fault of its own. That is no longer true:
+// epub4j and pdfium4j are both pinned to exact versions that resolve identically with and without
+// useLocalLibs, and no dependency in this build uses a dynamic version ("+", a range, or
+// latest.release). useLocalLibs now only changes WHICH repository serves a module, never which
+// version -- and lock verification checks versions -- so locking applies unconditionally and every
+// build, local or CI, gets lock protection.
+// If a dynamic or local-override version is ever reintroduced, do NOT re-add a blanket
+// `if (!useLocalLibs)` guard: it disables lock verification for the WHOLE classpath, silently and
+// without warning, not just for the dependency that needed the exception.
+dependencyLocking {
+    lockAllConfigurations()
 }
 
 hibernate {
