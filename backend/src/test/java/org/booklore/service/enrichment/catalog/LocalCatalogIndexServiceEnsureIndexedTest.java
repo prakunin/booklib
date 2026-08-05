@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -186,7 +187,6 @@ class LocalCatalogIndexServiceEnsureIndexedTest {
 
         @Test
         void buildsNothingWhileAnotherRunHoldsTheLibrarySlot() {
-            when(indexBuilder.rebuild(LIBRARY_ID)).thenReturn(new LocalCatalogIndexBuilder.IndexResult(1, 1, 1, 1, 1));
             service.rebuildAsync(LIBRARY_ID);
 
             Optional<LocalCatalogIndexBuilder.IndexResult> result = service.rebuildNow(LIBRARY_ID);
@@ -196,8 +196,7 @@ class LocalCatalogIndexServiceEnsureIndexedTest {
         }
 
         /**
-         * And it releases the slot again, so a refusal is never permanent. The {@code finally} that
-         * does the releasing is easy to lose alongside the guard it protects.
+         * And it releases the slot again, so a refusal is never permanent.
          */
         @Test
         void releasesTheSlotOnceTheRebuildReturns() {
@@ -207,6 +206,26 @@ class LocalCatalogIndexServiceEnsureIndexedTest {
 
             assertThat(service.isRunning(LIBRARY_ID)).isFalse();
             assertThat(service.rebuildNow(LIBRARY_ID)).isPresent();
+        }
+
+        /**
+         * The case that actually pins the {@code finally} down. A {@code running.remove(libraryId)}
+         * written as a plain statement before the return releases the slot just as well on the happy
+         * path, so {@link #releasesTheSlotOnceTheRebuildReturns()} passes either way and says nothing
+         * about the construct it claims to protect. Only a rebuild that throws can tell the two apart
+         * — and it is the throwing case that matters, because that is where a leaked slot turns into
+         * a library whose backfill refuses to start, permanently, until the JVM restarts.
+         */
+        @Test
+        void releasesTheSlotWhenTheRebuildThrows() {
+            when(indexBuilder.rebuild(LIBRARY_ID))
+                    .thenThrow(new IllegalStateException("catalog archive disappeared mid-rebuild"));
+
+            assertThatThrownBy(() -> service.rebuildNow(LIBRARY_ID))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("catalog archive disappeared mid-rebuild");
+
+            assertThat(service.isRunning(LIBRARY_ID)).isFalse();
         }
     }
 }
