@@ -76,6 +76,20 @@ public class LocalCatalogIndexService {
      * genuinely has nothing for, and is never revisited — a completed run is never automatically run
      * again, and {@code AUTO_IF_EMPTY} leaves no trace that anything was missed. Waiting 2m20s once,
      * at the start of a multi-hour run, costs nothing by comparison.
+     * <p>
+     * The running check comes <strong>before</strong> the {@code isIndexed} check, and the order is
+     * load-bearing. {@link LocalCatalogIndexBuilder#isIndexed} is satisfied by {@code REVIEW} rows
+     * alone, and {@link LocalCatalogIndexBuilder#rebuild} writes {@code REVIEW} first — so from the
+     * moment a rebuild started elsewhere flushes its first {@code REVIEW} batch, "some rows exist"
+     * answers yes while {@code AUTHOR_BIO}, {@code COMPILATION} and {@code LANGUAGE} are still absent
+     * or mid-{@code deleteByLibraryIdAndSourceType}. Asking {@code isIndexed} first would hand the
+     * walk exactly the partial index this method exists to refuse. Concurrent rebuilds are not
+     * hypothetical here: {@code EnrichmentPipeline} calls {@link #ensureIndexed} at the top of every
+     * book on the queue-driven path, which the INPX import budget now reliably feeds, and
+     * {@code EnrichmentController} exposes a manual rebuild.
+     * <p>
+     * {@link #rebuildNow}'s own empty result stays as the second line of defence, for a rebuild that
+     * starts between this check and that call.
      *
      * @return true when the index is ready to be read; false when a rebuild started elsewhere is
      * already in flight, in which case this call did not build anything and the caller must not
@@ -83,6 +97,9 @@ public class LocalCatalogIndexService {
      * prevent, and there is no safe point at which to join a build already under way.
      */
     public boolean ensureIndexedNow(long libraryId) {
+        if (isRunning(libraryId)) {
+            return false;
+        }
         if (indexBuilder.isIndexed(libraryId)) {
             return true;
         }

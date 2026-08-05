@@ -130,10 +130,20 @@ class LocalCatalogIndexServiceEnsureIndexedTest {
          * A rebuild started elsewhere holds the per-library slot, so this call builds nothing and must
          * say so. Returning true here would let the backfill walk against somebody else's half-written
          * index, which is the failure the blocking form exists to prevent.
+         * <p>
+         * {@code isIndexed} is stubbed <strong>true</strong>, and that is the whole point of the test.
+         * {@link LocalCatalogIndexBuilder#isIndexed} is satisfied by {@code REVIEW} rows alone, and a
+         * rebuild writes {@code REVIEW} first — so the moment the other run flushes its first REVIEW
+         * batch, "some rows exist" and "the index is ready" stop being the same statement. Stubbing it
+         * false, as this test first did, describes only a library nobody has ever indexed and cannot
+         * see the ordering defect at all: an {@code isIndexed}-first implementation passes that version
+         * and still hands the 702k walk a catalog whose AUTHOR_BIO, COMPILATION and LANGUAGE rows are
+         * absent or mid-{@code deleteByLibraryIdAndSourceType}. The running guard therefore has to come
+         * first, and this asserts that it does.
          */
         @Test
-        void reportsNotReadyWhenARebuildIsAlreadyInFlight() {
-            when(indexBuilder.isIndexed(LIBRARY_ID)).thenReturn(false);
+        void reportsNotReadyWhenARebuildIsAlreadyInFlightEvenThoughSomeRowsExist() {
+            when(indexBuilder.isIndexed(LIBRARY_ID)).thenReturn(true);
             service.rebuildAsync(LIBRARY_ID);
 
             boolean ready = service.ensureIndexedNow(LIBRARY_ID);
