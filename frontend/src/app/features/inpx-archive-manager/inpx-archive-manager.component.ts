@@ -15,6 +15,32 @@ import {DialogLauncherService} from '../../shared/services/dialog-launcher.servi
 import {TaskProgressPayload, TaskService, TaskStatus, TaskType} from '../settings/task-management/task.service';
 import {AppButtonComponent} from '../../shared/ui/button/app-button.component';
 
+/**
+ * Task ids whose FAILED frame has already been shown to the user, and the reason it lives at module
+ * scope rather than on the component. `TaskService.taskProgress$` is a `BehaviorSubject` that nothing
+ * ever resets, so it replays the last frame of the last run to every new subscriber — and this
+ * component subscribes in its constructor. A component field would be wiped by the very remount that
+ * replays the frame, so the same toast came back on every navigation into the panel, for a run that
+ * had ended long before. The cost is one short string per failed backfill run per browser session.
+ */
+const reportedBackfillFailures = new Set<string>();
+
+/**
+ * What `LocalCatalogBackfillTask.reportFailure` puts on the wire when the exception it caught carries
+ * no message: it builds the frame as a fixed prefix plus `getMessage()`, which is null for plenty of
+ * runtime exceptions, and concatenation turns that into the literal word "null". The whole frame is
+ * matched rather than the word searched for, so a genuine reason that happens to mention null is
+ * still shown.
+ */
+const BACKFILL_FAILURE_WITHOUT_REASON = /^Local catalog backfill failed:(\s*null)?$/;
+
+/**
+ * A failed backfill's toast carries a full sentence of explanation about a job that may have run for
+ * hours, so it gets the longest life this codebase uses for a toast — the same one
+ * `TaskHelperService` gives its task-start failures. Nothing here is sticky; no toast in the app is.
+ */
+const FAILURE_TOAST_LIFE_MS = 5000;
+
 @Component({
   selector: 'app-inpx-archive-manager',
   standalone: true,
@@ -66,16 +92,34 @@ export class InpxArchiveManagerComponent {
         // again once indexing has finished") would then be indistinguishable from a completed run.
         // Toasting it is what keeps the two apart; `detail` is the backend's own text rather than a
         // translated string because it names the library and the state that caused the refusal.
-        if (progress.taskStatus === TaskStatus.FAILED) {
+        // Guarded by `reportedBackfillFailures` because the frame is replayed to every later
+        // subscriber, and a run is worth telling the user about exactly once.
+        if (progress.taskStatus === TaskStatus.FAILED && !reportedBackfillFailures.has(progress.taskId)) {
+          reportedBackfillFailures.add(progress.taskId);
           this.messages.add({
             severity: 'error',
             summary: this.t.translate('book.inpxArchives.localCatalog.backfillRunFailed'),
-            detail: progress.message,
+            detail: this.failureDetail(progress.message),
+            life: FAILURE_TOAST_LIFE_MS,
           });
         }
         this.loadLocalCatalogStatus();
       }
     });
+  }
+
+  /**
+   * The backend's own text wins when there is any, because it names the library and the state that
+   * caused the refusal — but it is not always text. When the frame is empty, blank, or has collapsed
+   * to the bare prefix with a null message behind it, a translated line in the user's own language is
+   * strictly better than showing them the word "null".
+   */
+  private failureDetail(message: string | null | undefined): string {
+    const text = message?.trim() ?? '';
+    if (!text || BACKFILL_FAILURE_WITHOUT_REASON.test(text)) {
+      return this.t.translate('book.inpxArchives.localCatalog.backfillRunFailedNoReason');
+    }
+    return text;
   }
 
   loadLocalCatalogStatus(): void {

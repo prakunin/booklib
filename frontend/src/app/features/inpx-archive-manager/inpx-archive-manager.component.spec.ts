@@ -1,7 +1,7 @@
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, Router} from '@angular/router';
 import {MessageService} from 'primeng/api';
-import {Observable, of, Subject} from 'rxjs';
+import {BehaviorSubject, Observable, of, Subject} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {getTranslocoModule} from '../../core/testing/transloco-testing';
 import {InpxArchiveManagerComponent} from './inpx-archive-manager.component';
@@ -11,6 +11,15 @@ import {DialogLauncherService} from '../../shared/services/dialog-launcher.servi
 import {TaskProgressPayload, TaskService, TaskStatus, TaskType} from '../settings/task-management/task.service';
 
 describe('InpxArchiveManagerComponent', () => {
+  /**
+   * The exact text that reaches the browser when the backfill refuses to start against an index
+   * somebody else is rebuilding. `LocalCatalogBackfillService.run` raises the sentence;
+   * `LocalCatalogBackfillTask.reportFailure` prefixes it before putting it on the wire, and the
+   * prefix is part of what the user reads, so the fixture carries it too.
+   */
+  const REFUSAL_FRAME = 'Local catalog backfill failed: The local catalog index for library 7 is being rebuilt; '
+    + 'start the backfill again once indexing has finished';
+
   const archive: InpxArchive = {
     archiveName: 'new.zip',
     sizeBytes: 2 * 1024 * 1024,
@@ -64,9 +73,15 @@ describe('InpxArchiveManagerComponent', () => {
     add: vi.fn(),
   };
 
-  function backfillFrame(taskStatus: TaskStatus, message: string): TaskProgressPayload {
+  /**
+   * The task id is a parameter because the component now reports a given run's failure once and only
+   * once, and it remembers that across component instances — a component field would be wiped by the
+   * very remount whose replayed toast is the defect. Each case that toasts therefore uses an id of
+   * its own, so the cases stay independent of the order they run in.
+   */
+  function backfillFrame(taskStatus: TaskStatus, message: string, taskId = 't1'): TaskProgressPayload {
     return {
-      taskId: 't1',
+      taskId,
       taskType: TaskType.LOCAL_CATALOG_BACKFILL,
       message,
       progress: 3,
@@ -149,7 +164,6 @@ describe('InpxArchiveManagerComponent', () => {
    * that carries it. Without a toast a refused run looks exactly like a finished one.
    */
   it('surfaces the reason a backfill run failed once its terminal frame arrives', () => {
-    const refusal = 'The local catalog index for library 7 is being rebuilt; start the backfill again once indexing has finished';
     const progress = new Subject<TaskProgressPayload | null>();
     taskService.taskProgress$ = progress;
     const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
@@ -159,15 +173,69 @@ describe('InpxArchiveManagerComponent', () => {
     progress.next(backfillFrame(TaskStatus.IN_PROGRESS, 'Walking 702511 books'));
     expect(fixture.componentInstance.backfillRunning()).toBe(true);
 
-    progress.next(backfillFrame(TaskStatus.FAILED, refusal));
+    progress.next(backfillFrame(TaskStatus.FAILED, REFUSAL_FRAME));
 
     expect(fixture.componentInstance.backfillRunning()).toBe(false);
     expect(messageService.add).toHaveBeenCalledWith({
       severity: 'error',
       summary: 'The local catalog backfill stopped.',
-      detail: refusal,
+      detail: REFUSAL_FRAME,
+      life: 5000,
     });
     expect(archiveService.getLocalCatalogStatus).toHaveBeenCalledWith(7);
+    fixture.destroy();
+  });
+
+  /**
+   * `TaskService.taskProgress$` is a `BehaviorSubject` and nothing ever pushes a null frame back into
+   * it, so it hands every later subscriber the last frame of the last run at the moment it
+   * subscribes. This component subscribes in its constructor, so once a run had ended FAILED, every
+   * navigation back into the archive manager replayed that frame and popped its toast again — for a
+   * run the user was told about once already, possibly hours earlier.
+   *
+   * The subject here is a `BehaviorSubject` rather than the plain `Subject` the cases above use, and
+   * that is the whole point: a plain `Subject` does not replay, so it cannot reproduce this at all,
+   * which is why the existing cases were blind to it.
+   */
+  it('does not repeat a failure toast when the archive manager is opened again', () => {
+    const progress = new BehaviorSubject<TaskProgressPayload | null>(null);
+    taskService.taskProgress$ = progress;
+
+    const first = TestBed.createComponent(InpxArchiveManagerComponent);
+    first.detectChanges();
+    progress.next(backfillFrame(TaskStatus.FAILED, REFUSAL_FRAME, 't2'));
+    expect(messageService.add).toHaveBeenCalledTimes(1);
+    first.destroy();
+
+    messageService.add.mockClear();
+    const second = TestBed.createComponent(InpxArchiveManagerComponent);
+    second.detectChanges();
+
+    expect(second.componentInstance.backfillProgress()?.taskStatus).toBe(TaskStatus.FAILED);
+    expect(messageService.add).not.toHaveBeenCalled();
+    second.destroy();
+  });
+
+  /**
+   * `LocalCatalogBackfillTask.reportFailure` builds the frame as a fixed prefix plus
+   * `RuntimeException.getMessage()`, and that is null for plenty of exceptions — an NPE, for one — so
+   * string concatenation puts the literal word "null" in front of the user. A translated generic line
+   * says no less and reads like the product rather than like a stack trace.
+   */
+  it('falls back to a translated line when the failure frame carries no reason', () => {
+    const progress = new Subject<TaskProgressPayload | null>();
+    taskService.taskProgress$ = progress;
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.detectChanges();
+
+    progress.next(backfillFrame(TaskStatus.FAILED, 'Local catalog backfill failed: null', 't3'));
+
+    expect(messageService.add).toHaveBeenCalledWith({
+      severity: 'error',
+      summary: 'The local catalog backfill stopped.',
+      detail: 'It stopped without reporting a reason. The server log records what happened.',
+      life: 5000,
+    });
     fixture.destroy();
   });
 

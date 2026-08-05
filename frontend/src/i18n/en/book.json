@@ -319,7 +319,8 @@
       "runBackfill": "Run local catalog backfill",
       "backfillQueued": "Local catalog backfill queued.",
       "backfillFailed": "Could not start the local catalog backfill.",
-      "backfillRunFailed": "The local catalog backfill stopped."
+      "backfillRunFailed": "The local catalog backfill stopped.",
+      "backfillRunFailedNoReason": "It stopped without reporting a reason. The server log records what happened."
     },
     "phases": {
       "QUEUED": "Waiting",
