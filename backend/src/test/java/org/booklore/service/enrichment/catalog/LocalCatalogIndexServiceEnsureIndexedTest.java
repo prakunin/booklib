@@ -5,9 +5,11 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -150,6 +152,61 @@ class LocalCatalogIndexServiceEnsureIndexedTest {
 
             assertThat(ready).isFalse();
             verify(indexBuilder, never()).rebuild(LIBRARY_ID);
+        }
+
+        /**
+         * The same refusal for a library nobody has ever indexed. This is the weaker of the two
+         * in-flight cases — the running guard answers it before {@code isIndexed} is ever consulted —
+         * but it is the one a reader assumes is covered, and leaving it out invites somebody to
+         * "simplify" the guard back behind the {@code isIndexed} check on the grounds that the
+         * never-indexed path is untested.
+         */
+        @Test
+        void reportsNotReadyWhenARebuildIsAlreadyInFlightAndNothingHasBeenIndexedYet() {
+            when(indexBuilder.isIndexed(LIBRARY_ID)).thenReturn(false);
+            service.rebuildAsync(LIBRARY_ID);
+
+            boolean ready = service.ensureIndexedNow(LIBRARY_ID);
+
+            assertThat(ready).isFalse();
+            verify(indexBuilder, never()).rebuild(anyLong());
+        }
+    }
+
+    /**
+     * {@code rebuildNow}'s own {@code putIfAbsent} is the last thing standing between two threads and
+     * a pair of concurrent rebuilds writing the same rows, and it has to be tested here rather than
+     * through {@code ensureIndexedNow}: since the running guard moved to the front of that method,
+     * no call through it can reach this one with the slot already held, so an {@code ensureIndexedNow}
+     * test cannot see whether this guard exists at all. Deleting it used to leave the whole suite
+     * green, which is how it came to be deleted-able in the first place.
+     */
+    @Nested
+    class RebuildNow {
+
+        @Test
+        void buildsNothingWhileAnotherRunHoldsTheLibrarySlot() {
+            when(indexBuilder.rebuild(LIBRARY_ID)).thenReturn(new LocalCatalogIndexBuilder.IndexResult(1, 1, 1, 1, 1));
+            service.rebuildAsync(LIBRARY_ID);
+
+            Optional<LocalCatalogIndexBuilder.IndexResult> result = service.rebuildNow(LIBRARY_ID);
+
+            assertThat(result).isEmpty();
+            verify(indexBuilder, never()).rebuild(anyLong());
+        }
+
+        /**
+         * And it releases the slot again, so a refusal is never permanent. The {@code finally} that
+         * does the releasing is easy to lose alongside the guard it protects.
+         */
+        @Test
+        void releasesTheSlotOnceTheRebuildReturns() {
+            when(indexBuilder.rebuild(LIBRARY_ID)).thenReturn(new LocalCatalogIndexBuilder.IndexResult(1, 1, 1, 1, 1));
+
+            assertThat(service.rebuildNow(LIBRARY_ID)).isPresent();
+
+            assertThat(service.isRunning(LIBRARY_ID)).isFalse();
+            assertThat(service.rebuildNow(LIBRARY_ID)).isPresent();
         }
     }
 }
