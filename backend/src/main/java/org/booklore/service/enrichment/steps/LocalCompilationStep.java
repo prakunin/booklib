@@ -30,6 +30,19 @@ import java.util.List;
  * shipped catalog repeat — and there is no confident way to pick a winner among them, so the step
  * contributes nothing rather than guess. The memberships themselves stay in the local catalog index
  * either way, for a future UI to offer as a choice.
+ * <p>
+ * <strong>The catalog's {@code part} is a 0-based index; BookLib series numbers are 1-based</strong>,
+ * so the index is shifted by one on the way in. Measured against the shipped catalog
+ * ({@code compilations.json}, 17,398 compilations, 78,907 part keys): every single compilation has a
+ * minimum part of 0 — the histogram of minimum-part-per-compilation is {@code [(0, 17398)]}, and the
+ * overall part histogram runs {@code 0→17398, 1→27001, 2→21044, 3→15090, …}. Writing the raw index
+ * would have numbered the first constituent work of every omnibus "0" and every other work one lower
+ * than its true position, under {@code AUTO_IF_EMPTY} where nothing later contradicts it.
+ * <p>
+ * Note that {@code FlibustaCompilationParser} defaults a missing {@code part} field to 0
+ * ({@code part.path("part").asInt(0)}), so a malformed entry is treated as the first work of its
+ * omnibus and lands on series number 1. That is the correct floor for a 1-based number: the previous
+ * behaviour put such an entry at 0, which is not a valid series position at all.
  */
 @Slf4j
 @Component
@@ -80,7 +93,7 @@ public class LocalCompilationStep implements EnrichmentStepHandler {
                 BookMetadata.builder()
                         .bookId(context.bookId())
                         .seriesName(seriesName)
-                        .seriesNumber((float) found.part())
+                        .seriesNumber((float) (found.part() + 1))
                         .build(),
                 EnrichmentConfidence.HIGH);
         context.note("Local catalog placed this book in the compilation " + seriesName);
