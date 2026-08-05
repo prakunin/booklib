@@ -1,8 +1,6 @@
 package org.booklore.model.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import org.booklore.model.enums.TaskType;
 import org.booklore.task.options.LibraryRescanOptions;
 import org.booklore.task.options.LocalCatalogBackfillOptions;
@@ -10,6 +8,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.exc.InvalidTypeIdException;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -27,10 +28,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * elsewhere construct the DTO directly in Java and so never exercise real deserialization, and the
  * frontend spec mocks the HTTP call. Only a round trip through a real {@link ObjectMapper} — the
  * same one Spring uses to parse the request body — would have caught it.
+ * <p>
+ * The mapper is deliberately {@code tools.jackson.databind} (Jackson 3), not
+ * {@code com.fasterxml.jackson.databind} (Jackson 2). This backend runs on Jackson 3
+ * ({@code build.gradle.kts} pulls {@code tools.jackson.core:jackson-databind}, and every mapper in
+ * main source is the Jackson 3 one), so a Jackson 2 mapper here would exercise a different
+ * polymorphic-deserialization implementation from the one Spring uses on the request body — a
+ * regression test for a deserialization defect proving something about a library the application does
+ * not parse with. Jackson 2 databind is also only on the test classpath transitively. The
+ * {@code @JsonSubTypes}/{@code @JsonTypeInfo} annotations stay in {@code com.fasterxml.jackson.annotation}:
+ * Jackson 3 kept the annotations package, and only databind moved.
  */
 class TaskCreateRequestTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     @Test
     void deserializesLocalCatalogBackfillOptions() throws Exception {
