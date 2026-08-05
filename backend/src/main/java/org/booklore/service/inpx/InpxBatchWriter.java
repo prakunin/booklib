@@ -128,7 +128,7 @@ public class InpxBatchWriter {
             books.forEach(entityManager::detach);
         }
         registerCachePromotion(caches, pendingAuthors, pendingCategories);
-        queueLocalEnrichment(books.stream().map(BookEntity::getId).toList());
+        queueLocalEnrichment(caches, books.stream().map(BookEntity::getId).toList());
         return new BatchResult(books.size(), skipped);
     }
 
@@ -202,6 +202,15 @@ public class InpxBatchWriter {
      * Newly scanned books go through the ordinary queue rather than the whole-library backfill: a
      * scan adds a handful at a time, and the queue already owns retries, deduplication and priority.
      * <p>
+     * "A handful" is the justification, so it is also the limit. {@link InpxScanCaches} carries a
+     * per-scan budget ({@link InpxScanCaches#maxEnrichmentQueueBooks()}) and a scan that exceeds it —
+     * a first import, where every record is new — stops queueing and leaves the rest to the
+     * per-library backfill task, which is the tool built for that volume. Without the budget a
+     * 702,511-book import enqueued about 24 days of work at the worker's five-books-per-fifteen-seconds
+     * drain rate, plus a {@code findOutstandingForBook} SELECT and an INSERT per book on the import's
+     * hot path. A rescan of an already imported library is unaffected: its handful of genuinely new
+     * books is far inside the budget.
+     * <p>
      * Deferred to after commit, same as {@link #registerCachePromotion}, and for the same reason
      * plus one more: {@link EnrichmentQueueService#enqueue} is itself {@code @Transactional}. Calling
      * it while this method's {@code REQUIRES_NEW} transaction is still open would make it join that
@@ -209,19 +218,39 @@ public class InpxBatchWriter {
      * before this method's {@code catch} ever runs — silently turning a queueing hiccup into lost
      * books. Running it only once the batch has actually committed keeps the two failure domains
      * apart, at the cost of a second, independent commit for the queue rows.
+     * <p>
+     * The budget is claimed here, before the commit hook, rather than inside it: the claim is what
+     * decides which ids are carried into the hook, and it must happen in the scanner's own call order
+     * so that batches consume the budget in the order they were written.
      */
-    private void queueLocalEnrichment(List<Long> bookIds) {
+    private void queueLocalEnrichment(InpxScanCaches caches, List<Long> bookIds) {
         if (bookIds.isEmpty()) {
             return;
         }
+        boolean alreadyExhausted = caches.isEnrichmentQueueBudgetExhausted();
+        int granted = caches.claimEnrichmentQueueSlots(bookIds.size());
+        if (!alreadyExhausted && granted < bookIds.size()) {
+            log.warn("This scan has queued {} books for local enrichment, its whole budget; the {} "
+                            + "remaining books of this batch and every later one are left to the "
+                            + "per-library local catalog backfill task, which is built for bulk",
+                    InpxScanCaches.maxEnrichmentQueueBooks(), bookIds.size() - granted);
+        }
+        if (granted == 0) {
+            return;
+        }
+        // ArrayList, not List.copyOf: the copy is only here to snapshot the sub-list view for the
+        // deferred hook, and List.copyOf would reject a null id outside doQueueLocalEnrichment's
+        // catch — turning what has always been a swallowed, logged queueing failure into a thrown
+        // one that rolls the whole scan batch back.
+        List<Long> queued = new ArrayList<>(bookIds.subList(0, granted));
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            doQueueLocalEnrichment(bookIds);
+            doQueueLocalEnrichment(queued);
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                doQueueLocalEnrichment(bookIds);
+                doQueueLocalEnrichment(queued);
             }
         });
     }
