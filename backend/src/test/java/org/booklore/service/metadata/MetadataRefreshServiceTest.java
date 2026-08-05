@@ -62,6 +62,7 @@ class MetadataRefreshServiceTest {
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private AuthenticationService authenticationService;
     @Mock private TaskCancellationManager cancellationManager;
+    @Mock private MetadataProposalProvenanceService proposalProvenanceService;
 
     @InjectMocks
     private MetadataRefreshService service;

@@ -50,4 +50,15 @@ public class MetadataFetchProposalEntity {
     @LazyGroup("lob")
     @Column(name = "metadata_json", columnDefinition = "JSON")
     private String metadataJson;
+
+    /**
+     * Which provider supplied each field this proposal would actually change, kept so the accept can
+     * file provenance rows the client-replayed PUT cannot carry. Server-side only: no DTO or mapper
+     * exposes it, so it can neither be read nor asserted by a client.
+     */
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @LazyGroup("lob")
+    @Column(name = "field_providers_json", columnDefinition = "JSON")
+    private String fieldProvidersJson;
 }

@@ -28,6 +28,7 @@ public class MetadataTaskService {
     private final MetadataFetchProposalRepository proposalRepository;
     private final FetchedProposalMapper fetchedProposalMapper;
     private final AuthenticationService authenticationService;
+    private final MetadataProposalProvenanceService proposalProvenanceService;
 
     @Transactional(readOnly = true)
     public Optional<MetadataTaskDetailsResponse> getTaskWithProposals(String taskId) {
@@ -65,6 +66,11 @@ public class MetadataTaskService {
                 .orElse(false);
     }
 
+    /**
+     * The existing transaction now also covers filing provenance rows, which reads the proposal's lazy
+     * JSON columns and writes to a second table: the status change and the attribution stand or fall
+     * together.
+     */
     @Transactional
     public boolean updateProposalStatus(String taskId, Long proposalId, String statusStr) {
         Long userId = authenticationService.getAuthenticatedUser().getId();
@@ -76,6 +82,11 @@ public class MetadataTaskService {
                     proposal.setReviewedAt(Instant.now());
                     proposal.setReviewerUserId(userId);
                     proposalRepository.save(proposal);
+                    if (fetchedMetadataProposalStatus == FetchedMetadataProposalStatus.ACCEPTED) {
+                        // The client has already replayed the accepted values through the metadata PUT,
+                        // which carries no providers; this is the only place that can attribute them.
+                        proposalProvenanceService.recordAcceptedProposal(proposal);
+                    }
                     return true;
                 })
                 .orElse(false)).orElse(false);

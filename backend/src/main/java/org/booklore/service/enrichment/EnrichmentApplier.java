@@ -12,6 +12,7 @@ import org.booklore.model.enums.MetadataFetchTaskStatus;
 import org.booklore.repository.AuthorRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.MetadataFetchJobRepository;
+import org.booklore.service.metadata.MetadataProposalProvenanceService;
 import org.booklore.service.metadata.MetadataRefreshService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class EnrichmentApplier {
     private final MetadataFetchJobRepository jobRepository;
     private final MetadataRefreshService metadataRefreshService;
     private final ObjectMapper objectMapper;
+    private final MetadataProposalProvenanceService proposalProvenanceService;
 
     @Transactional
     public void apply(EnrichmentContext context, EnrichmentOutcome outcome) {
@@ -84,6 +86,8 @@ public class EnrichmentApplier {
                     .job(job)
                     .bookId(context.bookId())
                     .metadataJson(objectMapper.writeValueAsString(outcome.getProposed()))
+                    .fieldProvidersJson(proposalProvenanceService.describeChanges(
+                            outcome.getProposed(), context.getBook() == null ? null : context.getBook().getMetadata()))
                     .status(FetchedMetadataProposalStatus.FETCHED)
                     .fetchedAt(Instant.now())
                     .build());

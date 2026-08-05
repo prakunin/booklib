@@ -42,6 +42,8 @@ class MetadataTaskServiceTest {
 
     @Mock
     private AuthenticationService authenticationService;
+    @Mock
+    private MetadataProposalProvenanceService proposalProvenanceService;
 
     @InjectMocks
     private MetadataTaskService service;

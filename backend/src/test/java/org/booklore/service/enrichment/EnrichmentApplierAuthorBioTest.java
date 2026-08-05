@@ -10,6 +10,7 @@ import org.booklore.model.entity.AuthorEntity;
 import org.booklore.repository.AuthorRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.MetadataFetchJobRepository;
+import org.booklore.service.metadata.MetadataProposalProvenanceService;
 import org.booklore.service.metadata.MetadataRefreshService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,13 +54,15 @@ class EnrichmentApplierAuthorBioTest {
     private MetadataFetchJobRepository jobRepository;
     @Mock
     private MetadataRefreshService metadataRefreshService;
+    @Mock
+    private MetadataProposalProvenanceService proposalProvenanceService;
 
     private EnrichmentApplier applier;
 
     @BeforeEach
     void setUp() {
         applier = new EnrichmentApplier(bookRepository, authorRepository, jobRepository,
-                metadataRefreshService, new ObjectMapper());
+                metadataRefreshService, new ObjectMapper(), proposalProvenanceService);
     }
 
     private EnrichmentContext contextWithBio(String authorName, String bio) {

@@ -1,6 +1,6 @@
 package org.booklore.service.metadata;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.booklore.model.dto.Book;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.entity.BookMetadataFieldSourceEntity;
@@ -165,7 +165,7 @@ class BookMetadataFieldSourceServiceTest {
         private final ObjectMapper objectMapper = new ObjectMapper();
 
         @Test
-        void serialisesTheSourcesSoTheUiCanReadThem() throws Exception {
+        void serialisesTheSourcesSoTheUiCanReadThem() {
             BookMetadata metadata = BookMetadata.builder()
                     .bookId(7L)
                     .fieldSources(Map.of(MetadataField.TITLE, MetadataProvider.FlibustaLocal))
@@ -176,7 +176,7 @@ class BookMetadataFieldSourceServiceTest {
         }
 
         @Test
-        void refusesProvenanceAssertedByAClientOnTheWayIn() throws Exception {
+        void refusesProvenanceAssertedByAClientOnTheWayIn() {
             String forged = "{\"bookId\":7,\"fieldSources\":{\"TITLE\":\"GoodReads\"}}";
 
             BookMetadata deserialised = objectMapper.readValue(forged, BookMetadata.class);
@@ -186,7 +186,7 @@ class BookMetadataFieldSourceServiceTest {
         }
 
         @Test
-        void staysOutOfTheJsonEntirelyWhenNothingAttachedIt() throws Exception {
+        void staysOutOfTheJsonEntirelyWhenNothingAttachedIt() {
             BookMetadata metadata = BookMetadata.builder().bookId(7L).build();
 
             assertThat(objectMapper.writeValueAsString(metadata)).doesNotContain("fieldSources");

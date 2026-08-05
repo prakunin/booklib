@@ -63,6 +63,7 @@ public class MetadataRefreshService {
     private final PlatformTransactionManager transactionManager;
     private final AuthenticationService authenticationService;
     private final TaskCancellationManager cancellationManager;
+    private final MetadataProposalProvenanceService proposalProvenanceService;
 
 
     public void refreshMetadata(MetadataRefreshRequest request, String jobId) {
@@ -240,7 +241,7 @@ public class MetadataRefreshService {
     private void applyFetchedMetadata(MetadataFetchJobEntity task, BookEntity book, BookMetadata fetched,
                                       MetadataRefreshOptions refreshOptions, boolean bookReviewMode) throws JacksonException {
         if (bookReviewMode) {
-            saveProposal(task, book.getId(), fetched);
+            saveProposal(task, book, fetched);
         } else {
             // Use the replaceMode from options - allows user to control whether to replace existing or only fill missing
             MetadataReplaceMode replaceMode = refreshOptions.getReplaceMode() != null
@@ -354,11 +355,17 @@ public class MetadataRefreshService {
         sendBatchProgressNotification(task.getTaskId(), task.getCompletedBooks(), task.getTotalBooksCount(), "Task cancelled by user", MetadataFetchTaskStatus.CANCELLED, false);
     }
 
-    private void saveProposal(MetadataFetchJobEntity job, Long bookId, BookMetadata metadata) throws JacksonException {
+    private void saveProposal(MetadataFetchJobEntity job, BookEntity book, BookMetadata metadata) throws JacksonException {
+        // The provider map is filtered here, against what the book holds right now, because this is the
+        // last moment both values exist: the accept arrives as a separate client PUT with no before-state.
+        Book existingBook = bookMapper.toBook(book);
+        String fieldProvidersJson = proposalProvenanceService.describeChanges(
+                metadata, existingBook == null ? null : existingBook.getMetadata());
         MetadataFetchProposalEntity proposal = MetadataFetchProposalEntity.builder()
                 .job(job)
-                .bookId(bookId)
+                .bookId(book.getId())
                 .metadataJson(objectMapper.writeValueAsString(metadata))
+                .fieldProvidersJson(fieldProvidersJson)
                 .status(FetchedMetadataProposalStatus.FETCHED)
                 .fetchedAt(Instant.now())
                 .build();
