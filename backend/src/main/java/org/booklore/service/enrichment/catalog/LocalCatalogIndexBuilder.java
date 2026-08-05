@@ -17,11 +17,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -227,6 +229,19 @@ public class LocalCatalogIndexBuilder {
      * at most 78,907 small (archive, entry, part) records — a few tens of megabytes — alongside the
      * ~30 MB {@code compilations.json} document already held in memory for the parse itself, so the
      * extra cost is small relative to what this pass already keeps resident.
+     * <p>
+     * The forward {@code COMPILATION} rows are deduplicated by {@code compilationKeys}, first sighting
+     * wins — the same rule {@link #indexLanguages} applies through {@code putIfAbsent}, and for the same
+     * reason: {@code uk_local_catalog_index} allows one row per (library, source type, key), so a second
+     * sighting of a {@code (folder, file)} pair would abort the whole rebuild at {@link #flush}. That
+     * abort is not recoverable on a later run: it happens after the {@code REVIEW} and
+     * {@code AUTHOR_BIO} rows are written and before {@link #indexLanguages} runs, and
+     * {@link #isIndexed} is already satisfied by those rows, so {@code ensureIndexed} never retries and
+     * {@code LANGUAGE} and {@code COMPILATION} stay permanently empty for that library. A repeated key
+     * denotes the same compilation, so its parts are skipped with it rather than being counted twice
+     * into {@code membershipsByPartKey}, where a doubled membership would make the single-omnibus book
+     * look as though it belonged to two and {@code LocalCompilationStep} would then decline to name a
+     * series at all.
      */
     private CompilationCounts indexCompilations(long libraryId, Path catalogRoot) {
         Path container = layout.compilations(catalogRoot);
@@ -242,10 +257,16 @@ public class LocalCatalogIndexBuilder {
 
         List<LocalCatalogIndexEntity> batch = new ArrayList<>(BATCH_SIZE);
         Map<String, List<CompilationMembership>> membershipsByPartKey = new LinkedHashMap<>();
+        Set<String> compilationKeys = new HashSet<>();
+        AtomicLong duplicates = new AtomicLong();
         AtomicReference<RuntimeException> saveFailure = new AtomicReference<>();
-        int indexed = compilationParser.parse(new ByteArrayInputStream(json), (key, parts) -> {
+        compilationParser.parse(new ByteArrayInputStream(json), (key, parts) -> {
             String entryKey = layout.bookKey(key.archiveName(), key.entryName());
             if (entryKey == null) {
+                return;
+            }
+            if (!compilationKeys.add(entryKey)) {
+                duplicates.incrementAndGet();
                 return;
             }
             batch.add(LocalCatalogIndexEntity.builder()
@@ -290,7 +311,12 @@ public class LocalCatalogIndexBuilder {
             }
         }
         flush(batch);
-        return new CompilationCounts(indexed, membershipsByPartKey.size());
+
+        if (duplicates.get() > 0) {
+            log.warn("compilations.json for library {} lists {} compilation(s) more than once; kept the "
+                    + "first sighting of each", libraryId, duplicates.get());
+        }
+        return new CompilationCounts(compilationKeys.size(), membershipsByPartKey.size());
     }
 
     /**

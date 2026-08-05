@@ -192,6 +192,39 @@ class LocalCatalogIndexBuilderCompilationPartTest {
     }
 
     /**
+     * The fifth and last instance of this branch's defect 2 — "one row per sighting of a key, so the
+     * second sighting collides with {@code uk_local_catalog_index} and aborts the whole rebuild". The
+     * four other passes were fixed; the forward {@code COMPILATION} pass was not, and it is the one
+     * whose abort is unrecoverable: it happens after {@code REVIEW}/{@code AUTHOR_BIO} are written and
+     * before {@code indexLanguages} runs, and {@code isIndexed} is satisfied by the rows already there,
+     * so {@code ensureIndexed} never repairs it and {@code LANGUAGE}/{@code COMPILATION} stay
+     * permanently empty for that library.
+     * <p>
+     * The same {@code (folder, file)} pair is listed twice with different part lists, so a fix that
+     * merely deduplicated the row while still counting both sightings' parts would fail the membership
+     * assertion rather than pass by accident.
+     */
+    @Test
+    void writesOneForwardRowWhenTheSameCompilationIsListedTwice() throws Exception {
+        when(archiveService.getEntryBytes(catalogRoot.resolve("compilations.7z"), "compilations.json"))
+                .thenReturn("""
+                        [{"file": "13026.fb2", "folder": "omnibus.zip",
+                          "compilation": [{"file": "13023.fb2", "folder": "a.zip", "part": 0}]},
+                         {"file": "13026.fb2", "folder": "omnibus.zip",
+                          "compilation": [{"file": "13023.fb2", "folder": "a.zip", "part": 0}]}]
+                        """.getBytes(StandardCharsets.UTF_8));
+
+        LocalCatalogIndexBuilder.IndexResult result = builder.rebuild(7L);
+
+        assertThat(savedRowsOfType(LocalCatalogSourceType.COMPILATION))
+                .extracting(LocalCatalogIndexEntity::getEntryKey)
+                .containsExactly("omnibus.zip#13026.fb2");
+        assertThat(result.compilations()).isEqualTo(1);
+        assertThat(membershipsOf("a.zip#13023.fb2"))
+                .containsExactly(new CompilationMembership("omnibus.zip", "13026.fb2", 0));
+    }
+
+    /**
      * The reverse rows are a source type of their own — 78,907 of them in the shipped catalog — and
      * they can zero out independently of the forward rows: a document of compilations that names no
      * usable part keys writes {@code COMPILATION} rows and no {@code COMPILATION_PART} rows at all.
