@@ -9,6 +9,7 @@ import org.booklore.service.book.BookQueryService;
 import org.booklore.service.book.BookService;
 import org.booklore.service.book.BookUpdateService;
 import org.booklore.service.progress.ReadingProgressService;
+import org.booklore.service.metadata.BookMetadataFieldSourceService;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
 import org.booklore.service.FileStreamingService;
@@ -62,6 +63,7 @@ class BookServiceDeleteTests {
         AuditService auditService = mock(AuditService.class);
         ArchivedBookContentService archivedBookContentService = mock(ArchivedBookContentService.class);
         ContentRestrictionService contentRestrictionService = mock(ContentRestrictionService.class);
+        BookMetadataFieldSourceService bookMetadataFieldSourceService = mock(BookMetadataFieldSourceService.class);
         EntityManager entityManager = mock(EntityManager.class);
 
         bookService = new BookService(
@@ -85,7 +87,8 @@ class BookServiceDeleteTests {
                 fileStreamingService,
                 auditService,
                 archivedBookContentService,
-                contentRestrictionService
+                contentRestrictionService,
+                bookMetadataFieldSourceService
         );
     }
 

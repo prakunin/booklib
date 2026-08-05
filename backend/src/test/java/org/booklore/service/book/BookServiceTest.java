@@ -16,6 +16,7 @@ import org.booklore.model.enums.CbxPageViewMode;
 import org.booklore.model.enums.NewPdfPageViewMode;
 import org.booklore.repository.*;
 import org.booklore.service.audit.AuditService;
+import org.booklore.service.metadata.BookMetadataFieldSourceService;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
 import org.booklore.service.progress.ReadingProgressService;
 import org.booklore.service.restriction.ContentRestrictionService;
@@ -84,6 +85,8 @@ class BookServiceTest {
     private EntityManager entityManager;
     @Mock
     private ContentRestrictionService contentRestrictionService;
+    @Mock
+    private BookMetadataFieldSourceService bookMetadataFieldSourceService;
 
     @InjectMocks
     private BookService bookService;
@@ -181,6 +184,9 @@ class BookServiceTest {
         List<Book> result = bookService.getBooksByIds(Set.of(2L, 3L, 4L), true);
 
         assertEquals(List.of(mappedBook), result);
+        // Provenance for the whole set in one call, not one call per book.
+        verify(bookMetadataFieldSourceService, times(1)).attachTo(List.of(mappedBook));
+        verify(bookMetadataFieldSourceService, never()).attachTo(any(Book.class));
         verify(contentRestrictionService).applyRestrictions(List.of(allowedBook, restrictedBook), 10L);
         verify(bookMapper, never()).toBook(restrictedBook);
         verify(bookMapper, never()).toBook(otherLibraryBook);
@@ -210,6 +216,9 @@ class BookServiceTest {
             Book result = bookService.getBook(3L, true);
             assertEquals(3L, result.getId());
             verify(bookRepository).findByIdWithBookFiles(3L);
+            // The metadata screen loads the book through this endpoint; without this call the
+            // per-field source badge has nothing to render and the feature is invisible.
+            verify(bookMetadataFieldSourceService).attachTo(result);
         }
     }
 

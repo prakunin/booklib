@@ -4,6 +4,7 @@ import org.booklore.model.enums.MetadataField;
 import org.booklore.model.enums.MetadataProvider;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 import java.time.Instant;
@@ -80,6 +81,23 @@ public class BookMetadata {
      */
     @JsonIgnore
     private Map<MetadataField, MetadataProvider> fieldProviders;
+
+    /**
+     * Which provider the value currently stored in each field came from, read out of
+     * {@code book_metadata_field_source} by {@code BookMetadataFieldSourceService} and attached on the
+     * book detail read paths only — never on a paginated list, where it would cost a query per page
+     * for data no list view renders.
+     * <p>
+     * A field missing from the map has no attribution, which is the normal state for anything typed by
+     * hand or filled before provenance was recorded. It does not mean "unknown provider" and must not
+     * be rendered as one. The map is empty rather than null wherever it has been attached, so an empty
+     * map and an absent key both read as "no source", never as a failure to look.
+     * <p>
+     * Read-only on the wire: a client cannot assert provenance by posting it back through the metadata
+     * PUT endpoint, the same guard {@code fieldProviders} gets from {@code @JsonIgnore}.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Map<MetadataField, MetadataProvider> fieldSources;
 
     private String thumbnailUrl;
     private List<BookReview> bookReviews;

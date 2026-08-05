@@ -12,5 +12,11 @@ public interface BookMetadataFieldSourceRepository
 
     List<BookMetadataFieldSourceEntity> findByBookId(Long bookId);
 
+    /**
+     * Every row of a whole set of books in one statement. The read path attaches provenance to lists
+     * of books, and a per-book lookup there would be a query per row of the page.
+     */
+    List<BookMetadataFieldSourceEntity> findByBookIdIn(Collection<Long> bookIds);
+
     void deleteByBookIdAndFieldNameIn(Long bookId, Collection<MetadataField> fieldNames);
 }
