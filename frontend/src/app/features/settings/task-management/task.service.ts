@@ -25,6 +25,10 @@ export const TASK_TYPE_CONFIG: Record<TaskType, { parallel: boolean; async: bool
   [TaskType.CLEANUP_TEMP_METADATA]: {parallel: false, async: false, displayOrder: 6},
   [TaskType.REFRESH_METADATA_MANUAL]: {parallel: false, async: false, displayOrder: 7},
   [TaskType.CLEAR_PDF_CACHE]: {parallel: false, async: false, displayOrder: 8},
+  // REFRESH_METADATA_MANUAL and LOCAL_CATALOG_BACKFILL are hiddenFromUI on the backend, so Task
+  // Management never receives them and never reads these two entries. They are kept because this is
+  // an exhaustive Record<TaskType, ...> and the enum members themselves are load-bearing: the INPX
+  // archive panel starts LOCAL_CATALOG_BACKFILL with a libraryId and filters task progress on it.
   [TaskType.LOCAL_CATALOG_BACKFILL]: {parallel: false, async: true, displayOrder: 9},
 };
 

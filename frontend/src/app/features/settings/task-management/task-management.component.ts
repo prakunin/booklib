@@ -538,8 +538,11 @@ export class TaskManagementComponent implements OnInit {
       [TaskType.CLEANUP_DELETED_BOOKS]: 'pi-trash',
       [TaskType.SYNC_LIBRARY_FILES]: 'pi-sync',
       [TaskType.BOOKDROP_PERIODIC_SCANNING]: 'pi-inbox',
-      [TaskType.CLEANUP_TEMP_METADATA]: 'pi-file',
-      [TaskType.LOCAL_CATALOG_BACKFILL]: 'pi-book'
+      [TaskType.CLEANUP_TEMP_METADATA]: 'pi-file'
+      // No entry for REFRESH_METADATA_MANUAL or LOCAL_CATALOG_BACKFILL: both are hiddenFromUI on the
+      // backend, so neither /tasks/available nor the task-history response ever names them and this
+      // screen cannot render a card for either. They are launched from the screens that can supply
+      // their required options.
     };
     return icons[taskType] || 'pi-cog';
   }
