@@ -1,5 +1,7 @@
 package org.booklore.task.tasks;
 
+import org.booklore.exception.APIException;
+import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.request.TaskCreateRequest;
 import org.booklore.model.dto.response.TaskCreateResponse;
 import org.booklore.model.enums.TaskType;
@@ -11,6 +13,7 @@ import org.booklore.task.options.LocalCatalogBackfillOptions;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -71,5 +74,30 @@ class LocalCatalogBackfillTaskTest {
         assertThatThrownBy(() -> task.execute(request(null)))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("libraryId");
+    }
+
+    /**
+     * {@code CAN_ACCESS_TASK_MANAGER} is a permission gate on a task that rewrites the metadata of
+     * every archived book in a library, and six sibling task tests cover exactly this — this was the
+     * only new task without it. Mirrors {@code FacetCountRecomputeTaskTest}.
+     */
+    @Test
+    void validatePermissionsRejectsUsersWithoutTaskManagerAccess() {
+        BookLoreUser.UserPermissions permissions = new BookLoreUser.UserPermissions();
+        BookLoreUser user = BookLoreUser.builder().id(1L).permissions(permissions).build();
+        TaskCreateRequest request = request(LocalCatalogBackfillOptions.builder().libraryId(19L).build());
+
+        assertThatThrownBy(() -> task.validatePermissions(user, request))
+                .isInstanceOf(APIException.class);
+    }
+
+    @Test
+    void validatePermissionsAllowsUsersWithTaskManagerAccess() {
+        BookLoreUser.UserPermissions permissions = new BookLoreUser.UserPermissions();
+        permissions.setCanAccessTaskManager(true);
+        BookLoreUser user = BookLoreUser.builder().id(1L).permissions(permissions).build();
+        TaskCreateRequest request = request(LocalCatalogBackfillOptions.builder().libraryId(19L).build());
+
+        assertThatCode(() -> task.validatePermissions(user, request)).doesNotThrowAnyException();
     }
 }
