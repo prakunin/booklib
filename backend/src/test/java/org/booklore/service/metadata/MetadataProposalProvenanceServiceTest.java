@@ -145,6 +145,15 @@ class MetadataProposalProvenanceServiceTest {
                     .build();
         }
 
+        /**
+         * Stubs what {@code book_metadata} holds at the moment the ACCEPT is processed.
+         * <p>
+         * This method decides which side of the client's PUT the accept lands on, and that ordering is
+         * the client's to guarantee, not this service's — see
+         * {@code metadata-review-dialog-component.spec.ts}, which is what actually pins it. What is
+         * pinned here is that the service is safe on both sides: fed post-PUT state it attributes, fed
+         * pre-PUT state it files nothing rather than something wrong.
+         */
         private void bookNowHolds(BookMetadata stored) {
             BookMetadataEntity entity = new BookMetadataEntity();
             when(bookMetadataRepository.findById(7L)).thenReturn(Optional.of(entity));
@@ -197,6 +206,23 @@ class MetadataProposalProvenanceServiceTest {
             bookNowHolds(BookMetadata.builder().title("Something Else Entirely").build());
 
             service.recordAcceptedProposal(proposal(metadataJson, "{\"TITLE\":\"GoodReads\"}"));
+
+            verify(fieldSourceRepository, never()).saveAll(any());
+        }
+
+        @Test
+        void attributesNothingIfItIsSomehowRunBeforeTheAcceptedValuesWereWritten() {
+            // The interleaving that used to happen for real: the client fired the ACCEPTED post
+            // alongside the metadata PUT rather than after it, so this ran against pre-PUT state. The
+            // service cannot detect that, and this is what it does when it happens — nothing, rather
+            // than attributing the old value to the provider. The ordering itself is guaranteed on the
+            // client and pinned by metadata-review-dialog-component.spec.ts.
+            String metadataJson = objectMapper.writeValueAsString(
+                    BookMetadata.builder().title("The Fetched Title").publisher("Gollancz").build());
+            bookNowHolds(BookMetadata.builder().title("The Title From Before").publisher("Old Publisher").build());
+
+            service.recordAcceptedProposal(proposal(metadataJson,
+                    "{\"TITLE\":\"GoodReads\",\"PUBLISHER\":\"FlibustaLocal\"}"));
 
             verify(fieldSourceRepository, never()).saveAll(any());
         }
