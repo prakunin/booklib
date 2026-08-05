@@ -94,4 +94,52 @@ class LocalCatalogIndexServiceEnsureIndexedTest {
             verify(indexBuilder, times(3)).isIndexed(LIBRARY_ID);
         }
     }
+
+    /**
+     * The blocking form the backfill uses. The distinction from {@code ensureIndexed} is the whole
+     * point of it existing: {@code ensureIndexed} hands the 2m20s rebuild to the executor and returns,
+     * which is right for {@code EnrichmentPipeline} (no user action may block behind it) and wrong for
+     * a 702,511-book walk with no checkpoint.
+     */
+    @Nested
+    class EnsureIndexedNow {
+
+        @Test
+        void buildsTheIndexOnTheCallingThreadRatherThanTheExecutor() {
+            when(indexBuilder.isIndexed(LIBRARY_ID)).thenReturn(false);
+            when(indexBuilder.rebuild(LIBRARY_ID)).thenReturn(new LocalCatalogIndexBuilder.IndexResult(1, 1, 1, 1, 1));
+
+            boolean ready = service.ensureIndexedNow(LIBRARY_ID);
+
+            assertThat(ready).isTrue();
+            assertThat(submitted).isEmpty();
+            verify(indexBuilder).rebuild(LIBRARY_ID);
+        }
+
+        @Test
+        void buildsNothingWhenTheCatalogIsAlreadyIndexed() {
+            when(indexBuilder.isIndexed(LIBRARY_ID)).thenReturn(true);
+
+            boolean ready = service.ensureIndexedNow(LIBRARY_ID);
+
+            assertThat(ready).isTrue();
+            verify(indexBuilder, never()).rebuild(LIBRARY_ID);
+        }
+
+        /**
+         * A rebuild started elsewhere holds the per-library slot, so this call builds nothing and must
+         * say so. Returning true here would let the backfill walk against somebody else's half-written
+         * index, which is the failure the blocking form exists to prevent.
+         */
+        @Test
+        void reportsNotReadyWhenARebuildIsAlreadyInFlight() {
+            when(indexBuilder.isIndexed(LIBRARY_ID)).thenReturn(false);
+            service.rebuildAsync(LIBRARY_ID);
+
+            boolean ready = service.ensureIndexedNow(LIBRARY_ID);
+
+            assertThat(ready).isFalse();
+            verify(indexBuilder, never()).rebuild(LIBRARY_ID);
+        }
+    }
 }

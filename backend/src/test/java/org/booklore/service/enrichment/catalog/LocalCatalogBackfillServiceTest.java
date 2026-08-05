@@ -1,21 +1,26 @@
 package org.booklore.service.enrichment.catalog;
 
+import org.booklore.exception.APIException;
 import org.booklore.model.dto.request.EnrichmentRequest;
 import org.booklore.model.enums.EnrichmentStepType;
 import org.booklore.model.enums.EnrichmentWritePolicy;
 import org.booklore.repository.BookFileRepository;
 import org.booklore.service.enrichment.EnrichmentPipeline;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -29,6 +34,11 @@ class LocalCatalogBackfillServiceTest {
 
     private final LocalCatalogBackfillService service =
             new LocalCatalogBackfillService(bookFileRepository, pipeline, indexService);
+
+    @BeforeEach
+    void indexIsReady() {
+        when(indexService.ensureIndexedNow(anyLong())).thenReturn(true);
+    }
 
     private Object[] row(long id, String archive, String entry) {
         return new Object[]{id, archive, entry};
@@ -50,6 +60,12 @@ class LocalCatalogBackfillServiceTest {
         verify(pipeline).enrich(eq(2L), any(EnrichmentRequest.class));
     }
 
+    /**
+     * The name makes an ordering claim, so the test asserts an ordering: {@code verify} alone would
+     * pass just as well if the walk ran first. Walking an index that is not there yet is precisely the
+     * defect this service was found to have — a pass over an empty index is indistinguishable from a
+     * successful one.
+     */
     @Test
     void indexesBeforeWalkingBooks() {
         when(bookFileRepository.findArchivedBooksForBackfill(anyLong(), any(), any(), anyLong(), any(Pageable.class)))
@@ -57,7 +73,46 @@ class LocalCatalogBackfillServiceTest {
 
         service.run(7L, "task-1", () -> false, progress -> { });
 
-        verify(indexService).ensureIndexed(7L);
+        InOrder inOrder = inOrder(indexService, bookFileRepository);
+        inOrder.verify(indexService).ensureIndexedNow(7L);
+        inOrder.verify(bookFileRepository)
+                .findArchivedBooksForBackfill(anyLong(), any(), any(), anyLong(), any(Pageable.class));
+    }
+
+    /**
+     * {@code ensureIndexed} hands the 2m20s rebuild to the task executor and returns immediately, so
+     * the walk used to start against an index that was still being written — and there is no
+     * checkpoint, so every book walked in that window is silently left un-enriched forever. The
+     * blocking form is the whole point; this fails against the old {@code ensureIndexed} call.
+     */
+    @Test
+    void buildsTheIndexSynchronouslyRatherThanFireAndForget() {
+        when(bookFileRepository.findArchivedBooksForBackfill(anyLong(), any(), any(), anyLong(), any(Pageable.class)))
+                .thenReturn(List.of());
+
+        service.run(7L, "task-1", () -> false, progress -> { });
+
+        verify(indexService).ensureIndexedNow(7L);
+        verify(indexService, never()).ensureIndexed(anyLong());
+    }
+
+    /**
+     * A rebuild started elsewhere is already in flight, so no index was built by this call. Starting
+     * the walk anyway would reintroduce exactly the bug above, so the run refuses instead — loudly,
+     * because a run that reports success while enriching nothing is the failure mode this branch spent
+     * eleven tasks not noticing.
+     */
+    @Test
+    void refusesToWalkWhenAnIndexRebuildIsAlreadyInFlight() {
+        when(indexService.ensureIndexedNow(7L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.run(7L, "task-1", () -> false, progress -> { }))
+                .isInstanceOf(APIException.class)
+                .hasMessageContaining("being rebuilt");
+
+        verify(bookFileRepository, never())
+                .findArchivedBooksForBackfill(anyLong(), any(), any(), anyLong(), any(Pageable.class));
+        verify(pipeline, never()).enrich(anyLong(), any(EnrichmentRequest.class));
     }
 
     @Test

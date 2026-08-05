@@ -2,6 +2,7 @@ package org.booklore.service.enrichment.catalog;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.booklore.exception.ApiError;
 import org.booklore.model.dto.request.EnrichmentRequest;
 import org.booklore.model.enums.EnrichmentStepType;
 import org.booklore.model.enums.EnrichmentWritePolicy;
@@ -28,6 +29,13 @@ import java.util.function.LongConsumer;
  * <p>
  * There is no checkpoint. Under {@code AUTO_IF_EMPTY} a book that is already filled resolves to a
  * no-op, so a run interrupted by a restart is simply started again.
+ * <p>
+ * That same absence of a checkpoint is why the index is built <em>synchronously</em> before the walk
+ * begins, through {@link LocalCatalogIndexService#ensureIndexedNow} rather than the fire-and-forget
+ * {@code ensureIndexed}. A book walked while the index is still being written finds nothing, which is
+ * indistinguishable from a book the catalog has nothing for, and nothing ever comes back for it. If a
+ * rebuild started elsewhere is already in flight the run refuses to start at all rather than walk
+ * against a partial index.
  */
 @Slf4j
 @Service
@@ -56,7 +64,11 @@ public class LocalCatalogBackfillService {
     }
 
     public BackfillResult run(long libraryId, String taskId, BooleanSupplier cancelled, LongConsumer progress) {
-        indexService.ensureIndexed(libraryId);
+        if (!indexService.ensureIndexedNow(libraryId)) {
+            throw ApiError.CONFLICT.createException(
+                    "The local catalog index for library " + libraryId + " is being rebuilt; start the "
+                            + "backfill again once indexing has finished");
+        }
 
         EnrichmentRequest request = EnrichmentRequest.builder()
                 .steps(LOCAL_STEPS)
