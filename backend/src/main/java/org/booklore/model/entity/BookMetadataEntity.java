@@ -390,7 +390,16 @@ public class BookMetadataEntity {
      * {@code @PrePersist} has already run, so on an INSERT the field is null at exactly the moment
      * this fires — and a warning about lost text that names no book is close to useless to whoever
      * has to act on it. Nothing in {@code src/main/java} sets {@code bookId} on this entity directly,
-     * which makes the association the only identity available here.
+     * so the association is the best identity available here.
+     * <p>
+     * It is not always an identity, though, and the fallback is a recovery of the common case rather
+     * than a guarantee. It names the book whenever the parent already has an id — every UPDATE, and
+     * an INSERT whose parent Hibernate has already assigned one to. It does not on a still-transient
+     * parent: {@code PhysicalBookService} calls {@code updateSearchText()} through
+     * {@code addAuthorsToBook} <em>before</em> {@code bookRepository.save}, so {@code book.getId()} is
+     * null there. Nor does it where there is no parent to read: {@code BookFileDetachmentService}'s
+     * {@code copyMetadataFrom} builds the copy — description included — with neither field set, and
+     * only attaches it afterwards. Both cases still log, and still log {@code null} for the book.
      */
     private String clampDescription(String value) {
         String clamped = BookUtils.clampToUtf8Bytes(value, BookUtils.TEXT_MAX_UTF8_BYTES);

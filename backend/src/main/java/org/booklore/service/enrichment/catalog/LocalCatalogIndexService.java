@@ -97,6 +97,15 @@ public class LocalCatalogIndexService {
      * Narrowing it would mean holding the slot across the {@code isIndexed} query, which would make an
      * ordinary readiness question contend with real rebuilds; the window is microseconds against a
      * 2m20s build, and the cost of losing it is one backfill run, which is restartable.
+     * <p>
+     * That microsecond window is the smaller exposure, and quantifying it alone would mislead. The
+     * answer this returns is a statement about one instant and nothing renews it:
+     * {@code LocalCatalogBackfillService.run} asks once, before its walk, and then pages through the
+     * library for hours without asking again, while {@code EnrichmentController} can start a rebuild
+     * at any point during that walk. The books walked after such a rebuild begins see exactly the
+     * partial index this method exists to refuse. What holds the risk down is not this check but the
+     * fact that a manual rebuild is a deliberate admin action; a caller that needs more than that
+     * would have to re-ask per page and abandon the run, which nothing does today.
      *
      * @return true when the index is ready to be read; false when a rebuild started elsewhere is
      * already in flight, in which case this call did not build anything and the caller must not
