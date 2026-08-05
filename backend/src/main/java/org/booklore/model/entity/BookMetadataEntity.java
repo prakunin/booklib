@@ -392,14 +392,20 @@ public class BookMetadataEntity {
      * has to act on it. Nothing in {@code src/main/java} sets {@code bookId} on this entity directly,
      * so the association is the best identity available here.
      * <p>
-     * It is not always an identity, though, and the fallback is a recovery of the common case rather
-     * than a guarantee. It names the book whenever the parent already has an id — every UPDATE, and
-     * an INSERT whose parent Hibernate has already assigned one to. It does not on a still-transient
-     * parent: {@code PhysicalBookService} calls {@code updateSearchText()} through
-     * {@code addAuthorsToBook} <em>before</em> {@code bookRepository.save}, so {@code book.getId()} is
-     * null there. Nor does it where there is no parent to read: {@code BookFileDetachmentService}'s
-     * {@code copyMetadataFrom} builds the copy — description included — with neither field set, and
-     * only attaches it afterwards. Both cases still log, and still log {@code null} for the book.
+     * It is not always an identity, though, so this recovers the common case rather than guaranteeing
+     * a name. It covers every UPDATE, where {@code bookId} is already populated, and the cascaded
+     * INSERT: {@code BookEntity}'s id is {@code IDENTITY}, so the parent row is inserted at
+     * {@code persist} time and the association has an id by the time the cascade reaches this
+     * entity's {@code @PrePersist}. That is what covers a metadata built with neither field set —
+     * {@code BookFileDetachmentService.copyMetadataFrom} does exactly that, description included, and
+     * attaches the parent before saving.
+     * <p>
+     * What it does not cover is {@code updateSearchText()} called by hand ahead of the save:
+     * {@code PhysicalBookService} calls it through {@code addAuthorsToBook} <em>before</em>
+     * {@code bookRepository.save}, so the clamp fires against a parent that is still transient and
+     * {@code book.getId()} is null. The value is already clamped by the time {@code @PrePersist} runs,
+     * so the length comparison is false there and no second, named warning follows: a description
+     * truncated on that path yields one nameless warning and nothing more.
      */
     private String clampDescription(String value) {
         String clamped = BookUtils.clampToUtf8Bytes(value, BookUtils.TEXT_MAX_UTF8_BYTES);
