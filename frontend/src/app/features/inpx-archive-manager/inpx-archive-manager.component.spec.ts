@@ -1,14 +1,14 @@
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, Router} from '@angular/router';
 import {MessageService} from 'primeng/api';
-import {of, Subject} from 'rxjs';
+import {Observable, of, Subject} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {getTranslocoModule} from '../../core/testing/transloco-testing';
 import {InpxArchiveManagerComponent} from './inpx-archive-manager.component';
 import {InpxArchiveService} from './inpx-archive.service';
 import type {InpxArchive, InpxArchiveScanTask, LocalCatalogStatus} from './inpx-archive.model';
 import {DialogLauncherService} from '../../shared/services/dialog-launcher.service';
-import {TaskService, TaskType} from '../settings/task-management/task.service';
+import {TaskProgressPayload, TaskService, TaskStatus, TaskType} from '../settings/task-management/task.service';
 
 describe('InpxArchiveManagerComponent', () => {
   const archive: InpxArchive = {
@@ -53,10 +53,26 @@ describe('InpxArchiveManagerComponent', () => {
   const router = {
     navigate: vi.fn(() => Promise.resolve(true)),
   };
-  const taskService = {
+  const taskService: {
+    startTask: ReturnType<typeof vi.fn>;
+    taskProgress$: Observable<TaskProgressPayload | null>;
+  } = {
     startTask: vi.fn(() => of({taskId: 't1', taskType: 'LOCAL_CATALOG_BACKFILL', status: 'ACCEPTED'})),
     taskProgress$: of(null),
   };
+  const messageService = {
+    add: vi.fn(),
+  };
+
+  function backfillFrame(taskStatus: TaskStatus, message: string): TaskProgressPayload {
+    return {
+      taskId: 't1',
+      taskType: TaskType.LOCAL_CATALOG_BACKFILL,
+      message,
+      progress: 3,
+      taskStatus,
+    };
+  }
 
   afterEach(() => {
     vi.useRealTimers();
@@ -77,7 +93,7 @@ describe('InpxArchiveManagerComponent', () => {
         {provide: InpxArchiveService, useValue: archiveService},
         {provide: ActivatedRoute, useValue: {snapshot: {paramMap: convertToParamMap({libraryId: '7'})}}},
         {provide: Router, useValue: router},
-        {provide: MessageService, useValue: {add: vi.fn()}},
+        {provide: MessageService, useValue: messageService},
         {provide: DialogLauncherService, useValue: dialogLauncher},
         {provide: TaskService, useValue: taskService},
       ],
@@ -122,6 +138,52 @@ describe('InpxArchiveManagerComponent', () => {
       triggeredByCron: false,
       options: {libraryId: 7},
     });
+    fixture.destroy();
+  });
+
+  /**
+   * The backfill's own refusal — "the index is being rebuilt, start again once it has finished" —
+   * arrives in the FAILED frame's message and used to go nowhere. The template renders
+   * `backfillProgress()?.message` only while `backfillRunning()` is true, and that is
+   * `taskStatus === IN_PROGRESS`, so the element holding the reason is torn out by the very frame
+   * that carries it. Without a toast a refused run looks exactly like a finished one.
+   */
+  it('surfaces the reason a backfill run failed once its terminal frame arrives', () => {
+    const refusal = 'The local catalog index for library 7 is being rebuilt; start the backfill again once indexing has finished';
+    const progress = new Subject<TaskProgressPayload | null>();
+    taskService.taskProgress$ = progress;
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.detectChanges();
+    archiveService.getLocalCatalogStatus.mockClear();
+
+    progress.next(backfillFrame(TaskStatus.IN_PROGRESS, 'Walking 702511 books'));
+    expect(fixture.componentInstance.backfillRunning()).toBe(true);
+
+    progress.next(backfillFrame(TaskStatus.FAILED, refusal));
+
+    expect(fixture.componentInstance.backfillRunning()).toBe(false);
+    expect(messageService.add).toHaveBeenCalledWith({
+      severity: 'error',
+      summary: 'The local catalog backfill stopped.',
+      detail: refusal,
+    });
+    expect(archiveService.getLocalCatalogStatus).toHaveBeenCalledWith(7);
+    fixture.destroy();
+  });
+
+  it('clears the panel without an error toast when a backfill run completes', () => {
+    const progress = new Subject<TaskProgressPayload | null>();
+    taskService.taskProgress$ = progress;
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.detectChanges();
+    archiveService.getLocalCatalogStatus.mockClear();
+
+    progress.next(backfillFrame(TaskStatus.IN_PROGRESS, 'Walking 702511 books'));
+    progress.next(backfillFrame(TaskStatus.COMPLETED, 'Enriched 702511 books'));
+
+    expect(fixture.componentInstance.backfillRunning()).toBe(false);
+    expect(messageService.add).not.toHaveBeenCalled();
+    expect(archiveService.getLocalCatalogStatus).toHaveBeenCalledWith(7);
     fixture.destroy();
   });
 

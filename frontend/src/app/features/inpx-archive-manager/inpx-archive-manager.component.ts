@@ -59,6 +59,20 @@ export class InpxArchiveManagerComponent {
       }
       this.backfillProgress.set(progress);
       if (progress.taskStatus !== TaskStatus.IN_PROGRESS) {
+        // The frame that ends the run is also the only place its reason is ever offered. The
+        // template renders `backfillProgress()?.message` inside `@if (backfillRunning())`, and
+        // `backfillRunning()` is IN_PROGRESS, so this very frame tears the message element out
+        // again — and a refusal the backfill raised on purpose ("the index is being rebuilt, start
+        // again once indexing has finished") would then be indistinguishable from a completed run.
+        // Toasting it is what keeps the two apart; `detail` is the backend's own text rather than a
+        // translated string because it names the library and the state that caused the refusal.
+        if (progress.taskStatus === TaskStatus.FAILED) {
+          this.messages.add({
+            severity: 'error',
+            summary: this.t.translate('book.inpxArchives.localCatalog.backfillRunFailed'),
+            detail: progress.message,
+          });
+        }
         this.loadLocalCatalogStatus();
       }
     });

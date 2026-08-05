@@ -318,7 +318,8 @@
       "authorsWithBiographyCoverage": "{{ count }} authors have a biography (global figure, not limited to this library)",
       "runBackfill": "Run local catalog backfill",
       "backfillQueued": "Local catalog backfill queued.",
-      "backfillFailed": "Could not start the local catalog backfill."
+      "backfillFailed": "Could not start the local catalog backfill.",
+      "backfillRunFailed": "The local catalog backfill stopped."
     },
     "phases": {
       "QUEUED": "Waiting",
