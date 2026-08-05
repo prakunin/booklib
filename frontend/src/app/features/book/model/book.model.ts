@@ -1,6 +1,7 @@
 import {Shelf} from './shelf.model';
 import {CbxBackgroundColor, CbxFitMode, CbxPageSpread, CbxPageSplitOption, CbxPageViewMode, CbxScrollMode, NewPdfReaderSetting} from '../../settings/user-management/user.service';
 import {BookReview} from '../components/book-reviews/book-review-service';
+import {MetadataFieldSources} from '../../../shared/metadata/metadata-field-source';
 
 export const BOOK_TYPES = ['PDF', 'EPUB', 'HTML', 'CBX', 'FB2', 'MOBI', 'AZW3', 'AUDIOBOOK', 'DOC', 'DJVU', 'OTHER'] as const;
 export type BookType = typeof BOOK_TYPES[number];
@@ -216,6 +217,12 @@ export interface BookMetadata {
   moods?: string[];
   tags?: string[];
   provider?: string;
+  /**
+   * Backend `MetadataField` name → the provider whose value is stored in that field. Attached by the
+   * book detail endpoints only; a field with no entry has no recorded source, which is not the same
+   * as an unknown one. See `shared/metadata/metadata-field-source.ts`.
+   */
+  fieldSources?: MetadataFieldSources;
   providerBookId?: string;
   externalUrl?: string;
   thumbnailUrl?: string | null;

@@ -184,6 +184,9 @@
         "specialCharacter": "специальный символ",
         "invalid": "Пароль не соответствует текущим требованиям"
     },
+    "metadataProvider": {
+        "flibustaLocal": "Локальный каталог"
+    },
     "ui": {
         "validation": {
             "min": "",

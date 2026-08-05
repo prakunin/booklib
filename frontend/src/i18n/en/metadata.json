@@ -20,6 +20,9 @@
     "page": "Page",
     "audio": "Audio"
   },
+  "fieldSource": {
+    "tooltip": "Filled in from {{ provider }}"
+  },
   "editor": {
     "ebookCover": "Ebook Cover",
     "audiobookCover": "Audiobook Cover",

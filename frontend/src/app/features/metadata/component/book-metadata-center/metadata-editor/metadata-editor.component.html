@@ -177,7 +177,7 @@
 
           <div class="field-row">
             <div class="field-group title-field">
-              <label for="title">{{ t('title') }} @if (isEmbeddable('title', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="title">{{ t('title') }} @if (isEmbeddable('title', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="title" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <input pInputText id="title" formControlName="title"/>
                 @if (!book.metadata!['titleLocked']) {
@@ -190,7 +190,7 @@
             </div>
 
             <div class="field-group subtitle-field">
-              <label for="subtitle">{{ t('subtitle') }} @if (isEmbeddable('subtitle', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="subtitle">{{ t('subtitle') }} @if (isEmbeddable('subtitle', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="subtitle" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <input pInputText id="subtitle" formControlName="subtitle"/>
                 @if (!book.metadata!['subtitleLocked']) {
@@ -203,7 +203,7 @@
             </div>
 
             <div class="field-group language-field">
-              <label for="language">{{ t('language') }} @if (isEmbeddable('language', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="language">{{ t('language') }} @if (isEmbeddable('language', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="language" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <input pInputText id="language" formControlName="language"/>
                 @if (!book.metadata!['languageLocked']) {
@@ -262,7 +262,7 @@
               </div>
             </div>
             <div class="field-group publisher-field">
-              <label for="publisher">{{ t('publisher') }} @if (isEmbeddable('publisher', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="publisher">{{ t('publisher') }} @if (isEmbeddable('publisher', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="publisher" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <p-autoComplete
                   [fluid]="true"
@@ -284,7 +284,7 @@
               </div>
             </div>
             <div class="field-group date-field">
-              <label for="publishedDate">{{ t('publishDate') }} @if (isEmbeddable('publishedDate', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="publishedDate">{{ t('publishDate') }} @if (isEmbeddable('publishedDate', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="publishedDate" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <p-datepicker
                   formControlName="publishedDate"
@@ -387,7 +387,7 @@
 
           <div class="field-row">
             <div class="field-group series-name-field">
-              <label for="seriesName">{{ t('seriesName') }} @if (isEmbeddable('seriesName', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="seriesName">{{ t('seriesName') }} @if (isEmbeddable('seriesName', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="seriesName" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <p-autoComplete
                   [fluid]="true"
@@ -410,7 +410,7 @@
             </div>
 
             <div class="field-group small-field">
-              <label for="seriesNumber">{{ t('seriesNumber') }} @if (isEmbeddable('seriesNumber', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="seriesNumber">{{ t('seriesNumber') }} @if (isEmbeddable('seriesNumber', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="seriesNumber" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <input pInputText id="seriesNumber" formControlName="seriesNumber"/>
                 @if (!book.metadata!['seriesNumberLocked']) {
@@ -423,7 +423,7 @@
             </div>
 
             <div class="field-group small-field">
-              <label for="seriesTotal">{{ t('seriesTotal') }} @if (isEmbeddable('seriesTotal', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="seriesTotal">{{ t('seriesTotal') }} @if (isEmbeddable('seriesTotal', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="seriesTotal" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <input pInputText id="seriesTotal" formControlName="seriesTotal"/>
                 @if (!book.metadata!['seriesTotalLocked']) {
@@ -450,7 +450,7 @@
 
           <div class="field-row">
             <div class="field-group small-field">
-              <label for="isbn10">{{ t('isbn10') }} @if (isEmbeddable('isbn10', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="isbn10">{{ t('isbn10') }} @if (isEmbeddable('isbn10', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="isbn10" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <input pInputText id="isbn10" formControlName="isbn10"/>
                 @if (!book.metadata!['isbn10Locked']) {
@@ -462,7 +462,7 @@
               </div>
             </div>
             <div class="field-group small-field">
-              <label for="isbn13">{{ t('isbn13') }} @if (isEmbeddable('isbn13', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="isbn13">{{ t('isbn13') }} @if (isEmbeddable('isbn13', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="isbn13" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <input pInputText id="isbn13" formControlName="isbn13"/>
                 @if (!book.metadata!['isbn13Locked']) {
@@ -516,7 +516,7 @@
               </div>
             </div>
             <div class="field-group small-field">
-              <label for="pageCount">{{ t('pages') }} @if (isEmbeddable('pageCount', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+              <label for="pageCount">{{ t('pages') }} @if (isEmbeddable('pageCount', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="pageCount" [sources]="fieldSources" /></label>
               <div class="field-with-lock">
                 <input pInputText id="pageCount" formControlName="pageCount"/>
                 @if (!book.metadata!['pageCountLocked']) {
@@ -948,7 +948,7 @@
 
       <div class="description-section">
         <div class="field-group description-field">
-          <label for="description">{{ t('description') }} @if (isEmbeddable('description', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</label>
+          <label for="description">{{ t('description') }} @if (isEmbeddable('description', book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> } <app-metadata-source-badge field="description" [sources]="fieldSources" /></label>
           <div class="field-with-lock description-with-lock">
                 <textarea
                   id="description"

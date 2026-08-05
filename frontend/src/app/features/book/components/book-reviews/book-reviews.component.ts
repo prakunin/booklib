@@ -16,6 +16,11 @@ import {Tooltip} from 'primeng/tooltip';
 import {BookService} from '../../service/book.service';
 import {BookMetadataManageService} from '../../service/book-metadata-manage.service';
 import {AppSettingsService} from '../../../../shared/service/app-settings.service';
+import {
+  metadataProviderLabelKey,
+  metadataProviderSeverity,
+  MetadataProviderSeverity
+} from '../../../../shared/metadata/metadata-provider-display';
 
 @Component({
   selector: 'app-book-reviews',
@@ -358,20 +363,12 @@ export class BookReviewsComponent implements OnInit, OnChanges {
     this.reviewDownloadEnabled = settings?.metadataPublicReviewsSettings?.downloadEnabled ?? true;
   }
 
-  getProviderSeverity(provider: string): 'success' | 'warn' | 'info' {
-    switch (provider?.toLowerCase()) {
-      case 'amazon':
-        return 'warn';
-      case 'flibustalocal':
-        return 'info';
-      default:
-        return 'success';
-    }
+  getProviderSeverity(provider: string): MetadataProviderSeverity {
+    return metadataProviderSeverity(provider);
   }
 
   getProviderLabel(provider: string): string {
-    return provider?.toLowerCase() === 'flibustalocal'
-      ? this.t.translate('book.reviews.providers.flibustaLocal')
-      : provider;
+    const key = metadataProviderLabelKey(provider);
+    return key ? this.t.translate(key) : provider;
   }
 }

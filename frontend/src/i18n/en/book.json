@@ -474,9 +474,6 @@
       "anonymous": "Anonymous",
       "spoiler": "Spoiler"
     },
-    "providers": {
-      "flibustaLocal": "Local catalog"
-    },
     "empty": {
       "noReviews": "No reviews available for this book",
       "downloadsDisabled": "Book review downloads are currently disabled. Enable this in Metadata Settings to fetch reviews.",

@@ -8,6 +8,8 @@ import {MessageService} from "primeng/api";
 import {Book, BookMetadata, ComicMetadata, MetadataClearFlags, MetadataUpdateWrapper,} from "../../../../book/model/book.model";
 import {UrlHelperService} from "../../../../../shared/service/url-helper.service";
 import {CoverComponent} from "../../../../../shared/components/cover/cover.component";
+import {MetadataSourceBadgeComponent} from "../../../../../shared/components/metadata-source-badge/metadata-source-badge.component";
+import {MetadataFieldSources} from '../../../../../shared/metadata';
 import {ALL_COMIC_METADATA_FIELDS, AUDIOBOOK_METADATA_FIELDS, COMIC_FORM_TO_MODEL_LOCK, COMIC_TEXT_METADATA_FIELDS, COMIC_ARRAY_METADATA_FIELDS, COMIC_TEXTAREA_METADATA_FIELDS, isFieldEmbeddable, hasMetadataWriter} from '../../../../../shared/metadata';
 import {FileUpload, FileUploadErrorEvent, FileUploadEvent,} from "primeng/fileupload";
 import {HttpResponse} from "@angular/common/http";
@@ -58,6 +60,7 @@ import {MetadataFieldProposal, SmartEnrichmentDialogResult} from '../../../model
     CdkDropList,
     CdkDrag,
     CoverComponent,
+    MetadataSourceBadgeComponent,
   ],
 })
 export class MetadataEditorComponent implements OnInit {
@@ -1242,6 +1245,15 @@ export class MetadataEditorComponent implements OnInit {
 
   isEmbeddable(controlName: string, book: Book): boolean {
     return isFieldEmbeddable(book.primaryFile?.bookType, controlName);
+  }
+
+  /**
+   * Where each field's stored value came from, as the book detail endpoint reported it. Undefined
+   * until a book is loaded, and empty for a book nothing has ever been attributed on — both cases
+   * render no badge at all.
+   */
+  get fieldSources(): MetadataFieldSources | undefined {
+    return this.currentBook?.metadata?.fieldSources;
   }
 
   hasWriter(book: Book): boolean {

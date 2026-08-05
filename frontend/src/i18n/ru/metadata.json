@@ -20,6 +20,9 @@
         "page": "Страница",
         "audio": "Аудио"
     },
+    "fieldSource": {
+        "tooltip": "Заполнено из источника {{ provider }}"
+    },
     "editor": {
         "ebookCover": "Обложка электронной книги",
         "audiobookCover": "Обложка аудиокниги",
