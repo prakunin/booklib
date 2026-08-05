@@ -12,7 +12,7 @@ import {MetadataPickerComponent} from '../book-metadata-center/metadata-picker/m
 import {DecimalPipe} from '@angular/common';
 import {AppBooksApiService} from '../../../book/service/app-books-api.service';
 import {injectQuery} from '@tanstack/angular-query-experimental';
-import {lastValueFrom} from 'rxjs';
+import {finalize, lastValueFrom, switchMap} from 'rxjs';
 
 @Component({
   selector: 'app-metadata-review-dialog-component',
@@ -35,6 +35,8 @@ export class MetadataReviewDialogComponent implements OnInit {
 
   readonly proposals = signal<FetchedProposal[]>([]);
   readonly currentIndex = signal(0);
+  /** True from the moment Accept & Save is pressed until both server calls have settled. */
+  readonly saving = signal(false);
   private readonly proposalBooksQuery = injectQuery(() => {
     const ids = [...new Set(this.proposals().map(proposal => proposal.bookId))];
     return {
@@ -81,18 +83,36 @@ export class MetadataReviewDialogComponent implements OnInit {
     return this.proposals()[this.currentIndex()] ?? null;
   }
 
+  /**
+   * Accepting is two server calls that must happen in this order.
+   *
+   * The picker's PUT is what actually writes the accepted values; the ACCEPTED status POST is what
+   * makes the server file the per-field provenance, and it does that by comparing the proposal against
+   * what the book holds *now*. Fired concurrently — as this used to — the POST usually reads pre-PUT
+   * metadata and attributes nothing, and in the other interleaving the PUT deletes the rows the POST
+   * has just filed. So the POST waits for the PUT's response, which is also the point at which its
+   * transaction has committed.
+   *
+   * A failed save short-circuits the `switchMap`: a proposal whose values never landed must not be
+   * marked accepted.
+   */
   onSave(): void {
     const currentProposal = this.currentProposal;
-    if (!currentProposal) return;
-    this.pickerComponent.onSave();
-    this.metadataTaskService.updateProposalStatus(currentProposal.taskId, currentProposal.proposalId, 'ACCEPTED').subscribe({
+    if (!currentProposal || this.saving()) return;
+    this.saving.set(true);
+    this.pickerComponent.saveMetadata().pipe(
+      switchMap(() => this.metadataTaskService.updateProposalStatus(
+        currentProposal.taskId, currentProposal.proposalId, 'ACCEPTED')),
+      finalize(() => this.saving.set(false)),
+    ).subscribe({
       next: () => {
         if (this.isLast) {
           this.metadataTaskService.deleteTask(currentProposal.taskId).subscribe(() => {
             this.progressService.clearTask(currentProposal.taskId);
           });
         }
-      }
+      },
+      error: () => undefined,   // the picker has already surfaced the failure to the user
     });
   }
 
