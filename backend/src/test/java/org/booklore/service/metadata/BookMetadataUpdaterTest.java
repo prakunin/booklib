@@ -2142,6 +2142,79 @@ class BookMetadataUpdaterTest {
         }
 
         @Test
+        void attributesNothingWhenAProviderMerelyAgreedWithTheValueAlreadyStored() {
+            metadataEntity.setIsbn13("9780000000001");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("Original Title")
+                    .isbn13("9780000000001")
+                    .fieldProviders(Map.of(MetadataField.ISBN_13, MetadataProvider.GoodReads))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(metadataEntity.getIsbn13()).isEqualTo("9780000000001");
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+            verify(bookMetadataFieldSourceRepository, never()).deleteByBookIdAndFieldNameIn(anyLong(), argThat(fields -> fields.contains(MetadataField.ISBN_13)));
+        }
+
+        @Test
+        void leavesAnExistingRowAloneWhenAProviderMerelyAgreedWithTheValueAlreadyStored() {
+            BookMetadataFieldSourceEntity seeded = seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
+            metadataEntity.setDescription("Exactly the same text");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("Original Title")
+                    .description("Exactly the same text")
+                    .fieldProviders(Map.of(MetadataField.DESCRIPTION, MetadataProvider.GoodReads))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(seeded.getProvider()).isEqualTo(MetadataProvider.Amazon);
+            assertThat(seeded.getUpdatedAt()).isEqualTo(Instant.parse("2020-01-01T00:00:00Z"));
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+            verify(bookMetadataFieldSourceRepository, never()).deleteByBookIdAndFieldNameIn(anyLong(), any());
+        }
+
+        @Test
+        void clearsOnlyTheRowsOfTheFieldsAnUnattributedWriteActuallyChanged() {
+            BookMetadataFieldSourceEntity description = BookMetadataFieldSourceEntity.builder()
+                    .bookId(1L).fieldName(MetadataField.DESCRIPTION).provider(MetadataProvider.Amazon)
+                    .updatedAt(Instant.parse("2020-01-01T00:00:00Z")).build();
+            BookMetadataFieldSourceEntity isbn = BookMetadataFieldSourceEntity.builder()
+                    .bookId(1L).fieldName(MetadataField.ISBN_13).provider(MetadataProvider.Amazon)
+                    .updatedAt(Instant.parse("2020-01-01T00:00:00Z")).build();
+            when(bookMetadataFieldSourceRepository.findByBookId(1L)).thenReturn(new ArrayList<>(List.of(description, isbn)));
+            metadataEntity.setDescription("What the provider had put there");
+            metadataEntity.setIsbn13("9780000000001");
+
+            // The shape an accepted review proposal arrives in: no fieldProviders survived the JSON
+            // round trip through metadata_fetch_proposal, so nothing here is attributable.
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("Original Title")
+                    .description("A different description entirely")
+                    .isbn13("9780000000001")
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_WHEN_PROVIDED));
+            }
+
+            verify(bookMetadataFieldSourceRepository).deleteByBookIdAndFieldNameIn(1L, Set.of(MetadataField.DESCRIPTION));
+            assertThat(isbn.getProvider()).isEqualTo(MetadataProvider.Amazon);
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+        }
+
+        @Test
         void recordsNothingWhenReplaceMissingDeclinedToWriteTheField() {
             seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
             metadataEntity.setDescription("A description that is already here");

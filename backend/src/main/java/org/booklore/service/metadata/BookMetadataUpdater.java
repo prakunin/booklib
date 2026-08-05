@@ -144,13 +144,28 @@ public class BookMetadataUpdater {
         private final Map<MetadataField, MetadataProvider> toRecord = new EnumMap<>(MetadataField.class);
         private final Set<MetadataField> toDelete = EnumSet.noneOf(MetadataField.class);
 
+        /**
+         * A null map and an empty one mean the same thing here - no attribution reached the updater -
+         * and are deliberately not distinguished. The write paths that arrive with no map at all are
+         * the manual metadata PUT, a sidecar or rescan import, and an accepted review proposal (the
+         * provider map does not survive the JSON round trip through {@code metadata_fetch_proposal}),
+         * and the first two of those are exactly the hand edits rule 3 exists to catch. Since a row
+         * asserts "the value stored now came from X", any of them changing a value makes an existing
+         * row false, whether or not we can name the new source; the row goes, and its absence says
+         * "origin unknown", which is the truth. Recording provenance through the proposal path needs
+         * the map persisted with the proposal and filed when it is accepted - see the Task 12 report.
+         */
         private FieldSourceChanges(Map<MetadataField, MetadataProvider> providers) {
             this.providers = providers != null ? providers : Map.of();
         }
 
         private void record(MetadataField field, FieldWriteOutcome outcome) {
-            if (field == null || outcome == FieldWriteOutcome.NOT_WRITTEN) {
+            if (field == null || outcome == FieldWriteOutcome.NOT_WRITTEN || outcome == FieldWriteOutcome.UNCHANGED) {
                 // Nothing was stored, so whatever the field's row says is still whatever it said.
+                // UNCHANGED counts as nothing stored in both directions - it neither deletes a row nor
+                // creates one. A provider that hands back exactly what is already stored cannot be told
+                // apart from a user who typed what that provider would have said, so filing a row here
+                // would credit the provider with the user's own text.
                 return;
             }
             if (outcome == FieldWriteOutcome.CLEARED) {
@@ -161,7 +176,7 @@ public class BookMetadataUpdater {
             MetadataProvider provider = providers.get(field);
             if (provider != null) {
                 toRecord.put(field, provider);
-            } else if (outcome == FieldWriteOutcome.WRITTEN) {
+            } else {
                 // Something changed this field and named no provider - a manual edit is exactly this
                 // shape - so any existing row now credits a provider for someone else's text.
                 toDelete.add(field);
