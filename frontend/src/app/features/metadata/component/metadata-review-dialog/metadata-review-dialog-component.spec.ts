@@ -179,6 +179,23 @@ describe('MetadataReviewDialogComponent', () => {
     expect(clearTask).not.toHaveBeenCalled();
   });
 
+  it('leaves Accept & Save usable when a proposal renders without a picker behind it', () => {
+    // The footer renders under `@if (!loading())`; the picker renders under the narrower
+    // `@if (currentProposal?.metadataJson; as proposed)`. A proposal with a falsy metadataJson
+    // therefore shows the button with no picker, and the un-guarded `this.pickerComponent.saveMetadata()`
+    // threw before the pipe existed — so `finalize` never ran and the button stayed disabled for the
+    // rest of the dialog's life.
+    getTaskWithProposals.mockReturnValue(of({proposals: []}));
+
+    const component = createComponent('task-1');
+    component.proposals.set([createProposal({proposalId: 5, metadataJson: null as unknown as BookMetadata})]);
+    component.pickerComponent = undefined as unknown as MetadataPickerComponent;
+
+    expect(() => component.onSave()).not.toThrow();
+    expect(component.saving()).toBe(false);
+    expect(updateProposalStatus).not.toHaveBeenCalled();
+  });
+
   it('advances between proposals and closes when moving past the last one', () => {
     getTaskWithProposals.mockReturnValue(of({proposals: []}));
 

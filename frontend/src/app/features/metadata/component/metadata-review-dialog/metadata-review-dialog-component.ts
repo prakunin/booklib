@@ -98,9 +98,16 @@ export class MetadataReviewDialogComponent implements OnInit {
    */
   onSave(): void {
     const currentProposal = this.currentProposal;
-    if (!currentProposal || this.saving()) return;
+    // The picker is guarded as well as the proposal: the footer holding Accept & Save renders under
+    // `@if (!loading())` while the picker renders under the narrower
+    // `@if (currentProposal?.metadataJson; as proposed)`, so a proposal with a falsy metadataJson
+    // shows the button with no picker behind it. Reading `saveMetadata()` off `undefined` throws
+    // before the pipe exists, so `finalize` never runs and `saving()` stays true — leaving the button
+    // `[disabled]` for the rest of the dialog's life.
+    const picker = this.pickerComponent;
+    if (!currentProposal || !picker || this.saving()) return;
     this.saving.set(true);
-    this.pickerComponent.saveMetadata().pipe(
+    picker.saveMetadata().pipe(
       switchMap(() => this.metadataTaskService.updateProposalStatus(
         currentProposal.taskId, currentProposal.proposalId, 'ACCEPTED')),
       finalize(() => this.saving.set(false)),
