@@ -30,3 +30,20 @@ export interface InpxArchiveScanTask {
   completedAt: string | null;
   errorMessage: string | null;
 }
+
+export type LocalCatalogSourceType = 'REVIEW' | 'AUTHOR_BIO' | 'COMPILATION' | 'COMPILATION_PART' | 'LANGUAGE';
+
+/**
+ * What a local catalog attached to a library has indexed, and how much of the library's metadata it
+ * has actually filled. `authorsWithBiography` is global (authors are not library-scoped), not specific
+ * to this library — see `LocalCatalogStatusDto` on the backend.
+ */
+export interface LocalCatalogStatus {
+  configured: boolean;
+  catalogPath: string | null;
+  indexedEntries: Record<LocalCatalogSourceType, number>;
+  totalBooks: number;
+  booksWithDescription: number;
+  localReviews: number;
+  authorsWithBiography: number;
+}

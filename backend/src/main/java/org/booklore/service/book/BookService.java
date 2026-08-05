@@ -17,6 +17,7 @@ import org.booklore.repository.*;
 import org.booklore.service.FileStreamingService;
 import org.booklore.service.audit.AuditService;
 import org.booklore.service.inpx.ArchivedBookContentService;
+import org.booklore.service.metadata.BookMetadataFieldSourceService;
 import org.booklore.service.metadata.sidecar.SidecarMetadataWriter;
 import org.booklore.service.monitoring.MonitoringRegistrationService;
 import org.booklore.service.annotation.InvalidateUserStats;
@@ -75,6 +76,7 @@ public class BookService {
     private final AuditService auditService;
     private final ArchivedBookContentService archivedBookContentService;
     private final ContentRestrictionService contentRestrictionService;
+    private final BookMetadataFieldSourceService bookMetadataFieldSourceService;
 
 
     public List<Book> getBookDTOs(boolean includeDescription, boolean stripForListView) {
@@ -166,7 +168,7 @@ public class BookService {
         Map<Long, UserBookFileProgressEntity> fileProgressMap =
                 readingProgressService.fetchUserFileProgress(user.getId(), entityIds);
 
-        return bookEntities.stream().map(bookEntity -> {
+        List<Book> books = bookEntities.stream().map(bookEntity -> {
             Book book = bookMapper.toBook(bookEntity);
             if (!withDescription) book.getMetadata().setDescription(null);
             readingProgressService.enrichBookWithProgress(
@@ -176,6 +178,12 @@ public class BookService {
             );
             return book;
         }).toList();
+
+        // One statement for the whole set, not one per book: this endpoint is called with an
+        // explicit id list that the caller chooses the size of.
+        bookMetadataFieldSourceService.attachTo(books);
+
+        return books;
     }
 
     public Book getBook(long bookId, boolean withDescription) {
@@ -197,6 +205,8 @@ public class BookService {
         if (!withDescription) {
             book.getMetadata().setDescription(null);
         }
+
+        bookMetadataFieldSourceService.attachTo(book);
 
         return book;
     }

@@ -1,6 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {of, throwError} from 'rxjs';
+import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
 
@@ -44,12 +44,14 @@ describe('MetadataReviewDialogComponent', () => {
     };
   }
 
-  function createPickerStub() {
+  function createPickerStub(save: Subject<unknown> = new Subject<unknown>()) {
     return {
+      save,
+      saveMetadata: vi.fn(() => save),
       onSave: vi.fn(),
       lockAll: vi.fn(),
       unlockAll: vi.fn(),
-    } as unknown as MetadataPickerComponent;
+    } as unknown as MetadataPickerComponent & {save: Subject<unknown>; saveMetadata: ReturnType<typeof vi.fn>};
   }
 
   function createComponent(taskId: string | undefined) {
@@ -104,19 +106,63 @@ describe('MetadataReviewDialogComponent', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it('saves the current proposal and clears progress when saving the last proposal', () => {
+  it('does not mark the proposal accepted until the metadata save has finished at the server', () => {
     getTaskWithProposals.mockReturnValue(of({proposals: []}));
 
+    const save = new Subject<unknown>();
     const component = createComponent('task-1');
     component.proposals.set([createProposal({proposalId: 5})]);
-    component.pickerComponent = createPickerStub();
+    const picker = createPickerStub(save);
+    component.pickerComponent = picker;
 
     component.onSave();
 
-    expect(component.pickerComponent.onSave).toHaveBeenCalledOnce();
+    // The PUT that writes the accepted values is still in flight. Posting ACCEPTED now would make the
+    // server compare the proposal against pre-save metadata and file no provenance at all — and the
+    // PUT landing afterwards would delete the rows of every field it changed.
+    expect(picker.saveMetadata).toHaveBeenCalledOnce();
+    expect(component.saving()).toBe(true);
+    expect(updateProposalStatus).not.toHaveBeenCalled();
+
+    save.next(undefined);
+    save.complete();
+
     expect(updateProposalStatus).toHaveBeenCalledWith('task-1', 5, 'ACCEPTED');
     expect(deleteTask).toHaveBeenCalledWith('task-1');
     expect(clearTask).toHaveBeenCalledWith('task-1');
+    expect(component.saving()).toBe(false);
+  });
+
+  it('never marks a proposal accepted when its metadata save failed', () => {
+    getTaskWithProposals.mockReturnValue(of({proposals: []}));
+
+    const save = new Subject<unknown>();
+    const component = createComponent('task-1');
+    component.proposals.set([createProposal({proposalId: 5})]);
+    component.pickerComponent = createPickerStub(save);
+
+    component.onSave();
+    save.error(new Error('put failed'));
+
+    expect(updateProposalStatus).not.toHaveBeenCalled();
+    expect(deleteTask).not.toHaveBeenCalled();
+    expect(component.saving()).toBe(false);
+  });
+
+  it('ignores a second Accept while the first is still in flight', () => {
+    getTaskWithProposals.mockReturnValue(of({proposals: []}));
+
+    const save = new Subject<unknown>();
+    const component = createComponent('task-1');
+    component.proposals.set([createProposal({proposalId: 5})]);
+    const picker = createPickerStub(save);
+    component.pickerComponent = picker;
+
+    component.onSave();
+    component.onSave();
+
+    // Accepting is now asynchronous, so a double click must not issue the PUT twice.
+    expect(picker.saveMetadata).toHaveBeenCalledOnce();
   });
 
   it('does nothing when save is triggered without an active proposal', () => {
@@ -127,10 +173,27 @@ describe('MetadataReviewDialogComponent', () => {
 
     component.onSave();
 
-    expect(component.pickerComponent.onSave).not.toHaveBeenCalled();
+    expect(component.pickerComponent.saveMetadata).not.toHaveBeenCalled();
     expect(updateProposalStatus).not.toHaveBeenCalled();
     expect(deleteTask).not.toHaveBeenCalled();
     expect(clearTask).not.toHaveBeenCalled();
+  });
+
+  it('leaves Accept & Save usable when a proposal renders without a picker behind it', () => {
+    // The footer renders under `@if (!loading())`; the picker renders under the narrower
+    // `@if (currentProposal?.metadataJson; as proposed)`. A proposal with a falsy metadataJson
+    // therefore shows the button with no picker, and the un-guarded `this.pickerComponent.saveMetadata()`
+    // threw before the pipe existed — so `finalize` never ran and the button stayed disabled for the
+    // rest of the dialog's life.
+    getTaskWithProposals.mockReturnValue(of({proposals: []}));
+
+    const component = createComponent('task-1');
+    component.proposals.set([createProposal({proposalId: 5, metadataJson: null as unknown as BookMetadata})]);
+    component.pickerComponent = undefined as unknown as MetadataPickerComponent;
+
+    expect(() => component.onSave()).not.toThrow();
+    expect(component.saving()).toBe(false);
+    expect(updateProposalStatus).not.toHaveBeenCalled();
   });
 
   it('advances between proposals and closes when moving past the last one', () => {

@@ -19,6 +19,16 @@ public interface AuthorRepository extends JpaRepository<AuthorEntity, Long> {
 
     Optional<AuthorEntity> findByNameIgnoreCase(String name);
 
+    /**
+     * Same case-folded match as {@link #findByNameIgnoreCase}, but as a {@code List} rather than an
+     * {@code Optional}. {@code unique_name} only constrains the exact string, so on a collation that
+     * is not case-insensitive two rows (e.g. {@code Orwell} and {@code ORWELL}) can legitimately match
+     * the same folded name; the {@code Optional} form throws {@code IncorrectResultSizeDataAccessException}
+     * the moment that happens, which is unsafe for a caller that must not abort on an ambiguous name.
+     * Ordered by id so a caller taking the first result gets a deterministic, reproducible pick.
+     */
+    List<AuthorEntity> findAllByNameIgnoreCaseOrderByIdAsc(String name);
+
     @Query("SELECT a FROM AuthorEntity a JOIN a.bookMetadataEntityList bm WHERE bm.bookId = :bookId")
     List<AuthorEntity> findAuthorsByBookId(@Param("bookId") Long bookId);
 
@@ -45,6 +55,12 @@ public interface AuthorRepository extends JpaRepository<AuthorEntity, Long> {
 
     @Query("SELECT bm.bookId AS bookId, a.name AS authorName FROM AuthorEntity a JOIN a.bookMetadataEntityList bm WHERE bm.bookId IN :bookIds ORDER BY a.name")
     List<AuthorBookProjection> findAuthorNamesByBookIds(@Param("bookIds") Set<Long> bookIds);
+
+    /**
+     * Authors with a non-blank description. Global — authors are not library-scoped in this schema.
+     */
+    @Query("SELECT COUNT(a) FROM AuthorEntity a WHERE a.description IS NOT NULL AND TRIM(a.description) <> ''")
+    long countWithNonBlankDescription();
 
     interface AuthorBookProjection {
         Long getBookId();

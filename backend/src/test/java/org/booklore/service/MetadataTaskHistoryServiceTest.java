@@ -2,6 +2,7 @@ package org.booklore.service;
 
 import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.mapper.FetchedProposalMapper;
+import org.booklore.service.metadata.MetadataProposalProvenanceService;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.FetchedProposal;
 import org.booklore.model.dto.MetadataBatchProgressNotification;
@@ -40,6 +41,8 @@ class MetadataTaskHistoryServiceTest {
 
     @Mock
     private AuthenticationService authenticationService;
+    @Mock
+    private MetadataProposalProvenanceService proposalProvenanceService;
 
     @InjectMocks
     private MetadataTaskService service;

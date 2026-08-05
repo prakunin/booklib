@@ -57,7 +57,7 @@
                       @if (review.metadataProvider) {
                         <p-tag
                           [rounded]="true"
-                          [value]="review.metadataProvider"
+                          [value]="getProviderLabel(review.metadataProvider)"
                           [severity]="getProviderSeverity(review.metadataProvider)"/>
                       }
                       @if (review.country) {

@@ -8,6 +8,7 @@ import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.MergeMetadataType;
+import org.booklore.model.enums.MetadataField;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.author.AuthorLocalResolver;
@@ -15,8 +16,10 @@ import org.booklore.service.file.FileMoveService;
 import org.booklore.service.metadata.writer.MetadataWriter;
 import org.booklore.service.metadata.writer.MetadataWriterFactory;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -47,6 +50,7 @@ class MetadataManagementServiceTest {
     @Mock private MetadataWriterFactory metadataWriterFactory;
     @Mock private FileMoveService fileMoveService;
     @Mock private BookRepository bookRepository;
+    @Mock private BookMetadataFieldSourceRepository bookMetadataFieldSourceRepository;
 
     @InjectMocks
     private MetadataManagementService service;
@@ -782,5 +786,136 @@ class MetadataManagementServiceTest {
         verify(metadataWriterFactory, never()).getWriter(any());
         verify(bookRepository, never()).saveAndFlush(any());
         verify(authorRepository).delete(oldAuthor);
+    }
+
+    /**
+     * A {@code book_metadata_field_source} row asserts "the value stored in this field right now came
+     * from this provider". These six paths write {@code series_name}, {@code publisher} and
+     * {@code language} straight through {@code saveAll}, without {@code BookMetadataUpdater}, so
+     * without an explicit deletion the row survives the change that invalidates it: after a merge it
+     * credits a provider for a value the <em>user</em> chose on the consolidation screen, and after a
+     * delete it credits a provider for a field that is now NULL.
+     * <p>
+     * These are three of the fields the local catalog fills across the whole library, so this is the
+     * first thing an operator tidying up catalog-derived language codes and compilation series names
+     * would hit.
+     */
+    @Nested
+    class FieldSourceProvenance {
+
+        private BookMetadataEntity metadataFor(long bookId) {
+            return BookMetadataEntity.builder()
+                    .bookId(bookId)
+                    .seriesName("Old Series")
+                    .publisher("Old Pub")
+                    .language("fr")
+                    .build();
+        }
+
+        @Test
+        void aSeriesMergeDropsTheSeriesNameRow() {
+            when(bookMetadataRepository.findAllBySeriesNameIgnoreCase("Old Series"))
+                    .thenReturn(List.of(metadataFor(11L)));
+
+            service.consolidateMetadata(MergeMetadataType.series, List.of("New Series"), List.of("Old Series"));
+
+            verify(bookMetadataFieldSourceRepository)
+                    .deleteByBookIdInAndFieldNameIn(List.of(11L), List.of(MetadataField.SERIES_NAME));
+        }
+
+        /**
+         * The delete clears {@code seriesNumber} and {@code seriesTotal} as well as the name, so all
+         * three rows are now false and all three must go.
+         */
+        @Test
+        void aSeriesDeleteDropsTheNameNumberAndTotalRows() {
+            when(bookMetadataRepository.findAllBySeriesNameIgnoreCase("Old Series"))
+                    .thenReturn(List.of(metadataFor(11L)));
+
+            service.deleteMetadata(MergeMetadataType.series, List.of("Old Series"));
+
+            verify(bookMetadataFieldSourceRepository).deleteByBookIdInAndFieldNameIn(
+                    List.of(11L),
+                    List.of(MetadataField.SERIES_NAME, MetadataField.SERIES_NUMBER, MetadataField.SERIES_TOTAL));
+        }
+
+        @Test
+        void aPublisherMergeDropsThePublisherRow() {
+            when(bookMetadataRepository.findAllByPublisherIgnoreCase("Old Pub"))
+                    .thenReturn(List.of(metadataFor(12L)));
+
+            service.consolidateMetadata(MergeMetadataType.publishers, List.of("New Pub"), List.of("Old Pub"));
+
+            verify(bookMetadataFieldSourceRepository)
+                    .deleteByBookIdInAndFieldNameIn(List.of(12L), List.of(MetadataField.PUBLISHER));
+        }
+
+        @Test
+        void aPublisherDeleteDropsThePublisherRow() {
+            when(bookMetadataRepository.findAllByPublisherIgnoreCase("Old Pub"))
+                    .thenReturn(List.of(metadataFor(12L)));
+
+            service.deleteMetadata(MergeMetadataType.publishers, List.of("Old Pub"));
+
+            verify(bookMetadataFieldSourceRepository)
+                    .deleteByBookIdInAndFieldNameIn(List.of(12L), List.of(MetadataField.PUBLISHER));
+        }
+
+        @Test
+        void aLanguageMergeDropsTheLanguageRow() {
+            when(bookMetadataRepository.findAllByLanguageIgnoreCase("fr"))
+                    .thenReturn(List.of(metadataFor(13L)));
+
+            service.consolidateMetadata(MergeMetadataType.languages, List.of("en"), List.of("fr"));
+
+            verify(bookMetadataFieldSourceRepository)
+                    .deleteByBookIdInAndFieldNameIn(List.of(13L), List.of(MetadataField.LANGUAGE));
+        }
+
+        @Test
+        void aLanguageDeleteDropsTheLanguageRow() {
+            when(bookMetadataRepository.findAllByLanguageIgnoreCase("fr"))
+                    .thenReturn(List.of(metadataFor(13L)));
+
+            service.deleteMetadata(MergeMetadataType.languages, List.of("fr"));
+
+            verify(bookMetadataFieldSourceRepository)
+                    .deleteByBookIdInAndFieldNameIn(List.of(13L), List.of(MetadataField.LANGUAGE));
+        }
+
+        /**
+         * These merges run over whole-library result sets, so the {@code IN} list is batched rather
+         * than sent as one statement per book or one statement of 702,511 ids. 2,500 books is two full
+         * batches and a partial one.
+         */
+        @Test
+        void theDeleteIsBatchedRatherThanOneStatementForTheWholeLibrary() {
+            List<BookMetadataEntity> books = new ArrayList<>();
+            for (long bookId = 1; bookId <= 2_500; bookId++) {
+                books.add(metadataFor(bookId));
+            }
+            when(bookMetadataRepository.findAllByLanguageIgnoreCase("fr")).thenReturn(books);
+
+            service.consolidateMetadata(MergeMetadataType.languages, List.of("en"), List.of("fr"));
+
+            ArgumentCaptor<Collection<Long>> captor = ArgumentCaptor.captor();
+            verify(bookMetadataFieldSourceRepository, times(3))
+                    .deleteByBookIdInAndFieldNameIn(captor.capture(), eq(List.of(MetadataField.LANGUAGE)));
+            assertThat(captor.getAllValues()).extracting(Collection::size).containsExactly(1_000, 1_000, 500);
+            assertThat(captor.getAllValues().stream().flatMap(Collection::stream).distinct()).hasSize(2_500);
+        }
+
+        /**
+         * A merge that matched nothing must not issue a delete with an empty {@code IN} list, which
+         * some drivers reject outright.
+         */
+        @Test
+        void touchesNothingWhenTheMergeMatchedNoBooks() {
+            when(bookMetadataRepository.findAllByLanguageIgnoreCase("fr")).thenReturn(List.of());
+
+            service.consolidateMetadata(MergeMetadataType.languages, List.of("en"), List.of("fr"));
+
+            verifyNoInteractions(bookMetadataFieldSourceRepository);
+        }
     }
 }

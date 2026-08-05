@@ -195,6 +195,9 @@
     "specialCharacter": "a special character",
     "invalid": "Password does not meet the current requirements"
   },
+  "metadataProvider": {
+    "flibustaLocal": "Local catalog"
+  },
   "ui": {
     "autocomplete": {
       "noResults": "No results",

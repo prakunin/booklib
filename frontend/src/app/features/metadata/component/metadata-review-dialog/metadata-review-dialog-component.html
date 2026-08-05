@@ -74,10 +74,11 @@
 
         <p-button
           label="Accept & Save"
-          icon="pi pi-check-circle"
+          [icon]="saving() ? 'pi pi-spin pi-spinner' : 'pi pi-check-circle'"
           iconPos="right"
           severity="success"
           [outlined]="true"
+          [disabled]="saving()"
           (click)="onSave()">
         </p-button>
 

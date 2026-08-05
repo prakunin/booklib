@@ -91,6 +91,31 @@ class TaskServiceTest {
         assertTrue(tasks.stream().anyMatch(t -> t.getTaskType() == TaskType.CLEANUP_TEMP_METADATA));
     }
 
+    /**
+     * Task Management renders a Run card for every task {@code getAvailableTasks} returns, and its
+     * generic Run path sends {@code options: null} for everything except
+     * {@code REFRESH_LIBRARY_METADATA}. {@code LOCAL_CATALOG_BACKFILL} requires a {@code libraryId} —
+     * the catalog it reads is a per-library setting — so a card there is a button that can only ever
+     * fail {@code requireLibraryId} with a generic "failed to start" toast, from a screen that has no
+     * way to succeed. It is launched from the INPX archive panel instead, which knows the library.
+     * <p>
+     * {@code REFRESH_METADATA_MANUAL} is the existing precedent for exactly this shape and is hidden
+     * for exactly this reason.
+     */
+    @Test
+    void backfillIsNotOfferedAsAGenericRunnableTask() {
+        when(taskCronService.getCronConfigOrDefault(any())).thenReturn(
+                CronConfig.builder().taskType(TaskType.CLEANUP_TEMP_METADATA).enabled(false).build());
+
+        List<TaskInfo> tasks = taskService.getAvailableTasks();
+
+        assertTrue(tasks.stream().noneMatch(t -> t.getTaskType() == TaskType.LOCAL_CATALOG_BACKFILL),
+                "LOCAL_CATALOG_BACKFILL must be hiddenFromUI: Task Management's generic Run button "
+                        + "cannot supply the libraryId the task requires");
+        assertTrue(tasks.stream().noneMatch(t -> t.getTaskType() == TaskType.REFRESH_METADATA_MANUAL),
+                "REFRESH_METADATA_MANUAL is the precedent this follows and must stay hidden too");
+    }
+
     @Test
     void testRunAsUserSyncTask() {
         BookLoreUser user = new BookLoreUser();

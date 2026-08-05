@@ -850,6 +850,19 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     long countByLibraryIdNonDeleted(@Param("libraryId") Long libraryId);
 
     /**
+     * Non-deleted books in a library whose metadata description is non-null and non-blank. The
+     * coverage number the local catalog backfill (Task 10A) reports climbing as it runs.
+     */
+    @Query("""
+            SELECT COUNT(b) FROM BookEntity b
+            WHERE b.library.id = :libraryId
+              AND (b.deleted IS NULL OR b.deleted = false)
+              AND b.metadata.description IS NOT NULL
+              AND TRIM(b.metadata.description) <> ''
+            """)
+    long countByLibraryIdNonDeletedWithDescription(@Param("libraryId") Long libraryId);
+
+    /**
      * Paginated query for all non-deleted books (main UI listing).
      * Only ToOne paths in EntityGraph to avoid Cartesian product with LIMIT;
      * collections (authors, categories, tags, moods, shelves, bookFiles) loaded via @BatchSize.

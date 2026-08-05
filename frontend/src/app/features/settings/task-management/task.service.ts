@@ -12,7 +12,8 @@ export enum TaskType {
   SYNC_LIBRARY_FILES = 'SYNC_LIBRARY_FILES',
   BOOKDROP_PERIODIC_SCANNING = 'BOOKDROP_PERIODIC_SCANNING',
   CLEANUP_TEMP_METADATA = 'CLEANUP_TEMP_METADATA',
-  REFRESH_METADATA_MANUAL = 'REFRESH_METADATA_MANUAL'
+  REFRESH_METADATA_MANUAL = 'REFRESH_METADATA_MANUAL',
+  LOCAL_CATALOG_BACKFILL = 'LOCAL_CATALOG_BACKFILL'
 }
 
 export const TASK_TYPE_CONFIG: Record<TaskType, { parallel: boolean; async: boolean; displayOrder: number }> = {
@@ -24,6 +25,11 @@ export const TASK_TYPE_CONFIG: Record<TaskType, { parallel: boolean; async: bool
   [TaskType.CLEANUP_TEMP_METADATA]: {parallel: false, async: false, displayOrder: 6},
   [TaskType.REFRESH_METADATA_MANUAL]: {parallel: false, async: false, displayOrder: 7},
   [TaskType.CLEAR_PDF_CACHE]: {parallel: false, async: false, displayOrder: 8},
+  // REFRESH_METADATA_MANUAL and LOCAL_CATALOG_BACKFILL are hiddenFromUI on the backend, so Task
+  // Management never receives them and never reads these two entries. They are kept because this is
+  // an exhaustive Record<TaskType, ...> and the enum members themselves are load-bearing: the INPX
+  // archive panel starts LOCAL_CATALOG_BACKFILL with a libraryId and filters task progress on it.
+  [TaskType.LOCAL_CATALOG_BACKFILL]: {parallel: false, async: true, displayOrder: 9},
 };
 
 export enum MetadataReplaceMode {
@@ -35,10 +41,14 @@ export interface LibraryRescanOptions {
   metadataReplaceMode?: MetadataReplaceMode;
 }
 
+export interface LocalCatalogBackfillOptions {
+  libraryId: number;
+}
+
 export interface TaskCreateRequest {
   taskType: TaskType;
   triggeredByCron?: boolean;
-  options?: LibraryRescanOptions | MetadataRefreshRequest | null;
+  options?: LibraryRescanOptions | MetadataRefreshRequest | LocalCatalogBackfillOptions | null;
 }
 
 export interface TaskCreateResponse {

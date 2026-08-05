@@ -12,6 +12,7 @@ import org.booklore.repository.BookFileRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.CategoryRepository;
 import org.booklore.service.author.AuthorLocalResolver;
+import org.booklore.service.enrichment.queue.EnrichmentQueueService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +48,8 @@ class InpxBatchWriterTest {
     private CategoryRepository categoryRepository;
     @Mock
     private AuthorLocalResolver authorLocalResolver;
+    @Mock
+    private EnrichmentQueueService enrichmentQueueService;
     @Mock
     private EntityManager entityManager;
 

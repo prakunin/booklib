@@ -32,4 +32,20 @@ public interface LocalCatalogSource {
     Optional<String> lookupAuthorBio(long libraryId, String authorName);
 
     List<CompilationPart> lookupCompilation(long libraryId, String archiveName, String entryName);
+
+    /**
+     * The language the catalog lists this book under, as a lower-case code such as {@code "ru"}.
+     */
+    default Optional<String> lookupLanguage(long libraryId, String archiveName, String entryName) {
+        return Optional.empty();
+    }
+
+    /**
+     * Every omnibus the catalog says this book is a part of. A work legitimately belongs to more than
+     * one — the caller decides what, if anything, to do with ambiguity; this method only reports it.
+     */
+    default List<CompilationMembership> lookupContainingCompilations(
+            long libraryId, String archiveName, String entryName) {
+        return List.of();
+    }
 }

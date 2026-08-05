@@ -4,10 +4,12 @@ import org.booklore.util.BookUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.LazyGroup;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 
 @Entity
+@Slf4j
 @Getter
 @Setter
 @Builder
@@ -346,6 +349,7 @@ public class BookMetadataEntity {
         this.title = trimOrNull(this.title);
         this.subtitle = trimOrNull(this.subtitle);
         this.publisher = trimOrNull(this.publisher);
+        this.description = clampDescription(this.description);
         this.seriesName = trimToCodePoints(this.seriesName, SERIES_NAME_MAX_LENGTH);
         this.language = trimOrNull(this.language);
         this.isbn13 = trimOrNull(this.isbn13);
@@ -361,6 +365,58 @@ public class BookMetadataEntity {
         this.audibleId = trimOrNull(this.audibleId);
         this.contentRating = trimOrNull(this.contentRating);
         this.narrator = trimOrNull(this.narrator);
+    }
+
+    /**
+     * Fits the description into its {@code TEXT} column, and says so when it has to.
+     * <p>
+     * {@code TEXT} is a byte budget, not a character count, and the local catalog writes annotations
+     * of unbounded length into it. Overflowing does not truncate — MariaDB rolls back the whole
+     * transaction, which on the enrichment path carries the book's language, series, reviews and its
+     * authors' biographies alongside the description. The clamp lives here, in the lifecycle callback,
+     * rather than in one caller, so every write path (enrichment, provider fetch, bulk edit, sidecar
+     * import) is covered by the same guard.
+     * <p>
+     * Losing the tail of a description is still data loss, so it is not done silently: a truncation is
+     * a fact about the catalog's content that an operator may want to act on, and neither the user nor
+     * the log had any way to learn of it. The warning is bound to the clamp actually firing — this
+     * method runs on every metadata write, ~700k times in a backfill, and the common path must stay
+     * quiet. The comparison is on length rather than identity so that "was it shortened" is stated
+     * directly, and the UTF-8 byte count, which is the constraint that was hit, is only computed on
+     * the rare branch that reports it.
+     * <p>
+     * The id is read from the {@code book} association when the field is still empty. {@code bookId}
+     * is derived through {@code @MapsId} and Hibernate resolves it during {@code save}, after
+     * {@code @PrePersist} has already run, so on an INSERT the field is null at exactly the moment
+     * this fires — and a warning about lost text that names no book is close to useless to whoever
+     * has to act on it. Nothing in {@code src/main/java} sets {@code bookId} on this entity directly,
+     * so the association is the best identity available here.
+     * <p>
+     * It is not always an identity, though, so this recovers the common case rather than guaranteeing
+     * a name. It covers every UPDATE, where {@code bookId} is already populated, and the cascaded
+     * INSERT: {@code BookEntity}'s id is {@code IDENTITY}, so the parent row is inserted at
+     * {@code persist} time and the association has an id by the time the cascade reaches this
+     * entity's {@code @PrePersist}. That is what covers a metadata built with neither field set —
+     * {@code BookFileDetachmentService.copyMetadataFrom} does exactly that, description included, and
+     * attaches the parent before saving.
+     * <p>
+     * What it does not cover is {@code updateSearchText()} called by hand ahead of the save:
+     * {@code PhysicalBookService} calls it through {@code addAuthorsToBook} <em>before</em>
+     * {@code bookRepository.save}, so the clamp fires against a parent that is still transient and
+     * {@code book.getId()} is null. The value is already clamped by the time {@code @PrePersist} runs,
+     * so the length comparison is false there and no second, named warning follows: a description
+     * truncated on that path yields one nameless warning and nothing more.
+     */
+    private String clampDescription(String value) {
+        String clamped = BookUtils.clampToUtf8Bytes(value, BookUtils.TEXT_MAX_UTF8_BYTES);
+        if (value != null && clamped.length() < value.length()) {
+            Long id = this.bookId != null ? this.bookId : (this.book == null ? null : this.book.getId());
+            log.warn("Description of book {} did not fit its TEXT column and was truncated: {} characters "
+                            + "({} bytes of UTF-8) cut to {} characters, against a column limit of {} bytes",
+                    id, value.length(), value.getBytes(StandardCharsets.UTF_8).length,
+                    clamped.length(), BookUtils.TEXT_MAX_UTF8_BYTES);
+        }
+        return clamped;
     }
 
     private static String trimToCodePoints(String value, int maxCodePoints) {

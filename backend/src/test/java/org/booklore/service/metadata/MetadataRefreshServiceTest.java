@@ -62,6 +62,7 @@ class MetadataRefreshServiceTest {
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private AuthenticationService authenticationService;
     @Mock private TaskCancellationManager cancellationManager;
+    @Mock private MetadataProposalProvenanceService proposalProvenanceService;
 
     @InjectMocks
     private MetadataRefreshService service;
@@ -1621,6 +1622,45 @@ class MetadataRefreshServiceTest {
             assertThat(jobCaptor.getAllValues())
                     .extracting(MetadataFetchJobEntity::getStatus)
                     .contains(MetadataFetchTaskStatus.COMPLETED);
+        }
+
+        /**
+         * The review-mode branch parks the fetched metadata as a proposal instead of writing it, and
+         * the moment the proposal is built is the only one at which both the proposed value and the
+         * value the book already held exist — the accept arrives later as a separate client PUT with
+         * no before-state. So {@code saveProposal} has to ask
+         * {@link MetadataProposalProvenanceService#describeChanges} and carry the answer onto the
+         * proposal.
+         * <p>
+         * This is a call-site test: before it, nothing in the suite named this line, and deleting it
+         * left the suite green while every review-gated accept silently lost its attribution.
+         */
+        @Test
+        void reviewModeStoresTheProviderMapOnTheProposal() {
+            BookEntity book = unlockedBook(20L);
+            Book mapped = Book.builder().id(20L)
+                    .metadata(BookMetadata.builder().title("Title 20").build()).build();
+            when(bookRepository.findAllWithMetadataByIds(Set.of(20L))).thenReturn(List.of(book));
+            when(bookMapper.toBook(book)).thenReturn(mapped);
+            when(proposalProvenanceService.describeChanges(any(), eq(mapped.getMetadata())))
+                    .thenReturn("{\"TITLE\":\"Amazon\"}");
+
+            MetadataRefreshOptions options = MetadataRefreshOptions.builder()
+                    .fieldOptions(new MetadataRefreshOptions.FieldOptions())
+                    .enabledFields(new MetadataRefreshOptions.EnabledFields())
+                    .reviewBeforeApply(true)
+                    .build();
+
+            service.refreshMetadata(booksRequest(20L, options), JOB_ID);
+
+            ArgumentCaptor<MetadataFetchJobEntity> jobCaptor = ArgumentCaptor.forClass(MetadataFetchJobEntity.class);
+            verify(metadataFetchJobRepository, atLeastOnce()).save(jobCaptor.capture());
+            assertThat(jobCaptor.getAllValues())
+                    .flatExtracting(MetadataFetchJobEntity::getProposals)
+                    .isNotEmpty()
+                    .allSatisfy(proposal ->
+                            assertThat(proposal.getFieldProvidersJson()).isEqualTo("{\"TITLE\":\"Amazon\"}"));
+            verify(bookMetadataUpdater, never()).setBookMetadata(any());
         }
     }
 }

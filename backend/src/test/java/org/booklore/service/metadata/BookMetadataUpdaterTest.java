@@ -12,6 +12,8 @@ import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.ComicCreatorRole;
+import org.booklore.model.enums.MetadataField;
+import org.booklore.model.enums.MetadataProvider;
 import org.booklore.model.enums.MetadataReplaceMode;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
@@ -36,12 +38,14 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.File;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Month;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -69,6 +73,7 @@ class BookMetadataUpdaterTest {
     @Mock private FileMoveService fileMoveService;
     @Mock private SidecarMetadataWriter sidecarMetadataWriter;
     @Mock private AuthorLocalResolver authorLocalResolver;
+    @Mock private BookMetadataFieldSourceRepository bookMetadataFieldSourceRepository;
 
     @InjectMocks
     private BookMetadataUpdater updater;
@@ -1989,6 +1994,296 @@ class BookMetadataUpdaterTest {
                 verify(writer).saveMetadataToFile(any(File.class), eq(metadataEntity), thumbnailCaptor.capture(), any());
                 assertThat(thumbnailCaptor.getValue()).isNull();
             }
+        }
+    }
+
+    @Nested
+    class FieldSourceRecording {
+
+        private BookMetadataFieldSourceEntity seedRow(MetadataField field, MetadataProvider provider) {
+            BookMetadataFieldSourceEntity row = BookMetadataFieldSourceEntity.builder()
+                    .bookId(1L)
+                    .fieldName(field)
+                    .provider(provider)
+                    .updatedAt(Instant.parse("2020-01-01T00:00:00Z"))
+                    .build();
+            lenient().when(bookMetadataFieldSourceRepository.findByBookId(1L)).thenReturn(new ArrayList<>(List.of(row)));
+            return row;
+        }
+
+        private MetadataUpdateContext contextWith(BookMetadata newMeta, MetadataClearFlags clearFlags, MetadataReplaceMode mode) {
+            return MetadataUpdateContext.builder()
+                    .bookEntity(bookEntity)
+                    .metadataUpdateWrapper(MetadataUpdateWrapper.builder().metadata(newMeta).clearFlags(clearFlags).build())
+                    .replaceMode(mode)
+                    .build();
+        }
+
+        @SuppressWarnings("unchecked")
+        private List<BookMetadataFieldSourceEntity> capturedSavedRows() {
+            ArgumentCaptor<Iterable<BookMetadataFieldSourceEntity>> captor = ArgumentCaptor.forClass(Iterable.class);
+            verify(bookMetadataFieldSourceRepository).saveAll(captor.capture());
+            List<BookMetadataFieldSourceEntity> rows = new ArrayList<>();
+            captor.getValue().forEach(rows::add);
+            return rows;
+        }
+
+        @Test
+        void recordsTheProviderForAFieldTheUpdaterActuallyWrote() {
+            when(bookMetadataFieldSourceRepository.findByBookId(1L)).thenReturn(new ArrayList<>());
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("T")
+                    .description("Blurb from a provider")
+                    .fieldProviders(Map.of(MetadataField.DESCRIPTION, MetadataProvider.GoodReads))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(metadataEntity.getDescription()).isEqualTo("Blurb from a provider");
+            assertThat(capturedSavedRows())
+                    .singleElement()
+                    .satisfies(row -> {
+                        assertThat(row.getBookId()).isEqualTo(1L);
+                        assertThat(row.getFieldName()).isEqualTo(MetadataField.DESCRIPTION);
+                        assertThat(row.getProvider()).isEqualTo(MetadataProvider.GoodReads);
+                        assertThat(row.getUpdatedAt()).isNotNull();
+                    });
+        }
+
+        /**
+         * The {@code updated_at} churn guard: when the row already names the provider doing the
+         * writing, {@code applyFieldSources} returns before touching it. The row's assertion is
+         * unchanged — the same provider still supplied the stored value — so re-saving it would only
+         * move {@code updated_at} on every re-scrape, once per attributed field per book, which across
+         * a whole-library refresh is the difference between a handful of writes and hundreds of
+         * thousands.
+         * <p>
+         * The description is deliberately <em>different</em> from what is stored, so the write really
+         * happens and the field really is recorded; the only thing that matches is the provider. That
+         * is the sole path through the {@code row.getProvider() == provider} branch, and none of the
+         * nest's other eight tests reaches it.
+         */
+        @Test
+        void doesNotRewriteTheRowWhenTheSameProviderWritesTheFieldAgain() {
+            BookMetadataFieldSourceEntity seeded = seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
+            metadataEntity.setDescription("The blurb Amazon supplied last time");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("T")
+                    .description("The blurb Amazon supplies this time")
+                    .fieldProviders(Map.of(MetadataField.DESCRIPTION, MetadataProvider.Amazon))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(metadataEntity.getDescription()).isEqualTo("The blurb Amazon supplies this time");
+            assertThat(seeded.getProvider()).isEqualTo(MetadataProvider.Amazon);
+            assertThat(seeded.getUpdatedAt()).isEqualTo(Instant.parse("2020-01-01T00:00:00Z"));
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+        }
+
+        @Test
+        void leavesTheRowOfALockedFieldExactlyAsItWas() {
+            BookMetadataFieldSourceEntity seeded = seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
+            metadataEntity.setDescription("Text the user locked");
+            metadataEntity.setDescriptionLocked(true);
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("T")
+                    .description("A provider wanted to overwrite this")
+                    .fieldProviders(Map.of(MetadataField.DESCRIPTION, MetadataProvider.GoodReads))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(metadataEntity.getDescription()).isEqualTo("Text the user locked");
+            assertThat(seeded.getProvider()).isEqualTo(MetadataProvider.Amazon);
+            assertThat(seeded.getUpdatedAt()).isEqualTo(Instant.parse("2020-01-01T00:00:00Z"));
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+            verify(bookMetadataFieldSourceRepository, never()).deleteByBookIdAndFieldNameIn(anyLong(), any());
+        }
+
+        @Test
+        void deletesTheRowOfAFieldThatWasCleared() {
+            seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
+            metadataEntity.setDescription("Text about to be cleared");
+            MetadataClearFlags clearFlags = new MetadataClearFlags();
+            clearFlags.setDescription(true);
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("T")
+                    .description("Ignored because the field is being cleared")
+                    .fieldProviders(Map.of(MetadataField.DESCRIPTION, MetadataProvider.GoodReads))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, clearFlags, MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(metadataEntity.getDescription()).isNull();
+            verify(bookMetadataFieldSourceRepository).deleteByBookIdAndFieldNameIn(1L, Set.of(MetadataField.DESCRIPTION));
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+        }
+
+        @Test
+        void deletesTheRowOfAFieldWrittenWithNoProviderAttributed() {
+            seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
+            metadataEntity.setDescription("What the provider had put there");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("T")
+                    .description("What the user typed instead")
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(metadataEntity.getDescription()).isEqualTo("What the user typed instead");
+            verify(bookMetadataFieldSourceRepository).deleteByBookIdAndFieldNameIn(1L, Set.of(MetadataField.DESCRIPTION));
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+        }
+
+        @Test
+        void keepsTheRowWhenAnUnattributedWriteLeftTheValueUnchanged() {
+            BookMetadataFieldSourceEntity seeded = seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
+            metadataEntity.setDescription("Exactly the same text");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("T")
+                    .description("Exactly the same text")
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(seeded.getProvider()).isEqualTo(MetadataProvider.Amazon);
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+            verify(bookMetadataFieldSourceRepository, never()).deleteByBookIdAndFieldNameIn(anyLong(), any());
+        }
+
+        @Test
+        void attributesNothingWhenAProviderMerelyAgreedWithTheValueAlreadyStored() {
+            metadataEntity.setIsbn13("9780000000001");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("Original Title")
+                    .isbn13("9780000000001")
+                    .fieldProviders(Map.of(MetadataField.ISBN_13, MetadataProvider.GoodReads))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(metadataEntity.getIsbn13()).isEqualTo("9780000000001");
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+            verify(bookMetadataFieldSourceRepository, never()).deleteByBookIdAndFieldNameIn(anyLong(), argThat(fields -> fields.contains(MetadataField.ISBN_13)));
+        }
+
+        @Test
+        void leavesAnExistingRowAloneWhenAProviderMerelyAgreedWithTheValueAlreadyStored() {
+            BookMetadataFieldSourceEntity seeded = seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
+            metadataEntity.setDescription("Exactly the same text");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("Original Title")
+                    .description("Exactly the same text")
+                    .fieldProviders(Map.of(MetadataField.DESCRIPTION, MetadataProvider.GoodReads))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(seeded.getProvider()).isEqualTo(MetadataProvider.Amazon);
+            assertThat(seeded.getUpdatedAt()).isEqualTo(Instant.parse("2020-01-01T00:00:00Z"));
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+            verify(bookMetadataFieldSourceRepository, never()).deleteByBookIdAndFieldNameIn(anyLong(), any());
+        }
+
+        @Test
+        void clearsOnlyTheRowsOfTheFieldsAnUnattributedWriteActuallyChanged() {
+            BookMetadataFieldSourceEntity description = BookMetadataFieldSourceEntity.builder()
+                    .bookId(1L).fieldName(MetadataField.DESCRIPTION).provider(MetadataProvider.Amazon)
+                    .updatedAt(Instant.parse("2020-01-01T00:00:00Z")).build();
+            BookMetadataFieldSourceEntity isbn = BookMetadataFieldSourceEntity.builder()
+                    .bookId(1L).fieldName(MetadataField.ISBN_13).provider(MetadataProvider.Amazon)
+                    .updatedAt(Instant.parse("2020-01-01T00:00:00Z")).build();
+            when(bookMetadataFieldSourceRepository.findByBookId(1L)).thenReturn(new ArrayList<>(List.of(description, isbn)));
+            metadataEntity.setDescription("What the provider had put there");
+            metadataEntity.setIsbn13("9780000000001");
+
+            // The shape an accepted review proposal arrives in: no fieldProviders survived the JSON
+            // round trip through metadata_fetch_proposal, so nothing here is attributable.
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("Original Title")
+                    .description("A different description entirely")
+                    .isbn13("9780000000001")
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_WHEN_PROVIDED));
+            }
+
+            verify(bookMetadataFieldSourceRepository).deleteByBookIdAndFieldNameIn(1L, Set.of(MetadataField.DESCRIPTION));
+            assertThat(isbn.getProvider()).isEqualTo(MetadataProvider.Amazon);
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+        }
+
+        @Test
+        void recordsNothingWhenReplaceMissingDeclinedToWriteTheField() {
+            seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
+            metadataEntity.setDescription("A description that is already here");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .description("A newer description that will not be stored")
+                    .fieldProviders(Map.of(MetadataField.DESCRIPTION, MetadataProvider.GoodReads))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_MISSING));
+            }
+
+            assertThat(metadataEntity.getDescription()).isEqualTo("A description that is already here");
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+            verify(bookMetadataFieldSourceRepository, never()).deleteByBookIdAndFieldNameIn(anyLong(), any());
+        }
+
+        @Test
+        void touchesNothingWhenTheMergeAttributedNothingAndNoFieldChanged() {
+            metadataEntity.setDescription("Unchanged");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("Original Title")
+                    .description("Unchanged")
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_WHEN_PROVIDED));
+            }
+
+            verifyNoInteractions(bookMetadataFieldSourceRepository);
         }
     }
 }

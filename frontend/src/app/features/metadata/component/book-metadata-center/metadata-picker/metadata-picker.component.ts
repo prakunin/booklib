@@ -5,7 +5,7 @@ import {CdkDragDrop, CdkDropList, CdkDrag, moveItemInArray} from '@angular/cdk/d
 import {Button} from 'primeng/button';
 import {FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {InputText} from 'primeng/inputtext';
-import {forkJoin, Observable} from 'rxjs';
+import {defer, forkJoin, Observable, tap} from 'rxjs';
 import {Tooltip} from 'primeng/tooltip';
 import {UrlHelperService} from '../../../../../shared/service/url-helper.service';
 import {BookService} from '../../../../book/service/book.service';
@@ -298,37 +298,61 @@ export class MetadataPickerComponent {
     setTimeout(() => this.authorInputValue = '');
   }
 
-  onSave(): void {
-    this.isSaving = true;
-    const updatedBookMetadata = this.buildMetadataWrapper(undefined);
+  /**
+   * The save, as a cold observable the caller owns.
+   *
+   * Deliberately does not subscribe: a caller that has to run something *after* the metadata has
+   * actually been written — the review dialog, which may only mark a proposal ACCEPTED once the PUT
+   * has committed — needs to sequence off completion, and `onSave()` returns nothing to sequence on.
+   * Because the underlying HttpClient observables are cold, this must be subscribed to exactly once;
+   * subscribing twice would issue the PUT twice.
+   *
+   * Everything the save does on the way out — the spinner, the saved-field markers, the toasts — is
+   * in a `tap` rather than in a subscriber, so every caller gets identical behaviour. Errors are
+   * re-thrown after the toast, so the caller can decide what not to do next.
+   */
+  saveMetadata(): Observable<unknown> {
+    return defer(() => {
+      this.isSaving = true;
+      const updatedBookMetadata = this.buildMetadataWrapper(undefined);
 
-    const requests: Observable<unknown>[] = [
-      this.bookMetadataManageService.updateBookMetadata(this.currentBookId, updatedBookMetadata, false, 'REPLACE_WHEN_PROVIDED')
-    ];
+      const requests: Observable<unknown>[] = [
+        this.bookMetadataManageService.updateBookMetadata(this.currentBookId, updatedBookMetadata, false, 'REPLACE_WHEN_PROVIDED')
+      ];
 
-    // Handle audiobook cover upload when fetched from Audible provider
-    if (this.isAudibleProvider() && this.copiedFields['audiobookThumbnailUrl']) {
-      const audiobookCoverUrl = this.fetchedMetadata.thumbnailUrl;
-      if (audiobookCoverUrl) {
-        requests.push(this.bookMetadataManageService.uploadAudiobookCoverFromUrl(this.currentBookId, audiobookCoverUrl));
-      }
-    }
-
-    forkJoin(requests).subscribe({
-      next: () => {
-        this.isSaving = false;
-        for (const field of Object.keys(this.copiedFields)) {
-          if (this.copiedFields[field]) {
-            this.savedFields[field] = true;
-          }
+      // Handle audiobook cover upload when fetched from Audible provider
+      if (this.isAudibleProvider() && this.copiedFields['audiobookThumbnailUrl']) {
+        const audiobookCoverUrl = this.fetchedMetadata.thumbnailUrl;
+        if (audiobookCoverUrl) {
+          requests.push(this.bookMetadataManageService.uploadAudiobookCoverFromUrl(this.currentBookId, audiobookCoverUrl));
         }
-        this.messageService.add({severity: 'info', summary: this.t.translate('metadata.picker.toast.successSummary'), detail: this.t.translate('metadata.picker.toast.metadataUpdated')});
-      },
-      error: () => {
-        this.isSaving = false;
-        this.messageService.add({severity: 'error', summary: this.t.translate('metadata.picker.toast.errorSummary'), detail: this.t.translate('metadata.picker.toast.metadataUpdateFailed')});
       }
-    });
+
+      return forkJoin(requests);
+    }).pipe(
+      tap({
+        next: () => {
+          this.isSaving = false;
+          for (const field of Object.keys(this.copiedFields)) {
+            if (this.copiedFields[field]) {
+              this.savedFields[field] = true;
+            }
+          }
+          this.messageService.add({severity: 'info', summary: this.t.translate('metadata.picker.toast.successSummary'), detail: this.t.translate('metadata.picker.toast.metadataUpdated')});
+        },
+        error: () => {
+          this.isSaving = false;
+          this.messageService.add({severity: 'error', summary: this.t.translate('metadata.picker.toast.errorSummary'), detail: this.t.translate('metadata.picker.toast.metadataUpdateFailed')});
+        }
+      })
+    );
+  }
+
+  onSave(): void {
+    // The one subscription for callers with nothing to do afterwards (the picker's own submit button,
+    // and the searcher that hosts it). The empty error handler only marks the already-reported failure
+    // as handled — `saveMetadata` has shown the toast by the time it arrives here.
+    this.saveMetadata().subscribe({error: () => undefined});
   }
 
   private buildMetadataWrapper(shouldLockAllFields: boolean | undefined): MetadataUpdateWrapper {

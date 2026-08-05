@@ -7,6 +7,7 @@ import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.MergeMetadataType;
+import org.booklore.model.enums.MetadataField;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
 import org.booklore.service.author.AuthorLocalResolver;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -39,6 +41,15 @@ public class MetadataManagementService {
     private final MetadataWriterFactory metadataWriterFactory;
     private final FileMoveService fileMoveService;
     private final BookRepository bookRepository;
+    private final BookMetadataFieldSourceRepository bookMetadataFieldSourceRepository;
+
+    /**
+     * How many book ids go into one {@code DELETE … WHERE book_id IN (…)}. These merges run over
+     * whole-library result sets — a language merge on the library this feature was built for touches
+     * 702,511 rows — and an unbounded {@code IN} list is a parse-time and packet-size problem long
+     * before it is a performance one.
+     */
+    private static final int FIELD_SOURCE_DELETE_BATCH = 1_000;
 
 
     @Transactional
@@ -291,6 +302,7 @@ public class MetadataManagementService {
             }
 
             bookMetadataRepository.saveAll(booksWithOldSeries);
+            dropFieldSources(booksWithOldSeries, MetadataField.SERIES_NAME);
             writeMetadataToFile(booksWithOldSeries, moveFile);
         }
 
@@ -311,6 +323,7 @@ public class MetadataManagementService {
             }
 
             bookMetadataRepository.saveAll(booksWithOldPublisher);
+            dropFieldSources(booksWithOldPublisher, MetadataField.PUBLISHER);
             writeMetadataToFile(booksWithOldPublisher, moveFile);
         }
 
@@ -331,6 +344,7 @@ public class MetadataManagementService {
             }
 
             bookMetadataRepository.saveAll(booksWithOldLanguage);
+            dropFieldSources(booksWithOldLanguage, MetadataField.LANGUAGE);
             writeMetadataToFile(booksWithOldLanguage, moveFile);
         }
 
@@ -457,6 +471,8 @@ public class MetadataManagementService {
 
             if (!booksWithSeries.isEmpty()) {
                 bookMetadataRepository.saveAll(booksWithSeries);
+                dropFieldSources(booksWithSeries, MetadataField.SERIES_NAME,
+                        MetadataField.SERIES_NUMBER, MetadataField.SERIES_TOTAL);
                 writeMetadataToFile(booksWithSeries, moveFile);
             }
         }
@@ -474,6 +490,7 @@ public class MetadataManagementService {
 
             if (!booksWithPublisher.isEmpty()) {
                 bookMetadataRepository.saveAll(booksWithPublisher);
+                dropFieldSources(booksWithPublisher, MetadataField.PUBLISHER);
                 writeMetadataToFile(booksWithPublisher, moveFile);
             }
         }
@@ -491,10 +508,50 @@ public class MetadataManagementService {
 
             if (!booksWithLanguage.isEmpty()) {
                 bookMetadataRepository.saveAll(booksWithLanguage);
+                dropFieldSources(booksWithLanguage, MetadataField.LANGUAGE);
                 writeMetadataToFile(booksWithLanguage, moveFile);
             }
         }
 
         log.info("Deleted {} languages: {}", valuesToDelete.size(), valuesToDelete);
+    }
+
+    /**
+     * Removes the per-field provenance of fields this screen has just overwritten.
+     * <p>
+     * A {@code book_metadata_field_source} row asserts "the value stored in this field right now came
+     * from this provider". The series, publisher and language merges and deletes change exactly those
+     * values, so every row they leave behind is a false assertion: after a merge the badge credits a
+     * provider for a name the <em>user</em> picked on the consolidation screen, and after a delete it
+     * credits a provider for a field that is now NULL. These are three of the fields the local catalog
+     * fills across the whole library, so the badge would be wrong on real data from the first merge
+     * onward.
+     * <p>
+     * The rows are deleted here rather than by routing these six methods through
+     * {@link BookMetadataUpdater}. The updater is built for one book's full metadata document: it
+     * resolves locks, runs the change detector, files new attributions and emits a
+     * {@code BOOK_METADATA_UPDATE} frame per book. Driving it over a whole-library result set would
+     * turn a two-statement merge into per-book work and hundreds of thousands of WebSocket frames —
+     * the load problem this branch already has a follow-up issue for — to achieve, for provenance,
+     * exactly the deletion below. Deleting is also the honest outcome: these writes have no provider,
+     * so there is nothing for the updater to re-attribute.
+     * <p>
+     * This runs inside {@code consolidateMetadata}/{@code deleteMetadata}'s transaction, so the row
+     * removal commits with the value change or not at all.
+     */
+    private void dropFieldSources(List<BookMetadataEntity> metadata, MetadataField... fields) {
+        if (metadata.isEmpty() || fields.length == 0) {
+            return;
+        }
+        List<Long> bookIds = metadata.stream()
+                .map(BookMetadataEntity::getBookId)
+                .filter(Objects::nonNull)
+                .toList();
+        List<MetadataField> fieldNames = List.of(fields);
+        for (int from = 0; from < bookIds.size(); from += FIELD_SOURCE_DELETE_BATCH) {
+            int to = Math.min(from + FIELD_SOURCE_DELETE_BATCH, bookIds.size());
+            bookMetadataFieldSourceRepository.deleteByBookIdInAndFieldNameIn(
+                    bookIds.subList(from, to), fieldNames);
+        }
     }
 }

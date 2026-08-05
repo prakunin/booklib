@@ -338,6 +338,10 @@ describe('BookReviewsComponent', () => {
     expect(component.reviewDownloadEnabled).toBe(false);
     expect(component.getProviderSeverity('amazon')).toBe('warn');
     expect(component.getProviderSeverity('goodreads')).toBe('success');
+    expect(component.getProviderSeverity('FlibustaLocal')).toBe('info');
+    expect(component.getProviderLabel('goodreads')).toBe('goodreads');
+    expect(component.getProviderLabel('FlibustaLocal')).toBe('shared.metadataProvider.flibustaLocal');
+    expect(translate).toHaveBeenCalledWith('shared.metadataProvider.flibustaLocal');
     expect(component.formatDate('2026-03-28T12:00:00.000Z')).toBe('March 28, 2026');
   });
 

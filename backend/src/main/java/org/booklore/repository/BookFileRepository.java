@@ -231,4 +231,49 @@ public interface BookFileRepository extends JpaRepository<BookFileEntity, Long> 
             WHERE bf.id = :id
             """)
     Optional<BookFileEntity> findByIdWithBookAndLibraryPath(@Param("id") Long id);
+
+    @Query("""
+            SELECT bf.book.metadata.title
+            FROM BookFileEntity bf
+            WHERE bf.book.library.id = :libraryId
+            AND bf.sourceArchive = :archive
+            AND bf.sourceArchiveEntry = :entry
+            AND (bf.book.deleted IS NULL OR bf.book.deleted = false)
+            """)
+    List<String> findTitleBySourceArchiveEntry(@Param("libraryId") long libraryId,
+                                               @Param("archive") String archive,
+                                               @Param("entry") String entry);
+
+    /**
+     * Books of a library that came out of an archive, in archive order.
+     * <p>
+     * The ordering is a performance contract, not tidiness: {@code FlibustaCatalogSource} caches
+     * parsed annotations per archive with room for six, so walking books grouped by archive
+     * decompresses each of the 218 documents once. Walking them by id would re-decompress a ~2.4 MB
+     * document per book.
+     * <p>
+     * {@code (sourceArchive, sourceArchiveEntry)} has only a non-unique index, not a uniqueness
+     * constraint, so the book id is a mandatory third key: without it, a tied group split across a
+     * page boundary would be permanently excluded by the next page's strict {@code >} predicate — a
+     * silent skip, not a spin, since nothing about it would look wrong.
+     */
+    @Query("""
+            SELECT bf.book.id, bf.sourceArchive, bf.sourceArchiveEntry
+            FROM BookFileEntity bf
+            WHERE bf.book.library.id = :libraryId
+            AND bf.sourceArchive IS NOT NULL
+            AND bf.sourceArchive <> ''
+            AND bf.sourceArchiveEntry IS NOT NULL
+            AND bf.sourceArchiveEntry <> ''
+            AND (bf.book.deleted IS NULL OR bf.book.deleted = false)
+            AND (bf.sourceArchive > :afterArchive
+                 OR (bf.sourceArchive = :afterArchive AND bf.sourceArchiveEntry > :afterEntry)
+                 OR (bf.sourceArchive = :afterArchive AND bf.sourceArchiveEntry = :afterEntry AND bf.book.id > :afterId))
+            ORDER BY bf.sourceArchive, bf.sourceArchiveEntry, bf.book.id
+            """)
+    List<Object[]> findArchivedBooksForBackfill(@Param("libraryId") long libraryId,
+                                                @Param("afterArchive") String afterArchive,
+                                                @Param("afterEntry") String afterEntry,
+                                                @Param("afterId") long afterId,
+                                                Pageable pageable);
 }

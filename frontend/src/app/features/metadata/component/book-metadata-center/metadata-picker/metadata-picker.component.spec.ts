@@ -255,6 +255,34 @@ describe('MetadataPickerComponent', () => {
     expect(updateBookMetadata).toHaveBeenCalledTimes(4);
   });
 
+  it('does not issue the save until something subscribes to it', () => {
+    const component = TestBed.runInInjectionContext(() => new MetadataPickerComponent());
+    component.fetchedMetadata = createMetadata();
+    component.book = createBook();
+
+    const save = component.saveMetadata();
+
+    // Cold on purpose: the review dialog needs to sequence its ACCEPTED post off this completing, and
+    // that only works if building the observable is not the same thing as sending the request.
+    expect(updateBookMetadata).not.toHaveBeenCalled();
+    expect(component.isSaving).toBe(false);
+
+    save.subscribe();
+
+    expect(updateBookMetadata).toHaveBeenCalledOnce();
+  });
+
+  it('sends exactly one request per onSave, never two', () => {
+    const component = TestBed.runInInjectionContext(() => new MetadataPickerComponent());
+    component.fetchedMetadata = createMetadata();
+    component.book = createBook();
+
+    component.onSave();
+
+    // The cold observable would issue a second PUT if onSave both returned and subscribed to it.
+    expect(updateBookMetadata).toHaveBeenCalledOnce();
+  });
+
   it('covers hover state, back navigation, dual-cover helpers, and comic visibility helpers', () => {
     const component = TestBed.runInInjectionContext(() => new MetadataPickerComponent());
     const goBackEmit = vi.spyOn(component.goBack, 'emit');

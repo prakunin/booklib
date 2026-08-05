@@ -42,6 +42,8 @@ class MetadataTaskServiceTest {
 
     @Mock
     private AuthenticationService authenticationService;
+    @Mock
+    private MetadataProposalProvenanceService proposalProvenanceService;
 
     @InjectMocks
     private MetadataTaskService service;
@@ -223,6 +225,43 @@ class MetadataTaskServiceTest {
 
             assertThat(result).isTrue();
             assertThat(proposal.getStatus()).isEqualTo(FetchedMetadataProposalStatus.REJECTED);
+        }
+
+        /**
+         * ACCEPT is the only moment provenance can be filed for the review-gated path: the client
+         * replays the accepted values through the ordinary metadata PUT, which is indistinguishable
+         * from a user typing and carries no providers. Delete the call from
+         * {@code updateProposalStatus} and this is the test that goes red — before it, nothing in the
+         * suite named the call site at all, only the service it calls.
+         */
+        @Test
+        void filesProvenanceWhenTheProposalIsAccepted() {
+            when(authenticationService.getAuthenticatedUser())
+                    .thenReturn(BookLoreUser.builder().id(1L).build());
+            MetadataFetchJobEntity job = buildTask("t1", MetadataFetchTaskStatus.COMPLETED, new ArrayList<>());
+            MetadataFetchProposalEntity proposal = buildProposal(10L, job, FetchedMetadataProposalStatus.FETCHED);
+            when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
+
+            service.updateProposalStatus("t1", 10L, "ACCEPTED");
+
+            verify(proposalProvenanceService).recordAcceptedProposal(proposal);
+        }
+
+        /**
+         * The other half of the same rule: a rejected proposal was never written to the book, so
+         * attributing it would credit a provider for a value nobody stored.
+         */
+        @Test
+        void filesNoProvenanceWhenTheProposalIsRejected() {
+            when(authenticationService.getAuthenticatedUser())
+                    .thenReturn(BookLoreUser.builder().id(1L).build());
+            MetadataFetchJobEntity job = buildTask("t1", MetadataFetchTaskStatus.COMPLETED, new ArrayList<>());
+            MetadataFetchProposalEntity proposal = buildProposal(10L, job, FetchedMetadataProposalStatus.FETCHED);
+            when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
+
+            service.updateProposalStatus("t1", 10L, "REJECTED");
+
+            verify(proposalProvenanceService, never()).recordAcceptedProposal(any());
         }
     }
 

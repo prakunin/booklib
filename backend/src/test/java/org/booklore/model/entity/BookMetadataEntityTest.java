@@ -1,7 +1,12 @@
 package org.booklore.model.entity;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.booklore.util.BookUtils;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -239,6 +244,146 @@ class BookMetadataEntityTest {
 
         assertThat(metadata.getSearchText()).startsWith("document");
         assertThat(BookUtils.extractDocumentBodySearchText(metadata.getSearchText())).isEmpty();
+    }
+
+    /**
+     * {@code description} is a {@code TEXT} column and {@code TEXT}'s 65,535 is a byte budget, so a
+     * Cyrillic annotation from the local catalog overflows it at ~32,000 characters. Overflowing is not
+     * a truncated description — MariaDB rolls back the whole transaction, which on the enrichment path
+     * also carries the book's language, series, reviews and its authors' biographies. 40,000 Cyrillic
+     * characters is 80,000 bytes, comfortably over; the assertion is on bytes, because a character
+     * count would pass against the unbounded code as well.
+     */
+    @Test
+    void updateSearchText_keepsDescriptionWithinTheTextColumnsByteBudget() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("я".repeat(40_000));
+
+        metadata.updateSearchText();
+
+        assertThat(metadata.getDescription().getBytes(StandardCharsets.UTF_8))
+                .hasSizeLessThanOrEqualTo(BookUtils.TEXT_MAX_UTF8_BYTES);
+        assertThat(metadata.getDescription()).startsWith("я").doesNotContain("�");
+    }
+
+    /**
+     * Truncating is still data loss, so it must not be silent: neither the user nor an operator had
+     * any way to learn that a description had been shortened. The warning names the book and both
+     * lengths, because the character count alone reads as nonsense against a limit expressed in bytes.
+     */
+    @Test
+    void updateSearchText_warnsWhenItTruncatesADescription() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setBookId(4242L);
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("я".repeat(40_000));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(BookMetadataEntity.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            metadata.updateSearchText();
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertThat(appender.list)
+                .filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage())
+                        .contains("book 4242")
+                        .contains("40000 characters")
+                        .contains("80000 bytes")
+                        .contains("cut to 32767 characters")
+                        .contains("limit of 65535 bytes"));
+    }
+
+    /**
+     * The same warning on the path that actually inserts a row. {@code bookId} is derived through
+     * {@code @MapsId} from the {@code book} association and Hibernate resolves it during {@code save},
+     * <em>after</em> {@code @PrePersist} has run — so on a brand new {@code book_metadata} row the
+     * field this warning reads is still null, and the one line an operator gets about lost catalog
+     * text would name no book at all. Nothing in {@code src/main/java} calls {@code setBookId} on this
+     * entity; the association is the only place the identity exists at this point.
+     */
+    @Test
+    void updateSearchText_namesTheBookFromItsAssociationWhenTheDerivedIdIsNotYetResolved() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setBook(BookEntity.builder().id(4242L).build());
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("я".repeat(40_000));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(BookMetadataEntity.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            metadata.updateSearchText();
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertThat(appender.list)
+                .filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage()).contains("book 4242"));
+    }
+
+    /**
+     * The other half of the same rule. This runs on every metadata write — roughly 700,000 times in a
+     * single backfill — so a description that fits must not produce a line of log.
+     * <p>
+     * The level is pinned to {@code TRACE} rather than left to whatever the JVM happens to be
+     * configured with, because a {@link ListAppender} only ever sees events that already passed the
+     * logger's effective level, and this suite shares one JVM ({@code build.gradle.kts} sets no
+     * {@code forkEvery}). There is no {@code logback-test.xml}, so a JVM running this class alone
+     * defaults to root {@code DEBUG} and the assertion bites — but any {@code @SpringBootTest} that
+     * ran earlier installed Spring Boot's {@code LoggingSystem} with {@code root: INFO} from
+     * {@code application.yaml}, and under that a {@code log.debug} added to this ~700k-times path
+     * would sail straight through a green test. Pinning makes the assertion mean "logs nothing"
+     * rather than "logs nothing above whatever the last test left the root logger at".
+     */
+    @Test
+    void updateSearchText_saysNothingWhenTheDescriptionFits() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setBookId(4242L);
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("Короткая аннотация");
+
+        Logger logger = (Logger) LoggerFactory.getLogger(BookMetadataEntity.class);
+        Level originalLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.TRACE);
+        try {
+            metadata.updateSearchText();
+        } finally {
+            logger.setLevel(originalLevel);
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertThat(appender.list).isEmpty();
+    }
+
+    /**
+     * The clamp must not touch a description that already fits — including one that ends on a
+     * supplementary code point, which the byte walk must not split in half.
+     */
+    @Test
+    void updateSearchText_leavesADescriptionThatAlreadyFitsAlone() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("Короткая аннотация 📚");
+
+        metadata.updateSearchText();
+
+        assertThat(metadata.getDescription()).isEqualTo("Короткая аннотация 📚");
     }
 
     @Test
