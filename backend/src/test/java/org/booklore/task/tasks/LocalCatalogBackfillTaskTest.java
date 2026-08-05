@@ -5,12 +5,15 @@ import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.request.TaskCreateRequest;
 import org.booklore.model.dto.response.TaskCreateResponse;
 import org.booklore.model.enums.TaskType;
+import org.booklore.model.websocket.TaskProgressPayload;
+import org.booklore.model.websocket.Topic;
 import org.booklore.service.NotificationService;
 import org.booklore.service.enrichment.catalog.LocalCatalogBackfillService;
 import org.booklore.task.TaskCancellationManager;
 import org.booklore.task.TaskStatus;
 import org.booklore.task.options.LocalCatalogBackfillOptions;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -18,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,6 +78,35 @@ class LocalCatalogBackfillTaskTest {
         assertThatThrownBy(() -> task.execute(request(null)))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("libraryId");
+    }
+
+    /**
+     * {@code TaskService.executeAsyncTask} catches a failing task into task history and sends no
+     * {@code TASK_PROGRESS} frame, so without this the INPX archive panel is left holding this task's
+     * opening "Indexing the local catalog" {@code IN_PROGRESS} frame forever: {@code backfillRunning()}
+     * stays true, Run stays disabled and the spinner keeps turning until the page is reloaded. The
+     * panel clears on any terminal status, so the failure has to send one.
+     * <p>
+     * The refusal to walk while an index rebuild is in flight is the likely trigger — it is the one
+     * failure a user can provoke by pressing Run at the wrong moment — but the frame is owed for any
+     * failure out of the walk, which is why the assertion only cares that a terminal FAILED frame went
+     * out and that the exception still propagates for task history to record.
+     */
+    @Test
+    void tellsTheUiTheRunIsOverWhenTheBackfillRefusesToStart() {
+        when(backfillService.run(anyLong(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("the index is being rebuilt"));
+
+        assertThatThrownBy(() -> task.execute(
+                request(LocalCatalogBackfillOptions.builder().libraryId(19L).build())))
+                .isInstanceOf(IllegalStateException.class);
+
+        ArgumentCaptor<TaskProgressPayload> payloads = ArgumentCaptor.captor();
+        verify(notificationService, atLeastOnce()).sendMessage(eq(Topic.TASK_PROGRESS), payloads.capture());
+        assertThat(payloads.getAllValues())
+                .extracting(TaskProgressPayload::getTaskStatus)
+                .containsExactly(TaskStatus.IN_PROGRESS, TaskStatus.FAILED);
+        assertThat(payloads.getAllValues().getLast().getMessage()).contains("the index is being rebuilt");
     }
 
     /**

@@ -57,12 +57,17 @@ public class LocalCatalogBackfillTask implements Task {
                 .taskType(TaskType.LOCAL_CATALOG_BACKFILL);
 
         sendProgress(taskId, UNKNOWN_PROGRESS, "Indexing the local catalog", TaskStatus.IN_PROGRESS);
-        LocalCatalogBackfillService.BackfillResult result = backfillService.run(
-                libraryId,
-                taskId,
-                () -> cancellationManager.isTaskCancelled(taskId),
-                processed -> sendProgress(taskId, UNKNOWN_PROGRESS,
-                        "Enriched " + processed + " books from the local catalog", TaskStatus.IN_PROGRESS));
+        LocalCatalogBackfillService.BackfillResult result;
+        try {
+            result = backfillService.run(
+                    libraryId,
+                    taskId,
+                    () -> cancellationManager.isTaskCancelled(taskId),
+                    processed -> sendProgress(taskId, UNKNOWN_PROGRESS,
+                            "Enriched " + processed + " books from the local catalog", TaskStatus.IN_PROGRESS));
+        } catch (RuntimeException e) {
+            throw reportFailure(taskId, e);
+        }
 
         if (result.cancelled()) {
             return buildCancelledResponse(builder, taskId);
@@ -88,6 +93,30 @@ public class LocalCatalogBackfillTask implements Task {
         }
         throw ApiError.GENERIC_BAD_REQUEST.createException(
                 "Local catalog backfill requires a libraryId option");
+    }
+
+    /**
+     * Emits the terminal frame a failed run owes the UI, then hands the exception back to be thrown.
+     * <p>
+     * {@code TaskService.executeAsyncTask} catches a failing task into task history and nothing else —
+     * it sends no {@code TASK_PROGRESS} frame — so a run that dies after this task's opening
+     * "Indexing the local catalog" frame left the INPX archive panel's {@code backfillRunning()}
+     * computed permanently true: Run stayed disabled and the spinner kept turning until the user
+     * reloaded the page. The panel clears on any terminal status, so one {@code FAILED} frame closes
+     * it. This is deliberately scoped to this task rather than fixed in {@code TaskService}, whose
+     * error handling is shared by every task type.
+     * <p>
+     * Catches {@code RuntimeException} rather than only the index-still-building refusal: any failure
+     * out of the walk leaves the panel in exactly the same stuck state, and the refusal is merely its
+     * most likely cause. The exception is returned rather than thrown here so the call site reads
+     * {@code throw reportFailure(...)} and the compiler can still see that the branch does not fall
+     * through.
+     */
+    private RuntimeException reportFailure(String taskId, RuntimeException failure) {
+        log.warn("{}: Task {} failed: {}", getTaskType(), taskId, failure.getMessage());
+        sendProgress(taskId, UNKNOWN_PROGRESS,
+                "Local catalog backfill failed: " + failure.getMessage(), TaskStatus.FAILED);
+        return failure;
     }
 
     private TaskCreateResponse buildCancelledResponse(
