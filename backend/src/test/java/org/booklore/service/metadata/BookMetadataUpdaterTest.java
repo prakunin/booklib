@@ -2054,6 +2054,41 @@ class BookMetadataUpdaterTest {
                     });
         }
 
+        /**
+         * The {@code updated_at} churn guard: when the row already names the provider doing the
+         * writing, {@code applyFieldSources} returns before touching it. The row's assertion is
+         * unchanged — the same provider still supplied the stored value — so re-saving it would only
+         * move {@code updated_at} on every re-scrape, once per attributed field per book, which across
+         * a whole-library refresh is the difference between a handful of writes and hundreds of
+         * thousands.
+         * <p>
+         * The description is deliberately <em>different</em> from what is stored, so the write really
+         * happens and the field really is recorded; the only thing that matches is the provider. That
+         * is the sole path through the {@code row.getProvider() == provider} branch, and none of the
+         * nest's other eight tests reaches it.
+         */
+        @Test
+        void doesNotRewriteTheRowWhenTheSameProviderWritesTheFieldAgain() {
+            BookMetadataFieldSourceEntity seeded = seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
+            metadataEntity.setDescription("The blurb Amazon supplied last time");
+            BookMetadata newMeta = BookMetadata.builder()
+                    .title("T")
+                    .description("The blurb Amazon supplies this time")
+                    .fieldProviders(Map.of(MetadataField.DESCRIPTION, MetadataProvider.Amazon))
+                    .build();
+
+            try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+                mockSettingsAndChangeDetector(mcd, true, true);
+
+                updater.setBookMetadata(contextWith(newMeta, new MetadataClearFlags(), MetadataReplaceMode.REPLACE_ALL));
+            }
+
+            assertThat(metadataEntity.getDescription()).isEqualTo("The blurb Amazon supplies this time");
+            assertThat(seeded.getProvider()).isEqualTo(MetadataProvider.Amazon);
+            assertThat(seeded.getUpdatedAt()).isEqualTo(Instant.parse("2020-01-01T00:00:00Z"));
+            verify(bookMetadataFieldSourceRepository, never()).saveAll(any());
+        }
+
         @Test
         void leavesTheRowOfALockedFieldExactlyAsItWas() {
             BookMetadataFieldSourceEntity seeded = seedRow(MetadataField.DESCRIPTION, MetadataProvider.Amazon);
