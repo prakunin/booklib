@@ -132,6 +132,15 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
      * one written. The stored name assumes nothing about which token is the surname while the rotation
      * asserts one, so stored-order is the more specific evidence and preferring it is a documented
      * precedence, not a guess between two people. The rotation is never read in that case.
+     * <p>
+     * The residual risk that leaves, stated plainly: the rotation is only ever read when the
+     * stored-order key misses, and a rotated key that resolves is accepted without further evidence —
+     * so a rotation colliding with a <em>different real person's</em> catalog key writes that person's
+     * biography onto this author. {@link FlibustaAuthorKey} argues the opposite direction (a rotation
+     * of an already-correct name is a key the catalog does not hold), which is true but is about a
+     * different case: this one is a rotation that resolves precisely because it names somebody else.
+     * Measured at 2-of-2 benign in the pairs that were read in full, out of the 126 authors that reach
+     * a different key under each candidate, and accepted on that basis.
      */
     @Override
     public Optional<String> lookupAuthorBio(long libraryId, String authorName) {

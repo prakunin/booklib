@@ -45,7 +45,16 @@ import java.util.Objects;
  * </ul>
  * The composition can only ever under-attribute — if the accept never arrives, or the values were
  * edited, or the map was never stored, the outcome is an absent row, which the schema already defines
- * as "origin not recorded". It can never invent a provider for something a user wrote.
+ * as "origin not recorded".
+ * <p>
+ * It almost never invents a provider for something a user wrote, and the one case it does not cover is
+ * worth naming rather than rounding off: a value hand-typed to match the proposal <em>between</em> the
+ * proposal being built and being accepted. {@link #describeChanges} recorded the field because it
+ * differed at build time; the user then edits it through the ordinary editor PUT to exactly the value
+ * the proposal offers, which deletes the row (a manual PUT carries no providers); the accept then finds
+ * proposed and stored equal and files a row crediting the provider for the user's own text
+ * ({@link #recordAcceptedProposal}). The accept cannot tell that apart from the provider's own value,
+ * and this is accepted on that basis.
  */
 @Slf4j
 @Service
