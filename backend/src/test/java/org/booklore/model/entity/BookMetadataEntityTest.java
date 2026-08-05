@@ -300,6 +300,38 @@ class BookMetadataEntityTest {
     }
 
     /**
+     * The same warning on the path that actually inserts a row. {@code bookId} is derived through
+     * {@code @MapsId} from the {@code book} association and Hibernate resolves it during {@code save},
+     * <em>after</em> {@code @PrePersist} has run — so on a brand new {@code book_metadata} row the
+     * field this warning reads is still null, and the one line an operator gets about lost catalog
+     * text would name no book at all. Nothing in {@code src/main/java} calls {@code setBookId} on this
+     * entity; the association is the only place the identity exists at this point.
+     */
+    @Test
+    void updateSearchText_namesTheBookFromItsAssociationWhenTheDerivedIdIsNotYetResolved() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setBook(BookEntity.builder().id(4242L).build());
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("я".repeat(40_000));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(BookMetadataEntity.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            metadata.updateSearchText();
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertThat(appender.list)
+                .filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage()).contains("book 4242"));
+    }
+
+    /**
      * The other half of the same rule. This runs on every metadata write — roughly 700,000 times in a
      * single backfill — so a description that fits must not produce a line of log.
      */

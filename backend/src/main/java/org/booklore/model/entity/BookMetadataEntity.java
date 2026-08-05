@@ -384,13 +384,21 @@ public class BookMetadataEntity {
      * quiet. The comparison is on length rather than identity so that "was it shortened" is stated
      * directly, and the UTF-8 byte count, which is the constraint that was hit, is only computed on
      * the rare branch that reports it.
+     * <p>
+     * The id is read from the {@code book} association when the field is still empty. {@code bookId}
+     * is derived through {@code @MapsId} and Hibernate resolves it during {@code save}, after
+     * {@code @PrePersist} has already run, so on an INSERT the field is null at exactly the moment
+     * this fires — and a warning about lost text that names no book is close to useless to whoever
+     * has to act on it. Nothing in {@code src/main/java} sets {@code bookId} on this entity directly,
+     * which makes the association the only identity available here.
      */
     private String clampDescription(String value) {
         String clamped = BookUtils.clampToUtf8Bytes(value, BookUtils.TEXT_MAX_UTF8_BYTES);
         if (value != null && clamped.length() < value.length()) {
+            Long id = this.bookId != null ? this.bookId : (this.book == null ? null : this.book.getId());
             log.warn("Description of book {} did not fit its TEXT column and was truncated: {} characters "
                             + "({} bytes of UTF-8) cut to {} characters, against a column limit of {} bytes",
-                    this.bookId, value.length(), value.getBytes(StandardCharsets.UTF_8).length,
+                    id, value.length(), value.getBytes(StandardCharsets.UTF_8).length,
                     clamped.length(), BookUtils.TEXT_MAX_UTF8_BYTES);
         }
         return clamped;
