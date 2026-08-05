@@ -71,6 +71,9 @@ public class BookMetadataUpdater {
         BookEntity bookEntity = context.getBookEntity();
         MetadataUpdateWrapper wrapper = context.getMetadataUpdateWrapper();
         boolean mergeCategories = context.isMergeCategories();
+        boolean mergeAuthors = context.getMergeAuthors() == null
+                ? mergeCategories
+                : context.getMergeAuthors();
         boolean mergeMoods = context.isMergeMoods();
         boolean mergeTags = context.isMergeTags();
         boolean updateThumbnail = context.isUpdateThumbnail();
@@ -111,7 +114,7 @@ public class BookMetadataUpdater {
         FieldSourceChanges fieldSources = new FieldSourceChanges(newMetadata.getFieldProviders());
 
         updateBasicFields(newMetadata, metadata, clearFlags, replaceMode, fieldSources);
-        updateAuthorsIfNeeded(newMetadata, metadata, clearFlags, mergeCategories, replaceMode);
+        updateAuthorsIfNeeded(newMetadata, metadata, clearFlags, mergeAuthors, replaceMode);
         updateCategoriesIfNeeded(newMetadata, metadata, clearFlags, mergeCategories, replaceMode);
         updateMoodsIfNeeded(newMetadata, metadata, clearFlags, mergeMoods, replaceMode);
         updateTagsIfNeeded(newMetadata, metadata, clearFlags, mergeTags, replaceMode);

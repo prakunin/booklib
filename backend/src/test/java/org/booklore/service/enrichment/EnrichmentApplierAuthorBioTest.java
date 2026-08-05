@@ -5,8 +5,13 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import org.booklore.model.dto.Book;
+import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.request.EnrichmentRequest;
 import org.booklore.model.entity.AuthorEntity;
+import org.booklore.model.entity.BookEntity;
+import org.booklore.model.enums.EnrichmentConfidence;
+import org.booklore.model.enums.EnrichmentWritePolicy;
+import org.booklore.model.enums.MetadataProvider;
 import org.booklore.repository.AuthorRepository;
 import org.booklore.repository.BookRepository;
 import org.booklore.repository.MetadataFetchJobRepository;
@@ -30,6 +35,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -75,6 +81,28 @@ class EnrichmentApplierAuthorBioTest {
 
     private AuthorEntity author(String name) {
         return AuthorEntity.builder().id(3L).name(name).build();
+    }
+
+    @Test
+    void exactCatalogAuthorsReplaceRatherThanMergeWithTheStoredAuthors() {
+        EnrichmentContext context = new EnrichmentContext(
+                Book.builder().id(11L).build(), 19L, "f.fb2-185838-188548.zip", "185900.fb2",
+                EnrichmentRequest.builder()
+                        .scope(EnrichmentRequest.Scope.BOOK)
+                        .writePolicy(EnrichmentWritePolicy.AUTO)
+                        .build());
+        BookMetadata catalog = BookMetadata.builder()
+                .bookId(11L)
+                .authors(List.of("Correct Author"))
+                .build();
+        context.addContribution(MetadataProvider.FlibustaLocal, catalog, EnrichmentConfidence.HIGH);
+        BookEntity stored = BookEntity.builder().id(11L).build();
+        when(bookRepository.findById(11L)).thenReturn(Optional.of(stored));
+
+        applier.apply(context, EnrichmentOutcome.builder().applied(catalog).build());
+
+        verify(metadataRefreshService).updateBookMetadata(
+                eq(stored), eq(catalog), eq(true), eq(true), eq(false), eq(EnrichmentWritePolicy.AUTO.replaceMode()));
     }
 
     @Nested

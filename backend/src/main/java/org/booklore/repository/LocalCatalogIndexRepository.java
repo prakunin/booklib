@@ -30,6 +30,9 @@ public interface LocalCatalogIndexRepository extends JpaRepository<LocalCatalogI
      */
     boolean existsByLibraryIdAndSourceType(Long libraryId, LocalCatalogSourceType sourceType);
 
+    boolean existsByLibraryIdAndSourceTypeAndEntryKey(
+            Long libraryId, LocalCatalogSourceType sourceType, String entryKey);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM LocalCatalogIndexEntity i WHERE i.libraryId = :libraryId AND i.sourceType = :sourceType")

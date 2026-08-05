@@ -89,6 +89,10 @@ class EnrichmentFieldOptionsTest {
                 .fieldOptions(MetadataRefreshOptions.FieldOptions.builder()
                         .description(MetadataRefreshOptions.FieldProvider.builder()
                                 .p1(MetadataProvider.Amazon).build())
+                        .title(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Google).build())
+                        .authors(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.GoodReads).build())
                         .language(MetadataRefreshOptions.FieldProvider.builder()
                                 .p1(MetadataProvider.Google).build())
                         .seriesName(MetadataRefreshOptions.FieldProvider.builder()
@@ -101,6 +105,8 @@ class EnrichmentFieldOptionsTest {
         MetadataRefreshOptions result = fieldOptions.withLocalCatalog(options);
 
         assertThat(result.getFieldOptions().getDescription().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
+        assertThat(result.getFieldOptions().getTitle().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
+        assertThat(result.getFieldOptions().getAuthors().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
         assertThat(result.getFieldOptions().getLanguage().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
         assertThat(result.getFieldOptions().getSeriesName().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
         assertThat(result.getFieldOptions().getSeriesNumber().getP2()).isEqualTo(MetadataProvider.FlibustaLocal);
@@ -110,6 +116,18 @@ class EnrichmentFieldOptionsTest {
     void doesNotDisplaceAFilledChainForAnyField() {
         MetadataRefreshOptions options = MetadataRefreshOptions.builder()
                 .fieldOptions(MetadataRefreshOptions.FieldOptions.builder()
+                        .title(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Amazon)
+                                .p2(MetadataProvider.Google)
+                                .p3(MetadataProvider.GoodReads)
+                                .p4(MetadataProvider.Hardcover)
+                                .build())
+                        .authors(MetadataRefreshOptions.FieldProvider.builder()
+                                .p1(MetadataProvider.Amazon)
+                                .p2(MetadataProvider.Google)
+                                .p3(MetadataProvider.GoodReads)
+                                .p4(MetadataProvider.Hardcover)
+                                .build())
                         .description(MetadataRefreshOptions.FieldProvider.builder()
                                 .p1(MetadataProvider.Amazon)
                                 .p2(MetadataProvider.Google)
@@ -140,6 +158,8 @@ class EnrichmentFieldOptionsTest {
         MetadataRefreshOptions result = fieldOptions.withLocalCatalog(options);
 
         // All chains should remain unchanged
+        assertThat(result.getFieldOptions().getTitle().getP4()).isEqualTo(MetadataProvider.Hardcover);
+        assertThat(result.getFieldOptions().getAuthors().getP4()).isEqualTo(MetadataProvider.Hardcover);
         assertThat(result.getFieldOptions().getDescription().getP4()).isEqualTo(MetadataProvider.Hardcover);
         assertThat(result.getFieldOptions().getLanguage().getP4()).isEqualTo(MetadataProvider.Hardcover);
         assertThat(result.getFieldOptions().getSeriesName().getP4()).isEqualTo(MetadataProvider.Hardcover);

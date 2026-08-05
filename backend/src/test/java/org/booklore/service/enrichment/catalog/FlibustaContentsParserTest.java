@@ -13,11 +13,11 @@ class FlibustaContentsParserTest {
 
     private final FlibustaContentsParser parser = new FlibustaContentsParser();
 
-    private final List<String> collected = new ArrayList<>();
+    private final List<FlibustaContentsParser.CatalogRow> collected = new ArrayList<>();
 
     private int parse(String tsv) {
         return parser.parse(new ByteArrayInputStream(tsv.getBytes(StandardCharsets.UTF_8)),
-                (archive, entry) -> collected.add(archive + "#" + entry));
+                collected::add);
     }
 
     @Test
@@ -27,8 +27,12 @@ class FlibustaContentsParserTest {
 
         assertThat(count).isEqualTo(2);
         assertThat(collected).containsExactly(
-                "fb2-091841-104214.zip#95887.fb2",
-                "f.fb2-173909-177717.zip#174393.fb2");
+                new FlibustaContentsParser.CatalogRow(
+                        "Wolf Totem (chinese)", List.of("Жун Цзян"),
+                        "fb2-091841-104214.zip", "95887.fb2"),
+                new FlibustaContentsParser.CatalogRow(
+                        "Война и мир", List.of("Толстой Лев"),
+                        "f.fb2-173909-177717.zip", "174393.fb2"));
     }
 
     @Test
@@ -62,6 +66,26 @@ class FlibustaContentsParserTest {
         int count = parse(tsv.toString());
 
         assertThat(count).isEqualTo(50_000);
-        assertThat(collected).hasSize(50_000).last().isEqualTo("archive.zip#49999.fb2");
+        assertThat(collected).hasSize(50_000);
+        assertThat(collected.getLast().archiveName()).isEqualTo("archive.zip");
+        assertThat(collected.getLast().entryName()).isEqualTo("49999.fb2");
+    }
+
+    @Test
+    void splitsSeveralAuthorsAndDropsEmptyTrailingComponents() {
+        int count = parse("Толстой,Лев,Николаевич:Ильф,Илья,:	Книга		books.zip	1.fb2\n");
+
+        assertThat(count).isEqualTo(1);
+        assertThat(collected.getFirst().authors())
+                .containsExactly("Толстой Лев Николаевич", "Ильф Илья");
+    }
+
+    @Test
+    void keepsAUsableRowWhenIdentityFieldsAreBlank() {
+        int count = parse("\t\t\tbooks.zip\t1.fb2\n");
+
+        assertThat(count).isEqualTo(1);
+        assertThat(collected.getFirst().title()).isEmpty();
+        assertThat(collected.getFirst().authors()).isEmpty();
     }
 }

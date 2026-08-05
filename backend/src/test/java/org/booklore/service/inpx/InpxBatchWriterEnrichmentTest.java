@@ -137,7 +137,7 @@ class InpxBatchWriterEnrichmentTest {
         assertThat(request.getScope()).isEqualTo(EnrichmentRequest.Scope.BOOKS);
         assertThat(request.getBookIds()).containsExactly(100L);
         assertThat(request.getSteps()).isEqualTo(LocalCatalogBackfillService.LOCAL_STEPS);
-        assertThat(request.getWritePolicy()).isEqualTo(EnrichmentWritePolicy.AUTO_IF_EMPTY);
+        assertThat(request.getWritePolicy()).isEqualTo(EnrichmentWritePolicy.AUTO);
         assertThat(request.isAgentAllowed()).isFalse();
     }
 

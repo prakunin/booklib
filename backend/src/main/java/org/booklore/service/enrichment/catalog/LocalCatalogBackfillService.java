@@ -27,8 +27,8 @@ import java.util.function.LongConsumer;
  * that queue is drained five books per fifteen seconds because it is sized for rate-limited provider
  * calls, which would put a 615k-book library three weeks away.
  * <p>
- * There is no checkpoint. Under {@code AUTO_IF_EMPTY} a book that is already filled resolves to a
- * no-op, so a run interrupted by a restart is simply started again.
+ * There is no checkpoint. The local catalog is an exact archive-entry match and produces idempotent
+ * values, so a run interrupted by a restart is simply started again.
  * <p>
  * That same absence of a checkpoint is why the index is built <em>synchronously</em> before the walk
  * begins, through {@link LocalCatalogIndexService#ensureIndexedNow} rather than the fire-and-forget
@@ -72,7 +72,7 @@ public class LocalCatalogBackfillService {
 
         EnrichmentRequest request = EnrichmentRequest.builder()
                 .steps(LOCAL_STEPS)
-                .writePolicy(EnrichmentWritePolicy.AUTO_IF_EMPTY)
+                .writePolicy(EnrichmentWritePolicy.AUTO)
                 .agentAllowed(false)
                 .build();
 

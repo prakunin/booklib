@@ -378,6 +378,12 @@ public class MetadataRefreshService {
     }
 
     public void updateBookMetadata(BookEntity bookEntity, BookMetadata metadata, boolean replaceCover, boolean mergeCategories, MetadataReplaceMode replaceMode) {
+        updateBookMetadata(bookEntity, metadata, replaceCover, mergeCategories, mergeCategories, replaceMode);
+    }
+
+    public void updateBookMetadata(BookEntity bookEntity, BookMetadata metadata, boolean replaceCover,
+                                   boolean mergeCategories, boolean mergeAuthors,
+                                   MetadataReplaceMode replaceMode) {
         MetadataUpdateContext context = MetadataUpdateContext.builder()
                 .bookEntity(bookEntity)
                 .metadataUpdateWrapper(MetadataUpdateWrapper.builder()
@@ -385,6 +391,7 @@ public class MetadataRefreshService {
                         .build())
                 .updateThumbnail(replaceCover)
                 .mergeCategories(mergeCategories)
+                .mergeAuthors(mergeAuthors)
                 .replaceMode(replaceMode)
                 .mergeMoods(true)
                 .mergeTags(true)

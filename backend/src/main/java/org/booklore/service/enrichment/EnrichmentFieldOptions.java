@@ -27,10 +27,14 @@ import java.util.function.Function;
 public class EnrichmentFieldOptions {
 
     /**
-     * Fields the local catalog can supply: annotations (descriptions), per-language listings,
-     * and compilation membership (series).
+     * Fields the local catalog can supply: exact book identity, annotations (descriptions),
+     * per-language listings, and compilation membership (series).
      */
     private static final List<FieldSlot> LOCAL_CATALOG_FIELDS = List.of(
+            new FieldSlot(MetadataRefreshOptions.FieldOptions::getTitle,
+                    MetadataRefreshOptions.FieldOptions::setTitle),
+            new FieldSlot(MetadataRefreshOptions.FieldOptions::getAuthors,
+                    MetadataRefreshOptions.FieldOptions::setAuthors),
             new FieldSlot(MetadataRefreshOptions.FieldOptions::getDescription,
                     MetadataRefreshOptions.FieldOptions::setDescription),
             new FieldSlot(MetadataRefreshOptions.FieldOptions::getLanguage,

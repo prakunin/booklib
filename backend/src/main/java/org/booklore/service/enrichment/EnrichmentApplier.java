@@ -8,6 +8,7 @@ import org.booklore.model.entity.MetadataFetchJobEntity;
 import org.booklore.model.entity.MetadataFetchProposalEntity;
 import org.booklore.model.enums.EnrichmentWritePolicy;
 import org.booklore.model.enums.FetchedMetadataProposalStatus;
+import org.booklore.model.enums.MetadataProvider;
 import org.booklore.model.enums.MetadataFetchTaskStatus;
 import org.booklore.repository.AuthorRepository;
 import org.booklore.repository.BookRepository;
@@ -64,7 +65,11 @@ public class EnrichmentApplier {
             return;
         }
         EnrichmentWritePolicy policy = context.getRequest().getWritePolicy();
-        metadataRefreshService.updateBookMetadata(book, outcome.getApplied(), true, true, policy.replaceMode());
+        boolean replaceAuthors = context.getContributions().get(MetadataProvider.FlibustaLocal) != null
+                && context.getContributions().get(MetadataProvider.FlibustaLocal).getAuthors() != null
+                && !context.getContributions().get(MetadataProvider.FlibustaLocal).getAuthors().isEmpty();
+        metadataRefreshService.updateBookMetadata(
+                book, outcome.getApplied(), true, true, !replaceAuthors, policy.replaceMode());
     }
 
     /**

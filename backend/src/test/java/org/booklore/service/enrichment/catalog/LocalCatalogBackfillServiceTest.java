@@ -116,7 +116,7 @@ class LocalCatalogBackfillServiceTest {
     }
 
     @Test
-    void pinsLocalStepsAndAutoIfEmpty() {
+    void pinsLocalStepsAndAuthoritativeAutoWrite() {
         when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq(""), eq(""), eq(0L), any(Pageable.class)))
                 .thenReturn(List.<Object[]>of(row(1L, "a.zip", "1.fb2")));
         when(bookFileRepository.findArchivedBooksForBackfill(eq(7L), eq("a.zip"), eq("1.fb2"), eq(1L), any(Pageable.class)))
@@ -126,7 +126,7 @@ class LocalCatalogBackfillServiceTest {
 
         ArgumentCaptor<EnrichmentRequest> request = ArgumentCaptor.captor();
         verify(pipeline).enrich(eq(1L), request.capture());
-        assertThat(request.getValue().getWritePolicy()).isEqualTo(EnrichmentWritePolicy.AUTO_IF_EMPTY);
+        assertThat(request.getValue().getWritePolicy()).isEqualTo(EnrichmentWritePolicy.AUTO);
         assertThat(request.getValue().isAgentAllowed()).isFalse();
         assertThat(request.getValue().getSteps()).containsExactlyInAnyOrder(
                 EnrichmentStepType.LOCAL_CATALOG,

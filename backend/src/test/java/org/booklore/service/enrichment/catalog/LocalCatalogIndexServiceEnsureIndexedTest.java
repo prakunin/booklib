@@ -109,7 +109,7 @@ class LocalCatalogIndexServiceEnsureIndexedTest {
 
         @Test
         void buildsTheIndexOnTheCallingThreadRatherThanTheExecutor() {
-            when(indexBuilder.isIndexed(LIBRARY_ID)).thenReturn(false);
+            when(indexBuilder.isIndexed(LIBRARY_ID)).thenReturn(false, true);
             when(indexBuilder.rebuild(LIBRARY_ID)).thenReturn(new LocalCatalogIndexBuilder.IndexResult(1, 1, 1, 1, 1));
 
             boolean ready = service.ensureIndexedNow(LIBRARY_ID);
@@ -117,6 +117,16 @@ class LocalCatalogIndexServiceEnsureIndexedTest {
             assertThat(ready).isTrue();
             assertThat(submitted).isEmpty();
             verify(indexBuilder).rebuild(LIBRARY_ID);
+        }
+
+        @Test
+        void reportsNotReadyWhenTheRebuildProducesNoCompletionMarker() {
+            when(indexBuilder.isIndexed(LIBRARY_ID)).thenReturn(false);
+            when(indexBuilder.rebuild(LIBRARY_ID)).thenReturn(LocalCatalogIndexBuilder.IndexResult.empty());
+
+            boolean ready = service.ensureIndexedNow(LIBRARY_ID);
+
+            assertThat(ready).isFalse();
         }
 
         @Test

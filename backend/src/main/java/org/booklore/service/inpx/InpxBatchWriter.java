@@ -261,7 +261,7 @@ public class InpxBatchWriter {
                     .scope(EnrichmentRequest.Scope.BOOKS)
                     .bookIds(Set.copyOf(bookIds))
                     .steps(LocalCatalogBackfillService.LOCAL_STEPS)
-                    .writePolicy(EnrichmentWritePolicy.AUTO_IF_EMPTY)
+                    .writePolicy(EnrichmentWritePolicy.AUTO)
                     .agentAllowed(false)
                     .build(), EnrichmentPriority.IMPORT_TOP_UP);
         } catch (RuntimeException e) {

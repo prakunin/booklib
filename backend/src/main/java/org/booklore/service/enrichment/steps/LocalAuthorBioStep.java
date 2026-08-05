@@ -2,7 +2,9 @@ package org.booklore.service.enrichment.steps;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.enums.EnrichmentStepType;
+import org.booklore.model.enums.MetadataProvider;
 import org.booklore.service.enrichment.EnrichmentContext;
 import org.booklore.service.enrichment.EnrichmentStepHandler;
 import org.booklore.service.enrichment.catalog.LocalCatalogSource;
@@ -46,10 +48,17 @@ public class LocalAuthorBioStep implements EnrichmentStepHandler {
     }
 
     private List<String> authorsOf(EnrichmentContext context) {
-        if (context.existingMetadata() == null || context.existingMetadata().getAuthors() == null) {
+        BookMetadata existing = context.existingMetadata();
+        if (existing != null && !Boolean.TRUE.equals(existing.getAuthorsLocked())) {
+            BookMetadata local = context.getContributions().get(MetadataProvider.FlibustaLocal);
+            if (local != null && local.getAuthors() != null && !local.getAuthors().isEmpty()) {
+                return local.getAuthors();
+            }
+        }
+        if (existing == null || existing.getAuthors() == null) {
             return List.of();
         }
-        return context.existingMetadata().getAuthors().stream()
+        return existing.getAuthors().stream()
                 .filter(author -> author != null && !author.isBlank())
                 .toList();
     }

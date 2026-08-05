@@ -1,5 +1,6 @@
 package org.booklore.service.enrichment.catalog;
 
+import org.booklore.model.entity.LocalCatalogIndexEntity;
 import org.booklore.model.enums.LocalCatalogSourceType;
 import org.booklore.repository.LibraryRepository;
 import org.booklore.repository.LocalCatalogIndexRepository;
@@ -8,10 +9,11 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -22,8 +24,7 @@ import static org.mockito.Mockito.when;
  * {@code ensureIndexed} at the top of every book's enrichment — so how it asks is a throughput
  * contract, not an implementation detail.
  * <p>
- * Measured on the 1,031,476-row {@code local_catalog_index} of library 19, where the first source
- * type it asks about (REVIEW) has 176,334 rows:
+ * Measured on the 1,031,476-row {@code local_catalog_index} of library 19:
  * <pre>
  * SELECT count(*) … WHERE library_id=19 AND source_type='REVIEW'   41.6 / 40.0 / 45.8 ms
  * SELECT 1        … WHERE library_id=19 AND source_type='REVIEW' LIMIT 1   0.25 / 0.12 / 0.11 ms
@@ -34,9 +35,8 @@ import static org.mockito.Mockito.when;
  * row at all", and asking it cost 45.4 ms × 14,003 books = 57.7% of a measured backfill's wall
  * clock.
  * <p>
- * These tests pin the outcome (which source types decide the answer, and the short-circuit) plus
- * the one thing that is genuinely about which query is issued, because "does not count a
- * million rows to answer a yes/no question" is the contract this change exists to establish.
+ * Readiness is represented by one marker written only after every source pass completes. That both
+ * upgrades legacy indexes and prevents committed partial rows from looking ready.
  */
 class LocalCatalogIndexBuilderIsIndexedTest {
 
@@ -54,31 +54,32 @@ class LocalCatalogIndexBuilderIsIndexedTest {
             archiveService, new ObjectMapper());
 
     private void hasRows(LocalCatalogSourceType sourceType) {
-        when(indexRepository.existsByLibraryIdAndSourceType(LIBRARY_ID, sourceType)).thenReturn(true);
+        if (sourceType == LocalCatalogSourceType.INDEX_VERSION) {
+            when(indexRepository.findByLibraryIdAndSourceTypeAndEntryKey(
+                    LIBRARY_ID, sourceType, LocalCatalogIndexBuilder.INDEX_VERSION_KEY))
+                    .thenReturn(Optional.of(LocalCatalogIndexEntity.builder().payload("2").build()));
+        } else {
+            when(indexRepository.existsByLibraryIdAndSourceType(LIBRARY_ID, sourceType)).thenReturn(true);
+        }
     }
 
     @Nested
     class WhatDecidesTheAnswer {
 
         @Test
-        void reviewRowsAloneMakeTheLibraryIndexed() {
+        void theCurrentVersionMarkerMakesTheLibraryIndexed() {
+            hasRows(LocalCatalogSourceType.INDEX_VERSION);
+
+            assertThat(builder.isIndexed(LIBRARY_ID)).isTrue();
+        }
+
+        @Test
+        void legacyRowsWithoutTheMarkerRequireARebuild() {
             hasRows(LocalCatalogSourceType.REVIEW);
-
-            assertThat(builder.isIndexed(LIBRARY_ID)).isTrue();
-        }
-
-        @Test
-        void authorBiographyRowsAloneMakeTheLibraryIndexed() {
             hasRows(LocalCatalogSourceType.AUTHOR_BIO);
-
-            assertThat(builder.isIndexed(LIBRARY_ID)).isTrue();
-        }
-
-        @Test
-        void languageRowsAloneMakeTheLibraryIndexed() {
             hasRows(LocalCatalogSourceType.LANGUAGE);
 
-            assertThat(builder.isIndexed(LIBRARY_ID)).isTrue();
+            assertThat(builder.isIndexed(LIBRARY_ID)).isFalse();
         }
 
         @Test
@@ -86,12 +87,19 @@ class LocalCatalogIndexBuilderIsIndexedTest {
             assertThat(builder.isIndexed(LIBRARY_ID)).isFalse();
         }
 
-        /**
-         * Compilations are derived from a single JSON document that indexes even when the archive
-         * walk found nothing, so they are deliberately not evidence that the catalog was walked.
-         */
         @Test
-        void compilationRowsAloneAreNotEvidenceOfAWalkedCatalog() {
+        void aMarkerWithTheWrongPayloadIsNotIndexed() {
+            when(indexRepository.findByLibraryIdAndSourceTypeAndEntryKey(
+                    LIBRARY_ID, LocalCatalogSourceType.INDEX_VERSION,
+                    LocalCatalogIndexBuilder.INDEX_VERSION_KEY))
+                    .thenReturn(Optional.of(LocalCatalogIndexEntity.builder().payload("corrupt").build()));
+
+            assertThat(builder.isIndexed(LIBRARY_ID)).isFalse();
+        }
+
+        @Test
+        void partialRowsAreNotEvidenceOfACompletedCatalog() {
+            hasRows(LocalCatalogSourceType.REVIEW);
             hasRows(LocalCatalogSourceType.COMPILATION);
             hasRows(LocalCatalogSourceType.COMPILATION_PART);
 
@@ -104,7 +112,7 @@ class LocalCatalogIndexBuilderIsIndexedTest {
 
         @Test
         void neverCountsRowsToAnswerAYesNoQuestion() {
-            hasRows(LocalCatalogSourceType.LANGUAGE);
+            hasRows(LocalCatalogSourceType.INDEX_VERSION);
 
             builder.isIndexed(LIBRARY_ID);
 
@@ -112,25 +120,15 @@ class LocalCatalogIndexBuilderIsIndexedTest {
         }
 
         @Test
-        void stopsAtTheFirstSourceTypeThatHasRows() {
-            hasRows(LocalCatalogSourceType.REVIEW);
+        void asksOnlyForTheCompletionMarker() {
+            hasRows(LocalCatalogSourceType.INDEX_VERSION);
 
             builder.isIndexed(LIBRARY_ID);
 
-            verify(indexRepository).existsByLibraryIdAndSourceType(LIBRARY_ID, LocalCatalogSourceType.REVIEW);
-            verify(indexRepository, never())
-                    .existsByLibraryIdAndSourceType(eq(LIBRARY_ID), eq(LocalCatalogSourceType.AUTHOR_BIO));
-            verify(indexRepository, never())
-                    .existsByLibraryIdAndSourceType(eq(LIBRARY_ID), eq(LocalCatalogSourceType.LANGUAGE));
-        }
-
-        @Test
-        void asksAtMostOncePerSourceTypeWhenNothingIsIndexed() {
-            builder.isIndexed(LIBRARY_ID);
-
-            verify(indexRepository).existsByLibraryIdAndSourceType(LIBRARY_ID, LocalCatalogSourceType.REVIEW);
-            verify(indexRepository).existsByLibraryIdAndSourceType(LIBRARY_ID, LocalCatalogSourceType.AUTHOR_BIO);
-            verify(indexRepository).existsByLibraryIdAndSourceType(LIBRARY_ID, LocalCatalogSourceType.LANGUAGE);
+            verify(indexRepository).findByLibraryIdAndSourceTypeAndEntryKey(
+                    LIBRARY_ID, LocalCatalogSourceType.INDEX_VERSION,
+                    LocalCatalogIndexBuilder.INDEX_VERSION_KEY);
+            verify(indexRepository, never()).existsByLibraryIdAndSourceType(anyLong(), any());
         }
     }
 }
