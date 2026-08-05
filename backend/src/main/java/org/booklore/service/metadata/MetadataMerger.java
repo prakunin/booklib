@@ -3,11 +3,13 @@ package org.booklore.service.metadata;
 import org.booklore.model.dto.BookMetadata;
 import org.booklore.model.dto.BookReview;
 import org.booklore.model.dto.request.MetadataRefreshOptions;
+import org.booklore.model.enums.MetadataField;
 import org.booklore.model.enums.MetadataProvider;
 import org.booklore.model.enums.MetadataReplaceMode;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -23,72 +25,72 @@ import static org.booklore.model.enums.MetadataProvider.*;
 class MetadataMerger {
 
     private final List<FieldMergeSpec> fieldMergeSpecs = List.of(
-            resolvedString(MetadataRefreshOptions.EnabledFields::isTitle, MetadataRefreshOptions.FieldOptions::getTitle,
+            resolvedString(MetadataField.TITLE, MetadataRefreshOptions.EnabledFields::isTitle, MetadataRefreshOptions.FieldOptions::getTitle,
                     BookMetadata::getTitle, BookMetadata::setTitle),
-            resolvedString(MetadataRefreshOptions.EnabledFields::isSubtitle, MetadataRefreshOptions.FieldOptions::getSubtitle,
+            resolvedString(MetadataField.SUBTITLE, MetadataRefreshOptions.EnabledFields::isSubtitle, MetadataRefreshOptions.FieldOptions::getSubtitle,
                     BookMetadata::getSubtitle, BookMetadata::setSubtitle),
-            resolvedString(MetadataRefreshOptions.EnabledFields::isDescription, MetadataRefreshOptions.FieldOptions::getDescription,
+            resolvedString(MetadataField.DESCRIPTION, MetadataRefreshOptions.EnabledFields::isDescription, MetadataRefreshOptions.FieldOptions::getDescription,
                     BookMetadata::getDescription, BookMetadata::setDescription),
             resolvedList(MetadataRefreshOptions.EnabledFields::isAuthors, MetadataRefreshOptions.FieldOptions::getAuthors,
                     BookMetadata::getAuthors, BookMetadata::setAuthors),
-            resolvedString(MetadataRefreshOptions.EnabledFields::isPublisher, MetadataRefreshOptions.FieldOptions::getPublisher,
+            resolvedString(MetadataField.PUBLISHER, MetadataRefreshOptions.EnabledFields::isPublisher, MetadataRefreshOptions.FieldOptions::getPublisher,
                     BookMetadata::getPublisher, BookMetadata::setPublisher),
-            resolved(MetadataRefreshOptions.EnabledFields::isPublishedDate, MetadataRefreshOptions.FieldOptions::getPublishedDate,
+            resolved(MetadataField.PUBLISHED_DATE, MetadataRefreshOptions.EnabledFields::isPublishedDate, MetadataRefreshOptions.FieldOptions::getPublishedDate,
                     BookMetadata::getPublishedDate, BookMetadata::setPublishedDate),
-            resolvedString(MetadataRefreshOptions.EnabledFields::isSeriesName, MetadataRefreshOptions.FieldOptions::getSeriesName,
+            resolvedString(MetadataField.SERIES_NAME, MetadataRefreshOptions.EnabledFields::isSeriesName, MetadataRefreshOptions.FieldOptions::getSeriesName,
                     BookMetadata::getSeriesName, BookMetadata::setSeriesName),
-            resolved(MetadataRefreshOptions.EnabledFields::isSeriesNumber, MetadataRefreshOptions.FieldOptions::getSeriesNumber,
+            resolved(MetadataField.SERIES_NUMBER, MetadataRefreshOptions.EnabledFields::isSeriesNumber, MetadataRefreshOptions.FieldOptions::getSeriesNumber,
                     BookMetadata::getSeriesNumber, BookMetadata::setSeriesNumber),
-            resolvedInteger(MetadataRefreshOptions.EnabledFields::isSeriesTotal, MetadataRefreshOptions.FieldOptions::getSeriesTotal,
+            resolvedInteger(MetadataField.SERIES_TOTAL, MetadataRefreshOptions.EnabledFields::isSeriesTotal, MetadataRefreshOptions.FieldOptions::getSeriesTotal,
                     BookMetadata::getSeriesTotal, BookMetadata::setSeriesTotal),
-            resolvedString(MetadataRefreshOptions.EnabledFields::isIsbn13, MetadataRefreshOptions.FieldOptions::getIsbn13,
+            resolvedString(MetadataField.ISBN_13, MetadataRefreshOptions.EnabledFields::isIsbn13, MetadataRefreshOptions.FieldOptions::getIsbn13,
                     BookMetadata::getIsbn13, BookMetadata::setIsbn13),
-            resolvedString(MetadataRefreshOptions.EnabledFields::isIsbn10, MetadataRefreshOptions.FieldOptions::getIsbn10,
+            resolvedString(MetadataField.ISBN_10, MetadataRefreshOptions.EnabledFields::isIsbn10, MetadataRefreshOptions.FieldOptions::getIsbn10,
                     BookMetadata::getIsbn10, BookMetadata::setIsbn10),
-            resolvedString(MetadataRefreshOptions.EnabledFields::isLanguage, MetadataRefreshOptions.FieldOptions::getLanguage,
+            resolvedString(MetadataField.LANGUAGE, MetadataRefreshOptions.EnabledFields::isLanguage, MetadataRefreshOptions.FieldOptions::getLanguage,
                     BookMetadata::getLanguage, BookMetadata::setLanguage),
-            resolvedInteger(MetadataRefreshOptions.EnabledFields::isPageCount, MetadataRefreshOptions.FieldOptions::getPageCount,
+            resolvedInteger(MetadataField.PAGE_COUNT, MetadataRefreshOptions.EnabledFields::isPageCount, MetadataRefreshOptions.FieldOptions::getPageCount,
                     BookMetadata::getPageCount, BookMetadata::setPageCount),
-            resolvedString(MetadataRefreshOptions.EnabledFields::isCover, MetadataRefreshOptions.FieldOptions::getCover,
+            resolvedString(null, MetadataRefreshOptions.EnabledFields::isCover, MetadataRefreshOptions.FieldOptions::getCover,
                     BookMetadata::getThumbnailUrl, BookMetadata::setThumbnailUrl),
-            providerField(MetadataRefreshOptions.EnabledFields::isAmazonRating, Amazon,
+            providerField(MetadataField.AMAZON_RATING, MetadataRefreshOptions.EnabledFields::isAmazonRating, Amazon,
                     BookMetadata::getAmazonRating, BookMetadata::setAmazonRating),
-            providerField(MetadataRefreshOptions.EnabledFields::isAmazonReviewCount, Amazon,
+            providerField(MetadataField.AMAZON_REVIEW_COUNT, MetadataRefreshOptions.EnabledFields::isAmazonReviewCount, Amazon,
                     BookMetadata::getAmazonReviewCount, BookMetadata::setAmazonReviewCount),
-            providerField(MetadataRefreshOptions.EnabledFields::isGoodreadsRating, GoodReads,
+            providerField(MetadataField.GOODREADS_RATING, MetadataRefreshOptions.EnabledFields::isGoodreadsRating, GoodReads,
                     BookMetadata::getGoodreadsRating, BookMetadata::setGoodreadsRating),
-            providerField(MetadataRefreshOptions.EnabledFields::isGoodreadsReviewCount, GoodReads,
+            providerField(MetadataField.GOODREADS_REVIEW_COUNT, MetadataRefreshOptions.EnabledFields::isGoodreadsReviewCount, GoodReads,
                     BookMetadata::getGoodreadsReviewCount, BookMetadata::setGoodreadsReviewCount),
-            providerField(MetadataRefreshOptions.EnabledFields::isHardcoverRating, Hardcover,
+            providerField(MetadataField.HARDCOVER_RATING, MetadataRefreshOptions.EnabledFields::isHardcoverRating, Hardcover,
                     BookMetadata::getHardcoverRating, BookMetadata::setHardcoverRating),
-            providerField(MetadataRefreshOptions.EnabledFields::isHardcoverReviewCount, Hardcover,
+            providerField(MetadataField.HARDCOVER_REVIEW_COUNT, MetadataRefreshOptions.EnabledFields::isHardcoverReviewCount, Hardcover,
                     BookMetadata::getHardcoverReviewCount, BookMetadata::setHardcoverReviewCount),
-            providerField(MetadataRefreshOptions.EnabledFields::isAsin, Amazon,
+            providerField(MetadataField.ASIN, MetadataRefreshOptions.EnabledFields::isAsin, Amazon,
                     BookMetadata::getAsin, BookMetadata::setAsin),
-            providerField(MetadataRefreshOptions.EnabledFields::isGoodreadsId, GoodReads,
+            providerField(MetadataField.GOODREADS_ID, MetadataRefreshOptions.EnabledFields::isGoodreadsId, GoodReads,
                     BookMetadata::getGoodreadsId, BookMetadata::setGoodreadsId),
             hardcoverIds(),
-            providerField(MetadataRefreshOptions.EnabledFields::isGoogleId, Google,
+            providerField(MetadataField.GOOGLE_ID, MetadataRefreshOptions.EnabledFields::isGoogleId, Google,
                     BookMetadata::getGoogleId, BookMetadata::setGoogleId),
-            providerField(MetadataRefreshOptions.EnabledFields::isComicvineId, Comicvine,
+            providerField(MetadataField.COMICVINE_ID, MetadataRefreshOptions.EnabledFields::isComicvineId, Comicvine,
                     BookMetadata::getComicvineId, BookMetadata::setComicvineId),
-            providerField(MetadataRefreshOptions.EnabledFields::isLubimyczytacId, Lubimyczytac,
+            providerField(MetadataField.LUBIMYCZYTAC_ID, MetadataRefreshOptions.EnabledFields::isLubimyczytacId, Lubimyczytac,
                     BookMetadata::getLubimyczytacId, BookMetadata::setLubimyczytacId),
-            providerField(MetadataRefreshOptions.EnabledFields::isLubimyczytacRating, Lubimyczytac,
+            providerField(MetadataField.LUBIMYCZYTAC_RATING, MetadataRefreshOptions.EnabledFields::isLubimyczytacRating, Lubimyczytac,
                     BookMetadata::getLubimyczytacRating, BookMetadata::setLubimyczytacRating),
-            providerField(MetadataRefreshOptions.EnabledFields::isRanobedbId, Ranobedb,
+            providerField(MetadataField.RANOBEDB_ID, MetadataRefreshOptions.EnabledFields::isRanobedbId, Ranobedb,
                     BookMetadata::getRanobedbId, BookMetadata::setRanobedbId),
-            providerField(MetadataRefreshOptions.EnabledFields::isRanobedbRating, Ranobedb,
+            providerField(MetadataField.RANOBEDB_RATING, MetadataRefreshOptions.EnabledFields::isRanobedbRating, Ranobedb,
                     BookMetadata::getRanobedbRating, BookMetadata::setRanobedbRating),
-            providerField(MetadataRefreshOptions.EnabledFields::isAudibleId, Audible,
+            providerField(MetadataField.AUDIBLE_ID, MetadataRefreshOptions.EnabledFields::isAudibleId, Audible,
                     BookMetadata::getAudibleId, BookMetadata::setAudibleId),
-            providerField(MetadataRefreshOptions.EnabledFields::isAudibleRating, Audible,
+            providerField(MetadataField.AUDIBLE_RATING, MetadataRefreshOptions.EnabledFields::isAudibleRating, Audible,
                     BookMetadata::getAudibleRating, BookMetadata::setAudibleRating),
-            providerField(MetadataRefreshOptions.EnabledFields::isAudibleReviewCount, Audible,
+            providerField(MetadataField.AUDIBLE_REVIEW_COUNT, MetadataRefreshOptions.EnabledFields::isAudibleReviewCount, Audible,
                     BookMetadata::getAudibleReviewCount, BookMetadata::setAudibleReviewCount),
-            providerField(MetadataRefreshOptions.EnabledFields::isMoods, Hardcover,
+            providerField(null, MetadataRefreshOptions.EnabledFields::isMoods, Hardcover,
                     BookMetadata::getMoods, BookMetadata::setMoods),
-            providerField(MetadataRefreshOptions.EnabledFields::isTags, Hardcover,
+            providerField(null, MetadataRefreshOptions.EnabledFields::isTags, Hardcover,
                     BookMetadata::getTags, BookMetadata::setTags),
             categories()
     );
@@ -141,15 +143,18 @@ class MetadataMerger {
         MetadataRefreshOptions.EnabledFields enabledFields = enabledFields(refreshOptions);
         MetadataReplaceMode replaceMode = refreshOptions.getReplaceMode();
         boolean isReplaceAll = replaceMode == MetadataReplaceMode.REPLACE_ALL;
-        MergeContext context = new MergeContext(fieldOptions, refreshOptions, metadataMap);
+        MergeContext context = new MergeContext(fieldOptions, refreshOptions, metadataMap, new EnumMap<>(MetadataField.class));
 
         for (FieldMergeSpec spec : fieldMergeSpecs) {
             if (spec.enabled().test(enabledFields)) {
                 spec.applyFetched().accept(context, metadata);
             } else if (isReplaceAll && existingMetadata != null) {
+                // Copying the existing value attributes nothing: the value did not come from this
+                // merge, so whatever the field's recorded source already was stays correct.
                 spec.copyExisting().accept(metadata, existingMetadata);
             }
         }
+        metadata.setFieldProviders(context.capturedProviders());
 
         BookMetadata comicvine = metadataMap.get(Comicvine);
         if (comicvine != null && comicvine.getComicMetadata() != null) {
@@ -266,18 +271,43 @@ class MetadataMerger {
             MetadataRefreshOptions.FieldProvider fieldProvider,
             Function<BookMetadata, T> extractor,
             Predicate<T> isValidValue) {
+        return resolveWithWinner(metadataMap, fieldProvider, extractor, isValidValue).value();
+    }
+
+    /**
+     * The p1-p4 walk, returning the winning provider alongside its value.
+     * <p>
+     * Everything else here discards the provider; this is the one place that knows it, so it is the
+     * only place provenance can be captured without a second implementation of field priority.
+     */
+    private <T> Resolved<T> resolveWithWinner(
+            Map<MetadataProvider, BookMetadata> metadataMap,
+            MetadataRefreshOptions.FieldProvider fieldProvider,
+            Function<BookMetadata, T> extractor,
+            Predicate<T> isValidValue) {
         if (fieldProvider == null) {
-            return null;
+            return new Resolved<>(null, null);
         }
         for (MetadataProvider provider : providers(fieldProvider)) {
             if (provider != null && metadataMap.containsKey(provider)) {
                 T value = extractor.apply(metadataMap.get(provider));
                 if (isValidValue.test(value)) {
-                    return value;
+                    return new Resolved<>(value, provider);
                 }
             }
         }
-        return null;
+        return new Resolved<>(null, null);
+    }
+
+    private <T> T resolveAndCapture(
+            MergeContext context,
+            MetadataField field,
+            MetadataRefreshOptions.FieldProvider fieldProvider,
+            Function<BookMetadata, T> extractor,
+            Predicate<T> isValidValue) {
+        Resolved<T> resolved = resolveWithWinner(context.metadataMap(), fieldProvider, extractor, isValidValue);
+        context.capture(field, resolved.provider());
+        return resolved.value();
     }
 
     private MetadataProvider[] providers(MetadataRefreshOptions.FieldProvider fieldProvider) {
@@ -290,14 +320,15 @@ class MetadataMerger {
     }
 
     private <T> FieldMergeSpec resolved(
+            MetadataField field,
             Predicate<MetadataRefreshOptions.EnabledFields> enabled,
             Function<MetadataRefreshOptions.FieldOptions, MetadataRefreshOptions.FieldProvider> providerSelector,
             Function<BookMetadata, T> getter,
             BiConsumer<BookMetadata, T> setter) {
         return new FieldMergeSpec(
                 enabled,
-                (context, metadata) -> setter.accept(metadata,
-                        resolveField(context.metadataMap(), providerSelector.apply(context.fieldOptions()), getter)),
+                (context, metadata) -> setter.accept(metadata, resolveAndCapture(
+                        context, field, providerSelector.apply(context.fieldOptions()), getter, Objects::nonNull)),
                 (metadata, existingMetadata) -> setter.accept(metadata, getter.apply(existingMetadata))
         );
     }
@@ -307,27 +338,29 @@ class MetadataMerger {
     // are nullable); BiConsumer<BookMetadata, Integer> is intentional here.
     @SuppressWarnings("java:S4276")
     private FieldMergeSpec resolvedInteger(
+            MetadataField field,
             Predicate<MetadataRefreshOptions.EnabledFields> enabled,
             Function<MetadataRefreshOptions.FieldOptions, MetadataRefreshOptions.FieldProvider> providerSelector,
             Function<BookMetadata, Integer> getter,
             BiConsumer<BookMetadata, Integer> setter) {
         return new FieldMergeSpec(
                 enabled,
-                (context, metadata) -> setter.accept(metadata,
-                        resolveFieldAsInteger(context.metadataMap(), providerSelector.apply(context.fieldOptions()), getter)),
+                (context, metadata) -> setter.accept(metadata, resolveAndCapture(
+                        context, field, providerSelector.apply(context.fieldOptions()), getter, Objects::nonNull)),
                 (metadata, existingMetadata) -> setter.accept(metadata, getter.apply(existingMetadata))
         );
     }
 
     private FieldMergeSpec resolvedString(
+            MetadataField field,
             Predicate<MetadataRefreshOptions.EnabledFields> enabled,
             Function<MetadataRefreshOptions.FieldOptions, MetadataRefreshOptions.FieldProvider> providerSelector,
             FieldValueExtractor getter,
             BiConsumer<BookMetadata, String> setter) {
         return new FieldMergeSpec(
                 enabled,
-                (context, metadata) -> setter.accept(metadata,
-                        resolveFieldAsString(context.metadataMap(), providerSelector.apply(context.fieldOptions()), getter)),
+                (context, metadata) -> setter.accept(metadata, resolveAndCapture(
+                        context, field, providerSelector.apply(context.fieldOptions()), getter::extract, Objects::nonNull)),
                 (metadata, existingMetadata) -> setter.accept(metadata, getter.extract(existingMetadata))
         );
     }
@@ -346,6 +379,7 @@ class MetadataMerger {
     }
 
     private <T> FieldMergeSpec providerField(
+            MetadataField field,
             Predicate<MetadataRefreshOptions.EnabledFields> enabled,
             MetadataProvider provider,
             Function<BookMetadata, T> getter,
@@ -355,7 +389,11 @@ class MetadataMerger {
                 (context, metadata) -> {
                     BookMetadata providerMetadata = context.metadataMap().get(provider);
                     if (providerMetadata != null) {
-                        setter.accept(metadata, getter.apply(providerMetadata));
+                        T value = getter.apply(providerMetadata);
+                        setter.accept(metadata, value);
+                        if (value != null) {
+                            context.capture(field, provider);
+                        }
                     }
                 },
                 (metadata, existingMetadata) -> setter.accept(metadata, getter.apply(existingMetadata))
@@ -370,6 +408,12 @@ class MetadataMerger {
                     if (hardcover != null) {
                         metadata.setHardcoverId(hardcover.getHardcoverId());
                         metadata.setHardcoverBookId(hardcover.getHardcoverBookId());
+                        if (hardcover.getHardcoverId() != null) {
+                            context.capture(MetadataField.HARDCOVER_ID, Hardcover);
+                        }
+                        if (hardcover.getHardcoverBookId() != null) {
+                            context.capture(MetadataField.HARDCOVER_BOOK_ID, Hardcover);
+                        }
                     }
                 },
                 (metadata, existingMetadata) -> {
@@ -440,7 +484,22 @@ class MetadataMerger {
     private record MergeContext(
             MetadataRefreshOptions.FieldOptions fieldOptions,
             MetadataRefreshOptions refreshOptions,
-            Map<MetadataProvider, BookMetadata> metadataMap) {
+            Map<MetadataProvider, BookMetadata> metadataMap,
+            Map<MetadataField, MetadataProvider> capturedProviders) {
+
+        /**
+         * Files the provider that won a field. A null field is one this merge cannot attribute -
+         * a collection or the cover, neither of which the updater writes through a single scalar
+         * setter - and a null provider means nothing resolved, which is not something to record.
+         */
+        void capture(MetadataField field, MetadataProvider provider) {
+            if (field != null && provider != null) {
+                capturedProviders.put(field, provider);
+            }
+        }
+    }
+
+    private record Resolved<T>(T value, MetadataProvider provider) {
     }
 
     private record FieldMergeSpec(

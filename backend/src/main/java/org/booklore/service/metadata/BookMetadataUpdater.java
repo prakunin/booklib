@@ -14,6 +14,8 @@ import org.booklore.model.dto.settings.MetadataPersistenceSettings;
 import org.booklore.model.entity.*;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.model.enums.ComicCreatorRole;
+import org.booklore.model.enums.MetadataField;
+import org.booklore.model.enums.MetadataProvider;
 import org.booklore.model.enums.MetadataReplaceMode;
 import org.booklore.repository.*;
 import org.booklore.service.appsettings.AppSettingService;
@@ -62,6 +64,7 @@ public class BookMetadataUpdater {
     private final FileMoveService fileMoveService;
     private final SidecarMetadataWriter sidecarMetadataWriter;
     private final AuthorLocalResolver authorLocalResolver;
+    private final BookMetadataFieldSourceRepository bookMetadataFieldSourceRepository;
 
     @Transactional
     public void setBookMetadata(MetadataUpdateContext context) {
@@ -105,7 +108,9 @@ public class BookMetadataUpdater {
 
         boolean hasValueChangesForFileWrite = MetadataChangeDetector.hasValueChangesForFileWrite(newMetadata, metadata, clearFlags);
 
-        updateBasicFields(newMetadata, metadata, clearFlags, replaceMode);
+        FieldSourceChanges fieldSources = new FieldSourceChanges(newMetadata.getFieldProviders());
+
+        updateBasicFields(newMetadata, metadata, clearFlags, replaceMode, fieldSources);
         updateAuthorsIfNeeded(newMetadata, metadata, clearFlags, mergeCategories, replaceMode);
         updateCategoriesIfNeeded(newMetadata, metadata, clearFlags, mergeCategories, replaceMode);
         updateMoodsIfNeeded(newMetadata, metadata, clearFlags, mergeMoods, replaceMode);
@@ -118,11 +123,88 @@ public class BookMetadataUpdater {
 
         bookEntity.setMetadataUpdatedAt(Instant.now());
         bookRepository.save(bookEntity);
+        applyFieldSources(bookId, fieldSources);
         calculateAndSetMatchScore(bookEntity, bookId);
         writeMetadataToFileIfNeeded(new FileWriteRequest(bookEntity, metadata, newMetadata, clearFlags, writeToFile,
                 primaryFile, bookType, updateThumbnail, thumbnailRequiresUpdate, hasValueChangesForFileWrite, bookId));
         writeSidecarMetadataIfEnabled(bookEntity, bookId);
         moveFilesToLibraryPatternIfEnabled(settings, primaryFile, metadata, bookId);
+    }
+
+    /**
+     * The source rows one metadata update implies.
+     * <p>
+     * Accumulated in memory and flushed once rather than a query per field, and derived only from
+     * what {@link #handleFieldUpdate} reports it stored - never from what the merger chose, which is
+     * only a proposal until the updater accepts it.
+     */
+    private static final class FieldSourceChanges {
+
+        private final Map<MetadataField, MetadataProvider> providers;
+        private final Map<MetadataField, MetadataProvider> toRecord = new EnumMap<>(MetadataField.class);
+        private final Set<MetadataField> toDelete = EnumSet.noneOf(MetadataField.class);
+
+        private FieldSourceChanges(Map<MetadataField, MetadataProvider> providers) {
+            this.providers = providers != null ? providers : Map.of();
+        }
+
+        private void record(MetadataField field, FieldWriteOutcome outcome) {
+            if (field == null || outcome == FieldWriteOutcome.NOT_WRITTEN) {
+                // Nothing was stored, so whatever the field's row says is still whatever it said.
+                return;
+            }
+            if (outcome == FieldWriteOutcome.CLEARED) {
+                // A row naming a provider for an empty field is a lie.
+                toDelete.add(field);
+                return;
+            }
+            MetadataProvider provider = providers.get(field);
+            if (provider != null) {
+                toRecord.put(field, provider);
+            } else if (outcome == FieldWriteOutcome.WRITTEN) {
+                // Something changed this field and named no provider - a manual edit is exactly this
+                // shape - so any existing row now credits a provider for someone else's text.
+                toDelete.add(field);
+            }
+        }
+
+        private boolean isEmpty() {
+            return toRecord.isEmpty() && toDelete.isEmpty();
+        }
+    }
+
+    private void applyFieldSources(Long bookId, FieldSourceChanges changes) {
+        if (changes.isEmpty()) {
+            return;
+        }
+        Map<MetadataField, BookMetadataFieldSourceEntity> existing = bookMetadataFieldSourceRepository.findByBookId(bookId).stream()
+                .collect(Collectors.toMap(BookMetadataFieldSourceEntity::getFieldName, row -> row,
+                        (first, second) -> first, () -> new EnumMap<>(MetadataField.class)));
+
+        Instant now = Instant.now();
+        List<BookMetadataFieldSourceEntity> upserts = new ArrayList<>();
+        changes.toRecord.forEach((field, provider) -> {
+            BookMetadataFieldSourceEntity row = existing.get(field);
+            if (row == null) {
+                row = BookMetadataFieldSourceEntity.builder().bookId(bookId).fieldName(field).build();
+            } else if (row.getProvider() == provider) {
+                return;
+            }
+            row.setProvider(provider);
+            row.setUpdatedAt(now);
+            upserts.add(row);
+        });
+
+        Set<MetadataField> deletions = changes.toDelete.stream()
+                .filter(existing::containsKey)
+                .collect(Collectors.toCollection(() -> EnumSet.noneOf(MetadataField.class)));
+
+        if (!upserts.isEmpty()) {
+            bookMetadataFieldSourceRepository.saveAll(upserts);
+        }
+        if (!deletions.isEmpty()) {
+            bookMetadataFieldSourceRepository.deleteByBookIdAndFieldNameIn(bookId, deletions);
+        }
     }
 
     private void calculateAndSetMatchScore(BookEntity bookEntity, Long bookId) {
@@ -207,68 +289,116 @@ public class BookMetadataUpdater {
         }
     }
 
-    private void updateBasicFields(BookMetadata m, BookMetadataEntity e, MetadataClearFlags clear, MetadataReplaceMode replaceMode) {
+    private void updateBasicFields(BookMetadata m, BookMetadataEntity e, MetadataClearFlags clear, MetadataReplaceMode replaceMode, FieldSourceChanges sources) {
         if (clear == null) {
             clear = new MetadataClearFlags();
         }
-        handleFieldUpdate(e.getTitleLocked(), clear.isTitle(), m.getTitle(), v -> e.setTitle(nullIfBlank(v)), e::getTitle, replaceMode);
-        handleFieldUpdate(e.getSubtitleLocked(), clear.isSubtitle(), m.getSubtitle(), v -> e.setSubtitle(nullIfBlank(v)), e::getSubtitle, replaceMode);
-        handleFieldUpdate(e.getPublisherLocked(), clear.isPublisher(), m.getPublisher(), v -> e.setPublisher(nullIfBlank(v)), e::getPublisher, replaceMode);
-        handleFieldUpdate(e.getPublishedDateLocked(), clear.isPublishedDate(), m.getPublishedDate(), e::setPublishedDate, e::getPublishedDate, replaceMode);
-        handleFieldUpdate(e.getDescriptionLocked(), clear.isDescription(), m.getDescription(), v -> e.setDescription(nullIfBlank(v)), e::getDescription, replaceMode);
-        handleFieldUpdate(e.getSeriesNameLocked(), clear.isSeriesName(), m.getSeriesName(), e::setSeriesName, e::getSeriesName, replaceMode);
-        handleFieldUpdate(e.getSeriesNumberLocked(), clear.isSeriesNumber(), m.getSeriesNumber(), e::setSeriesNumber, e::getSeriesNumber, replaceMode);
-        handleFieldUpdate(e.getSeriesTotalLocked(), clear.isSeriesTotal(), m.getSeriesTotal(), e::setSeriesTotal, e::getSeriesTotal, replaceMode);
-        handleFieldUpdate(e.getIsbn13Locked(), clear.isIsbn13(), m.getIsbn13(), v -> e.setIsbn13(nullIfBlank(v)), e::getIsbn13, replaceMode);
-        handleFieldUpdate(e.getIsbn10Locked(), clear.isIsbn10(), m.getIsbn10(), v -> e.setIsbn10(nullIfBlank(v)), e::getIsbn10, replaceMode);
-        handleFieldUpdate(e.getAsinLocked(), clear.isAsin(), m.getAsin(), v -> e.setAsin(nullIfBlank(v)), e::getAsin, replaceMode);
-        handleFieldUpdate(e.getGoodreadsIdLocked(), clear.isGoodreadsId(), m.getGoodreadsId(), v -> e.setGoodreadsId(nullIfBlank(v)), e::getGoodreadsId, replaceMode);
-        handleFieldUpdate(e.getComicvineIdLocked(), clear.isComicvineId(), m.getComicvineId(), v -> e.setComicvineId(nullIfBlank(v)), e::getComicvineId, replaceMode);
-        handleFieldUpdate(e.getHardcoverIdLocked(), clear.isHardcoverId(), m.getHardcoverId(), v -> e.setHardcoverId(nullIfBlank(v)), e::getHardcoverId, replaceMode);
-        handleFieldUpdate(e.getHardcoverBookIdLocked(), clear.isHardcoverBookId(), m.getHardcoverBookId(), e::setHardcoverBookId, e::getHardcoverBookId, replaceMode);
-        handleFieldUpdate(e.getGoogleIdLocked(), clear.isGoogleId(), m.getGoogleId(), v -> e.setGoogleId(nullIfBlank(v)), e::getGoogleId, replaceMode);
-        handleFieldUpdate(e.getPageCountLocked(), clear.isPageCount(), m.getPageCount(), e::setPageCount, e::getPageCount, replaceMode);
-        handleFieldUpdate(e.getLanguageLocked(), clear.isLanguage(), m.getLanguage(), v -> e.setLanguage(nullIfBlank(v)), e::getLanguage, replaceMode);
-        handleFieldUpdate(e.getAmazonRatingLocked(), clear.isAmazonRating(), m.getAmazonRating(), e::setAmazonRating, e::getAmazonRating, replaceMode);
-        handleFieldUpdate(e.getAmazonReviewCountLocked(), clear.isAmazonReviewCount(), m.getAmazonReviewCount(), e::setAmazonReviewCount, e::getAmazonReviewCount, replaceMode);
-        handleFieldUpdate(e.getGoodreadsRatingLocked(), clear.isGoodreadsRating(), m.getGoodreadsRating(), e::setGoodreadsRating, e::getGoodreadsRating, replaceMode);
-        handleFieldUpdate(e.getGoodreadsReviewCountLocked(), clear.isGoodreadsReviewCount(), m.getGoodreadsReviewCount(), e::setGoodreadsReviewCount, e::getGoodreadsReviewCount, replaceMode);
-        handleFieldUpdate(e.getHardcoverRatingLocked(), clear.isHardcoverRating(), m.getHardcoverRating(), e::setHardcoverRating, e::getHardcoverRating, replaceMode);
-        handleFieldUpdate(e.getHardcoverReviewCountLocked(), clear.isHardcoverReviewCount(), m.getHardcoverReviewCount(), e::setHardcoverReviewCount, e::getHardcoverReviewCount, replaceMode);
-        handleFieldUpdate(e.getLubimyczytacIdLocked(), clear.isLubimyczytacId(), m.getLubimyczytacId(), v -> e.setLubimyczytacId(nullIfBlank(v)), e::getLubimyczytacId, replaceMode);
-        handleFieldUpdate(e.getLubimyczytacRatingLocked(), clear.isLubimyczytacRating(), m.getLubimyczytacRating(), e::setLubimyczytacRating, e::getLubimyczytacRating, replaceMode);
-        handleFieldUpdate(e.getRanobedbIdLocked(), clear.isRanobedbId(), m.getRanobedbId(), v -> e.setRanobedbId(nullIfBlank(v)), e::getRanobedbId, replaceMode);
-        handleFieldUpdate(e.getRanobedbRatingLocked(), clear.isRanobedbRating(), m.getRanobedbRating(), e::setRanobedbRating, e::getRanobedbRating, replaceMode);
-        handleFieldUpdate(e.getAudibleIdLocked(), clear.isAudibleId(), m.getAudibleId(), v -> e.setAudibleId(nullIfBlank(v)), e::getAudibleId, replaceMode);
-        handleFieldUpdate(e.getAudibleRatingLocked(), clear.isAudibleRating(), m.getAudibleRating(), e::setAudibleRating, e::getAudibleRating, replaceMode);
-        handleFieldUpdate(e.getAudibleReviewCountLocked(), clear.isAudibleReviewCount(), m.getAudibleReviewCount(), e::setAudibleReviewCount, e::getAudibleReviewCount, replaceMode);
-        handleFieldUpdate(e.getAgeRatingLocked(), clear.isAgeRating(), m.getAgeRating(), e::setAgeRating, e::getAgeRating, replaceMode);
-        handleFieldUpdate(e.getContentRatingLocked(), clear.isContentRating(), m.getContentRating(), v -> e.setContentRating(nullIfBlank(v)), e::getContentRating, replaceMode);
+        FieldUpdater f = new FieldUpdater(replaceMode, sources);
+        f.apply(MetadataField.TITLE, e.getTitleLocked(), clear.isTitle(), m.getTitle(), v -> e.setTitle(nullIfBlank(v)), e::getTitle);
+        f.apply(MetadataField.SUBTITLE, e.getSubtitleLocked(), clear.isSubtitle(), m.getSubtitle(), v -> e.setSubtitle(nullIfBlank(v)), e::getSubtitle);
+        f.apply(MetadataField.PUBLISHER, e.getPublisherLocked(), clear.isPublisher(), m.getPublisher(), v -> e.setPublisher(nullIfBlank(v)), e::getPublisher);
+        f.apply(MetadataField.PUBLISHED_DATE, e.getPublishedDateLocked(), clear.isPublishedDate(), m.getPublishedDate(), e::setPublishedDate, e::getPublishedDate);
+        f.apply(MetadataField.DESCRIPTION, e.getDescriptionLocked(), clear.isDescription(), m.getDescription(), v -> e.setDescription(nullIfBlank(v)), e::getDescription);
+        f.apply(MetadataField.SERIES_NAME, e.getSeriesNameLocked(), clear.isSeriesName(), m.getSeriesName(), e::setSeriesName, e::getSeriesName);
+        f.apply(MetadataField.SERIES_NUMBER, e.getSeriesNumberLocked(), clear.isSeriesNumber(), m.getSeriesNumber(), e::setSeriesNumber, e::getSeriesNumber);
+        f.apply(MetadataField.SERIES_TOTAL, e.getSeriesTotalLocked(), clear.isSeriesTotal(), m.getSeriesTotal(), e::setSeriesTotal, e::getSeriesTotal);
+        f.apply(MetadataField.ISBN_13, e.getIsbn13Locked(), clear.isIsbn13(), m.getIsbn13(), v -> e.setIsbn13(nullIfBlank(v)), e::getIsbn13);
+        f.apply(MetadataField.ISBN_10, e.getIsbn10Locked(), clear.isIsbn10(), m.getIsbn10(), v -> e.setIsbn10(nullIfBlank(v)), e::getIsbn10);
+        f.apply(MetadataField.ASIN, e.getAsinLocked(), clear.isAsin(), m.getAsin(), v -> e.setAsin(nullIfBlank(v)), e::getAsin);
+        f.apply(MetadataField.GOODREADS_ID, e.getGoodreadsIdLocked(), clear.isGoodreadsId(), m.getGoodreadsId(), v -> e.setGoodreadsId(nullIfBlank(v)), e::getGoodreadsId);
+        f.apply(MetadataField.COMICVINE_ID, e.getComicvineIdLocked(), clear.isComicvineId(), m.getComicvineId(), v -> e.setComicvineId(nullIfBlank(v)), e::getComicvineId);
+        f.apply(MetadataField.HARDCOVER_ID, e.getHardcoverIdLocked(), clear.isHardcoverId(), m.getHardcoverId(), v -> e.setHardcoverId(nullIfBlank(v)), e::getHardcoverId);
+        f.apply(MetadataField.HARDCOVER_BOOK_ID, e.getHardcoverBookIdLocked(), clear.isHardcoverBookId(), m.getHardcoverBookId(), e::setHardcoverBookId, e::getHardcoverBookId);
+        f.apply(MetadataField.GOOGLE_ID, e.getGoogleIdLocked(), clear.isGoogleId(), m.getGoogleId(), v -> e.setGoogleId(nullIfBlank(v)), e::getGoogleId);
+        f.apply(MetadataField.PAGE_COUNT, e.getPageCountLocked(), clear.isPageCount(), m.getPageCount(), e::setPageCount, e::getPageCount);
+        f.apply(MetadataField.LANGUAGE, e.getLanguageLocked(), clear.isLanguage(), m.getLanguage(), v -> e.setLanguage(nullIfBlank(v)), e::getLanguage);
+        f.apply(MetadataField.AMAZON_RATING, e.getAmazonRatingLocked(), clear.isAmazonRating(), m.getAmazonRating(), e::setAmazonRating, e::getAmazonRating);
+        f.apply(MetadataField.AMAZON_REVIEW_COUNT, e.getAmazonReviewCountLocked(), clear.isAmazonReviewCount(), m.getAmazonReviewCount(), e::setAmazonReviewCount, e::getAmazonReviewCount);
+        f.apply(MetadataField.GOODREADS_RATING, e.getGoodreadsRatingLocked(), clear.isGoodreadsRating(), m.getGoodreadsRating(), e::setGoodreadsRating, e::getGoodreadsRating);
+        f.apply(MetadataField.GOODREADS_REVIEW_COUNT, e.getGoodreadsReviewCountLocked(), clear.isGoodreadsReviewCount(), m.getGoodreadsReviewCount(), e::setGoodreadsReviewCount, e::getGoodreadsReviewCount);
+        f.apply(MetadataField.HARDCOVER_RATING, e.getHardcoverRatingLocked(), clear.isHardcoverRating(), m.getHardcoverRating(), e::setHardcoverRating, e::getHardcoverRating);
+        f.apply(MetadataField.HARDCOVER_REVIEW_COUNT, e.getHardcoverReviewCountLocked(), clear.isHardcoverReviewCount(), m.getHardcoverReviewCount(), e::setHardcoverReviewCount, e::getHardcoverReviewCount);
+        f.apply(MetadataField.LUBIMYCZYTAC_ID, e.getLubimyczytacIdLocked(), clear.isLubimyczytacId(), m.getLubimyczytacId(), v -> e.setLubimyczytacId(nullIfBlank(v)), e::getLubimyczytacId);
+        f.apply(MetadataField.LUBIMYCZYTAC_RATING, e.getLubimyczytacRatingLocked(), clear.isLubimyczytacRating(), m.getLubimyczytacRating(), e::setLubimyczytacRating, e::getLubimyczytacRating);
+        f.apply(MetadataField.RANOBEDB_ID, e.getRanobedbIdLocked(), clear.isRanobedbId(), m.getRanobedbId(), v -> e.setRanobedbId(nullIfBlank(v)), e::getRanobedbId);
+        f.apply(MetadataField.RANOBEDB_RATING, e.getRanobedbRatingLocked(), clear.isRanobedbRating(), m.getRanobedbRating(), e::setRanobedbRating, e::getRanobedbRating);
+        f.apply(MetadataField.AUDIBLE_ID, e.getAudibleIdLocked(), clear.isAudibleId(), m.getAudibleId(), v -> e.setAudibleId(nullIfBlank(v)), e::getAudibleId);
+        f.apply(MetadataField.AUDIBLE_RATING, e.getAudibleRatingLocked(), clear.isAudibleRating(), m.getAudibleRating(), e::setAudibleRating, e::getAudibleRating);
+        f.apply(MetadataField.AUDIBLE_REVIEW_COUNT, e.getAudibleReviewCountLocked(), clear.isAudibleReviewCount(), m.getAudibleReviewCount(), e::setAudibleReviewCount, e::getAudibleReviewCount);
+        // ageRating and contentRating have no MetadataField constant: no provider chain resolves them,
+        // so there is never a provider to attribute them to.
+        f.apply(null, e.getAgeRatingLocked(), clear.isAgeRating(), m.getAgeRating(), e::setAgeRating, e::getAgeRating);
+        f.apply(null, e.getContentRatingLocked(), clear.isContentRating(), m.getContentRating(), v -> e.setContentRating(nullIfBlank(v)), e::getContentRating);
+    }
+
+    /**
+     * Applies one field write and files the provenance that write implies, so the two cannot drift
+     * apart across thirty-odd fields.
+     */
+    private final class FieldUpdater {
+
+        private final MetadataReplaceMode replaceMode;
+        private final FieldSourceChanges sources;
+
+        private FieldUpdater(MetadataReplaceMode replaceMode, FieldSourceChanges sources) {
+            this.replaceMode = replaceMode;
+            this.sources = sources;
+        }
+
+        private <T> void apply(MetadataField field, Boolean locked, boolean shouldClear, T newValue, Consumer<T> setter, Supplier<T> getter) {
+            sources.record(field, handleFieldUpdate(locked, shouldClear, newValue, setter, getter, replaceMode));
+        }
+    }
+
+    /**
+     * What one field write actually did to the stored value. Provenance is filed from this and never
+     * from what the merger chose: the merger picks a winner per field, but a locked field, a replace
+     * mode that declines, or a clear flag all mean that winner was never stored.
+     */
+    enum FieldWriteOutcome {
+        /** The setter never ran: the field is locked, or the replace mode declined to write. */
+        NOT_WRITTEN,
+        /** The setter ran and left the field holding exactly what it held before. */
+        UNCHANGED,
+        /** The setter ran and the field now holds a different, non-null value. */
+        WRITTEN,
+        /** The field now holds null - an explicit clear, or a write of a null or blank value. */
+        CLEARED
     }
 
     // S6916 false positive: "when" guards only attach to type/record patterns, not plain enum
     // constant case labels (JLS), so the suggested guard form for REPLACE_MISSING/REPLACE_WHEN_PROVIDED
     // below would not compile.
     @SuppressWarnings("java:S6916")
-    private <T> void handleFieldUpdate(Boolean locked, boolean shouldClear, T newValue, Consumer<T> setter, Supplier<T> getter, MetadataReplaceMode mode) {
-        if (Boolean.TRUE.equals(locked)) return;
+    private <T> FieldWriteOutcome handleFieldUpdate(Boolean locked, boolean shouldClear, T newValue, Consumer<T> setter, Supplier<T> getter, MetadataReplaceMode mode) {
+        if (Boolean.TRUE.equals(locked)) return FieldWriteOutcome.NOT_WRITTEN;
         if (shouldClear) {
             setter.accept(null);
-            return;
+            return FieldWriteOutcome.CLEARED;
         }
+        T previousValue = getter.get();
         if (mode == null) {
-            if (newValue != null) setter.accept(newValue);
-            return;
+            if (newValue == null) return FieldWriteOutcome.NOT_WRITTEN;
+            setter.accept(newValue);
+            return outcomeOf(previousValue, getter.get());
         }
         switch (mode) {
             case REPLACE_ALL -> setter.accept(newValue);
             case REPLACE_MISSING -> {
-                if (isValueMissing(getter.get())) setter.accept(newValue);
+                if (!isValueMissing(previousValue)) return FieldWriteOutcome.NOT_WRITTEN;
+                setter.accept(newValue);
             }
             case REPLACE_WHEN_PROVIDED -> {
-                if (!isValueMissing(newValue)) setter.accept(newValue);
+                if (isValueMissing(newValue)) return FieldWriteOutcome.NOT_WRITTEN;
+                setter.accept(newValue);
             }
         }
+        return outcomeOf(previousValue, getter.get());
+    }
+
+    private <T> FieldWriteOutcome outcomeOf(T previousValue, T storedValue) {
+        if (storedValue == null) return FieldWriteOutcome.CLEARED;
+        return Objects.equals(previousValue, storedValue) ? FieldWriteOutcome.UNCHANGED : FieldWriteOutcome.WRITTEN;
     }
 
     private <T> boolean isValueMissing(T value) {

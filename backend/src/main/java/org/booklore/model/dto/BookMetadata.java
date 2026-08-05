@@ -1,12 +1,15 @@
 package org.booklore.model.dto;
 
+import org.booklore.model.enums.MetadataField;
 import org.booklore.model.enums.MetadataProvider;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Getter
@@ -65,6 +68,19 @@ public class BookMetadata {
     private Set<String> moods;
     private Set<String> tags;
     private MetadataProvider provider;
+
+    /**
+     * Which provider won each field of this merge, filled in by {@code MetadataMerger} and read by
+     * {@code BookMetadataUpdater} so a source row can be filed for the fields it actually writes.
+     * <p>
+     * In-flight data, not part of this DTO's contract with anyone else: it is deliberately kept out of
+     * every serialization of this class, including the stored metadata fetch proposals, so no API
+     * response or persisted proposal changes shape. A field missing from the map means no provider was
+     * attributed for it, which is what a manual edit looks like.
+     */
+    @JsonIgnore
+    private Map<MetadataField, MetadataProvider> fieldProviders;
+
     private String thumbnailUrl;
     private List<BookReview> bookReviews;
     private Double rating;
