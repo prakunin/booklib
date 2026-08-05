@@ -294,9 +294,11 @@ class BookMetadataEntityTest {
                 .filteredOn(event -> event.getLevel() == Level.WARN)
                 .singleElement()
                 .satisfies(event -> assertThat(event.getFormattedMessage())
-                        .contains("4242")
-                        .contains("40000")
-                        .contains("80000"));
+                        .contains("book 4242")
+                        .contains("40000 characters")
+                        .contains("80000 bytes")
+                        .contains("cut to 32767 characters")
+                        .contains("limit of 65535 bytes"));
     }
 
     /**
@@ -334,6 +336,16 @@ class BookMetadataEntityTest {
     /**
      * The other half of the same rule. This runs on every metadata write — roughly 700,000 times in a
      * single backfill — so a description that fits must not produce a line of log.
+     * <p>
+     * The level is pinned to {@code TRACE} rather than left to whatever the JVM happens to be
+     * configured with, because a {@link ListAppender} only ever sees events that already passed the
+     * logger's effective level, and this suite shares one JVM ({@code build.gradle.kts} sets no
+     * {@code forkEvery}). There is no {@code logback-test.xml}, so a JVM running this class alone
+     * defaults to root {@code DEBUG} and the assertion bites — but any {@code @SpringBootTest} that
+     * ran earlier installed Spring Boot's {@code LoggingSystem} with {@code root: INFO} from
+     * {@code application.yaml}, and under that a {@code log.debug} added to this ~700k-times path
+     * would sail straight through a green test. Pinning makes the assertion mean "logs nothing"
+     * rather than "logs nothing above whatever the last test left the root logger at".
      */
     @Test
     void updateSearchText_saysNothingWhenTheDescriptionFits() {
@@ -343,12 +355,15 @@ class BookMetadataEntityTest {
         metadata.setDescription("Короткая аннотация");
 
         Logger logger = (Logger) LoggerFactory.getLogger(BookMetadataEntity.class);
+        Level originalLevel = logger.getLevel();
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
+        logger.setLevel(Level.TRACE);
         try {
             metadata.updateSearchText();
         } finally {
+            logger.setLevel(originalLevel);
             logger.detachAppender(appender);
             appender.stop();
         }
