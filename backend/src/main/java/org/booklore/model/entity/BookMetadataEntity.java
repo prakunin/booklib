@@ -4,10 +4,12 @@ import org.booklore.util.BookUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.LazyGroup;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 
 @Entity
+@Slf4j
 @Getter
 @Setter
 @Builder
@@ -346,12 +349,7 @@ public class BookMetadataEntity {
         this.title = trimOrNull(this.title);
         this.subtitle = trimOrNull(this.subtitle);
         this.publisher = trimOrNull(this.publisher);
-        // TEXT is a byte budget, not a character count, and the local catalog writes annotations of
-        // unbounded length into it. Overflowing it does not truncate — it rolls back the whole
-        // enrichment transaction, taking the book's language, series, reviews and author biographies
-        // with the description. Bounded here rather than in one caller so that every write path
-        // (enrichment, provider fetch, bulk edit, sidecar import) is covered by the same guard.
-        this.description = BookUtils.clampToUtf8Bytes(this.description, BookUtils.TEXT_MAX_UTF8_BYTES);
+        this.description = clampDescription(this.description);
         this.seriesName = trimToCodePoints(this.seriesName, SERIES_NAME_MAX_LENGTH);
         this.language = trimOrNull(this.language);
         this.isbn13 = trimOrNull(this.isbn13);
@@ -367,6 +365,35 @@ public class BookMetadataEntity {
         this.audibleId = trimOrNull(this.audibleId);
         this.contentRating = trimOrNull(this.contentRating);
         this.narrator = trimOrNull(this.narrator);
+    }
+
+    /**
+     * Fits the description into its {@code TEXT} column, and says so when it has to.
+     * <p>
+     * {@code TEXT} is a byte budget, not a character count, and the local catalog writes annotations
+     * of unbounded length into it. Overflowing does not truncate — MariaDB rolls back the whole
+     * transaction, which on the enrichment path carries the book's language, series, reviews and its
+     * authors' biographies alongside the description. The clamp lives here, in the lifecycle callback,
+     * rather than in one caller, so every write path (enrichment, provider fetch, bulk edit, sidecar
+     * import) is covered by the same guard.
+     * <p>
+     * Losing the tail of a description is still data loss, so it is not done silently: a truncation is
+     * a fact about the catalog's content that an operator may want to act on, and neither the user nor
+     * the log had any way to learn of it. The warning is bound to the clamp actually firing — this
+     * method runs on every metadata write, ~700k times in a backfill, and the common path must stay
+     * quiet. The comparison is on length rather than identity so that "was it shortened" is stated
+     * directly, and the UTF-8 byte count, which is the constraint that was hit, is only computed on
+     * the rare branch that reports it.
+     */
+    private String clampDescription(String value) {
+        String clamped = BookUtils.clampToUtf8Bytes(value, BookUtils.TEXT_MAX_UTF8_BYTES);
+        if (value != null && clamped.length() < value.length()) {
+            log.warn("Description of book {} did not fit its TEXT column and was truncated: {} characters "
+                            + "({} bytes of UTF-8) cut to {} characters, against a column limit of {} bytes",
+                    this.bookId, value.length(), value.getBytes(StandardCharsets.UTF_8).length,
+                    clamped.length(), BookUtils.TEXT_MAX_UTF8_BYTES);
+        }
+        return clamped;
     }
 
     private static String trimToCodePoints(String value, int maxCodePoints) {

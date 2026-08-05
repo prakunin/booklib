@@ -1,7 +1,12 @@
 package org.booklore.model.entity;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.booklore.util.BookUtils;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -260,6 +265,63 @@ class BookMetadataEntityTest {
         assertThat(metadata.getDescription().getBytes(StandardCharsets.UTF_8))
                 .hasSizeLessThanOrEqualTo(BookUtils.TEXT_MAX_UTF8_BYTES);
         assertThat(metadata.getDescription()).startsWith("я").doesNotContain("�");
+    }
+
+    /**
+     * Truncating is still data loss, so it must not be silent: neither the user nor an operator had
+     * any way to learn that a description had been shortened. The warning names the book and both
+     * lengths, because the character count alone reads as nonsense against a limit expressed in bytes.
+     */
+    @Test
+    void updateSearchText_warnsWhenItTruncatesADescription() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setBookId(4242L);
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("я".repeat(40_000));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(BookMetadataEntity.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            metadata.updateSearchText();
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertThat(appender.list)
+                .filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage())
+                        .contains("4242")
+                        .contains("40000")
+                        .contains("80000"));
+    }
+
+    /**
+     * The other half of the same rule. This runs on every metadata write — roughly 700,000 times in a
+     * single backfill — so a description that fits must not produce a line of log.
+     */
+    @Test
+    void updateSearchText_saysNothingWhenTheDescriptionFits() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setBookId(4242L);
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("Короткая аннотация");
+
+        Logger logger = (Logger) LoggerFactory.getLogger(BookMetadataEntity.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            metadata.updateSearchText();
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertThat(appender.list).isEmpty();
     }
 
     /**
