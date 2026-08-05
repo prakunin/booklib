@@ -124,6 +124,37 @@ public class BookUtils {
                 : searchText.substring(boundary + DOCUMENT_BODY_SEARCH_BOUNDARY.length());
     }
 
+    /**
+     * The byte budget of a MySQL/MariaDB {@code TEXT} column.
+     * <p>
+     * {@code TEXT} counts <em>bytes</em>, not characters, and this library's prose is largely Cyrillic
+     * at two bytes a character — so the practical ceiling is ~32,000 characters, well inside the range
+     * a catalog annotation or a long review reaches. Overflowing it is not a truncated value: MariaDB
+     * raises "Data too long for column" and rolls back the whole transaction the write was part of. On
+     * the enrichment path that transaction carries the book's description, language, series, reviews
+     * and its authors' biographies together, so one oversized string costs the book everything.
+     * {@code author.description} was widened to {@code MEDIUMTEXT} by {@code V172} for the same reason;
+     * these two columns are bounded in code instead, because widening them means a migration and the
+     * value beyond 65,535 bytes is not worth keeping.
+     */
+    public static final int TEXT_MAX_UTF8_BYTES = 65_535;
+
+    /**
+     * Cuts {@code value} to at most {@code maxBytes} bytes of UTF-8, on a code-point boundary, and
+     * returns it unchanged when it already fits.
+     * <p>
+     * The length pre-check is the fast path, not an approximation: UTF-8 never spends more than three
+     * bytes per UTF-16 code unit (a supplementary code point is two units and four bytes), so a string
+     * of at most {@code maxBytes / 3} characters cannot overflow and does not need to be walked. That
+     * matters because this runs on every metadata save, ~700k times in a backfill.
+     */
+    public static String clampToUtf8Bytes(String value, int maxBytes) {
+        if (value == null || value.length() <= maxBytes / 3) {
+            return value;
+        }
+        return truncateUtf8(value, maxBytes);
+    }
+
     private static String truncateUtf8(String value, int maxBytes) {
         int bytes = 0;
         int end = 0;

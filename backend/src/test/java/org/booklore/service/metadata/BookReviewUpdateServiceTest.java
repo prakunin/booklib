@@ -6,10 +6,12 @@ import org.booklore.model.dto.BookReview;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.BookReviewEntity;
 import org.booklore.model.enums.MetadataProvider;
+import org.booklore.util.BookUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -381,6 +383,45 @@ class BookReviewUpdateServiceTest {
         assertThat(created.getReviewerName()).hasSize(512);
         assertThat(created.getTitle()).hasSize(512);
         assertThat(created.getCountry()).hasSize(512);
+    }
+
+    /**
+     * {@code body} is the one review field that lands in a {@code TEXT} column rather than a
+     * {@code VARCHAR(512)}, and {@code TEXT}'s 65,535 is a byte budget: 40,000 Cyrillic characters is
+     * 80,000 bytes. It used to be passed through untouched, so a long catalog review rolled back the
+     * whole enrichment transaction and cost the book its description, language, series and author
+     * biographies as well. The assertion is on bytes because a character count would pass against the
+     * unbounded code too.
+     */
+    @Test
+    void reviewBodyIsBoundedByTheTextColumnsByteBudget() {
+        BookMetadataEntity entity = entityWithReviews(new HashSet<>());
+        BookReview review = BookReview.builder()
+                .metadataProvider(MetadataProvider.FlibustaLocal)
+                .body("я".repeat(40_000))
+                .build();
+
+        BookMetadata metadata = BookMetadata.builder().bookReviews(List.of(review)).build();
+        service.updateBookReviews(metadata, entity, new MetadataClearFlags(), true);
+
+        BookReviewEntity created = entity.getReviews().iterator().next();
+        assertThat(created.getBody().getBytes(StandardCharsets.UTF_8))
+                .hasSizeLessThanOrEqualTo(BookUtils.TEXT_MAX_UTF8_BYTES);
+        assertThat(created.getBody()).startsWith("я").doesNotContain("�");
+    }
+
+    @Test
+    void reviewBodyThatAlreadyFitsIsKeptVerbatim() {
+        BookMetadataEntity entity = entityWithReviews(new HashSet<>());
+        BookReview review = BookReview.builder()
+                .metadataProvider(MetadataProvider.FlibustaLocal)
+                .body("Отличная книга 📚")
+                .build();
+
+        BookMetadata metadata = BookMetadata.builder().bookReviews(List.of(review)).build();
+        service.updateBookReviews(metadata, entity, new MetadataClearFlags(), true);
+
+        assertThat(entity.getReviews().iterator().next().getBody()).isEqualTo("Отличная книга 📚");
     }
 
     @Test

@@ -241,6 +241,42 @@ class BookMetadataEntityTest {
         assertThat(BookUtils.extractDocumentBodySearchText(metadata.getSearchText())).isEmpty();
     }
 
+    /**
+     * {@code description} is a {@code TEXT} column and {@code TEXT}'s 65,535 is a byte budget, so a
+     * Cyrillic annotation from the local catalog overflows it at ~32,000 characters. Overflowing is not
+     * a truncated description — MariaDB rolls back the whole transaction, which on the enrichment path
+     * also carries the book's language, series, reviews and its authors' biographies. 40,000 Cyrillic
+     * characters is 80,000 bytes, comfortably over; the assertion is on bytes, because a character
+     * count would pass against the unbounded code as well.
+     */
+    @Test
+    void updateSearchText_keepsDescriptionWithinTheTextColumnsByteBudget() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("я".repeat(40_000));
+
+        metadata.updateSearchText();
+
+        assertThat(metadata.getDescription().getBytes(StandardCharsets.UTF_8))
+                .hasSizeLessThanOrEqualTo(BookUtils.TEXT_MAX_UTF8_BYTES);
+        assertThat(metadata.getDescription()).startsWith("я").doesNotContain("�");
+    }
+
+    /**
+     * The clamp must not touch a description that already fits — including one that ends on a
+     * supplementary code point, which the byte walk must not split in half.
+     */
+    @Test
+    void updateSearchText_leavesADescriptionThatAlreadyFitsAlone() {
+        BookMetadataEntity metadata = new BookMetadataEntity();
+        metadata.setTitle("Аннотация");
+        metadata.setDescription("Короткая аннотация 📚");
+
+        metadata.updateSearchText();
+
+        assertThat(metadata.getDescription()).isEqualTo("Короткая аннотация 📚");
+    }
+
     @Test
     void updateSearchText_keepsDocumentSearchTextWithinUtf8Envelope() {
         BookMetadataEntity metadata = new BookMetadataEntity();

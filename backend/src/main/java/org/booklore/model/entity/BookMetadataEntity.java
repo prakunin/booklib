@@ -346,6 +346,12 @@ public class BookMetadataEntity {
         this.title = trimOrNull(this.title);
         this.subtitle = trimOrNull(this.subtitle);
         this.publisher = trimOrNull(this.publisher);
+        // TEXT is a byte budget, not a character count, and the local catalog writes annotations of
+        // unbounded length into it. Overflowing it does not truncate — it rolls back the whole
+        // enrichment transaction, taking the book's language, series, reviews and author biographies
+        // with the description. Bounded here rather than in one caller so that every write path
+        // (enrichment, provider fetch, bulk edit, sidecar import) is covered by the same guard.
+        this.description = BookUtils.clampToUtf8Bytes(this.description, BookUtils.TEXT_MAX_UTF8_BYTES);
         this.seriesName = trimToCodePoints(this.seriesName, SERIES_NAME_MAX_LENGTH);
         this.language = trimOrNull(this.language);
         this.isbn13 = trimOrNull(this.isbn13);

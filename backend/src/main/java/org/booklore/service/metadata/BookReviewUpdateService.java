@@ -6,6 +6,7 @@ import org.booklore.model.dto.BookReview;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.model.entity.BookReviewEntity;
 import org.booklore.model.enums.MetadataProvider;
+import org.booklore.util.BookUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -77,6 +78,15 @@ public class BookReviewUpdateService {
         return input.length() <= maxLength ? input : input.substring(0, maxLength);
     }
 
+    /**
+     * {@code body} is bounded by bytes, not characters, because its column is {@code TEXT} rather than
+     * a {@code VARCHAR(n)}: {@code TEXT}'s 65,535 is a byte budget and Cyrillic review prose spends two
+     * bytes a character. Leaving it unbounded is not a truncated review, it is a rolled-back
+     * transaction — on the enrichment path that transaction also carries the book's description,
+     * language, series and its authors' biographies, so one oversized review body costs the book all
+     * of them. The other three are still clamped by character count, which is the right unit for the
+     * {@code VARCHAR(512)} columns they land in.
+     */
     private BookReviewEntity createReviewEntity(BookReview review, BookMetadataEntity entity) {
         // Some fields are truncated to properly fit in the entity field's max length.
         return BookReviewEntity.builder()
@@ -86,7 +96,7 @@ public class BookReviewUpdateService {
                 .title(truncate(review.getTitle(), 512))
                 .rating(review.getRating())
                 .date(review.getDate())
-                .body(review.getBody())
+                .body(BookUtils.clampToUtf8Bytes(review.getBody(), BookUtils.TEXT_MAX_UTF8_BYTES))
                 .spoiler(review.getSpoiler())
                 .followersCount(review.getFollowersCount())
                 .textReviewsCount(review.getTextReviewsCount())
