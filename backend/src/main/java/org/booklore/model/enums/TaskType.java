@@ -67,11 +67,16 @@ public enum TaskType {
             "Recompute Facet Counts",
             "Recomputes the materialized per-library facet counts that power the filter panel and library stats, so those aggregates are served from a table instead of scanning the whole catalog per request."
     ),
+    // hiddenFromUI = true, like REFRESH_METADATA_MANUAL above and for the same reason: this task
+    // requires caller-supplied options (a libraryId, because the catalog it reads is a per-library
+    // setting) and Task Management's generic Run button sends options: null for everything except
+    // REFRESH_LIBRARY_METADATA. Rendering a card there gives a button that can only ever fail
+    // requireLibraryId. It stays launchable from the INPX archive panel, which knows the library.
     LOCAL_CATALOG_BACKFILL(
             false,
             true,
             false,
-            false,
+            true,
             "Backfill From Local Catalog",
             "Fills in descriptions, languages, reviews, author biographies and compilation series "
                     + "for an INPX library from the catalog shipped next to its archives."
