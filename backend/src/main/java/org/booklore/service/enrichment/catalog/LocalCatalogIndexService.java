@@ -88,8 +88,15 @@ public class LocalCatalogIndexService {
      * book on the queue-driven path, which the INPX import budget now reliably feeds, and
      * {@code EnrichmentController} exposes a manual rebuild.
      * <p>
-     * {@link #rebuildNow}'s own empty result stays as the second line of defence, for a rebuild that
-     * starts between this check and that call.
+     * The check is not atomic with what follows it, and that is accepted rather than closed. On the
+     * never-indexed path {@link #rebuildNow}'s own {@code putIfAbsent} does back it up: a rebuild that
+     * starts between the two loses the race for the slot and this returns false. On the path the
+     * running guard was actually added for — {@code isIndexed} true, a rebuild in flight — there is no
+     * such backstop, because that path returns at the {@code isIndexed} check and never reaches
+     * {@code rebuildNow} at all. A rebuild starting in that window is therefore reported as ready.
+     * Narrowing it would mean holding the slot across the {@code isIndexed} query, which would make an
+     * ordinary readiness question contend with real rebuilds; the window is microseconds against a
+     * 2m20s build, and the cost of losing it is one backfill run, which is restartable.
      *
      * @return true when the index is ready to be read; false when a rebuild started elsewhere is
      * already in flight, in which case this call did not build anything and the caller must not
