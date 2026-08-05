@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -182,14 +183,21 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
     }
 
     @Override
-    public Optional<String> lookupLanguage(long libraryId, String archiveName, String entryName) {
+    public Optional<CatalogBookMetadata> lookupBookMetadata(
+            long libraryId, String archiveName, String entryName) {
         String key = layout.bookKey(archiveName, entryName);
         if (key == null) {
             return Optional.empty();
         }
         return findIndexed(libraryId, LocalCatalogSourceType.LANGUAGE, key)
                 .map(LocalCatalogIndexEntity::getPayload)
-                .filter(payload -> payload != null && !payload.isBlank());
+                .flatMap(this::readCatalogMetadata);
+    }
+
+    @Override
+    public Optional<String> lookupLanguage(long libraryId, String archiveName, String entryName) {
+        return lookupBookMetadata(libraryId, archiveName, entryName)
+                .map(CatalogBookMetadata::language);
     }
 
     @Override
@@ -250,6 +258,28 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
         } catch (JacksonException e) {
             log.warn("Could not read indexed catalog container payload: {}", e.getMessage());
             return List.of();
+        }
+    }
+
+    /**
+     * New rows are JSON. A plain payload is a pre-identity language row; preserving it here keeps
+     * lookups safe while the completion-marker check schedules the rebuild that upgrades the row.
+     */
+    private Optional<CatalogBookMetadata> readCatalogMetadata(String payload) {
+        if (payload == null || payload.isBlank()) {
+            return Optional.empty();
+        }
+        String value = payload.strip();
+        if (!value.startsWith("{")) {
+            return value.matches("[a-zA-Z]{2,3}")
+                    ? Optional.of(new CatalogBookMetadata(null, List.of(), value.toLowerCase(Locale.ROOT)))
+                    : Optional.empty();
+        }
+        try {
+            return Optional.of(objectMapper.readValue(value, CatalogBookMetadata.class));
+        } catch (JacksonException e) {
+            log.warn("Could not read indexed local catalog book metadata: {}", e.getMessage());
+            return Optional.empty();
         }
     }
 

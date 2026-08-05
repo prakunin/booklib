@@ -13,6 +13,7 @@ import org.booklore.repository.LocalCatalogIndexRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
 
 /**
@@ -33,6 +34,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class LocalCatalogStatusService {
 
+    /** Internal completion markers are deliberately not part of the status API consumed by the UI. */
+    private static final EnumSet<LocalCatalogSourceType> REPORTED_SOURCE_TYPES = EnumSet.of(
+            LocalCatalogSourceType.REVIEW,
+            LocalCatalogSourceType.AUTHOR_BIO,
+            LocalCatalogSourceType.COMPILATION,
+            LocalCatalogSourceType.COMPILATION_PART,
+            LocalCatalogSourceType.LANGUAGE);
+
     private final LocalCatalogIndexRepository localCatalogIndexRepository;
     private final BookRepository bookRepository;
     private final BookReviewRepository bookReviewRepository;
@@ -44,7 +53,7 @@ public class LocalCatalogStatusService {
         boolean configured = catalogPath != null && !catalogPath.isBlank();
 
         Map<LocalCatalogSourceType, Long> indexedEntries = new EnumMap<>(LocalCatalogSourceType.class);
-        for (LocalCatalogSourceType sourceType : LocalCatalogSourceType.values()) {
+        for (LocalCatalogSourceType sourceType : REPORTED_SOURCE_TYPES) {
             indexedEntries.put(sourceType,
                     localCatalogIndexRepository.countByLibraryIdAndSourceType(libraryId, sourceType));
         }

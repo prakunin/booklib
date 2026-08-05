@@ -36,6 +36,9 @@ public class LocalLanguageStep implements EnrichmentStepHandler {
     @Override
     public boolean supports(EnrichmentContext context) {
         return context.isStepAllowed(type())
+                // LOCAL_CATALOG reads the same contents-index row and contributes its language too.
+                // Skip the duplicate query when both standard local steps are selected.
+                && !context.isStepAllowed(EnrichmentStepType.LOCAL_CATALOG)
                 && context.getSourceArchive() != null
                 && context.getSourceArchiveEntry() != null
                 && catalogSource.isAvailable(context.getLibraryId());

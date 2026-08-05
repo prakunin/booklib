@@ -74,24 +74,19 @@ public class LocalCatalogIndexService {
      * The backfill walks every archived book of the library once and has no checkpoint, so a book it
      * walks while the index is half-built finds nothing, is indistinguishable from a book the catalog
      * genuinely has nothing for, and is never revisited — a completed run is never automatically run
-     * again, and {@code AUTO_IF_EMPTY} leaves no trace that anything was missed. Waiting 2m20s once,
+     * again. Waiting 2m20s once,
      * at the start of a multi-hour run, costs nothing by comparison.
      * <p>
      * The running check comes <strong>before</strong> the {@code isIndexed} check, and the order is
-     * load-bearing. {@link LocalCatalogIndexBuilder#isIndexed} is satisfied by {@code REVIEW} rows
-     * alone, and {@link LocalCatalogIndexBuilder#rebuild} writes {@code REVIEW} first — so from the
-     * moment a rebuild started elsewhere flushes its first {@code REVIEW} batch, "some rows exist"
-     * answers yes while {@code AUTHOR_BIO}, {@code COMPILATION} and {@code LANGUAGE} are still absent
-     * or mid-{@code deleteByLibraryIdAndSourceType}. Asking {@code isIndexed} first would hand the
-     * walk exactly the partial index this method exists to refuse. Concurrent rebuilds are not
+     * load-bearing. {@link LocalCatalogIndexBuilder#rebuild} removes its completion marker before it
+     * rewrites any source and restores it only after every pass succeeds. Concurrent rebuilds are not
      * hypothetical here: {@code EnrichmentPipeline} calls {@link #ensureIndexed} at the top of every
-     * book on the queue-driven path, which the INPX import budget now reliably feeds, and
-     * {@code EnrichmentController} exposes a manual rebuild.
+     * queue-driven book, and {@code EnrichmentController} exposes a manual rebuild.
      * <p>
      * The check is not atomic with what follows it, and that is accepted rather than closed. On the
-     * never-indexed path {@link #rebuildNow}'s own {@code putIfAbsent} does back it up: a rebuild that
+     * missing-or-old-index path {@link #rebuildNow}'s own {@code putIfAbsent} does back it up: a rebuild that
      * starts between the two loses the race for the slot and this returns false. On the path the
-     * running guard was actually added for — {@code isIndexed} true, a rebuild in flight — there is no
+     * already-indexed path — {@code isIndexed} true, a rebuild about to start — there is no
      * such backstop, because that path returns at the {@code isIndexed} check and never reaches
      * {@code rebuildNow} at all. A rebuild starting in that window is therefore reported as ready.
      * Narrowing it would mean holding the slot across the {@code isIndexed} query, which would make an
@@ -119,7 +114,7 @@ public class LocalCatalogIndexService {
         if (indexBuilder.isIndexed(libraryId)) {
             return true;
         }
-        return rebuildNow(libraryId).isPresent();
+        return rebuildNow(libraryId).isPresent() && indexBuilder.isIndexed(libraryId);
     }
 
     public Optional<LocalCatalogIndexBuilder.IndexResult> rebuildNow(long libraryId) {

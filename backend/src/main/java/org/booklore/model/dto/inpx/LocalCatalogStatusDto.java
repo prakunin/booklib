@@ -16,8 +16,8 @@ import java.util.Map;
  *
  * @param configured whether the library has a metadata sidecar path configured at all
  * @param catalogPath the configured sidecar path, or {@code null} when unset
- * @param indexedEntries one entry per {@link LocalCatalogSourceType} constant, always including zeros
- *                        — a missing key and a zero mean different things to a UI
+ * @param indexedEntries one entry per user-visible catalog source type, always including zeros;
+ *                        internal index-version markers are not exposed
  * @param totalBooks non-deleted books in this library
  * @param booksWithDescription non-deleted books in this library whose metadata description is
  *                              non-null and non-blank; the coverage number that climbs as the

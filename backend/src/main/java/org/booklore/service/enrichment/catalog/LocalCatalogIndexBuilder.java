@@ -45,6 +45,8 @@ public class LocalCatalogIndexBuilder {
 
     private static final int BATCH_SIZE = 1000;
     private static final int PROGRESS_EVERY = 25;
+    static final String INDEX_VERSION_KEY = "local-catalog-index-v2";
+    private static final String INDEX_VERSION = "2";
 
     private final LibraryRepository libraryRepository;
     private final LocalCatalogIndexRepository indexRepository;
@@ -65,14 +67,18 @@ public class LocalCatalogIndexBuilder {
         }
         Path catalogRoot = root.get();
         log.info("Indexing local catalog {} for library {}", catalogRoot, libraryId);
+        indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.INDEX_VERSION);
 
         long reviews = indexContainers(libraryId, layout.reviewContainers(catalogRoot), LocalCatalogSourceType.REVIEW);
         long authors = indexContainers(libraryId, layout.authorBuckets(catalogRoot), LocalCatalogSourceType.AUTHOR_BIO);
         CompilationCounts compilations = indexCompilations(libraryId, catalogRoot);
-        long languages = indexLanguages(libraryId, catalogRoot);
+        LanguageIndexResult languageIndex = indexLanguages(libraryId, catalogRoot);
 
         IndexResult result = new IndexResult(reviews, authors, compilations.forward(),
-                compilations.reverse(), languages);
+                compilations.reverse(), languageIndex.rows());
+        if (languageIndex.completed()) {
+            writeCompletionMarker(libraryId);
+        }
         logSummary(libraryId, result);
         return result;
     }
@@ -129,14 +135,16 @@ public class LocalCatalogIndexBuilder {
      * noticed, and every subsequent book silently enriches to nothing. Re-asking costs 0.16 ms and
      * bounds that staleness at a single book.
      * <p>
-     * The three source types are the ones a walk of the containers produces. {@code COMPILATION} is
-     * excluded on purpose: it comes from a single JSON document and can be present when the archive
-     * walk found nothing at all.
+     * The completion marker is written last, after every source pass. Older indexes do not have it,
+     * so upgrading the application makes the first enrichment rebuild them before identity lookups
+     * begin. A failed partial rebuild has no marker either and is never reported as ready.
      */
     public boolean isIndexed(long libraryId) {
-        return indexRepository.existsByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.REVIEW)
-                || indexRepository.existsByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.AUTHOR_BIO)
-                || indexRepository.existsByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.LANGUAGE);
+        return indexRepository.findByLibraryIdAndSourceTypeAndEntryKey(
+                        libraryId, LocalCatalogSourceType.INDEX_VERSION, INDEX_VERSION_KEY)
+                .map(LocalCatalogIndexEntity::getPayload)
+                .filter(INDEX_VERSION::equals)
+                .isPresent();
     }
 
     private Optional<Path> catalogRoot(long libraryId) {
@@ -333,58 +341,77 @@ public class LocalCatalogIndexBuilder {
      * reason to hold them: measured across all 75 listings, not one of the 702,291 keys appears under
      * two different languages, and the only duplication that exists is 75 keys listed twice as
      * byte-identical rows <em>within</em> a single listing. First-wins is therefore lossless on the
-     * shipped catalog, and {@code languageByKey} only has to remember which keys have already been
-     * written. It does remember the language too, at no extra cost, so that a key genuinely crossing a
-     * language boundary — which would be a change in the data's shape, not a duplicate — is reported
-     * rather than silently resolved. That map is the pass's memory cost: ~702k short keys, on the order
-     * of 100 MB, held only for the duration of the pass.
+     * shipped catalog, and {@code metadataHashByKey} only has to remember which keys have already
+     * been written. A compact payload hash detects conflicting identity or language without retaining
+     * 702k titles and author lists in memory. That map is the pass's memory cost and is held only for
+     * the duration of the pass.
      */
-    private long indexLanguages(long libraryId, Path catalogRoot) {
+    private LanguageIndexResult indexLanguages(long libraryId, Path catalogRoot) {
         Path container = layout.contents(catalogRoot);
         if (!Files.isReadable(container)) {
-            return 0;
+            log.warn("Local catalog contents archive is not readable: {}", container);
+            return LanguageIndexResult.incomplete();
         }
         indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.LANGUAGE);
 
         List<LocalCatalogIndexEntity> batch = new ArrayList<>(BATCH_SIZE);
-        Map<String, String> languageByKey = new HashMap<>();
+        Map<String, Integer> metadataHashByKey = new HashMap<>();
         AtomicLong conflicts = new AtomicLong();
         long rows = 0;
-        for (String entryName : entryNames(container)) {
+        List<String> contentsEntries;
+        try {
+            contentsEntries = archiveService.getEntryNames(container);
+        } catch (IOException e) {
+            log.warn("Could not list required local catalog archive {}: {}", container, e.getMessage());
+            return LanguageIndexResult.incomplete();
+        }
+        int listings = 0;
+        for (String entryName : contentsEntries) {
             String language = languageCode(entryName);
             if (language.isEmpty()) {
                 continue;
             }
-            byte[] listing = readEntry(container, entryName);
+            listings++;
+            byte[] listing;
+            try {
+                listing = archiveService.getEntryBytes(container, entryName);
+            } catch (IOException e) {
+                log.warn("Could not read required local catalog entry '{}' from {}: {}",
+                        entryName, container, e.getMessage());
+                return LanguageIndexResult.incomplete();
+            }
             if (listing.length == 0) {
-                continue;
+                log.warn("Local catalog contents listing is empty: {}", entryName);
+                return LanguageIndexResult.incomplete();
             }
             AtomicReference<RuntimeException> saveFailure = new AtomicReference<>();
-            rows += contentsParser.parse(new ByteArrayInputStream(listing), (archive, entry) -> {
-                String entryKey = layout.bookKey(archive, entry);
-                if (entryKey == null) {
-                    return;
-                }
-                String alreadyIndexed = languageByKey.putIfAbsent(entryKey, language);
-                if (alreadyIndexed != null) {
-                    if (!alreadyIndexed.equals(language)) {
-                        conflicts.incrementAndGet();
+            rows += contentsParser.parse(new ByteArrayInputStream(listing), row -> {
+                try {
+                    String entryKey = layout.bookKey(row.archiveName(), row.entryName());
+                    if (entryKey == null) {
+                        return;
                     }
-                    return;
-                }
-                batch.add(LocalCatalogIndexEntity.builder()
-                        .libraryId(libraryId)
-                        .sourceType(LocalCatalogSourceType.LANGUAGE)
-                        .entryKey(entryKey)
-                        .payload(language)
-                        .build());
-                if (batch.size() >= BATCH_SIZE) {
-                    try {
+                    CatalogBookMetadata catalogMetadata = new CatalogBookMetadata(
+                            row.title(), row.authors(), language);
+                    Integer alreadyIndexed = metadataHashByKey.putIfAbsent(entryKey, catalogMetadata.hashCode());
+                    if (alreadyIndexed != null) {
+                        if (alreadyIndexed != catalogMetadata.hashCode()) {
+                            conflicts.incrementAndGet();
+                        }
+                        return;
+                    }
+                    batch.add(LocalCatalogIndexEntity.builder()
+                            .libraryId(libraryId)
+                            .sourceType(LocalCatalogSourceType.LANGUAGE)
+                            .entryKey(entryKey)
+                            .payload(writeCatalogMetadata(catalogMetadata))
+                            .build());
+                    if (batch.size() >= BATCH_SIZE) {
                         flush(batch);
-                    } catch (RuntimeException e) {
-                        saveFailure.set(e);
-                        throw e;
                     }
+                } catch (RuntimeException e) {
+                    saveFailure.set(e);
+                    throw e;
                 }
             });
             RuntimeException failure = saveFailure.get();
@@ -394,15 +421,19 @@ public class LocalCatalogIndexBuilder {
                                 + "': " + failure.getMessage(), failure);
             }
         }
+        if (listings == 0) {
+            log.warn("Local catalog contents archive has no language listings: {}", container);
+            return LanguageIndexResult.incomplete();
+        }
         flush(batch);
 
         if (conflicts.get() > 0) {
-            log.warn("{} book(s) in library {} are listed under more than one language; kept the "
-                    + "listing each was seen in first", conflicts.get(), libraryId);
+            log.warn("{} book(s) in library {} have conflicting contents listings; kept the listing "
+                    + "each was seen in first", conflicts.get(), libraryId);
         }
         log.info("Indexed {} for library {}: {} keys from {} rows",
-                LocalCatalogSourceType.LANGUAGE, libraryId, languageByKey.size(), rows);
-        return languageByKey.size();
+                LocalCatalogSourceType.LANGUAGE, libraryId, metadataHashByKey.size(), rows);
+        return new LanguageIndexResult(metadataHashByKey.size(), true);
     }
 
     private String languageCode(String entryName) {
@@ -417,6 +448,15 @@ public class LocalCatalogIndexBuilder {
         }
         indexRepository.saveAll(batch);
         batch.clear();
+    }
+
+    private void writeCompletionMarker(long libraryId) {
+        indexRepository.saveAll(List.of(LocalCatalogIndexEntity.builder()
+                .libraryId(libraryId)
+                .sourceType(LocalCatalogSourceType.INDEX_VERSION)
+                .entryKey(INDEX_VERSION_KEY)
+                .payload(INDEX_VERSION)
+                .build()));
     }
 
     private List<String> entryNames(Path container) {
@@ -464,6 +504,14 @@ public class LocalCatalogIndexBuilder {
         }
     }
 
+    private String writeCatalogMetadata(CatalogBookMetadata metadata) {
+        try {
+            return objectMapper.writeValueAsString(metadata);
+        } catch (JacksonException e) {
+            throw new IllegalStateException("Could not serialise local catalog book metadata", e);
+        }
+    }
+
     /**
      * The two row counts one pass over {@code compilations.json} produces: forward
      * {@code COMPILATION} rows and reverse {@code COMPILATION_PART} rows. They are not the same
@@ -473,6 +521,12 @@ public class LocalCatalogIndexBuilder {
 
         static CompilationCounts none() {
             return new CompilationCounts(0, 0);
+        }
+    }
+
+    private record LanguageIndexResult(long rows, boolean completed) {
+        private static LanguageIndexResult incomplete() {
+            return new LanguageIndexResult(0, false);
         }
     }
 

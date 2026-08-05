@@ -8,6 +8,7 @@ import org.booklore.model.enums.EnrichmentStepType;
 import org.booklore.model.enums.MetadataProvider;
 import org.booklore.service.enrichment.EnrichmentContext;
 import org.booklore.service.enrichment.EnrichmentStepHandler;
+import org.booklore.service.enrichment.catalog.CatalogBookMetadata;
 import org.booklore.service.enrichment.catalog.LocalCatalogSource;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -44,18 +45,31 @@ public class LocalCatalogStep implements EnrichmentStepHandler {
 
     @Override
     public void run(EnrichmentContext context) {
+        Optional<CatalogBookMetadata> catalogMetadata = catalogSource.lookupBookMetadata(
+                context.getLibraryId(), context.getSourceArchive(), context.getSourceArchiveEntry());
         Optional<String> description = catalogSource.lookupDescription(
                 context.getLibraryId(), context.getSourceArchive(), context.getSourceArchiveEntry());
-        if (description.isEmpty()) {
+        CatalogBookMetadata identity = catalogMetadata.orElse(null);
+        boolean hasIdentity = identity != null
+                && (identity.title() != null || !identity.authors().isEmpty());
+        boolean hasContentsMetadata = hasIdentity || identity != null && identity.language() != null;
+        if (!hasContentsMetadata && description.isEmpty()) {
             return;
         }
         context.addContribution(
                 MetadataProvider.FlibustaLocal,
                 BookMetadata.builder()
                         .bookId(context.bookId())
-                        .description(description.get())
+                        .title(identity == null ? null : identity.title())
+                        .authors(identity == null ? null : identity.authors())
+                        .language(identity == null ? null : identity.language())
+                        .description(description.orElse(null))
                         .build(),
                 EnrichmentConfidence.HIGH);
-        context.note("Local catalog supplied a description");
+        context.note(hasIdentity
+                ? "Local catalog supplied exact book identity"
+                : hasContentsMetadata
+                        ? "Local catalog supplied exact book contents metadata"
+                        : "Local catalog supplied a description");
     }
 }

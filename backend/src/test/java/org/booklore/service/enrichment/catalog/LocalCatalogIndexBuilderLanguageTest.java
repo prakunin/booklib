@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -88,11 +89,14 @@ class LocalCatalogIndexBuilderLanguageTest {
                 .filter(row -> row.getSourceType() == LocalCatalogSourceType.LANGUAGE)
                 .toList();
 
-        assertThat(languageRows).extracting(
-                        LocalCatalogIndexEntity::getEntryKey, LocalCatalogIndexEntity::getPayload)
+        assertThat(languageRows).extracting(LocalCatalogIndexEntity::getEntryKey)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("f.fb2-173909-177717.zip#174393.fb2", "ru"),
-                        org.assertj.core.groups.Tuple.tuple("fb2-091841-104214.zip#95887.fb2", "zh"));
+                        "f.fb2-173909-177717.zip#174393.fb2",
+                        "fb2-091841-104214.zip#95887.fb2");
+        assertThat(readPayload(languageRows, "f.fb2-173909-177717.zip#174393.fb2"))
+                .isEqualTo(new CatalogBookMetadata("Война и мир", List.of("Толстой"), "ru"));
+        assertThat(readPayload(languageRows, "fb2-091841-104214.zip#95887.fb2"))
+                .isEqualTo(new CatalogBookMetadata("Wolf Totem", List.of("Жун"), "zh"));
     }
 
     @Test
@@ -120,9 +124,8 @@ class LocalCatalogIndexBuilderLanguageTest {
 
         assertThat(result.languages()).isEqualTo(1);
         assertThat(savedRows.stream().filter(row -> row.getSourceType() == LocalCatalogSourceType.LANGUAGE).toList())
-                .extracting(LocalCatalogIndexEntity::getEntryKey, LocalCatalogIndexEntity::getPayload)
-                .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("f.fb2-173909-177717.zip#174393.fb2", "ru"));
+                .extracting(LocalCatalogIndexEntity::getEntryKey)
+                .containsExactly("f.fb2-173909-177717.zip#174393.fb2");
     }
 
     /**
@@ -142,9 +145,13 @@ class LocalCatalogIndexBuilderLanguageTest {
 
         assertThat(result.languages()).isEqualTo(1);
         assertThat(savedRows.stream().filter(row -> row.getSourceType() == LocalCatalogSourceType.LANGUAGE).toList())
-                .extracting(LocalCatalogIndexEntity::getEntryKey, LocalCatalogIndexEntity::getPayload)
-                .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("f.fb2-173909-177717.zip#174393.fb2", "ru"));
+                .extracting(LocalCatalogIndexEntity::getEntryKey)
+                .containsExactly("f.fb2-173909-177717.zip#174393.fb2");
+        List<LocalCatalogIndexEntity> languageRows = savedRows.stream()
+                .filter(row -> row.getSourceType() == LocalCatalogSourceType.LANGUAGE)
+                .toList();
+        assertThat(readPayload(languageRows, "f.fb2-173909-177717.zip#174393.fb2"))
+                .isEqualTo(new CatalogBookMetadata("Война и мир", List.of("Толстой"), "ru"));
     }
 
     @Test
@@ -192,5 +199,51 @@ class LocalCatalogIndexBuilderLanguageTest {
         assertThatThrownBy(() -> builder.rebuild(7L))
                 .isInstanceOf(IllegalStateException.class)
                 .hasCause(dbFailure);
+    }
+
+    @Test
+    void writesTheVersionMarkerOnlyAfterTheContentsRows() {
+        builder.rebuild(7L);
+
+        assertThat(savedRows.getLast().getSourceType()).isEqualTo(LocalCatalogSourceType.INDEX_VERSION);
+        assertThat(savedRows.getLast().getPayload()).isEqualTo("2");
+    }
+
+    @Test
+    void doesNotWriteTheVersionMarkerWhenContentsCannotBeListed() throws Exception {
+        when(archiveService.getEntryNames(catalogRoot.resolve("contents.7z")))
+                .thenThrow(new IOException("damaged archive"));
+
+        builder.rebuild(7L);
+
+        assertThat(savedRows).noneMatch(row -> row.getSourceType() == LocalCatalogSourceType.INDEX_VERSION);
+    }
+
+    @Test
+    void doesNotWriteTheVersionMarkerWhenAContentsListingCannotBeRead() throws Exception {
+        when(archiveService.getEntryBytes(catalogRoot.resolve("contents.7z"), "ru.txt"))
+                .thenThrow(new IOException("damaged listing"));
+
+        builder.rebuild(7L);
+
+        assertThat(savedRows).noneMatch(row -> row.getSourceType() == LocalCatalogSourceType.INDEX_VERSION);
+    }
+
+    @Test
+    void doesNotWriteTheVersionMarkerWhenContentsArchiveIsMissing() throws Exception {
+        Files.delete(catalogRoot.resolve("contents.7z"));
+
+        builder.rebuild(7L);
+
+        assertThat(savedRows).noneMatch(row -> row.getSourceType() == LocalCatalogSourceType.INDEX_VERSION);
+    }
+
+    private CatalogBookMetadata readPayload(List<LocalCatalogIndexEntity> rows, String key) {
+        String payload = rows.stream()
+                .filter(row -> key.equals(row.getEntryKey()))
+                .findFirst()
+                .orElseThrow()
+                .getPayload();
+        return new ObjectMapper().readValue(payload, CatalogBookMetadata.class);
     }
 }

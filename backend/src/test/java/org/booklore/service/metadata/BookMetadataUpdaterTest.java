@@ -198,6 +198,21 @@ class BookMetadataUpdaterTest {
     }
 
     @Test
+    void setBookMetadata_replaceAll_preservesLockedTitle() {
+        metadataEntity.setTitleLocked(true);
+        BookMetadata newMeta = BookMetadata.builder().title("Catalog Title").build();
+        MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
+
+        try (MockedStatic<MetadataChangeDetector> mcd = mockStatic(MetadataChangeDetector.class)) {
+            mockSettingsAndChangeDetector(mcd, true, true);
+
+            updater.setBookMetadata(context);
+
+            assertThat(metadataEntity.getTitle()).isEqualTo("Original Title");
+        }
+    }
+
+    @Test
     void setBookMetadata_replaceAll_setsNullWhenNewValueNull() {
         metadataEntity.setPublisher("Old Publisher");
         BookMetadata newMeta = BookMetadata.builder().title("T").publisher(null).build();

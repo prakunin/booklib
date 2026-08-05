@@ -16,6 +16,8 @@ public class MetadataUpdateContext {
     private MetadataUpdateWrapper metadataUpdateWrapper;
     private boolean updateThumbnail;
     private boolean mergeCategories;
+    /** Null keeps the legacy behavior where author merging follows mergeCategories. */
+    private Boolean mergeAuthors;
     private boolean mergeMoods;
     private boolean mergeTags;
     private MetadataReplaceMode replaceMode;

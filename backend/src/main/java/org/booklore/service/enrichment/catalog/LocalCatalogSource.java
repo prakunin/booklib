@@ -24,6 +24,12 @@ public interface LocalCatalogSource {
      */
     Optional<String> lookupDescription(long libraryId, String archiveName, String entryName);
 
+    /** Exact-match title, authors and language stored from {@code contents.7z}. */
+    default Optional<CatalogBookMetadata> lookupBookMetadata(
+            long libraryId, String archiveName, String entryName) {
+        return Optional.empty();
+    }
+
     List<CatalogReview> lookupReviews(long libraryId, String archiveName, String entryName);
 
     /**
@@ -37,7 +43,8 @@ public interface LocalCatalogSource {
      * The language the catalog lists this book under, as a lower-case code such as {@code "ru"}.
      */
     default Optional<String> lookupLanguage(long libraryId, String archiveName, String entryName) {
-        return Optional.empty();
+        return lookupBookMetadata(libraryId, archiveName, entryName)
+                .map(CatalogBookMetadata::language);
     }
 
     /**

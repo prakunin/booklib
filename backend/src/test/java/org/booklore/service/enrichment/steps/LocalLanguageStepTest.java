@@ -59,4 +59,18 @@ class LocalLanguageStepTest {
         assertThat(step.supports(context(null, null))).isFalse();
         assertThat(step.supports(context("a.zip", "1.fb2"))).isTrue();
     }
+
+    @Test
+    void skipsTheDuplicateLookupWhenTheCombinedCatalogStepIsSelected() {
+        when(catalogSource.isAvailable(7L)).thenReturn(true);
+        Book book = Book.builder().id(42L).build();
+        EnrichmentContext context = new EnrichmentContext(book, 7L, "a.zip", "1.fb2",
+                EnrichmentRequest.builder()
+                        .steps(EnumSet.of(
+                                EnrichmentStepType.LOCAL_CATALOG,
+                                EnrichmentStepType.LOCAL_LANGUAGE))
+                        .build());
+
+        assertThat(step.supports(context)).isFalse();
+    }
 }
