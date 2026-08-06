@@ -38,6 +38,14 @@ class InpxControllerTest {
             inpxParser, inpxImportService, libraryService, archiveCatalogService,
             archiveFullScanService, inpxSourceResolver, localCatalogStatusService);
 
+    @Test
+    void startsAFullScanForEveryIdleArchiveInTheLibrary() {
+        var response = controller.rescanAllArchives(19L);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        verify(archiveFullScanService).startAll(19L);
+    }
+
     @Nested
     class GetLocalCatalogStatus {
 

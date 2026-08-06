@@ -1,7 +1,7 @@
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, Router} from '@angular/router';
-import {MessageService} from 'primeng/api';
-import {BehaviorSubject, Observable, of, Subject} from 'rxjs';
+import {ConfirmationService, MessageService} from 'primeng/api';
+import {BehaviorSubject, Observable, of, Subject, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {getTranslocoModule} from '../../core/testing/transloco-testing';
 import {InpxArchiveManagerComponent} from './inpx-archive-manager.component';
@@ -54,6 +54,7 @@ describe('InpxArchiveManagerComponent', () => {
     getArchives: vi.fn(() => of([archive])),
     getScanQueue: vi.fn(() => of([] as InpxArchiveScanTask[])),
     rescan: vi.fn(() => of(undefined)),
+    rescanAll: vi.fn(() => of(undefined)),
     getLocalCatalogStatus: vi.fn(() => of(configuredCatalogStatus)),
   };
   const dialogLauncher = {
@@ -71,6 +72,9 @@ describe('InpxArchiveManagerComponent', () => {
   };
   const messageService = {
     add: vi.fn(),
+  };
+  const confirmationService = {
+    confirm: vi.fn(),
   };
 
   /**
@@ -98,7 +102,9 @@ describe('InpxArchiveManagerComponent', () => {
     archiveService.getArchives.mockReset().mockReturnValue(of([archive]));
     archiveService.getScanQueue.mockReset().mockReturnValue(of([]));
     archiveService.rescan.mockReset().mockReturnValue(of(undefined));
+    archiveService.rescanAll.mockReset().mockReturnValue(of(undefined));
     archiveService.getLocalCatalogStatus.mockReset().mockReturnValue(of(configuredCatalogStatus));
+    confirmationService.confirm.mockClear();
     router.navigate.mockClear();
     taskService.startTask.mockReset().mockReturnValue(of({taskId: 't1', taskType: 'LOCAL_CATALOG_BACKFILL', status: 'ACCEPTED'}));
     taskService.taskProgress$ = of(null);
@@ -109,6 +115,7 @@ describe('InpxArchiveManagerComponent', () => {
         {provide: ActivatedRoute, useValue: {snapshot: {paramMap: convertToParamMap({libraryId: '7'})}}},
         {provide: Router, useValue: router},
         {provide: MessageService, useValue: messageService},
+        {provide: ConfirmationService, useValue: confirmationService},
         {provide: DialogLauncherService, useValue: dialogLauncher},
         {provide: TaskService, useValue: taskService},
       ],
@@ -314,6 +321,58 @@ describe('InpxArchiveManagerComponent', () => {
     expect(archiveService.rescan).toHaveBeenCalledWith(7, 'new.zip');
     expect(fixture.componentInstance.archives()[0].status).toBe('QUEUED');
     expect(fixture.componentInstance.isActive(fixture.componentInstance.archives()[0])).toBe(true);
+    fixture.destroy();
+  });
+
+  it('confirms and queues one sequential full scan for every idle archive', () => {
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.archives.set([
+      {...archive, archiveName: 'idle.zip'},
+      {...archive, archiveName: 'active.zip', status: 'SCANNING'},
+    ]);
+
+    fixture.componentInstance.confirmRescanAll();
+
+    expect(confirmationService.confirm).toHaveBeenCalledWith(expect.objectContaining({
+      header: 'Scan every archive?',
+      message: expect.stringContaining('1 archive(s)'),
+    }));
+    confirmationService.confirm.mock.calls[0][0].accept?.();
+
+    expect(archiveService.rescanAll).toHaveBeenCalledWith(7);
+    expect(fixture.componentInstance.archives().map(item => item.status)).toEqual(['QUEUED', 'SCANNING']);
+    expect(messageService.add).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Full scan queued for 1 archive(s).',
+    }));
+    fixture.destroy();
+  });
+
+  it('does not offer a bulk scan when every archive is already active', () => {
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.componentInstance.archives.set([{...archive, status: 'QUEUED'}]);
+
+    fixture.componentInstance.confirmRescanAll();
+
+    expect(confirmationService.confirm).not.toHaveBeenCalled();
+    expect(archiveService.rescanAll).not.toHaveBeenCalled();
+    fixture.destroy();
+  });
+
+  it('restores optimistic rows when the bulk request and recovery reload both fail', () => {
+    const fixture = TestBed.createComponent(InpxArchiveManagerComponent);
+    fixture.detectChanges();
+    archiveService.rescanAll.mockReturnValue(throwError(() => new Error('queue unavailable')));
+    archiveService.getArchives.mockReturnValue(throwError(() => new Error('reload unavailable')));
+
+    fixture.componentInstance.confirmRescanAll();
+    confirmationService.confirm.mock.calls[0][0].accept?.();
+
+    expect(fixture.componentInstance.archives()).toEqual([archive]);
+    expect(fixture.componentInstance.bulkScanEligibleCount()).toBe(1);
+    expect(messageService.add).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Could not start the full library scan.',
+    }));
     fixture.destroy();
   });
 

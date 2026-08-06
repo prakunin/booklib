@@ -57,11 +57,29 @@ public class InpxArchiveFullScanService {
         if (!catalogService.queue(libraryId, archiveName, candidate.entryCount())) {
             throw ApiError.GENERIC_BAD_REQUEST.createException("Archive is already being scanned: " + archiveName);
         }
+        submit(libraryId, List.of(archiveName));
+    }
+
+    public void startAll(long libraryId) {
+        LibraryEntity library = catalogService.requireInpxLibrary(libraryId);
+        List<String> queuedArchives = archiveScanner
+                .listArchiveMetadataWithoutInspection(library.getInpxArchivePath()).stream()
+                .filter(archive -> catalogService.queue(libraryId, archive.archiveName(),
+                        archive.entryCount() == null ? 0 : archive.entryCount()))
+                .map(InpxArchiveScanner.ArchiveFile::archiveName)
+                .toList();
+        if (queuedArchives.isEmpty()) {
+            return;
+        }
+        submit(libraryId, queuedArchives);
+    }
+
+    private void submit(long libraryId, List<String> archiveNames) {
         try {
-            taskExecutor.execute(() -> scan(libraryId, archiveName));
+            taskExecutor.execute(() -> archiveNames.forEach(archiveName -> scan(libraryId, archiveName)));
         } catch (RejectedExecutionException _) {
             String message = ApiError.INPX_ARCHIVE_SCAN_QUEUE_FULL.getMessage();
-            catalogService.failed(libraryId, archiveName, message);
+            archiveNames.forEach(archiveName -> catalogService.failed(libraryId, archiveName, message));
             throw ApiError.INPX_ARCHIVE_SCAN_QUEUE_FULL.createException();
         }
     }

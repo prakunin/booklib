@@ -6,7 +6,7 @@ import {TableModule} from 'primeng/table';
 import {Button} from 'primeng/button';
 import {Tag} from 'primeng/tag';
 import {ProgressSpinner} from 'primeng/progressspinner';
-import {MessageService} from 'primeng/api';
+import {ConfirmationService, MessageService} from 'primeng/api';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {catchError, EMPTY, exhaustMap, filter, finalize, map, Subscription, take, tap, timer} from 'rxjs';
 import {InpxArchive, InpxArchiveScanStatus, InpxArchiveScanTask, LocalCatalogStatus} from './inpx-archive.model';
@@ -54,6 +54,7 @@ export class InpxArchiveManagerComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
+  private readonly confirmationService = inject(ConfirmationService);
   private readonly t = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialogLauncher = inject(DialogLauncherService);
@@ -63,6 +64,8 @@ export class InpxArchiveManagerComponent {
   readonly archives = signal<InpxArchive[]>([]);
   readonly loading = signal(true);
   readonly loadFailed = signal(false);
+  readonly bulkScanStarting = signal(false);
+  readonly bulkScanEligibleCount = computed(() => this.archives().filter(archive => !this.isActive(archive)).length);
   private pollSubscription: Subscription | null = null;
   private calculationPollSubscription: Subscription | null = null;
   private rescanVersion = 0;
@@ -166,6 +169,63 @@ export class InpxArchiveManagerComponent {
 
   openScanQueue(): void {
     void this.dialogLauncher.openInpxScanQueueDialog(this.libraryId);
+  }
+
+  confirmRescanAll(): void {
+    const count = this.bulkScanEligibleCount();
+    if (count === 0 || this.bulkScanStarting()) {
+      return;
+    }
+    this.confirmationService.confirm({
+      header: this.t.translate('book.inpxArchives.fullRescanAllConfirmTitle'),
+      message: this.t.translate('book.inpxArchives.fullRescanAllConfirmMessage', {count}),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.t.translate('common.confirm'),
+      rejectLabel: this.t.translate('common.cancel'),
+      acceptButtonProps: {
+        label: this.t.translate('common.confirm'),
+        severity: 'warn',
+      },
+      rejectButtonProps: {
+        label: this.t.translate('common.cancel'),
+        severity: 'secondary',
+      },
+      accept: () => this.rescanAll(count),
+    });
+  }
+
+  private rescanAll(count: number): void {
+    if (this.bulkScanStarting()) {
+      return;
+    }
+    this.bulkScanStarting.set(true);
+    const previousArchives = this.archives();
+    this.archives.update(items => items.map(item => this.isActive(item)
+      ? item
+      : {...item, status: 'QUEUED', errorMessage: null}));
+    this.service.rescanAll(this.libraryId).pipe(
+      finalize(() => this.bulkScanStarting.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => {
+        this.rescanVersion++;
+        this.messages.add({
+          severity: 'info',
+          summary: this.t.translate('common.success'),
+          detail: this.t.translate('book.inpxArchives.fullRescanAllQueued', {count}),
+        });
+        this.pollUntilIdle();
+      },
+      error: () => {
+        this.archives.set(previousArchives);
+        this.messages.add({
+          severity: 'error',
+          summary: this.t.translate('common.error'),
+          detail: this.t.translate('book.inpxArchives.fullRescanAllFailed'),
+        });
+        this.load();
+      },
+    });
   }
 
   openArchive(archive: InpxArchive): void {

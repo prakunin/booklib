@@ -5,6 +5,13 @@
       <p>{{ t('subtitle') }}</p>
     </div>
     <div class="header-actions">
+      <p-button
+        icon="pi pi-refresh"
+        [label]="t('fullRescanAll')"
+        severity="warn"
+        [loading]="bulkScanStarting()"
+        [disabled]="loading() || loadFailed() || bulkScanStarting() || bulkScanEligibleCount() === 0"
+        (onClick)="confirmRescanAll()"/>
       <p-button icon="pi pi-list" [label]="t('scanQueue')" [outlined]="true" (onClick)="openScanQueue()"/>
     </div>
   </header>

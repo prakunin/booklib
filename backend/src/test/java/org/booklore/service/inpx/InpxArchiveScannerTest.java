@@ -512,6 +512,26 @@ class InpxArchiveScannerTest {
         assertThat(asynchronousScanner.activeInspectionCount()).isZero();
     }
 
+    @Test
+    void listsBulkScanMetadataWithoutSchedulingArchiveInspection(@TempDir Path root) throws IOException {
+        createArchive(root.resolve("books.zip"), "1.fb2", "2.fb2");
+        QueuedTaskExecutor executor = new QueuedTaskExecutor();
+        ArchiveEntryMetadataRecognizer recognizer = new ArchiveEntryMetadataRecognizer(
+                metadataExtractorFactory, docMetadataExtractor, new InpxFilenameMetadataParser());
+        InpxArchiveScanner asynchronousScanner = new InpxArchiveScanner(
+                bookFileRepository, fb2MetadataExtractor, recognizer, archiveService, executor);
+
+        assertThat(asynchronousScanner.listArchiveMetadataWithoutInspection(root.toString()))
+                .singleElement()
+                .satisfies(archive -> {
+                    assertThat(archive.archiveName()).isEqualTo("books.zip");
+                    assertThat(archive.entryCount()).isNull();
+                });
+
+        assertThat(executor.size()).isZero();
+        assertThat(asynchronousScanner.activeInspectionCount()).isZero();
+    }
+
     private void createArchive(Path path, String... entries) throws IOException {
         try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(path))) {
             for (String entry : entries) {

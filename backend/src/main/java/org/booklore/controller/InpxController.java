@@ -108,4 +108,13 @@ public class InpxController {
         archiveFullScanService.start(libraryId, request.getArchiveName());
         return ResponseEntity.status(HttpStatus.ACCEPTED).build();
     }
+
+    @PostMapping("/libraries/{libraryId}/archives/rescan-all")
+    @CheckLibraryAccess(libraryIdParam = "libraryId")
+    @PreAuthorize("@securityUtil.canManageLibrary() or @securityUtil.isAdmin()")
+    @Operation(summary = "Start a full metadata and cover rescan of every idle INPX ZIP archive")
+    public ResponseEntity<Void> rescanAllArchives(@PathVariable long libraryId) {
+        archiveFullScanService.startAll(libraryId);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).build();
+    }
 }

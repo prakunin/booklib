@@ -18,6 +18,7 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpStatus;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
@@ -29,8 +30,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
 
@@ -222,6 +225,136 @@ class InpxArchiveFullScanServiceTest {
 
         verify(catalogService).failed(7L, "new.zip",
                 "INPX archive scan queue is full. Please try again later.");
+    }
+
+    @Test
+    void queuesEveryIdleArchiveWithoutInspectingContentsThenScansThemSequentially() {
+        LibraryEntity library = LibraryEntity.builder()
+                .id(7L)
+                .inpxArchivePath("/books")
+                .libraryPaths(new ArrayList<>(List.of(LibraryPathEntity.builder().id(3L).build())))
+                .build();
+        Instant modifiedAt = Instant.parse("2026-08-05T10:00:00Z");
+        var firstFile = new InpxArchiveScanner.ArchiveFile(
+                Path.of("/books/a.zip"), "a.zip", 10, modifiedAt, null);
+        var secondFile = new InpxArchiveScanner.ArchiveFile(
+                Path.of("/books/b.zip"), "b.zip", 20, modifiedAt, 2L);
+        var firstCandidate = new InpxArchiveScanner.ArchiveCandidate(
+                firstFile.path(), firstFile.archiveName(), 1);
+        var secondCandidate = new InpxArchiveScanner.ArchiveCandidate(
+                secondFile.path(), secondFile.archiveName(), 2);
+        List<Runnable> submitted = new ArrayList<>();
+        InpxArchiveFullScanService queuedService = new InpxArchiveFullScanService(
+                catalogService, archiveScanner, batchWriter, bookFileRepository,
+                bookRefreshService, archiveReconciliationService, notificationService, submitted::add);
+        when(catalogService.requireInpxLibrary(7L)).thenReturn(library);
+        when(archiveScanner.listArchiveMetadataWithoutInspection("/books"))
+                .thenReturn(List.of(firstFile, secondFile));
+        when(catalogService.queue(7L, "a.zip", 0)).thenReturn(true);
+        when(catalogService.queue(7L, "b.zip", 2)).thenReturn(true);
+
+        queuedService.startAll(7L);
+
+        assertThat(submitted).hasSize(1);
+        verify(archiveScanner, never()).inspectArchive(any(), any());
+
+        when(archiveScanner.inspectArchive("/books", "a.zip")).thenReturn(firstCandidate);
+        when(archiveScanner.inspectArchive("/books", "b.zip")).thenReturn(secondCandidate);
+        when(archiveScanner.discoveryForArchive(7L, firstCandidate)).thenReturn(
+                new InpxArchiveScanner.Discovery(List.of(firstCandidate), 0, 7L));
+        when(archiveScanner.discoveryForArchive(7L, secondCandidate)).thenReturn(
+                new InpxArchiveScanner.Discovery(List.of(secondCandidate), 0, 7L));
+        when(bookFileRepository.findBookIdsByArchive(7L, "a.zip")).thenReturn(List.of());
+        when(bookFileRepository.findBookIdsByArchive(7L, "b.zip")).thenReturn(List.of());
+
+        submitted.getFirst().run();
+
+        var ordered = inOrder(catalogService);
+        ordered.verify(catalogService).importing(7L, "a.zip", 0);
+        ordered.verify(catalogService).refreshing(7L, "a.zip", 0, 0);
+        ordered.verify(catalogService).completed(7L, "a.zip");
+        ordered.verify(catalogService).importing(7L, "b.zip", 0);
+        ordered.verify(catalogService).refreshing(7L, "b.zip", 0, 0);
+        ordered.verify(catalogService).completed(7L, "b.zip");
+    }
+
+    @Test
+    void skipsAlreadyActiveArchivesAndDoesNotSubmitEmptyBulkWork() {
+        LibraryEntity library = LibraryEntity.builder().id(7L).inpxArchivePath("/books").build();
+        Instant modifiedAt = Instant.parse("2026-08-05T10:00:00Z");
+        var archive = new InpxArchiveScanner.ArchiveFile(
+                Path.of("/books/a.zip"), "a.zip", 10, modifiedAt, 1L);
+        TaskExecutor executor = mock(TaskExecutor.class);
+        InpxArchiveFullScanService queuedService = new InpxArchiveFullScanService(
+                catalogService, archiveScanner, batchWriter, bookFileRepository,
+                bookRefreshService, archiveReconciliationService, notificationService, executor);
+        when(catalogService.requireInpxLibrary(7L)).thenReturn(library);
+        when(archiveScanner.listArchiveMetadataWithoutInspection("/books")).thenReturn(List.of(archive));
+        when(catalogService.queue(7L, "a.zip", 1)).thenReturn(false);
+
+        queuedService.startAll(7L);
+
+        verifyNoInteractions(executor);
+        verify(archiveScanner, never()).inspectArchive(any(), any());
+    }
+
+    @Test
+    void marksEveryNewlyQueuedArchiveFailedWhenBulkSubmissionIsRejected() {
+        LibraryEntity library = LibraryEntity.builder().id(7L).inpxArchivePath("/books").build();
+        Instant modifiedAt = Instant.parse("2026-08-05T10:00:00Z");
+        var first = new InpxArchiveScanner.ArchiveFile(
+                Path.of("/books/a.zip"), "a.zip", 10, modifiedAt, 1L);
+        var second = new InpxArchiveScanner.ArchiveFile(
+                Path.of("/books/b.zip"), "b.zip", 20, modifiedAt, 2L);
+        TaskExecutor rejectingExecutor = task -> {
+            throw new RejectedExecutionException("full");
+        };
+        InpxArchiveFullScanService rejectingService = new InpxArchiveFullScanService(
+                catalogService, archiveScanner, batchWriter, bookFileRepository,
+                bookRefreshService, archiveReconciliationService, notificationService, rejectingExecutor);
+        when(catalogService.requireInpxLibrary(7L)).thenReturn(library);
+        when(archiveScanner.listArchiveMetadataWithoutInspection("/books")).thenReturn(List.of(first, second));
+        when(catalogService.queue(7L, "a.zip", 1)).thenReturn(true);
+        when(catalogService.queue(7L, "b.zip", 2)).thenReturn(true);
+
+        assertThatThrownBy(() -> rejectingService.startAll(7L))
+                .hasMessageContaining("scan queue is full");
+
+        verify(catalogService).failed(7L, "a.zip",
+                "INPX archive scan queue is full. Please try again later.");
+        verify(catalogService).failed(7L, "b.zip",
+                "INPX archive scan queue is full. Please try again later.");
+    }
+
+    @Test
+    void continuesWithLaterBulkArchivesWhenOneArchiveFails() {
+        LibraryEntity library = LibraryEntity.builder()
+                .id(7L)
+                .inpxArchivePath("/books")
+                .libraryPaths(new ArrayList<>(List.of(LibraryPathEntity.builder().id(3L).build())))
+                .build();
+        Instant modifiedAt = Instant.parse("2026-08-05T10:00:00Z");
+        var first = new InpxArchiveScanner.ArchiveFile(
+                Path.of("/books/a.zip"), "a.zip", 10, modifiedAt, 1L);
+        var second = new InpxArchiveScanner.ArchiveFile(
+                Path.of("/books/b.zip"), "b.zip", 20, modifiedAt, 2L);
+        var secondCandidate = new InpxArchiveScanner.ArchiveCandidate(
+                second.path(), second.archiveName(), 2);
+        when(catalogService.requireInpxLibrary(7L)).thenReturn(library);
+        when(archiveScanner.listArchiveMetadataWithoutInspection("/books")).thenReturn(List.of(first, second));
+        when(catalogService.queue(7L, "a.zip", 1)).thenReturn(true);
+        when(catalogService.queue(7L, "b.zip", 2)).thenReturn(true);
+        when(archiveScanner.inspectArchive("/books", "a.zip"))
+                .thenThrow(new IllegalStateException("corrupt archive"));
+        when(archiveScanner.inspectArchive("/books", "b.zip")).thenReturn(secondCandidate);
+        when(archiveScanner.discoveryForArchive(7L, secondCandidate)).thenReturn(
+                new InpxArchiveScanner.Discovery(List.of(secondCandidate), 0, 7L));
+        when(bookFileRepository.findBookIdsByArchive(7L, "b.zip")).thenReturn(List.of());
+
+        service.startAll(7L);
+
+        verify(catalogService).failed(7L, "a.zip", "corrupt archive");
+        verify(catalogService).completed(7L, "b.zip");
     }
 
     private InpxBookDto book(String fileName) {

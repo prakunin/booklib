@@ -21,6 +21,10 @@ export class InpxArchiveService {
     return this.http.post<void>(`${this.url}/${libraryId}/archives/rescan`, {archiveName});
   }
 
+  rescanAll(libraryId: number): Observable<void> {
+    return this.http.post<void>(`${this.url}/${libraryId}/archives/rescan-all`, null);
+  }
+
   getLocalCatalogStatus(libraryId: number): Observable<LocalCatalogStatus> {
     return this.http.get<LocalCatalogStatus>(`${this.url}/${libraryId}/local-catalog`);
   }

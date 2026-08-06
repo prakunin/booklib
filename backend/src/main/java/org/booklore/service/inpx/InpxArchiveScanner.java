@@ -120,14 +120,19 @@ public class InpxArchiveScanner {
     }
 
     public List<ArchiveFile> listArchives(String archiveRoot) {
-        return listArchives(archiveRoot, true);
+        return listArchives(archiveRoot, true, true);
     }
 
     public List<ArchiveFile> listArchiveMetadata(String archiveRoot) {
-        return listArchives(archiveRoot, false);
+        return listArchives(archiveRoot, false, true);
     }
 
-    private List<ArchiveFile> listArchives(String archiveRoot, boolean awaitInspection) {
+    public List<ArchiveFile> listArchiveMetadataWithoutInspection(String archiveRoot) {
+        return listArchives(archiveRoot, false, false);
+    }
+
+    private List<ArchiveFile> listArchives(String archiveRoot, boolean awaitInspection,
+                                           boolean scheduleInspection) {
         Path root = validateArchiveRoot(archiveRoot);
         try (Stream<Path> paths = Files.list(root)) {
             List<ArchiveFile> archives = new ArrayList<>();
@@ -142,6 +147,8 @@ public class InpxArchiveScanner {
                 ArchiveFile cached = archiveFileCache.get(path);
                 if (cached != null && cached.sizeBytes() == size && cached.modifiedAt().equals(modifiedAt)) {
                     archives.add(cached);
+                } else if (!scheduleInspection) {
+                    archives.add(new ArchiveFile(path, path.getFileName().toString(), size, modifiedAt, null));
                 } else {
                     CompletableFuture<ArchiveFile> inspection = inspectInBackground(path, size, modifiedAt);
                     archives.add(awaitInspection ? awaitInspection(inspection)

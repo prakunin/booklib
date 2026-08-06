@@ -43,6 +43,15 @@ describe('InpxArchiveService', () => {
     request.flush(null);
   });
 
+  it('starts one full scan coordinator for every idle archive', () => {
+    service.rescanAll(7).subscribe();
+
+    const request = http.expectOne(req => req.url.endsWith('/api/v1/inpx/libraries/7/archives/rescan-all'));
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    request.flush(null);
+  });
+
   it('loads the archive scan queue', () => {
     const tasks = [{archiveName: 'new.zip'}] as InpxArchiveScanTask[];
     let received: InpxArchiveScanTask[] | undefined;
