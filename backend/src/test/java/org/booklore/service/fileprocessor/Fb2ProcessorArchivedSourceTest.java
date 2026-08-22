@@ -33,14 +33,18 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Function;
 import java.util.Base64;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,8 +67,17 @@ class Fb2ProcessorArchivedSourceTest {
                 archivedBookContentService);
     }
 
+    /**
+     * The cover probe reads through {@link ArchivedBookContentService#withPublicationCopy}, which
+     * hands the extracted file to a callback instead of returning it, so the stub runs the callback.
+     */
+    private void readsArchivedContentFrom(BookFileEntity bookFile, Path path) {
+        when(archivedBookContentService.withPublicationCopy(eq(bookFile), any()))
+                .thenAnswer(invocation -> invocation.<Function<Path, Object>>getArgument(1).apply(path));
+    }
+
     @Test
-    void resolvesArchivedFb2BeforeExtractingItsCover() {
+    void readsTheArchivedFb2WithoutCachingItBeforeExtractingItsCover() {
         Fb2Processor processor = buildProcessor();
         BookEntity book = BookEntity.builder().id(42L).build();
         BookFileEntity bookFile = BookFileEntity.builder()
@@ -75,12 +88,15 @@ class Fb2ProcessorArchivedSourceTest {
                 .sourceArchiveEntry("book.fb2")
                 .build();
         Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
-        when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+        readsArchivedContentFrom(bookFile, cachedFile);
 
         boolean generated = processor.generateCover(book, bookFile);
 
         assertThat(generated).isFalse();
         verify(fb2MetadataExtractor).extractCover(new File(cachedFile.toUri()));
+        // A scan probes every book's cover, so this read must not go through the caching path -
+        // that is what grew the extraction cache to the size of the library uncompressed.
+        verify(archivedBookContentService, never()).resolve(bookFile);
     }
 
     /**
@@ -120,7 +136,7 @@ class Fb2ProcessorArchivedSourceTest {
             Fb2Processor processor = buildProcessor();
             BookEntity book = BookEntity.builder().id(42L).build();
             BookFileEntity bookFile = buildArchivedFile(book);
-            when(archivedBookContentService.resolve(bookFile))
+            when(archivedBookContentService.withPublicationCopy(eq(bookFile), any()))
                     .thenThrow(new RuntimeException("archive temporarily unavailable"));
 
             CoverExtraction extraction = processor.extractCover(book, bookFile);
@@ -135,7 +151,7 @@ class Fb2ProcessorArchivedSourceTest {
             BookEntity book = BookEntity.builder().id(42L).build();
             BookFileEntity bookFile = buildArchivedFile(book);
             Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
-            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            readsArchivedContentFrom(bookFile, cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri())))
                     .thenThrow(new CoverExtractionException(
                             "Failed to extract cover",
@@ -177,7 +193,7 @@ class Fb2ProcessorArchivedSourceTest {
             BookEntity book = BookEntity.builder().id(42L).build();
             BookFileEntity bookFile = buildArchivedFile(book);
             Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
-            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            readsArchivedContentFrom(bookFile, cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(null);
 
             CoverExtraction extraction = processor.extractCover(book, bookFile);
@@ -192,7 +208,7 @@ class Fb2ProcessorArchivedSourceTest {
             BookFileEntity bookFile = buildArchivedFile(book);
             Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
             byte[] png = encodePng();
-            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            readsArchivedContentFrom(bookFile, cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(png);
 
             CoverExtraction extraction = processor.extractCover(book, bookFile);
@@ -212,7 +228,7 @@ class Fb2ProcessorArchivedSourceTest {
             BookEntity book = BookEntity.builder().id(42L).build();
             BookFileEntity bookFile = buildArchivedFile(book);
             Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
-            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            readsArchivedContentFrom(bookFile, cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(encodePng());
 
             processor.extractCover(book, bookFile);
@@ -233,7 +249,7 @@ class Fb2ProcessorArchivedSourceTest {
             BookFileEntity bookFile = buildArchivedFile(book);
             Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
             byte[] png = encodePng();
-            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            readsArchivedContentFrom(bookFile, cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(png);
             when(fileService.saveCoverImageFromBytes(42L, png)).thenReturn(CoverSaveOutcome.SAVED);
 
@@ -250,7 +266,7 @@ class Fb2ProcessorArchivedSourceTest {
             BookFileEntity bookFile = buildArchivedFile(book);
             Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
             byte[] png = encodePng();
-            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            readsArchivedContentFrom(bookFile, cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(png);
             when(fileService.saveCoverImageFromBytes(42L, png)).thenReturn(CoverSaveOutcome.SAVE_FAILED);
 
@@ -269,7 +285,7 @@ class Fb2ProcessorArchivedSourceTest {
             BookFileEntity bookFile = buildArchivedFile(book);
             Path cachedFile = Path.of("/tmp/inpx-cache/book.fb2");
             byte[] svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"/>".getBytes();
-            when(archivedBookContentService.resolve(bookFile)).thenReturn(cachedFile);
+            readsArchivedContentFrom(bookFile, cachedFile);
             when(fb2MetadataExtractor.extractCover(new File(cachedFile.toUri()))).thenReturn(svg);
             when(fileService.saveCoverImageFromBytes(42L, svg)).thenReturn(CoverSaveOutcome.UNDECODABLE);
 
@@ -315,7 +331,7 @@ class Fb2ProcessorArchivedSourceTest {
                     .sourceArchive("catalog.zip")
                     .sourceArchiveEntry("book.fb2")
                     .build();
-            when(archivedBookContentService.resolve(bookFile)).thenReturn(realFile);
+            readsArchivedContentFrom(bookFile, realFile);
             return bookFile;
         }
 

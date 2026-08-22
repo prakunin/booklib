@@ -125,6 +125,9 @@ export class GlobalPreferencesComponent implements OnInit {
     if (settings.maxFileUploadSizeInMb) {
       this.maxFileUploadSizeInMb = settings.maxFileUploadSizeInMb;
     }
+    if (settings.inpxExtractionCacheSizeInMb) {
+      this.inpxExtractionCacheSizeInMb = settings.inpxExtractionCacheSizeInMb;
+    }
     if (settings.coverCroppingSettings) {
       this.coverCroppingSettings = {...settings.coverCroppingSettings};
     }
@@ -145,6 +148,7 @@ export class GlobalPreferencesComponent implements OnInit {
   });
 
   maxFileUploadSizeInMb?: number;
+  inpxExtractionCacheSizeInMb?: number;
   regenerateCoverMenuItems: MenuItem[] = [];
 
   ngOnInit(): void {
@@ -309,6 +313,14 @@ export class GlobalPreferencesComponent implements OnInit {
       return;
     }
     this.saveSetting(AppSettingKey.MAX_FILE_UPLOAD_SIZE_IN_MB, this.maxFileUploadSizeInMb);
+  }
+
+  saveInpxExtractionCacheSize() {
+    if (!this.inpxExtractionCacheSizeInMb || this.inpxExtractionCacheSizeInMb <= 0) {
+      this.showMessage('error', this.t.translate('settingsApp.fileManagement.invalidInput'), this.t.translate('settingsApp.fileManagement.invalidInpxCacheDetail'));
+      return;
+    }
+    this.saveSetting(AppSettingKey.INPX_EXTRACTION_CACHE_SIZE_IN_MB, this.inpxExtractionCacheSizeInMb);
   }
 
   regenerateCovers(missingOnly = false): void {

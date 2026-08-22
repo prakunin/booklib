@@ -124,7 +124,8 @@ class TaskCreateRequestTest {
                 TaskType.SYNC_LIBRARY_FILES,          // LibraryScanTask reads no options
                 TaskType.BOOKDROP_PERIODIC_SCANNING,  // BookdropPeriodicScanTask reads no options
                 TaskType.CLEANUP_TEMP_METADATA,       // TempFetchedMetadataCleanupTask reads no options
-                TaskType.RECOMPUTE_FACET_COUNTS       // FacetCountRecomputeTask reads no options
+                TaskType.RECOMPUTE_FACET_COUNTS,      // FacetCountRecomputeTask reads no options
+                TaskType.CLEANUP_INPX_EXTRACTION_CACHE // InpxExtractionCacheCleanupTask reads no options
         );
 
         @ParameterizedTest

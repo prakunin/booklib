@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Function;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -253,6 +254,15 @@ class ProcessorCoverExtractionContractTest {
                     new Fb2MetadataExtractor(), archivedBookContentService);
         }
 
+        /**
+         * The cover probe reads through {@link ArchivedBookContentService#withPublicationCopy},
+         * which hands the extracted file to a callback instead of returning it.
+         */
+        private void readsArchivedContentFrom(BookFileEntity bookFile, Path path) {
+            when(archivedBookContentService.withPublicationCopy(eq(bookFile), any()))
+                    .thenAnswer(invocation -> invocation.<Function<Path, Object>>getArgument(1).apply(path));
+        }
+
         private BookEntity fb2(String body) throws IOException {
             BookEntity book = bookWithFile(BookFileType.FB2, "book.fb2");
             Path path = tempDir.resolve("book.fb2");
@@ -262,7 +272,7 @@ class ProcessorCoverExtractionContractTest {
                     %s
                     </FictionBook>
                     """.formatted(body), StandardCharsets.UTF_8);
-            when(archivedBookContentService.resolve(fileOf(book))).thenReturn(path);
+            readsArchivedContentFrom(fileOf(book), path);
             return book;
         }
 
@@ -298,7 +308,7 @@ class ProcessorCoverExtractionContractTest {
             BookEntity book = bookWithFile(BookFileType.FB2, "book.fb2");
             Path path = tempDir.resolve("book.fb2");
             Files.writeString(path, "not xml at all");
-            when(archivedBookContentService.resolve(fileOf(book))).thenReturn(path);
+            readsArchivedContentFrom(fileOf(book), path);
 
             assertThat(processor().extractCover(book, fileOf(book)).outcome())
                     .isEqualTo(CoverProbeOutcome.READ_FAILED);
@@ -318,7 +328,7 @@ class ProcessorCoverExtractionContractTest {
         @Test
         void reportsReadFailedForAMissingFile() {
             BookEntity book = bookWithFile(BookFileType.FB2, "absent.fb2");
-            when(archivedBookContentService.resolve(fileOf(book))).thenReturn(tempDir.resolve("absent.fb2"));
+            readsArchivedContentFrom(fileOf(book), tempDir.resolve("absent.fb2"));
 
             assertThat(processor().extractCover(book, fileOf(book)).outcome())
                     .isEqualTo(CoverProbeOutcome.READ_FAILED);

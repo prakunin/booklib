@@ -26,6 +26,7 @@ public class AppSettings {
     private Integer pdfCacheSizeInMb;
     private boolean djvuPdfRenditionEnabled;
     private Integer djvuRenditionCacheSizeInMb;
+    private Integer inpxExtractionCacheSizeInMb;
     private Integer maxFileUploadSizeInMb;
     private boolean remoteAuthEnabled;
     private boolean metadataDownloadOnBookdrop;

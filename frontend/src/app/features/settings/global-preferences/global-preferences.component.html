@@ -408,6 +408,29 @@
             </div>
           </div>
         </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <div class="setting-label-row">
+              <span class="setting-label">{{ t('fileManagement.inpxCacheSize') }}</span>
+              <div class="input-group">
+                <div class="input-with-unit">
+                  <input
+                    type="text"
+                    pInputText
+                    [(ngModel)]="inpxExtractionCacheSizeInMb"
+                    [placeholder]="t('fileManagement.inpxCachePlaceholder')"/>
+                  <span class="unit">MB</span>
+                </div>
+                <p-button [label]="'common.save' | transloco" outlined severity="success" (onClick)="saveInpxExtractionCacheSize()"></p-button>
+              </div>
+            </div>
+            <p class="setting-description">
+              <i class="pi pi-info-circle"></i>
+              {{ t('fileManagement.inpxCacheDesc') }}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -1,6 +1,7 @@
 package org.booklore.service.inpx;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.booklore.config.AppProperties;
@@ -16,16 +17,22 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ArchivedBookContentService {
 
@@ -58,6 +65,96 @@ public class ArchivedBookContentService {
      */
     public Path resolveRevalidated(BookFileEntity bookFile) {
         return resolve(bookFile, true);
+    }
+
+    /**
+     * Reads an archived publication without adding it to the extraction cache.
+     * <p>
+     * For the passes that walk the whole library and read each book exactly once - cover probing
+     * and metadata extraction during a scan. Going through {@link #resolve} there caches every
+     * book the scan touches, so a full pass over an INPX library materialises the entire library
+     * uncompressed beside it; on this deployment that reached 475 GB against 894 GB of archives.
+     * <p>
+     * An extraction that is already cached is handed over as-is rather than repeated - a scan
+     * following a reader should not pay to extract a book that is already sitting there. Only a
+     * copy this method had to make itself is deleted, so the returned path from {@code action} is
+     * valid only for the duration of the call.
+     */
+    public <T> T withPublicationCopy(BookFileEntity bookFile, Function<Path, T> action) {
+        if (!bookFile.isArchivedSource()) {
+            return action.apply(bookFile.getFullFilePath());
+        }
+        Source source = source(bookFile);
+        Path cached = cachePath(bookFile);
+        if (isFresh(cached, source.archivePath())) {
+            stampRead(cached);
+            return action.apply(cached);
+        }
+
+        Path scratch;
+        try {
+            scratch = Files.createTempFile("booklib-inpx-readonce-", suffix(bookFile.getFileName()));
+        } catch (IOException e) {
+            throw ApiError.FILE_READ_ERROR.createException("Unable to read archived book: " + e.getMessage());
+        }
+        try {
+            extract(source.archivePath(), source.entryChain(), scratch);
+            return action.apply(scratch);
+        } catch (MissingEntryException _) {
+            throw new ArchiveEntryMissingException(safeEntryLeaf(bookFile.getFileName()));
+        } catch (IOException e) {
+            throw ApiError.FILE_READ_ERROR.createException("Unable to read archived book: " + e.getMessage());
+        } finally {
+            deleteQuietly(scratch);
+        }
+    }
+
+    /** What one eviction sweep removed, for the cleanup task to report. */
+    public record EvictionResult(int deletedFiles, long freedBytes) {
+    }
+
+    /**
+     * Deletes least-recently-read extractions until the cache is back under {@code limitBytes}.
+     * <p>
+     * Driven by the nightly cleanup task rather than by each extraction, unlike the PDF rendition
+     * cache: that one holds a handful of files in a flat directory, while this one reached 414 000
+     * files across nested per-book directories, and walking that on every book opened would make
+     * reading a book cost a full-cache stat.
+     * <p>
+     * Ordering is by modification time, which {@link #stampRead} maintains on every cache hit.
+     * Access time is not usable - the data volume is mounted {@code noatime}, so it would order
+     * entries by when they were first extracted and evict the most-read books first.
+     */
+    public EvictionResult evictBeyondCacheLimit(long limitBytes) {
+        if (limitBytes <= 0) {
+            return new EvictionResult(0, 0L);
+        }
+        Path root = cacheRoot();
+        if (!Files.isDirectory(root)) {
+            return new EvictionResult(0, 0L);
+        }
+
+        List<CachedExtraction> extractions = listExtractions(root);
+        long total = extractions.stream().mapToLong(CachedExtraction::size).sum();
+        if (total <= limitBytes) {
+            return new EvictionResult(0, 0L);
+        }
+
+        extractions.sort(Comparator.comparingLong(CachedExtraction::lastRead));
+        int deleted = 0;
+        long freed = 0L;
+        for (CachedExtraction extraction : extractions) {
+            if (total <= limitBytes) {
+                break;
+            }
+            if (deleteQuietly(extraction.path())) {
+                total -= extraction.size();
+                freed += extraction.size();
+                deleted++;
+                deleteIfEmpty(extraction.path().getParent(), root);
+            }
+        }
+        return new EvictionResult(deleted, freed);
     }
 
     /** Lists entries beside an archived publication without exposing them through an API. */
@@ -177,12 +274,11 @@ public class ArchivedBookContentService {
             throw ApiError.FILE_NOT_FOUND.createException("INPX archive is unavailable: " + archiveName);
         }
 
-        Path cacheDirectory = Path.of(appProperties.getPathConfig(), "cache", "inpx",
-                String.valueOf(library.getId()), String.valueOf(bookFile.getId()));
-        Path cached = cacheDirectory.resolve(entryName);
+        Path cached = cachePath(bookFile);
+        Path cacheDirectory = cached.getParent();
         try {
-            if (!revalidate && Files.isRegularFile(cached)
-                    && Files.getLastModifiedTime(cached).compareTo(Files.getLastModifiedTime(archivePath)) >= 0) {
+            if (!revalidate && isFresh(cached, archivePath)) {
+                stampRead(cached);
                 return cached;
             }
             Files.createDirectories(cacheDirectory);
@@ -261,6 +357,89 @@ public class ArchivedBookContentService {
 
     private boolean isZip(Path path) {
         return path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip");
+    }
+
+    private Path cacheRoot() {
+        return Path.of(appProperties.getPathConfig(), "cache", "inpx");
+    }
+
+    private Path cachePath(BookFileEntity bookFile) {
+        return cacheRoot()
+                .resolve(String.valueOf(bookFile.getBook().getLibrary().getId()))
+                .resolve(String.valueOf(bookFile.getId()))
+                .resolve(safeEntryLeaf(bookFile.getFileName()));
+    }
+
+    private boolean isFresh(Path cached, Path archivePath) {
+        try {
+            return Files.isRegularFile(cached)
+                    && Files.getLastModifiedTime(cached).compareTo(Files.getLastModifiedTime(archivePath)) >= 0;
+        } catch (IOException _) {
+            return false;
+        }
+    }
+
+    /**
+     * Records that a cached extraction was just read, so eviction can order by real use. Moving
+     * mtime forward cannot invalidate the entry: freshness asks that the copy be no older than its
+     * archive, and now is never older.
+     */
+    private void stampRead(Path cached) {
+        try {
+            Files.setLastModifiedTime(cached, FileTime.from(Instant.now()));
+        } catch (IOException e) {
+            // A read-only or exotic filesystem costs eviction accuracy, never the read itself.
+            log.debug("Could not stamp the read time of {}: {}", cached, e.getMessage());
+        }
+    }
+
+    private List<CachedExtraction> listExtractions(Path root) {
+        try (Stream<Path> paths = Files.walk(root)) {
+            return paths.filter(Files::isRegularFile)
+                    .map(path -> {
+                        try {
+                            var attributes = Files.readAttributes(path, BasicFileAttributes.class);
+                            return new CachedExtraction(path, attributes.size(),
+                                    attributes.lastModifiedTime().toMillis());
+                        } catch (IOException _) {
+                            return null;
+                        }
+                    })
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        } catch (IOException e) {
+            log.warn("Could not walk the INPX extraction cache at {}: {}", root, e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /** Prunes the per-book directory an eviction just emptied, never the cache root itself. */
+    private void deleteIfEmpty(Path directory, Path root) {
+        if (directory == null || directory.equals(root) || !directory.startsWith(root)) {
+            return;
+        }
+        try (Stream<Path> entries = Files.list(directory)) {
+            if (entries.findAny().isPresent()) {
+                return;
+            }
+        } catch (IOException _) {
+            return;
+        }
+        if (deleteQuietly(directory)) {
+            deleteIfEmpty(directory.getParent(), root);
+        }
+    }
+
+    private boolean deleteQuietly(Path path) {
+        try {
+            return Files.deleteIfExists(path);
+        } catch (IOException e) {
+            log.debug("Could not delete {}: {}", path, e.getMessage());
+            return false;
+        }
+    }
+
+    private record CachedExtraction(Path path, long size, long lastRead) {
     }
 
     private record Source(Path archivePath, List<String> entryChain) {

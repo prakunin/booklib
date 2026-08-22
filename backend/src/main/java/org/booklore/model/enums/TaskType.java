@@ -51,6 +51,14 @@ public enum TaskType {
             "Cleanup Temporary Metadata",
             "Removes temporary metadata files created during the bookdrop and manual metadata review processes."
     ),
+    CLEANUP_INPX_EXTRACTION_CACHE(
+            false,
+            true,
+            true,
+            false,
+            "Cleanup INPX Extraction Cache",
+            "Deletes the least recently read books that were extracted out of INPX archives, keeping that cache under its configured size limit."
+    ),
     REFRESH_METADATA_MANUAL(
             false,
             true,

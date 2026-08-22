@@ -51,6 +51,7 @@ function buildAppSettings(overrides: Partial<AppSettings> = {}): AppSettings {
       defaultLibraryIds: [],
     },
     maxFileUploadSizeInMb: 50,
+    inpxExtractionCacheSizeInMb: 10240,
     metadataProviderSettings: {} as never,
     metadataMatchWeights: {} as never,
     metadataPersistenceSettings: {} as never,

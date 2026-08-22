@@ -96,32 +96,36 @@ public class Fb2Processor extends AbstractFileProcessor implements BookFileProce
      */
     @Override
     public CoverExtraction extractCover(BookEntity bookEntity, BookFileEntity bookFile) {
-        File fb2File;
         try {
-            // Resolving is the actual archive read (opens the ZIP, extracts the entry): a failure
-            // here - IO error, corrupt or temporarily unavailable archive - means we could not look,
-            // not that there is no cover, so it must not be reported the same way as a clean miss.
-            fb2File = archivedBookContentService.resolve(bookFile).toFile();
+            // Read-once rather than cached: a cover probe runs for every book of a library scan, so
+            // caching each one materialises the whole library uncompressed beside its archives.
+            // withPublicationCopy still hands over an extraction a reader already paid for.
+            //
+            // Reading the archive at all can fail - IO error, corrupt or temporarily unavailable
+            // archive - and that means we could not look, not that there is no cover, so it must not
+            // be reported the same way as a clean miss.
+            return archivedBookContentService.withPublicationCopy(bookFile, fb2Path -> {
+                byte[] coverData;
+                try {
+                    coverData = fb2MetadataExtractor.extractCover(fb2Path.toFile());
+                } catch (Exception e) {
+                    // A malformed or unexpectedly-shaped FB2 must not propagate out of here: every
+                    // caller (the lazy probe and explicit regeneration) would otherwise turn one bad
+                    // file into a permanent 500, since the old generateCover caught everything and
+                    // just returned false.
+                    logCoverReadFailure("extract cover", bookFile.getFileName(), e);
+                    return CoverExtraction.readFailed();
+                }
+                if (coverData == null || coverData.length == 0) {
+                    log.warn("No cover image found in FB2 '{}'", bookFile.getFileName());
+                    return CoverExtraction.noCoverFound();
+                }
+                return CoverExtraction.found(coverData);
+            });
         } catch (Exception e) {
             logCoverReadFailure("resolve archived content", bookFile.getFileName(), e);
             return CoverExtraction.readFailed();
         }
-
-        byte[] coverData;
-        try {
-            coverData = fb2MetadataExtractor.extractCover(fb2File);
-        } catch (Exception e) {
-            // A malformed or unexpectedly-shaped FB2 must not propagate out of here: every caller
-            // (the lazy probe and explicit regeneration) would otherwise turn one bad file into a
-            // permanent 500, since the old generateCover caught everything and just returned false.
-            logCoverReadFailure("extract cover", bookFile.getFileName(), e);
-            return CoverExtraction.readFailed();
-        }
-        if (coverData == null || coverData.length == 0) {
-            log.warn("No cover image found in FB2 '{}'", bookFile.getFileName());
-            return CoverExtraction.noCoverFound();
-        }
-        return CoverExtraction.found(coverData);
     }
 
     private void logCoverReadFailure(String action, String fileName, Exception error) {

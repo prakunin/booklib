@@ -378,6 +378,9 @@ public class AppSettingService {
         // principle asks for. The size cap is what keeps that from quietly filling a disk.
         builder.djvuPdfRenditionEnabled(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.DJVU_PDF_RENDITION_ENABLED, "true")));
         builder.djvuRenditionCacheSizeInMb(Integer.parseInt(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.DJVU_RENDITION_CACHE_SIZE_IN_MB, "2048")));
+        // Archived books are extracted beside their archives so they can be read; without a cap that
+        // copy grows to the size of the library uncompressed - here 475 GB against 894 GB of archives.
+        builder.inpxExtractionCacheSizeInMb(Integer.parseInt(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.INPX_EXTRACTION_CACHE_SIZE_IN_MB, "10240")));
         builder.maxFileUploadSizeInMb(Integer.parseInt(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.MAX_FILE_UPLOAD_SIZE_IN_MB, "100")));
         builder.metadataDownloadOnBookdrop(Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.METADATA_DOWNLOAD_ON_BOOKDROP, "true")));
 

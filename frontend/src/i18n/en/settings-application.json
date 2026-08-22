@@ -69,7 +69,11 @@
     "maxUploadDesc": "Defines the maximum allowed size (in MB) for each uploaded file. Applies to all supported file formats.",
     "restartWarning": "Changes will take effect after restarting the server",
     "invalidInput": "Invalid Input",
-    "invalidInputDetail": "Please enter a valid max file upload size in MB."
+    "invalidInputDetail": "Please enter a valid max file upload size in MB.",
+    "inpxCacheSize": "INPX Extraction Cache Size",
+    "inpxCachePlaceholder": "Cache size",
+    "inpxCacheDesc": "Books stored inside INPX archives are extracted to disk before they can be read, and the copy is kept so the next read is free. A nightly task deletes the least recently read extractions to keep that cache under this size.",
+    "invalidInpxCacheDetail": "Please enter a valid INPX extraction cache size in MB."
   },
   "settingsSaved": "Settings Saved",
   "settingsSavedDetail": "The settings were successfully saved!",
