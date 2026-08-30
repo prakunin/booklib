@@ -338,7 +338,7 @@ public class InpxArchiveScanner {
                              TraversalContext context) throws IOException {
         // Commons Compress remains the reader for the legacy outer ZIPs whose central directory is
         // rejected by java.util.zip. Nested ZIPs use it too, preserving exact case-sensitive names.
-        try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
+        try (ZipFile archive = LibraryArchives.open(archivePath)) {
             List<ZipArchiveEntry> entries = Collections.list(archive.getEntries());
             Set<String> htmlEntrypoints = htmlEntrypoints(entries.stream()
                     .filter(Predicate.not(ZipArchiveEntry::isDirectory))
@@ -530,7 +530,7 @@ public class InpxArchiveScanner {
 
     private boolean isImageOnlyContainer(Path archivePath, String entryName) throws IOException {
         if (isZip(entryName)) {
-            try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
+            try (ZipFile archive = LibraryArchives.open(archivePath)) {
                 boolean hasImage = false;
                 int visited = 0;
                 var entries = archive.getEntries();
@@ -618,7 +618,7 @@ public class InpxArchiveScanner {
             if (!archivePath.startsWith(root) || !Files.isRegularFile(archivePath)) {
                 return;
             }
-            try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
+            try (ZipFile archive = LibraryArchives.open(archivePath)) {
                 Map<String, ZipArchiveEntry> entriesByName = ZipEntryNameResolver.indexEntries(archive);
                 for (InpxBookDto book : books) {
                     ZipArchiveEntry entry = entriesByName.get(book.getFileName() + "." + book.getExtension());

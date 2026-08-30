@@ -154,7 +154,7 @@ public class InpxImportService {
     }
 
     ZipFile openArchive(Path archivePath) throws IOException {
-        return ZipFile.builder().setFile(archivePath.toFile()).get();
+        return LibraryArchives.open(archivePath);
     }
 
     private void copyBounded(InputStream input, OutputStream output) throws IOException {

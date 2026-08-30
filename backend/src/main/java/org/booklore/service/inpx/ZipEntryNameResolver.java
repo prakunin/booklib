@@ -1,6 +1,8 @@
 package org.booklore.service.inpx;
 
+import org.apache.commons.compress.archivers.zip.UnicodePathExtraField;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipExtraField;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 
 import java.nio.ByteBuffer;
@@ -11,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.zip.CRC32;
 
 final class ZipEntryNameResolver {
 
@@ -31,6 +34,10 @@ final class ZipEntryNameResolver {
         byte[] rawName = entry.getRawName();
         if (rawName == null) {
             return entry.getName();
+        }
+        String declared = unicodePathName(entry, rawName);
+        if (declared != null) {
+            return declared;
         }
         String utf8 = decodeUtf8(rawName);
         if (utf8 != null) {
@@ -61,6 +68,38 @@ final class ZipEntryNameResolver {
             entriesByName.putIfAbsent(resolve(entry), entry);
         }
         return entriesByName;
+    }
+
+    /**
+     * The name the archive itself declares in a Unicode path extra field, when it declares one that
+     * matches this entry.
+     * <p>
+     * Commons Compress normally applies this during its local-file-header pass and reports the
+     * result as {@code NameSource.UNICODE_EXTRA_FIELD}, so the branch above would have caught it.
+     * {@link LibraryArchives} skips that pass — it costs minutes on a library archive — which leaves
+     * the field sitting unread on the entry, parsed from the central directory but never consulted.
+     * Reading it here keeps naming identical whichever way the archive was opened, and keeps a
+     * declared name ahead of the guesswork below, where it belongs.
+     * <p>
+     * The CRC guard is the same one Commons Compress applies: the extra field records a checksum of
+     * the name it was written for, and an extra field left over from a renamed entry describes a
+     * name this entry no longer has.
+     */
+    private static String unicodePathName(ZipArchiveEntry entry, byte[] rawName) {
+        ZipExtraField field = entry.getExtraField(UnicodePathExtraField.UPATH_ID);
+        if (!(field instanceof UnicodePathExtraField unicodePath)) {
+            return null;
+        }
+        byte[] unicodeName = unicodePath.getUnicodeName();
+        if (unicodeName == null) {
+            return null;
+        }
+        CRC32 crc = new CRC32();
+        crc.update(rawName);
+        if (crc.getValue() != unicodePath.getNameCRC32()) {
+            return null;
+        }
+        return decodeUtf8(unicodeName);
     }
 
     private static String decodeUtf8(byte[] rawName) {

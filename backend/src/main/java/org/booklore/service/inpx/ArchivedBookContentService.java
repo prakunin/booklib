@@ -163,7 +163,7 @@ public class ArchivedBookContentService {
             return withContainingArchive(bookFile, archivePath -> {
                 try {
                     if (archivePath.outer() || isZip(archivePath.path())) {
-                        try (ZipFile archive = ZipFile.builder().setFile(archivePath.path().toFile()).get()) {
+                        try (ZipFile archive = LibraryArchives.open(archivePath.path())) {
                             List<ArchivedEntry> entries = new ArrayList<>();
                             var archiveEntries = archive.getEntries();
                             while (archiveEntries.hasMoreElements()) {
@@ -341,7 +341,7 @@ public class ArchivedBookContentService {
     private void streamExactEntry(ContainingArchive archivePath, String entryName, OutputStream output) throws IOException {
         long[] expanded = {0};
         if (archivePath.outer() || isZip(archivePath.path())) {
-            try (ZipFile archive = ZipFile.builder().setFile(archivePath.path().toFile()).get()) {
+            try (ZipFile archive = LibraryArchives.open(archivePath.path())) {
                 ZipArchiveEntry entry = ZipEntryNameResolver.findEntry(archive, entryName);
                 if (entry == null || entry.isDirectory()) {
                     throw new MissingEntryException(entryName);
@@ -490,7 +490,7 @@ public class ArchivedBookContentService {
     private void extractEntry(Path archivePath, String entryName, Path output, boolean outer,
                               long[] totalExpanded) throws IOException {
         if (outer || archivePath.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip")) {
-            try (ZipFile archive = ZipFile.builder().setFile(archivePath.toFile()).get()) {
+            try (ZipFile archive = LibraryArchives.open(archivePath)) {
                 ZipArchiveEntry entry = ZipEntryNameResolver.findEntry(archive, entryName);
                 if (entry == null || entry.isDirectory()) {
                     throw new MissingEntryException(entryName);
