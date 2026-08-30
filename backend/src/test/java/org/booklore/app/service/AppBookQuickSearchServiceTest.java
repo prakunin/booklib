@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -143,6 +144,73 @@ class AppBookQuickSearchServiceTest {
 
         verify(bookRepository, never()).findAll(any(Specification.class));
         verify(bookRepository, never()).findAllForSummaryByIds(anyCollection());
+    }
+
+    @Nested
+    class AdjacentPhraseFallback {
+
+        @Test
+        void buildsOnePhrasePerAdjacentWordPair() {
+            assertThat(AppBookQuickSearchService.toAdjacentPhraseQuery(
+                    List.of("цикл", "дети", "времени")))
+                    .isEqualTo("\"цикл дети\" \"дети времени\"");
+        }
+
+        @Test
+        void retriesWithAdjacentPhrasesWhenTheMandatoryWordsMatchNothing() {
+            mockUser(true, Set.of());
+            when(bookRepository.searchBookIds("+цикл* +дети* +времени*", false, List.of(-1L), 50, 0))
+                    .thenReturn(List.of());
+            BookSearchHitProjection phraseHit = hit(7L);
+            when(bookRepository.searchBookIds("\"цикл дети\" \"дети времени\"", false, List.of(-1L), 50, 0))
+                    .thenReturn(List.of(phraseHit));
+            when(bookRepository.findAllForSummaryByIds(anyCollection()))
+                    .thenReturn(List.of(book(7L, "Дети времени")));
+
+            var result = service.search("Цикл Дети времени", 50);
+
+            assertThat(result).extracting(r -> r.id()).containsExactly(7L);
+        }
+
+        @Test
+        void keepsTheEmptyResultWhenTheAdjacentPhrasesMatchNothingEither() {
+            mockUser(true, Set.of());
+            when(bookRepository.searchBookIds(anyString(), anyBoolean(), anyCollection(), anyInt(), anyInt()))
+                    .thenReturn(List.of());
+
+            assertThat(service.search("Цикл Дети времени", 50)).isEmpty();
+
+            verify(bookRepository, times(2))
+                    .searchBookIds(anyString(), anyBoolean(), anyCollection(), anyInt(), anyInt());
+            verify(bookRepository, never()).findAllForSummaryByIds(anyCollection());
+        }
+
+        @Test
+        void doesNotRetryWhenTheMandatoryWordsAlreadyMatched() {
+            mockUser(true, Set.of());
+            BookSearchHitProjection strictHit = hit(7L);
+            when(bookRepository.searchBookIds("+цикл* +дети* +времени*", false, List.of(-1L), 50, 0))
+                    .thenReturn(List.of(strictHit));
+            when(bookRepository.findAllForSummaryByIds(anyCollection()))
+                    .thenReturn(List.of(book(7L, "Дети времени")));
+
+            assertThat(service.search("Цикл Дети времени", 50)).extracting(r -> r.id()).containsExactly(7L);
+
+            verify(bookRepository, times(1))
+                    .searchBookIds(anyString(), anyBoolean(), anyCollection(), anyInt(), anyInt());
+        }
+
+        @Test
+        void doesNotRetryBelowThreeWordsWhereAPhraseIsStricterThanTheQueryThatMissed() {
+            mockUser(true, Set.of());
+            when(bookRepository.searchBookIds("+цикл* +дети*", false, List.of(-1L), 50, 0))
+                    .thenReturn(List.of());
+
+            assertThat(service.search("Цикл Дети", 50)).isEmpty();
+
+            verify(bookRepository, times(1))
+                    .searchBookIds(anyString(), anyBoolean(), anyCollection(), anyInt(), anyInt());
+        }
     }
 
     private void mockUser(boolean admin, Set<Long> libraryIds) {

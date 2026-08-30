@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,6 +40,9 @@ public class AppBookQuickSearchService {
     private static final int MAX_CANDIDATES = 2_000;
     private static final int MIN_TOKEN_LENGTH = 3;
     private static final int MAX_QUERY_TOKENS = 12;
+    // With two words the only adjacent pair is the whole query, and a phrase is stricter than
+    // the mandatory-word search that just came back empty, so the retry cannot add anything.
+    private static final int MIN_TOKENS_FOR_PHRASE_FALLBACK = 3;
     private static final Pattern SEARCH_TOKEN = Pattern.compile("[\\p{L}\\p{N}]+");
     // Native IN parameters cannot be empty. The predicate is disabled for admins,
     // so this impossible ID is only a syntactically valid placeholder.
@@ -53,8 +57,8 @@ public class AppBookQuickSearchService {
     private final UserContentRestrictionRepository restrictionRepository;
 
     public List<AppBookQuickSearchResult> search(String rawQuery, Integer requestedLimit) {
-        String searchQuery = toBooleanSearchQuery(rawQuery);
-        if (searchQuery.isEmpty()) {
+        List<String> tokens = searchTokens(rawQuery);
+        if (tokens.isEmpty()) {
             return Collections.emptyList();
         }
 
@@ -72,10 +76,7 @@ public class AppBookQuickSearchService {
                 : restrictionRepository.findByUserId(user.getId());
 
         int candidateLimit = restrictions.isEmpty() ? limit : MAX_CANDIDATES;
-        List<Long> candidateIds = bookRepository.searchBookIds(
-                        searchQuery, !admin, queryLibraryIds, candidateLimit, 0).stream()
-                .map(BookSearchHitProjection::getBookId)
-                .toList();
+        List<Long> candidateIds = findCandidateIds(tokens, admin, queryLibraryIds, candidateLimit);
         Set<Long> allowedIds = restrictions.isEmpty()
                 ? new HashSet<>(candidateIds)
                 : filterRestrictedIds(candidateIds, restrictions);
@@ -103,23 +104,72 @@ public class AppBookQuickSearchService {
                 .toList();
     }
 
+    /**
+     * Every word is mandatory, so one word the catalog never pairs with the rest - "цикл" in
+     * "Цикл Дети времени" - empties a query that otherwise matches a whole series. The odd word out
+     * cannot be found by asking which word is unknown: "цикл" matches 1710 books on its own, it just
+     * never occurs next to the other two. So retry with the query's adjacent word pairs as optional
+     * phrases. A book holding "дети времени" then outranks one that merely happens to contain
+     * "цикл дети", and a word that pairs with nothing contributes no phrase at all.
+     */
+    private List<Long> findCandidateIds(List<String> tokens,
+                                        boolean admin,
+                                        Collection<Long> queryLibraryIds,
+                                        int candidateLimit) {
+        List<Long> candidateIds = searchCandidateIds(
+                toBooleanQuery(tokens), admin, queryLibraryIds, candidateLimit);
+        if (!candidateIds.isEmpty() || tokens.size() < MIN_TOKENS_FOR_PHRASE_FALLBACK) {
+            return candidateIds;
+        }
+        return searchCandidateIds(
+                toAdjacentPhraseQuery(tokens), admin, queryLibraryIds, candidateLimit);
+    }
+
+    private List<Long> searchCandidateIds(String searchQuery,
+                                          boolean admin,
+                                          Collection<Long> queryLibraryIds,
+                                          int candidateLimit) {
+        return bookRepository.searchBookIds(
+                        searchQuery, !admin, queryLibraryIds, candidateLimit, 0).stream()
+                .map(BookSearchHitProjection::getBookId)
+                .toList();
+    }
+
     static String toBooleanSearchQuery(String rawQuery) {
+        return toBooleanQuery(searchTokens(rawQuery));
+    }
+
+    static List<String> searchTokens(String rawQuery) {
         String normalized = BookUtils.normalizeForSearch(rawQuery);
         if (normalized == null || normalized.isBlank()) {
-            return "";
+            return List.of();
         }
         Matcher matcher = SEARCH_TOKEN.matcher(normalized);
         List<String> tokens = new ArrayList<>();
         while (matcher.find()) {
             String token = matcher.group();
             if (token.length() >= MIN_TOKEN_LENGTH && !INNODB_DEFAULT_STOPWORDS.contains(token)) {
-                tokens.add("+" + token + "*");
+                tokens.add(token);
                 if (tokens.size() == MAX_QUERY_TOKENS) {
                     break;
                 }
             }
         }
-        return String.join(" ", tokens);
+        return List.copyOf(tokens);
+    }
+
+    private static String toBooleanQuery(List<String> tokens) {
+        return tokens.stream().map(token -> "+" + token + "*").collect(Collectors.joining(" "));
+    }
+
+    /**
+     * Phrases carry no prefix operator: two words the user typed in full are what makes the pair
+     * worth trusting, and a truncated last word would match nothing as a phrase anyway.
+     */
+    static String toAdjacentPhraseQuery(List<String> tokens) {
+        return IntStream.range(1, tokens.size())
+                .mapToObj(index -> "\"" + tokens.get(index - 1) + " " + tokens.get(index) + "\"")
+                .collect(Collectors.joining(" "));
     }
 
     private Set<Long> filterRestrictedIds(Collection<Long> candidateIds,
