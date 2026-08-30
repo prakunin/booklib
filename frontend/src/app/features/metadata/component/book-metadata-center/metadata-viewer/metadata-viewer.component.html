@@ -410,7 +410,7 @@
               <span class="metadata-key">{{ t('languageLabel') }}</span>
               @if (book?.metadata!.language) {
                 <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToLanguage(book?.metadata!.language!)" (keydown.enter)="goToLanguage(book?.metadata!.language!)">
-                  {{ languageResolver.displayName(book?.metadata!.language) }}
+                  {{ book?.metadata!.language }}
                 </span>
               } @else {
                 <span class="metadata-value">-</span>
@@ -616,7 +616,7 @@
               <div class="metadata-item">
                 <span class="metadata-key">{{ t('fileSizeLabel') }}</span>
                 @if (book?.primaryFile?.fileSizeKb) {
-                  <span class="metadata-value">
+                  <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToFileSizeRange(book?.primaryFile?.fileSizeKb!)" (keydown.enter)="goToFileSizeRange(book?.primaryFile?.fileSizeKb!)">
                     {{ formatFileSize(book?.primaryFile) }}
                   </span>
                 } @else {
