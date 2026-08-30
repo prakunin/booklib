@@ -1253,4 +1253,92 @@ class BookSpecificationsTest {
             verify(root, never()).join(anyString(), any(jakarta.persistence.criteria.JoinType.class));
         }
     }
+
+    @Nested
+    @DisplayName("name matching stays index-friendly (no LOWER() on the column)")
+    class IndexFriendlyNameMatchingTest {
+
+        // The name columns behind these filters use MariaDB's case-insensitive
+        // utf8mb4_unicode_ci collation, so LOWER() on the column buys nothing and costs the
+        // index: on a 320k-author library it turned an author page into a full scan of
+        // book_metadata. The scalar filters were fixed in buildMetadataFieldSpec; these guard
+        // the collection filters against the same regression.
+
+        @Test
+        void withAuthors_orMode_doesNotWrapColumnInLower() {
+            Root<BookEntity> root = deepRoot();
+            CriteriaQuery<?> query = deepQuery();
+            CriteriaBuilder cb = deepCb();
+
+            BookSpecifications.withAuthors(List.of("Tolkien"), "or").toPredicate(root, query, cb);
+
+            verify(cb, never()).lower(any(Expression.class));
+        }
+
+        @Test
+        void withAuthors_andMode_doesNotWrapColumnInLower() {
+            Root<BookEntity> root = deepRoot();
+            CriteriaQuery<?> query = deepQuery();
+            CriteriaBuilder cb = deepCb();
+
+            BookSpecifications.withAuthors(List.of("Tolkien", "Sanderson"), "and").toPredicate(root, query, cb);
+
+            verify(cb, never()).lower(any(Expression.class));
+        }
+
+        @Test
+        void withCategories_orMode_doesNotWrapColumnInLower() {
+            Root<BookEntity> root = deepRoot();
+            CriteriaQuery<?> query = deepQuery();
+            CriteriaBuilder cb = deepCb();
+
+            BookSpecifications.withCategories(List.of("Fantasy"), "or").toPredicate(root, query, cb);
+
+            verify(cb, never()).lower(any(Expression.class));
+        }
+
+        @Test
+        void withTags_orMode_doesNotWrapColumnInLower() {
+            Root<BookEntity> root = deepRoot();
+            CriteriaQuery<?> query = deepQuery();
+            CriteriaBuilder cb = deepCb();
+
+            BookSpecifications.withTags(List.of("favourite"), "or").toPredicate(root, query, cb);
+
+            verify(cb, never()).lower(any(Expression.class));
+        }
+
+        @Test
+        void withMoods_orMode_doesNotWrapColumnInLower() {
+            Root<BookEntity> root = deepRoot();
+            CriteriaQuery<?> query = deepQuery();
+            CriteriaBuilder cb = deepCb();
+
+            BookSpecifications.withMoods(List.of("dark"), "or").toPredicate(root, query, cb);
+
+            verify(cb, never()).lower(any(Expression.class));
+        }
+
+        @Test
+        void withComicTeams_orMode_doesNotWrapColumnInLower() {
+            Root<BookEntity> root = deepRoot();
+            CriteriaQuery<?> query = deepQuery();
+            CriteriaBuilder cb = deepCb();
+
+            BookSpecifications.withComicTeams(List.of("Justice League"), "or").toPredicate(root, query, cb);
+
+            verify(cb, never()).lower(any(Expression.class));
+        }
+
+        @Test
+        void withComicCreators_doesNotWrapColumnInLower() {
+            Root<BookEntity> root = deepRoot();
+            CriteriaQuery<?> query = deepQuery();
+            CriteriaBuilder cb = deepCb();
+
+            BookSpecifications.withComicCreators(List.of("Jim Lee:penciller"), "or").toPredicate(root, query, cb);
+
+            verify(cb, never()).lower(any(Expression.class));
+        }
+    }
 }
