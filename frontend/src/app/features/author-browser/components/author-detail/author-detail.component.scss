@@ -144,11 +144,32 @@
   overflow: hidden;
 }
 
-.readonly-editor {
+// The biography is bound through [innerHTML], so its children never receive this component's
+// emulated-encapsulation attribute — descendant rules have to pierce it with ::ng-deep. Nothing
+// here sets white-space: the markup carries its own <br/> and paragraphs, and pre-wrap would
+// double every line break the source already encodes.
+.description-html {
   font-size: 0.7875rem;
   color: var(--color-text-secondary);
   line-height: 1.6;
-  white-space: pre-wrap;
+  overflow-wrap: break-word;
+
+  ::ng-deep p {
+    margin: 0 0 0.5rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  ::ng-deep a {
+    color: var(--color-primary);
+  }
+
+  ::ng-deep img {
+    max-width: 100%;
+    height: auto;
+  }
 }
 
 .books-section {

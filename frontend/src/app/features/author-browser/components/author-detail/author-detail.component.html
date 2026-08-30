@@ -78,7 +78,7 @@
                     <div #descriptionContent
                       [ngClass]="{'line-clamp-5': !isExpanded}"
                       class="description-container">
-                      <div class="readonly-editor">{{ author.description }}</div>
+                      <div class="description-html" [innerHTML]="sanitizedDescription()"></div>
                     </div>
                     @if (isExpanded || isOverflowing) {
                       <p-button

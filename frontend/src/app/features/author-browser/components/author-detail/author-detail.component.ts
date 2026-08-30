@@ -21,6 +21,7 @@ import { PageTitleService } from '../../../../shared/service/page-title.service'
 import { createVirtualGrid } from '../../../../shared/util/virtual-grid.util';
 import { finalize } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import DOMPurify from 'dompurify';
 
 @Component({
   selector: 'app-author-detail',
@@ -75,6 +76,17 @@ export class AuthorDetailComponent implements OnInit, AfterViewChecked {
   private nextBookPage = 0;
   author = this.authorState.asReadonly();
   authorBooks = this.authorBooksState.asReadonly();
+  /**
+   * Biographies harvested from the local catalog are HTML fragments — paragraphs, emphasis and
+   * <br/> the source author wrote — so the description is bound as markup rather than
+   * interpolated, the way the book description already is in the metadata viewer. DOMPurify
+   * keeps that formatting while dropping anything active, since the text comes from a
+   * third-party catalog and never passed through our own editor.
+   */
+  sanitizedDescription = computed(() => {
+    const description = this.author()?.description;
+    return description ? DOMPurify.sanitize(description) : '';
+  });
   authorBookCount = signal(0);
   booksLoading = signal(true);
   booksLoadError = signal(false);

@@ -224,6 +224,42 @@ describe('AuthorDetailComponent', () => {
     expect(component.isOverflowing).toBe(true);
   });
 
+  it('renders the catalog biography as markup instead of escaped tags', () => {
+    // Local-catalog biographies arrive as HTML fragments, so the description has to be
+    // sanitized and bound as markup — interpolating it showed readers literal <b> and <br/>.
+    getAuthorDetails.mockReturnValue(of({
+      ...baseAuthor,
+      description: '<b>Adrian Tchaikovsky</b><br/>British author.',
+    }));
+    const component = createComponent();
+    component.ngOnInit();
+
+    expect(component.sanitizedDescription()).toContain('<b>Adrian Tchaikovsky</b>');
+    expect(component.sanitizedDescription()).toContain('<br');
+  });
+
+  it('strips active content from the biography markup', () => {
+    getAuthorDetails.mockReturnValue(of({
+      ...baseAuthor,
+      description: '<b>safe</b><script>alert(1)</script><img src=x onerror="alert(2)">',
+    }));
+    const component = createComponent();
+    component.ngOnInit();
+
+    const sanitized = component.sanitizedDescription();
+    expect(sanitized).toContain('<b>safe</b>');
+    expect(sanitized).not.toContain('<script');
+    expect(sanitized).not.toContain('onerror');
+  });
+
+  it('yields an empty biography when the author has none', () => {
+    getAuthorDetails.mockReturnValue(of({...baseAuthor, description: undefined}));
+    const component = createComponent();
+    component.ngOnInit();
+
+    expect(component.sanitizedDescription()).toBe('');
+  });
+
   it('patches the cached author summary and refreshes photo state when the author is updated', () => {
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(777);
     const component = createComponent();
