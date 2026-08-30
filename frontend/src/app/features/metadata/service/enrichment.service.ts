@@ -8,6 +8,7 @@ import {
   EnrichmentQueueOverview,
   EnrichmentRequest,
 } from '../model/enrichment.model';
+import {LocalCatalogBookView} from '../model/local-catalog.model';
 
 @Injectable({providedIn: 'root'})
 export class EnrichmentService {
@@ -46,5 +47,13 @@ export class EnrichmentService {
 
   reindexLocalCatalog(libraryId: number): Observable<{started: boolean}> {
     return this.http.post<{started: boolean}>(`${this.url}/local-catalog/${libraryId}/reindex`, {});
+  }
+
+  /**
+   * What the catalog holds for one book, as opposed to what enrichment already wrote into it. Read
+   * on demand rather than carried on the book payload: it opens the catalog index per book.
+   */
+  localCatalogForBook(bookId: number): Observable<LocalCatalogBookView> {
+    return this.http.get<LocalCatalogBookView>(`${this.url}/local-catalog/books/${bookId}`);
   }
 }

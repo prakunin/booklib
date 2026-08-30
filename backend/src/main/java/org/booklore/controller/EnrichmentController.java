@@ -6,9 +6,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.booklore.config.security.annotation.CheckBookAccess;
+import org.booklore.model.dto.inpx.LocalCatalogBookViewDto;
 import org.booklore.model.dto.request.EnrichmentRequest;
 import org.booklore.model.enums.EnrichmentQueueStatus;
 import org.booklore.repository.EnrichmentQueueRepository;
+import org.booklore.service.enrichment.catalog.LocalCatalogBookViewService;
 import org.booklore.service.enrichment.catalog.LocalCatalogDetector;
 import org.booklore.service.enrichment.catalog.LocalCatalogIndexService;
 import org.booklore.service.enrichment.queue.EnrichmentPriority;
@@ -38,6 +41,7 @@ public class EnrichmentController {
     private final EnrichmentQueueRepository queueRepository;
     private final LocalCatalogIndexService localCatalogIndexService;
     private final LocalCatalogDetector localCatalogDetector;
+    private final LocalCatalogBookViewService localCatalogBookViewService;
 
     /**
      * Accepted rather than executed: even a single book can involve provider calls measured in
@@ -123,6 +127,20 @@ public class EnrichmentController {
     public ResponseEntity<ReindexResponse> reindexLocalCatalog(@PathVariable long libraryId) {
         boolean started = localCatalogIndexService.rebuildAsync(libraryId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(new ReindexResponse(started));
+    }
+
+    /**
+     * Read-only, and deliberately not folded into the book detail payload: it opens the catalog for
+     * one book on demand, which every book list would otherwise pay for.
+     */
+    @Operation(summary = "What the library's local catalog holds for one book",
+            description = "Reads the catalog directly rather than reporting what enrichment already wrote.")
+    @ApiResponse(responseCode = "200", description = "Catalog entry returned; `available` is false when the book has no catalog key")
+    @GetMapping("/local-catalog/books/{bookId}")
+    @CheckBookAccess(bookIdParam = "bookId")
+    public LocalCatalogBookViewDto localCatalogForBook(
+            @Parameter(description = "Book to look up in its library's catalog") @PathVariable long bookId) {
+        return localCatalogBookViewService.view(bookId);
     }
 
     public record EnqueueResponse(String jobId) {

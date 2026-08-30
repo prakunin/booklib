@@ -22,7 +22,7 @@ describe('MetadataTabsComponent default tab selection', () => {
     TestBed.resetTestingModule();
   });
 
-  function createFixture(hasSeries = false): ComponentFixture<MetadataTabsComponent> {
+  function createFixture(hasSeries = false, book?: Partial<Book>): ComponentFixture<MetadataTabsComponent> {
     TestBed.configureTestingModule({
       imports: [
         MetadataTabsComponent,
@@ -43,6 +43,7 @@ describe('MetadataTabsComponent default tab selection', () => {
       metadata: {bookId: 21, title: 'Test Book', authors: []},
       alternativeFormats: [],
       supplementaryFiles: [],
+      ...book,
     } satisfies Book);
     fixture.componentRef.setInput('hasSeries', hasSeries);
     fixture.componentRef.setInput('bookInSeries', []);
@@ -56,6 +57,26 @@ describe('MetadataTabsComponent default tab selection', () => {
     const component = fixture.componentInstance;
 
     expect(component.activeTab()).toBe('series');
+  });
+
+  it('hides the local catalog tab for a book that came from no archive', () => {
+    const component = createFixture().componentInstance;
+
+    expect(component.hasCatalogKey()).toBe(false);
+    expect(component.availableTabs().map(tab => tab.value)).not.toContain('catalog');
+  });
+
+  it('offers the local catalog tab as soon as any file carries a source archive', () => {
+    const component = createFixture(false, {
+      alternativeFormats: [{
+        id: 5,
+        bookId: 21,
+        sourceArchive: 'f.fb2-352350-355443.zip',
+      }],
+    }).componentInstance;
+
+    expect(component.hasCatalogKey()).toBe(true);
+    expect(component.availableTabs().map(tab => tab.value)).toContain('catalog');
   });
 });
 

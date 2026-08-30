@@ -95,6 +95,11 @@
         <app-book-reviews [bookId]="currentBook.id"></app-book-reviews>
       </ng-template>
     </p-tabpanel>
+    <p-tabpanel value="catalog">
+      <ng-template #content>
+        <app-local-catalog-panel [bookId]="currentBook.id"></app-local-catalog-panel>
+      </ng-template>
+    </p-tabpanel>
     <p-tabpanel value="chapters">
       <ng-template #content>
         <div class="chapters-tab-content">

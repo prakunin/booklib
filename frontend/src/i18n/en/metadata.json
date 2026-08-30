@@ -237,7 +237,8 @@
     "duration": "Duration",
     "totalDuration": "Total Duration",
     "noChapters": "No chapter information available.",
-    "fileName": "File"
+    "fileName": "File",
+    "localCatalog": "Catalog"
   },
   "viewer": {
     "metadataLocked": "This book metadata is locked.",
@@ -678,6 +679,14 @@
         "label": "Local catalog",
         "hint": "Descriptions from the catalog shipped with the library, matched on the exact file."
       },
+      "LOCAL_LANGUAGE": {
+        "label": "Catalog language",
+        "hint": "The language the catalog lists this file under."
+      },
+      "LOCAL_COMPILATION": {
+        "label": "Compilations",
+        "hint": "Maps an omnibus this work belongs to onto its series name and number."
+      },
       "WORK_CACHE": {
         "label": "Known works",
         "hint": "Reuse an identity already resolved for another edition of the same book."
@@ -720,6 +729,31 @@
     "progress": {
       "running": "Enriching: {{completed}} of {{total}}",
       "finished": "Enrichment finished: {{completed}} of {{total}} books processed"
+    }
+  },
+  "localCatalog": {
+    "loading": "Reading the catalog…",
+    "failed": "Could not read the local catalog.",
+    "unavailable": "This book's library has no local catalog, or the book did not come out of an archive.",
+    "noEntry": "The local catalog holds no entry for this book.",
+    "keyTooltip": "The archive and entry this book is filed under in the catalog",
+    "applied": "In use",
+    "notApplied": "Not applied",
+    "anonymousReviewer": "Anonymous",
+    "part": "#{{ part }}",
+    "reviewsCapped": "Showing {{ shown }} of {{ total }}.",
+    "sections": {
+      "annotation": "Annotation",
+      "identity": "Catalog listing",
+      "partOf": "Part of",
+      "contains": "Contains ({{ count }})",
+      "authorBios": "Author biographies",
+      "reviews": "Reader reviews ({{ count }})"
+    },
+    "fields": {
+      "title": "Title",
+      "authors": "Authors",
+      "language": "Language"
     }
   }
 }

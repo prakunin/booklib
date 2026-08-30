@@ -8,6 +8,7 @@ import {BookCardLiteComponent} from '../../../../../book/components/book-card-li
 import {BookReviewsComponent} from '../../../../../book/components/book-reviews/book-reviews.component';
 import {BookNotesComponent} from '../../../../../book/components/book-notes/book-notes-component';
 import {BookReadingSessionsComponent} from '../../book-reading-sessions/book-reading-sessions.component';
+import {LocalCatalogPanelComponent} from '../../../local-catalog-panel/local-catalog-panel.component';
 import {Button} from '@openng/optimus-ui/button';
 import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {UrlHelperService} from '../../../../../../shared/service/url-helper.service';
@@ -57,7 +58,7 @@ export interface DetachBookFileEvent {
   fileName: string;
 }
 
-type MetadataTabValue = 'series' | 'similar' | 'covers' | 'chapters' | 'files' | 'notes' | 'sessions' | 'reviews';
+type MetadataTabValue = 'series' | 'similar' | 'covers' | 'chapters' | 'files' | 'notes' | 'sessions' | 'reviews' | 'catalog';
 interface MetadataTab {
   value: MetadataTabValue;
   icon: string;
@@ -81,6 +82,7 @@ const metadataTab = (value: MetadataTabValue, icon: string, labelKey: string): M
     BookReviewsComponent,
     BookNotesComponent,
     BookReadingSessionsComponent,
+    LocalCatalogPanelComponent,
     Button,
     Tooltip,
     UpperCasePipe,
@@ -133,6 +135,16 @@ export class MetadataTabsComponent {
       totalContentFiles: contentFileCount,
     };
   });
+  /**
+   * The catalog is keyed on the archive a file came out of, so a book with no archived file can have
+   * no entry and the tab would only ever say so. Gating on the key the book already carries keeps the
+   * tab strip honest without a request per book.
+   */
+  readonly hasCatalogKey = computed(() => {
+    const book = this.book();
+    return !!book.primaryFile?.sourceArchive
+      || book.alternativeFormats?.some(file => !!file.sourceArchive) === true;
+  });
   readonly availableTabs = computed<MetadataTab[]>(() => [
     ...(this.hasSeries() ? [metadataTab('series', 'pi pi-ethereum', 'moreInSeries')] : []),
     metadataTab('similar', 'pi pi-bookmark', 'similarBooks'),
@@ -142,6 +154,7 @@ export class MetadataTabsComponent {
     metadataTab('notes', 'pi pi-pen-to-square', 'notes'),
     metadataTab('sessions', 'pi pi-clock', 'readingSessions'),
     metadataTab('reviews', 'pi pi-comments', 'reviews'),
+    ...(this.hasCatalogKey() ? [metadataTab('catalog', 'pi pi-database', 'localCatalog')] : []),
   ]);
   readonly activeTab = linkedSignal<MetadataTab[], MetadataTabValue>({
     source: this.availableTabs,

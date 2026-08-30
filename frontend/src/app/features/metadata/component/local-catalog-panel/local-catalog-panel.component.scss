@@ -1,0 +1,131 @@
+.local-catalog-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0.75rem 0.25rem 1.5rem;
+}
+
+.local-catalog-state {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.local-catalog-key {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+
+  code {
+    overflow-wrap: anywhere;
+  }
+}
+
+.local-catalog-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+}
+
+.local-catalog-annotation {
+  margin: 0;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.local-catalog-facts {
+  display: grid;
+  grid-template-columns: minmax(6rem, max-content) 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+
+  dt {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  dd {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.local-catalog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+}
+
+.local-catalog-part {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.local-catalog-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.local-catalog-bio,
+.local-catalog-review {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border-color, rgb(128 128 128 / 25%));
+  border-radius: 0.5rem;
+
+  p {
+    margin: 0.25rem 0 0;
+    line-height: 1.5;
+    white-space: pre-line;
+  }
+
+  h5 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+}
+
+.local-catalog-review {
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+  }
+}
+
+.local-catalog-reviewer {
+  font-weight: 600;
+}

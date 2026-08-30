@@ -4,6 +4,8 @@
  */
 export type EnrichmentStepType =
   | 'LOCAL_CATALOG'
+  | 'LOCAL_LANGUAGE'
+  | 'LOCAL_COMPILATION'
   | 'WORK_CACHE'
   | 'PROVIDERS'
   | 'AGENT_IDENTITY'
@@ -68,6 +70,8 @@ export type EnrichmentQueueOverview = Record<EnrichmentQueueStatus, number>;
  */
 export const SELECTABLE_ENRICHMENT_STEPS: readonly EnrichmentStepType[] = [
   'LOCAL_CATALOG',
+  'LOCAL_LANGUAGE',
+  'LOCAL_COMPILATION',
   'WORK_CACHE',
   'PROVIDERS',
   'REVIEWS',

@@ -1,0 +1,131 @@
+<ng-container *transloco="let t; prefix: 'metadata.localCatalog'">
+  <div class="local-catalog-panel">
+    @if (loading()) {
+      <div class="local-catalog-state">
+        <app-spinner size="md"/>
+        <span>{{ t('loading') }}</span>
+      </div>
+    } @else if (failed()) {
+      <p class="local-catalog-state">{{ t('failed') }}</p>
+    } @else if (!view()?.available) {
+      <p class="local-catalog-state">{{ t('unavailable') }}</p>
+    } @else if (empty()) {
+      <p class="local-catalog-state">{{ t('noEntry') }}</p>
+    } @else {
+      @let catalog = view()!;
+
+      @if (catalogKey(); as key) {
+        <p class="local-catalog-key" [title]="t('keyTooltip')">
+          <i class="pi pi-key"></i>
+          <code>{{ key }}</code>
+        </p>
+      }
+
+      @if (catalog.description) {
+        <section class="local-catalog-section">
+          <h4>
+            {{ t('sections.annotation') }}
+            @if (applied('DESCRIPTION')) {
+              <app-tag color="green" size="sm" [label]="t('applied')"/>
+            } @else {
+              <app-tag color="amber" size="sm" [label]="t('notApplied')"/>
+            }
+          </h4>
+          <p class="local-catalog-annotation">{{ catalog.description }}</p>
+        </section>
+      }
+
+      @if (catalog.title || catalog.authors.length > 0 || catalog.language) {
+        <section class="local-catalog-section">
+          <h4>{{ t('sections.identity') }}</h4>
+          <dl class="local-catalog-facts">
+            @if (catalog.title) {
+              <dt>{{ t('fields.title') }}</dt>
+              <dd>
+                <span>{{ catalog.title }}</span>
+                @if (applied('TITLE')) {
+                  <app-tag color="green" size="sm" [label]="t('applied')"/>
+                }
+              </dd>
+            }
+            @if (catalog.authors.length > 0) {
+              <dt>{{ t('fields.authors') }}</dt>
+              <dd>{{ catalog.authors.join(', ') }}</dd>
+            }
+            @if (catalog.language) {
+              <dt>{{ t('fields.language') }}</dt>
+              <dd>
+                <span>{{ catalog.language }}</span>
+                @if (applied('LANGUAGE')) {
+                  <app-tag color="green" size="sm" [label]="t('applied')"/>
+                }
+              </dd>
+            }
+          </dl>
+        </section>
+      }
+
+      @if (catalog.containingCompilations.length > 0) {
+        <section class="local-catalog-section">
+          <h4>{{ t('sections.partOf') }}</h4>
+          <ul class="local-catalog-list">
+            @for (ref of catalog.containingCompilations; track ref.archiveName + ref.entryName) {
+              <li>
+                <span class="local-catalog-part">{{ t('part', {part: ref.part}) }}</span>
+                <span>{{ ref.title || ref.entryName }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (catalog.compilationParts.length > 0) {
+        <section class="local-catalog-section">
+          <h4>{{ t('sections.contains', {count: catalog.compilationParts.length}) }}</h4>
+          <ul class="local-catalog-list">
+            @for (ref of catalog.compilationParts; track ref.archiveName + ref.entryName) {
+              <li>
+                <span class="local-catalog-part">{{ t('part', {part: ref.part}) }}</span>
+                <span>{{ ref.title || ref.entryName }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (catalog.authorBios.length > 0) {
+        <section class="local-catalog-section">
+          <h4>{{ t('sections.authorBios') }}</h4>
+          @for (bio of catalog.authorBios; track bio.authorName) {
+            <article class="local-catalog-bio">
+              <h5>{{ bio.authorName }}</h5>
+              <p>{{ bio.biography }}</p>
+            </article>
+          }
+        </section>
+      }
+
+      @if (catalog.reviewCount > 0) {
+        <section class="local-catalog-section">
+          <h4>{{ t('sections.reviews', {count: catalog.reviewCount}) }}</h4>
+          @if (catalog.reviewCount > catalog.reviews.length) {
+            <p class="local-catalog-note">
+              {{ t('reviewsCapped', {shown: catalog.reviews.length, total: catalog.reviewCount}) }}
+            </p>
+          }
+          @for (review of catalog.reviews; track $index) {
+            <article class="local-catalog-review">
+              <header>
+                <span class="local-catalog-reviewer">{{ review.reviewerName || t('anonymousReviewer') }}</span>
+                @if (review.postedAt) {
+                  <time [attr.datetime]="review.postedAt">{{ review.postedAt | date:'mediumDate' }}</time>
+                }
+              </header>
+              <p>{{ review.body }}</p>
+            </article>
+          }
+        </section>
+      }
+    }
+  </div>
+</ng-container>
