@@ -89,6 +89,7 @@
       "searchMetadata": "Search Metadata",
       "autoFetch": "Auto Fetch",
       "customFetch": "Custom Fetch",
+      "enrich": "Enrich…",
       "regenerateCover": "Create Cover from File",
       "generateCustomCover": "Generate Custom Cover",
       "moreActions": "More Actions",

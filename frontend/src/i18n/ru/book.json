@@ -86,6 +86,7 @@
             "searchMetadata": "Поиск метаданных",
             "autoFetch": "Автоматическое получение",
             "customFetch": "Настраиваемое получение",
+            "enrich": "Обогатить…",
             "regenerateCover": "Создать обложку из файла",
             "generateCustomCover": "Сгенерировать пользовательскую обложку",
             "moreActions": "Дополнительные действия",
@@ -190,6 +191,7 @@
         "menu": {
             "autoFetchMetadata": "Автоматическое получение метаданных",
             "customFetchMetadata": "Настраиваемое получение метаданных",
+            "enrich": "Обогатить…",
             "bulkMetadataEditor": "Массовый редактор метаданных",
             "multiBookMetadataEditor": "Редактор метаданных нескольких книг",
             "regenerateCovers": "Пересоздать обложки",

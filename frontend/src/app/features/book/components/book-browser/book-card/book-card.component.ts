@@ -471,6 +471,11 @@ export class BookCardComponent {
             command: () => void this.bookDialogHelperService.openMetadataRefreshDialog(new Set([this.book().id])).catch(() => undefined),
           },
           {
+            label: this.t.translate('book.card.menu.enrich'),
+            icon: 'pi pi-wand',
+            command: () => void this.bookDialogHelperService.openEnrichmentDialog(new Set([this.book().id])).catch(() => undefined),
+          },
+          {
             label: this.t.translate('book.card.menu.regenerateCover'),
             icon: 'pi pi-image',
             command: () => {

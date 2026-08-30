@@ -4,7 +4,8 @@ import {ActivatedRoute, Router} from '@angular/router';
 import {QueryClient} from '@tanstack/angular-query-experimental';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {ConfirmationService, MessageService} from '@openng/optimus-ui/api';
+import {ConfirmationService, MenuItem, MessageService} from '@openng/optimus-ui/api';
+import {TieredMenu} from '@openng/optimus-ui/tieredmenu';
 import {TaskHelperService} from '../../../../settings/task-management/task-helper.service';
 import {EmailService} from '../../../../settings/email-v2/email.service';
 import {User, UserService} from '../../../../settings/user-management/user.service';
@@ -139,6 +140,7 @@ describe('BookCardComponent', () => {
     openBookDetailsDialog: ReturnType<typeof vi.fn>;
     openCustomSendDialog: ReturnType<typeof vi.fn>;
     openMetadataRefreshDialog: ReturnType<typeof vi.fn>;
+    openEnrichmentDialog: ReturnType<typeof vi.fn>;
     openFileMoverDialog: ReturnType<typeof vi.fn>;
   };
   let bookNavigationService: {
@@ -195,6 +197,7 @@ describe('BookCardComponent', () => {
       openBookDetailsDialog: vi.fn(() => Promise.resolve(null)),
       openCustomSendDialog: vi.fn(() => Promise.resolve(null)),
       openMetadataRefreshDialog: vi.fn(() => Promise.resolve(null)),
+      openEnrichmentDialog: vi.fn(() => Promise.resolve(null)),
       openFileMoverDialog: vi.fn(() => Promise.resolve(null)),
     };
     bookNavigationService = {
@@ -541,5 +544,24 @@ describe('BookCardComponent', () => {
     expect(bookDialogHelperService.openBookDetailsDialog).toHaveBeenCalledWith(44);
     expect(router.navigate).not.toHaveBeenCalled();
     expect(bookNavigationService.setNavigationContext).toHaveBeenCalledWith([2, 44, 77], 44);
+  });
+
+  it('opens the enrichment dialog for the single book from the metadata menu', () => {
+    const user = makeUser('route');
+    user.permissions.canEditMetadata = true;
+    userService.currentUser.set(user);
+    ref.setInput('book', makeBook({id: 41}));
+    fixture.detectChanges();
+
+    component.onMenuToggle(new Event('click'), {toggle: vi.fn()} as unknown as TieredMenu);
+
+    const metadataMenu = component.items()?.find(item => item.label === 'Metadata');
+    const enrich = metadataMenu?.items?.find((item: MenuItem) => item.label === 'Enrich…');
+
+    expect(enrich).toBeDefined();
+
+    enrich?.command?.({});
+
+    expect(bookDialogHelperService.openEnrichmentDialog).toHaveBeenCalledWith(new Set([41]));
   });
 });
