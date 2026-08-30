@@ -475,7 +475,7 @@
                   </app-tag>
                 </span>
                 <i class="pi pi-pencil edit-icon" role="button" tabindex="0" (click)="menu.toggle($event)" (keydown.enter)="menu.toggle($event)"></i>
-                <p-menu #menu [popup]="true" [model]="readStatusMenuItems"></p-menu>
+                <p-menu #menu [popup]="true" appendTo="body" [model]="readStatusMenuItems"></p-menu>
               </span>
             </div>
 

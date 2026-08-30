@@ -123,6 +123,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
+  container-type: inline-size;
+  container-name: metadata-info;
 }
 
 .title-group {
@@ -406,25 +408,42 @@
   transform: translateY(-2px);
 }
 
+/* Label and value live in their own grid tracks so that every value in a
+   column starts at the same x, no matter how wide the label is. Each item is
+   a subgrid spanning one label/value track pair; the number of pairs follows
+   the available width of the info column, not the viewport. */
 .metadata-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.4375rem;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 0.875rem;
+  row-gap: 0.4375rem;
   padding: 0.4375rem 0;
   font-size: var(--app-text-sm);
 }
 
-@media (width >= 768px) {
+@container metadata-info (width >= 32rem) {
   .metadata-grid {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 0.4375rem;
+    grid-template-columns: repeat(2, max-content minmax(0, 1fr));
+  }
+}
+
+@container metadata-info (width >= 48rem) {
+  .metadata-grid {
+    grid-template-columns: repeat(3, max-content minmax(0, 1fr));
+  }
+}
+
+@container metadata-info (width >= 64rem) {
+  .metadata-grid {
+    grid-template-columns: repeat(4, max-content minmax(0, 1fr));
   }
 }
 
 .metadata-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: span 2;
   align-items: center;
-  gap: 0.4375rem;
   color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -440,6 +459,7 @@
 .metadata-value {
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -448,6 +468,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3281rem;
+  min-width: 0;
   flex-wrap: wrap;
 }
 
