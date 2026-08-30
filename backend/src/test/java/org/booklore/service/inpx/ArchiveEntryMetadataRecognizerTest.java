@@ -60,6 +60,21 @@ class ArchiveEntryMetadataRecognizerTest {
     }
 
     @Test
+    void treatsUndecodableExtractorValuesAsAbsentSoTheCatalogRecordSurvives() {
+        FileMetadataExtractor fb2 = mock(FileMetadataExtractor.class);
+        when(fb2.extractMetadata(any())).thenReturn(BookMetadata.builder()
+                .title("\uFFFD".repeat(12) + " " + "\uFFFD".repeat(10))
+                .authors(List.of("\uFFFD".repeat(8)))
+                .build());
+        when(extractorFactory.getExtractor(BookFileType.FB2)).thenReturn(fb2);
+
+        BookMetadata metadata = recognizer.recognize("238150.fb2", anyFile);
+
+        assertThat(metadata.getTitle()).isNull();
+        assertThat(metadata.getAuthors()).isEmpty();
+    }
+
+    @Test
     void prefersExtractorValuesOverTheFilenameBaseline() {
         FileMetadataExtractor pdf = mock(FileMetadataExtractor.class);
         when(pdf.extractMetadata(any())).thenReturn(BookMetadata.builder()

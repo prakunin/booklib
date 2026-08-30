@@ -16,6 +16,8 @@ import java.util.regex.Pattern;
  *       token joins it when the second is a Slavic patronymic ({@code -ovich}/{@code -evna}/…),
  *       which reliably marks a three-part name.</li>
  *   <li>Everything else is the title.</li>
+ *   <li>An entry named after nothing but digits — how the {@code f.fb2-*} archives file every book,
+ *       by catalog id — yields no title at all.</li>
  * </ul>
  * The result is a starting point that per-format extraction overrides where it has a value, and that
  * Smart Enrichment refines afterwards.
@@ -25,9 +27,16 @@ public class InpxFilenameMetadataParser {
 
     private static final Pattern NAME_TOKEN = Pattern.compile("^\\p{Lu}[\\p{L}'’.\\-]*$");
     private static final Pattern PATRONYMIC = Pattern.compile("(?i)(ovich|evich|ovna|evna)\\.?$");
+    private static final Pattern DIGITS_ONLY = Pattern.compile("\\d+");
 
     public ParsedName parse(String entryName) {
         String stem = stripExtension(entryName);
+        if (DIGITS_ONLY.matcher(stem).matches()) {
+            // The Flibusta fb2 collection names every entry after its catalog id. That number is an
+            // identifier, not a title, and offering it as one is worse than offering nothing: the
+            // archive refresh writes any non-blank title over the INPX record that has the real one.
+            return new ParsedName(null, null);
+        }
         String[] tokens = stem.split("_");
 
         // A leading underscore (empty first token) is the periodical marker: no author.

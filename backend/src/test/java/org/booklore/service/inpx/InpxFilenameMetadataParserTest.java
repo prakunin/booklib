@@ -10,6 +10,14 @@ class InpxFilenameMetadataParserTest {
     private final InpxFilenameMetadataParser parser = new InpxFilenameMetadataParser();
 
     @Test
+    void offersNoTitleForAnEntryNamedAfterItsCatalogId() {
+        InpxFilenameMetadataParser.ParsedName parsed = parser.parse("238150.fb2");
+
+        assertThat(parsed.author()).isNull();
+        assertThat(parsed.title()).isNull();
+    }
+
+    @Test
     void splitsSlavicThreePartNameByPatronymic() {
         InpxFilenameMetadataParser.ParsedName parsed =
                 parser.parse("Mark_Semyonovich_Solonin_23_iyunya._Den_M.zip");

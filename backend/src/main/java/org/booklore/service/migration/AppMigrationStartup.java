@@ -27,6 +27,7 @@ public class AppMigrationStartup {
     private final PromoteWordDocumentsFromOtherMigration promoteWordDocumentsFromOtherMigration;
     private final PromoteDjvuFilesFromOtherMigration promoteDjvuFilesFromOtherMigration;
     private final ResetUnreadableWordDocumentsMigration resetUnreadableWordDocumentsMigration;
+    private final RepairFb2TitlePageArtifactsMigration repairFb2TitlePageArtifactsMigration;
 
     @EventListener(ApplicationReadyEvent.class)
     public void runMigrationsOnce() {
@@ -46,5 +47,6 @@ public class AppMigrationStartup {
         appMigrationService.executeMigration(promoteWordDocumentsFromOtherMigration);
         appMigrationService.executeMigration(promoteDjvuFilesFromOtherMigration);
         appMigrationService.executeMigration(resetUnreadableWordDocumentsMigration);
+        appMigrationService.executeMigration(repairFb2TitlePageArtifactsMigration);
     }
 }

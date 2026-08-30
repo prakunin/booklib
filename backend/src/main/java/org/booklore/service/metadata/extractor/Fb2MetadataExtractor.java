@@ -1,6 +1,7 @@
 package org.booklore.service.metadata.extractor;
 
 import org.booklore.model.dto.BookMetadata;
+import org.booklore.util.MojibakeText;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
@@ -345,8 +346,16 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
      * conversion filename and a converter name), while the actual title page in
      * the body is correct. Recover only when the structured values are clearly
      * placeholders; normal, well-formed FB2 metadata remains untouched.
+     * <p>
+     * The scrub afterwards runs whether or not there was a body to recover from, because a value
+     * nobody can read is not a value: see {@link #scrubUndecodableValues}.
      */
     private void applyBodyMetadataFallback(BookMetadata metadata, List<String> paragraphs) {
+        recoverFromTitlePage(metadata, paragraphs);
+        scrubUndecodableValues(metadata);
+    }
+
+    private void recoverFromTitlePage(BookMetadata metadata, List<String> paragraphs) {
         if (paragraphs.isEmpty()) {
             return;
         }
@@ -387,9 +396,30 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
         }
     }
 
+    /**
+     * Drops values the file itself could not spell, after the title page has had its chance to
+     * supply a replacement.
+     * <p>
+     * A title stored as a run of U+FFFD was destroyed by whatever wrote the FB2 - calibre
+     * conversions from a mis-detected charset are the usual source - and passing it on is actively
+     * harmful: callers treat any non-blank string as a real value, so it would be written over an
+     * INPX or local-catalog record that is still intact. Reporting nothing leaves that record alone.
+     */
+    private void scrubUndecodableValues(BookMetadata metadata) {
+        metadata.setTitle(MojibakeText.scrub(metadata.getTitle()));
+        metadata.setSubtitle(MojibakeText.scrub(metadata.getSubtitle()));
+        metadata.setSeriesName(MojibakeText.scrub(metadata.getSeriesName()));
+        metadata.setPublisher(MojibakeText.scrub(metadata.getPublisher()));
+        List<String> authors = metadata.getAuthors();
+        if (authors != null && authors.stream().anyMatch(MojibakeText::isMojibake)) {
+            metadata.setAuthors(authors.stream().filter(author -> !MojibakeText.isMojibake(author)).toList());
+        }
+    }
+
     private boolean isPlaceholderTitle(String title) {
         return StringUtils.isBlank(title)
                 || isDotPlaceholder(title)
+                || MojibakeText.isMojibake(title)
                 || title.matches("(?i)^_?\\d+\\.(docx|fb2|epub|txt)$")
                 || title.toLowerCase(Locale.ROOT).contains("convertstandard.com");
     }
@@ -420,10 +450,7 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
     }
 
     private boolean looksLikeOriginalTitle(String value) {
-        long latinLetters = value.chars()
-                .filter(ch -> (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z'))
-                .count();
-        return latinLetters >= 3 && (value.matches(".*\\d{4}.*") || value.contains("«") || value.contains("\""));
+        return OriginalTitleHeuristic.looksLikeOriginalTitle(value);
     }
 
     private String normalizeParagraph(String value) {

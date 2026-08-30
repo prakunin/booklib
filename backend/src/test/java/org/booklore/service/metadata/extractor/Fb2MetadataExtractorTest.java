@@ -134,6 +134,81 @@ class Fb2MetadataExtractorTest {
     }
 
     @Test
+    void reportsNoTitleWhenTheFileSpellsItInReplacementCharacters() throws IOException {
+        File file = writeFb2("""
+                <description>
+                  <title-info>
+                    <book-title>%s</book-title>
+                    <author><last-name>%s</last-name></author>
+                  </title-info>
+                </description>
+                <body><section>
+                  <p>Untitled-3</p>
+                  <p>ВЕТХИЙ ЗАВЕТ</p>
+                  <p>ISBN 5-7281-0149-6</p>
+                </section></body>
+                """.formatted("\uFFFD".repeat(12) + " " + "\uFFFD".repeat(10), "\uFFFD".repeat(8)));
+
+        BookMetadata metadata = extractor.extractMetadata(file);
+
+        assertThat(metadata.getTitle()).isNull();
+        assertThat(metadata.getAuthors()).isEmpty();
+    }
+
+    @Test
+    void keepsAReadableTitleThatCarriesOneUndecodableCharacter() throws IOException {
+        File file = writeFb2("""
+                <description>
+                  <title-info>
+                    <book-title>Caf\uFFFD au lait and other stories</book-title>
+                  </title-info>
+                </description>
+                """);
+
+        BookMetadata metadata = extractor.extractMetadata(file);
+
+        assertThat(metadata.getTitle()).isEqualTo("Caf\uFFFD au lait and other stories");
+    }
+
+    @Test
+    void doesNotTakeAnIsbnLineFromTheBodyAsTheOriginalTitle() throws IOException {
+        File file = writeFb2("""
+                <description>
+                  <title-info>
+                    <book-title>Библия. Ветхий Завет. РБО 2011</book-title>
+                  </title-info>
+                </description>
+                <body><section>
+                  <p>Редактор А. Э. Графов</p>
+                  <p>ISBN 5-7281-0149-6</p>
+                </section></body>
+                """);
+
+        BookMetadata metadata = extractor.extractMetadata(file);
+
+        assertThat(metadata.getTitle()).isEqualTo("Библия. Ветхий Завет. РБО 2011");
+        assertThat(metadata.getSubtitle()).isNull();
+    }
+
+    @Test
+    void doesNotTakeConverterBoilerplateFromTheBodyAsTheOriginalTitle() throws IOException {
+        File file = writeFb2("""
+                <description>
+                  <title-info>
+                    <book-title>Тень горы</book-title>
+                  </title-info>
+                </description>
+                <body><section>
+                  <p>© Электронная версия книги подготовлена компанией ЛитРес (www.litres.ru), 2014</p>
+                </section></body>
+                """);
+
+        BookMetadata metadata = extractor.extractMetadata(file);
+
+        assertThat(metadata.getSubtitle()).isNull();
+    }
+
+    @Test
     void extractMetadata_fromArchiveEntryStream() throws IOException {
         File file = writeFb2("""
                 <description>

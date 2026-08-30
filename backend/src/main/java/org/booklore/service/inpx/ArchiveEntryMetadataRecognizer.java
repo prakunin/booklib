@@ -9,6 +9,7 @@ import org.booklore.model.enums.BookFileType;
 import org.booklore.service.metadata.extractor.DocMetadataExtractor;
 import org.booklore.service.metadata.extractor.FileMetadataExtractor;
 import org.booklore.service.metadata.extractor.MetadataExtractorFactory;
+import org.booklore.util.MojibakeText;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -24,6 +25,11 @@ import java.util.Locale;
  * Whatever an available extractor leaves blank is filled from the filename
  * baseline, and Smart Enrichment refines the result later. Formats with no extractor (djvu, rtf, …)
  * are recognised from the filename alone.
+ * <p>
+ * A value the file spells in replacement characters counts as blank here, and for a reason that is
+ * not cosmetic: the refresh path writes this record with {@code REPLACE_WHEN_PROVIDED}, so anything
+ * non-blank overwrites what the INPX record or the local catalog already established. Extractors
+ * scrub their own output, and this is the second line of that defence for every format at once.
  */
 @Slf4j
 @Component
@@ -101,12 +107,12 @@ public class ArchiveEntryMetadataRecognizer {
                     .authors(baselineAuthors)
                     .build();
         }
-        if (StringUtils.isBlank(extracted.getTitle())) {
+        if (StringUtils.isBlank(extracted.getTitle()) || MojibakeText.isMojibake(extracted.getTitle())) {
             extracted.setTitle(StringUtils.trimToNull(baseline.title()));
         }
-        if (extracted.getAuthors() == null || extracted.getAuthors().isEmpty()) {
-            extracted.setAuthors(baselineAuthors);
-        }
+        List<String> readableAuthors = extracted.getAuthors() == null ? List.of()
+                : extracted.getAuthors().stream().filter(author -> !MojibakeText.isMojibake(author)).toList();
+        extracted.setAuthors(readableAuthors.isEmpty() ? baselineAuthors : readableAuthors);
         return extracted;
     }
 
