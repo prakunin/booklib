@@ -28,6 +28,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -90,7 +91,7 @@ class PdfProcessorCoverTest {
                 .fileName("book.pdf")
                 .fileSubPath("")
                 .build();
-        book.setBookFiles(new ArrayList<>(List.of(bookFile)));
+        book.setBookFiles(new HashSet<>(List.of(bookFile)));
         return book;
     }
 
@@ -98,7 +99,7 @@ class PdfProcessorCoverTest {
     void rendersTheFirstPageIntoDecodableBytes() throws Exception {
         BookEntity book = bookWithRealPdf();
 
-        CoverExtraction extraction = processor().extractCover(book, book.getBookFiles().getFirst());
+        CoverExtraction extraction = processor().extractCover(book, book.getBookFiles().iterator().next());
 
         assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.COVER_FOUND);
         // The bytes must be a real image, not merely non-empty: the caller's next move is to hand
@@ -117,7 +118,7 @@ class PdfProcessorCoverTest {
     void extractCoverWritesNothingAndLeavesTheEntityUntouched() throws Exception {
         BookEntity book = bookWithRealPdf();
 
-        processor().extractCover(book, book.getBookFiles().getFirst());
+        processor().extractCover(book, book.getBookFiles().iterator().next());
 
         verifyNoInteractions(fileService);
         verifyNoInteractions(bookRepository);
@@ -134,7 +135,7 @@ class PdfProcessorCoverTest {
         BookEntity book = bookWithRealPdf();
         java.nio.file.Files.writeString(tempDir.resolve("book.pdf"), "this is not a pdf");
 
-        CoverExtraction extraction = processor().extractCover(book, book.getBookFiles().getFirst());
+        CoverExtraction extraction = processor().extractCover(book, book.getBookFiles().iterator().next());
 
         assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.READ_FAILED);
     }
@@ -157,7 +158,7 @@ class PdfProcessorCoverTest {
     void oversizedPageRendersToACoverFileServiceCanActuallyDecode() throws Exception {
         BookEntity book = bookWithRealPdf(A0);
 
-        CoverExtraction extraction = processor().extractCover(book, book.getBookFiles().getFirst());
+        CoverExtraction extraction = processor().extractCover(book, book.getBookFiles().iterator().next());
 
         assertThat(extraction.outcome()).isEqualTo(CoverProbeOutcome.COVER_FOUND);
         BufferedImage decoded = FileService.readImage(extraction.data());
@@ -181,7 +182,7 @@ class PdfProcessorCoverTest {
         BookEntity book = bookWithRealPdf(A0);
         ArgumentCaptor<BufferedImage> rendered = ArgumentCaptor.forClass(BufferedImage.class);
 
-        processor().generateCover(book, book.getBookFiles().getFirst());
+        processor().generateCover(book, book.getBookFiles().iterator().next());
 
         verify(fileService).saveCoverImages(rendered.capture(), eq(42L));
         assertThat(rendered.getValue().getWidth()).isLessThanOrEqualTo(FileService.MAX_ORIGINAL_WIDTH);

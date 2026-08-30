@@ -1,7 +1,7 @@
 import {ChangeDetectionStrategy, Component, EventEmitter, inject, Input, Output} from '@angular/core';
 import {NgClass} from '@angular/common';
-import {ProgressBar} from 'primeng/progressbar';
-import {Tooltip} from 'primeng/tooltip';
+import {ProgressBar} from '@openng/optimus-ui/progressbar';
+import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {SeriesSummary} from '../../model/series.model';
 import {UrlHelperService} from '../../../../shared/service/url-helper.service';
 import {CoverComponent} from '../../../../shared/components/cover/cover.component';

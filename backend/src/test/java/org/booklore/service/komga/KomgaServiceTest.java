@@ -36,6 +36,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.time.Instant;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -111,7 +112,7 @@ class KomgaServiceTest {
             pdf.setBookType(BookFileType.PDF);
             pdf.setBookFormat(true);
 
-            book.setBookFiles(List.of(pdf));
+            book.setBookFiles(Set.of(pdf));
 
             seriesBooks.add(book);
         }
@@ -430,7 +431,7 @@ class KomgaServiceTest {
         bookFile.setBook(bookEntity);
         bookFile.setBookType(bookFileType);
         bookFile.setBookFormat(true);
-        bookEntity.setBookFiles(List.of(bookFile));
+        bookEntity.setBookFiles(Set.of(bookFile));
         return bookEntity;
     }
 

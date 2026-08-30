@@ -185,6 +185,7 @@ fun epub4jNativesClassifier(): String {
     return "$osKey-$archKey"
 }
 
+
 configurations {
     compileOnly {
         extendsFrom(configurations.annotationProcessor.get())
@@ -241,6 +242,7 @@ dependencies {
     // --- Database & Migration ---
     implementation(libs.mariadb.java.client)
     implementation("org.springframework.boot:spring-boot-starter-flyway")
+    implementation("org.springframework.boot:spring-boot-http-client")
     implementation(libs.flyway.mysql)
 
     // --- Book & Image Processing ---

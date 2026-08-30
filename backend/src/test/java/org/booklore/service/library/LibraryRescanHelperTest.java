@@ -35,6 +35,7 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -421,7 +422,7 @@ class LibraryRescanHelperTest {
         primaryFile.setFileName(fileName);
         primaryFile.setFileSubPath("");
         primaryFile.setBookType(bookType);
-        book.setBookFiles(List.of(primaryFile));
+        book.setBookFiles(Set.of(primaryFile));
         return book;
     }
 }

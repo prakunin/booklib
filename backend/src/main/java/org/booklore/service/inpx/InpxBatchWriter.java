@@ -307,7 +307,7 @@ public class InpxBatchWriter {
                 .fileSizeKb(source.getFileSizeKb())
                 .addedOn(now)
                 .build();
-        book.setBookFiles(new ArrayList<>(List.of(file)));
+        book.setBookFiles(new HashSet<>(Set.of(file)));
         book.setHasFiles(true);
         return book;
     }

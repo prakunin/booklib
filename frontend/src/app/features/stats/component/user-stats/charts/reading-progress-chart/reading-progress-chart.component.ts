@@ -1,6 +1,6 @@
 import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
-import {Tooltip} from 'primeng/tooltip';
+import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {ChartConfiguration, ChartData} from 'chart.js';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {toSignal} from '@angular/core/rxjs-interop';
@@ -119,8 +119,7 @@ export class ReadingProgressChartComponent {
             return this.t.translate('statsUser.readingProgress.tooltipLabel', {value, plural, description, percentage});
           }
         }
-      },
-      datalabels: {display: false}
+      }
     },
     interaction: {
       intersect: false,

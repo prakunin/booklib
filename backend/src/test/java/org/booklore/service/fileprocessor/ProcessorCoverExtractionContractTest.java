@@ -42,6 +42,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.Function;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -116,12 +117,12 @@ class ProcessorCoverExtractionContractTest {
                 .fileName(fileName)
                 .fileSubPath("")
                 .build();
-        book.setBookFiles(new ArrayList<>(List.of(bookFile)));
+        book.setBookFiles(new HashSet<>(List.of(bookFile)));
         return book;
     }
 
     private static BookFileEntity fileOf(BookEntity book) {
-        return book.getBookFiles().getFirst();
+        return book.getBookFiles().iterator().next();
     }
 
     /**

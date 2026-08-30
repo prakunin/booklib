@@ -172,9 +172,6 @@ export class PublicationTrendChartComponent {
                 : this.t.translate('statsLibrary.publicationTrend.tooltipBooks', {value});
             }
           }
-        },
-        datalabels: {
-          display: false
         }
       },
       elements: {

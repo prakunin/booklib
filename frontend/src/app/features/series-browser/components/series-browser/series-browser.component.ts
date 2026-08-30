@@ -2,10 +2,10 @@ import {Component, DestroyRef, ElementRef, HostListener, computed, effect, injec
 import {toObservable, toSignal} from '@angular/core/rxjs-interop';
 import {FormsModule} from '@angular/forms';
 import {debounceTime, distinctUntilChanged} from 'rxjs';
-import {ProgressSpinner} from 'primeng/progressspinner';
-import {InputText} from 'primeng/inputtext';
-import {Select} from 'primeng/select';
-import {Popover} from 'primeng/popover';
+import {ProgressSpinner} from '@openng/optimus-ui/progressspinner';
+import {InputText} from '@openng/optimus-ui/inputtext';
+import {Select} from '@openng/optimus-ui/select';
+import {Popover} from '@openng/optimus-ui/popover';
 import {TranslocoDirective, TranslocoPipe, TranslocoService} from '@jsverse/transloco';
 import {SeriesBrowserSort, SeriesBrowserStatusFilter, SeriesDataService} from '../../service/series-data.service';
 import {SeriesSummary} from '../../model/series.model';

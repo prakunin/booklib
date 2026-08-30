@@ -78,7 +78,7 @@ class DuplicateDetectionServiceTest {
                 .id(id)
                 .library(library)
                 .metadata(metadata)
-                .bookFiles(new ArrayList<>(List.of(file)))
+                .bookFiles(new HashSet<>(Set.of(file)))
                 .build();
 
         file.setBook(book);
@@ -486,11 +486,11 @@ class DuplicateDetectionServiceTest {
 
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
             book1.setLibraryPath(path);
-            book1.getBookFiles().getFirst().setFileSubPath("fiction/scifi");
+            book1.getBookFiles().stream().toList().getFirst().setFileSubPath("fiction/scifi");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
             book2.setLibraryPath(path);
-            book2.getBookFiles().getFirst().setFileSubPath("fiction/scifi");
+            book2.getBookFiles().stream().toList().getFirst().setFileSubPath("fiction/scifi");
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyDirectory());
@@ -505,11 +505,11 @@ class DuplicateDetectionServiceTest {
 
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
             book1.setLibraryPath(path);
-            book1.getBookFiles().getFirst().setFileSubPath("fiction");
+            book1.getBookFiles().stream().toList().getFirst().setFileSubPath("fiction");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
             book2.setLibraryPath(path);
-            book2.getBookFiles().getFirst().setFileSubPath("nonfiction");
+            book2.getBookFiles().stream().toList().getFirst().setFileSubPath("nonfiction");
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyDirectory());
@@ -524,11 +524,11 @@ class DuplicateDetectionServiceTest {
 
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
             book1.setLibraryPath(path1);
-            book1.getBookFiles().getFirst().setFileSubPath("shared");
+            book1.getBookFiles().stream().toList().getFirst().setFileSubPath("shared");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
             book2.setLibraryPath(path2);
-            book2.getBookFiles().getFirst().setFileSubPath("shared");
+            book2.getBookFiles().stream().toList().getFirst().setFileSubPath("shared");
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyDirectory());
@@ -555,11 +555,11 @@ class DuplicateDetectionServiceTest {
 
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
             book1.setLibraryPath(path);
-            book1.getBookFiles().getFirst().setFileSubPath("  ");
+            book1.getBookFiles().stream().toList().getFirst().setFileSubPath("  ");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
             book2.setLibraryPath(path);
-            book2.getBookFiles().getFirst().setFileSubPath("  ");
+            book2.getBookFiles().stream().toList().getFirst().setFileSubPath("  ");
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyDirectory());
@@ -576,10 +576,10 @@ class DuplicateDetectionServiceTest {
         @Test
         void groupsBooksWithSameBaseFilename() {
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
-            book1.getBookFiles().getFirst().setFileName("my_book.epub");
+            book1.getBookFiles().stream().toList().getFirst().setFileName("my_book.epub");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
-            book2.getBookFiles().getFirst().setFileName("my_book.mobi");
+            book2.getBookFiles().stream().toList().getFirst().setFileName("my_book.mobi");
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyFilename());
@@ -591,10 +591,10 @@ class DuplicateDetectionServiceTest {
         @Test
         void normalizesUnderscoresHyphensCaseForMatching() {
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
-            book1.getBookFiles().getFirst().setFileName("My-Book_Title.epub");
+            book1.getBookFiles().stream().toList().getFirst().setFileName("My-Book_Title.epub");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
-            book2.getBookFiles().getFirst().setFileName("my book title.mobi");
+            book2.getBookFiles().stream().toList().getFirst().setFileName("my book title.mobi");
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyFilename());
@@ -605,10 +605,10 @@ class DuplicateDetectionServiceTest {
         @Test
         void stripsPunctuationForMatching() {
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
-            book1.getBookFiles().getFirst().setFileName("book!@#title.epub");
+            book1.getBookFiles().stream().toList().getFirst().setFileName("book!@#title.epub");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
-            book2.getBookFiles().getFirst().setFileName("booktitle.mobi");
+            book2.getBookFiles().stream().toList().getFirst().setFileName("booktitle.mobi");
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyFilename());
@@ -619,10 +619,10 @@ class DuplicateDetectionServiceTest {
         @Test
         void doesNotGroupDifferentFilenames() {
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
-            book1.getBookFiles().getFirst().setFileName("alpha.epub");
+            book1.getBookFiles().stream().toList().getFirst().setFileName("alpha.epub");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
-            book2.getBookFiles().getFirst().setFileName("beta.mobi");
+            book2.getBookFiles().stream().toList().getFirst().setFileName("beta.mobi");
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyFilename());
@@ -633,9 +633,9 @@ class DuplicateDetectionServiceTest {
         @Test
         void skipsBooksWithNoBookFiles() {
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
-            book1.setBookFiles(new ArrayList<>());
+            book1.setBookFiles(Set.of());
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
-            book2.setBookFiles(new ArrayList<>());
+            book2.setBookFiles(Set.of());
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyFilename());
@@ -901,10 +901,10 @@ class DuplicateDetectionServiceTest {
         @Test
         void booksWithOnlyNonBookFilesAreSkippedInFilenameMatch() {
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
-            book1.getBookFiles().getFirst().setBookFormat(false);
+            book1.getBookFiles().stream().toList().getFirst().setBookFormat(false);
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
-            book2.getBookFiles().getFirst().setBookFormat(false);
+            book2.getBookFiles().stream().toList().getFirst().setBookFormat(false);
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyFilename());
@@ -933,7 +933,7 @@ class DuplicateDetectionServiceTest {
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
-            book2.getBookFiles().getFirst().setBookType(null);
+            book2.getBookFiles().stream().toList().getFirst().setBookType(null);
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyTitleAuthor());
@@ -945,10 +945,10 @@ class DuplicateDetectionServiceTest {
         @Test
         void handlesFilenameWithNoExtension() {
             BookEntity book1 = createBook(BookFileType.EPUB, "Book", "Author");
-            book1.getBookFiles().getFirst().setFileName("mybook");
+            book1.getBookFiles().stream().toList().getFirst().setFileName("mybook");
 
             BookEntity book2 = createBook(BookFileType.MOBI, "Book", "Author");
-            book2.getBookFiles().getFirst().setFileName("mybook");
+            book2.getBookFiles().stream().toList().getFirst().setFileName("mybook");
             stubBooks(book1, book2);
 
             List<DuplicateGroup> result = service.findDuplicates(onlyFilename());

@@ -53,7 +53,7 @@ class OpdsBasicAuthRateLimitFilterTest {
         OpdsBasicAuthRateLimitFilter filter = new OpdsBasicAuthRateLimitFilter(authRateLimitService);
         MockHttpServletRequest request = request("reader", "password");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        OpdsUserDetails principal = new OpdsUserDetails(OpdsUserV2.builder().username("reader").build());
+        OpdsUserDetails principal = new OpdsUserDetails(null, OpdsUserV2.builder().username("reader").build());
         FilterChain chain = (req, res) -> SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null, List.of())
         );

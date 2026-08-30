@@ -78,7 +78,7 @@ class DjvuProcessorTest {
                 .build();
         book = BookEntity.builder()
                 .id(11L)
-                .bookFiles(List.of(bookFile))
+                .bookFiles(Set.of(bookFile))
                 .libraryPath(LibraryPathEntity.builder().path(tempDir.toString()).build())
                 .metadata(BookMetadataEntity.builder().build())
                 .build();

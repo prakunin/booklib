@@ -1,6 +1,6 @@
 import {TestBed} from '@angular/core/testing';
-import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
-import {MessageService} from 'primeng/api';
+import {DynamicDialogConfig, DynamicDialogRef} from '@openng/optimus-ui/dynamicdialog';
+import {MessageService} from '@openng/optimus-ui/api';
 import {of, throwError} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 

@@ -39,6 +39,7 @@ import org.booklore.repository.UserBookFileProgressRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -127,7 +128,7 @@ class KoboReadingStateServiceTest {
         primaryFile.setId(bookFileId);
         primaryFile.setBook(testBook);
         primaryFile.setBookType(BookFileType.EPUB);
-        testBook.setBookFiles(List.of(primaryFile));
+        testBook.setBookFiles(Set.of(primaryFile));
         return primaryFile;
     }
 

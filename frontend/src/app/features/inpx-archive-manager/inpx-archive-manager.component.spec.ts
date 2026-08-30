@@ -1,6 +1,6 @@
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, Router} from '@angular/router';
-import {ConfirmationService, MessageService} from 'primeng/api';
+import {ConfirmationService, MessageService} from '@openng/optimus-ui/api';
 import {BehaviorSubject, Observable, of, Subject, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {getTranslocoModule} from '../../core/testing/transloco-testing';

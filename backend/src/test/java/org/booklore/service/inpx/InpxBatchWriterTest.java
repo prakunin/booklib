@@ -103,9 +103,9 @@ class InpxBatchWriterTest {
         assertThat(captor.getValue()).singleElement()
                 .satisfies(saved -> {
                     assertThat(saved.getMetadata().getTitle()).isEqualTo("Fresh");
-                    assertThat(saved.getBookFiles().getFirst().getBookType()).isEqualTo(BookFileType.FB2);
-                    assertThat(saved.getBookFiles().getFirst().getSourceArchive()).isEqualTo("fb2-1.zip");
-                    assertThat(saved.getBookFiles().getFirst().getSourceArchiveEntry()).isEqualTo("fresh.fb2");
+                    assertThat(saved.getBookFiles().iterator().next().getBookType()).isEqualTo(BookFileType.FB2);
+                    assertThat(saved.getBookFiles().iterator().next().getSourceArchive()).isEqualTo("fb2-1.zip");
+                    assertThat(saved.getBookFiles().iterator().next().getSourceArchiveEntry()).isEqualTo("fresh.fb2");
                 });
     }
 
@@ -124,7 +124,7 @@ class InpxBatchWriterTest {
 
         ArgumentCaptor<List<BookEntity>> captor = ArgumentCaptor.forClass(List.class);
         verify(bookRepository).saveAll(captor.capture());
-        BookFileEntity file = captor.getValue().getFirst().getBookFiles().getFirst();
+        BookFileEntity file = captor.getValue().getFirst().getBookFiles().iterator().next();
         assertThat(file.getBookType()).isEqualTo(BookFileType.OTHER);
         assertThat(file.getSourceArchiveEntry()).isEqualTo("paper.doc");
     }
@@ -140,7 +140,7 @@ class InpxBatchWriterTest {
 
         ArgumentCaptor<List<BookEntity>> captor = ArgumentCaptor.forClass(List.class);
         verify(bookRepository).saveAll(captor.capture());
-        BookFileEntity file = captor.getValue().getFirst().getBookFiles().getFirst();
+        BookFileEntity file = captor.getValue().getFirst().getBookFiles().iterator().next();
         assertThat(file.getFileName()).isEqualTo("book.fb2");
         assertThat(file.getSourceArchiveEntry()).isEqualTo(locator);
     }

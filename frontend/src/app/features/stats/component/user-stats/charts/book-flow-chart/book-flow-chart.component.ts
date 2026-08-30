@@ -1,5 +1,5 @@
 import {AfterViewInit, Component, effect, ElementRef, inject, ViewChild} from '@angular/core';
-import {Tooltip} from 'primeng/tooltip';
+import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {ReadStatus} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {StatsChartThemeService} from '../../../shared/stats-chart-theme.service';

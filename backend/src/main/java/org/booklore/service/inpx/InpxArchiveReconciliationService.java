@@ -227,8 +227,8 @@ public class InpxArchiveReconciliationService {
     }
 
     private boolean isOnlyBookFile(BookFileEntity file) {
-        List<BookFileEntity> bookFiles = file.getBook().getBookFiles();
-        return bookFiles != null && bookFiles.size() == 1 && bookFiles.getFirst().equals(file);
+        Set<BookFileEntity> bookFiles = file.getBook().getBookFiles();
+        return bookFiles != null && bookFiles.size() == 1 && bookFiles.iterator().next().equals(file);
     }
 
     private boolean isHtml(String fileName) {

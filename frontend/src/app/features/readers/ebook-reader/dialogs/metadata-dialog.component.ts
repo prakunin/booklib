@@ -2,6 +2,7 @@ import {Component, EventEmitter, inject, Input, Output} from '@angular/core';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {Book} from '../../../book/model/book.model';
 import {UrlHelperService} from '../../../../shared/service/url-helper.service';
+import {LanguageResolverService} from '../../../../shared/service/language-resolver.service';
 import {CoverComponent} from '../../../../shared/components/cover/cover.component';
 import {AuthorService} from '../../../author-browser/service/author.service';
 import {Router} from '@angular/router';
@@ -27,6 +28,7 @@ export class ReaderBookMetadataDialogComponent {
   private readonly authorService = inject(AuthorService);
   private readonly router = inject(Router);
   private readonly t = inject(TranslocoService);
+  protected readonly languageResolver = inject(LanguageResolverService);
 
   get metadata() {
     return this.book?.metadata;

@@ -74,6 +74,8 @@ public class IconController {
                 .cacheControl(SVG_CACHE)
                 .eTag(etag)
                 .contentType(SVG_MEDIA_TYPE)
+                .header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; style-src 'self' 'unsafe-inline'")
+                .header("X-Content-Type-Options", "nosniff")
                 .body(svgContent);
     }
 

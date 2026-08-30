@@ -21,6 +21,7 @@ import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 
@@ -457,7 +458,7 @@ class BookRepositoryDataJpaTest {
                     .addedOn(Instant.now())
                     .build();
             entityManager.persist(bookFile);
-            book.setBookFiles(List.of(bookFile));
+            book.setBookFiles(Set.of(bookFile));
         }
 
         private void flushAndClear() {

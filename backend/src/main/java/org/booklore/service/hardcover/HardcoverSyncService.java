@@ -52,12 +52,14 @@ public class HardcoverSyncService {
     private final ThreadLocal<String> currentApiToken = new ThreadLocal<>();
 
     @Autowired
-    public HardcoverSyncService(HardcoverSyncSettingsService hardcoverSyncSettingsService, BookRepository bookRepository) {
+    public HardcoverSyncService(
+            HardcoverSyncSettingsService hardcoverSyncSettingsService,
+            BookRepository bookRepository,
+            RestClient restClient
+    ) {
         this.hardcoverSyncSettingsService = hardcoverSyncSettingsService;
         this.bookRepository = bookRepository;
-        this.restClient = RestClient.builder()
-                .baseUrl(HARDCOVER_API_URL)
-                .build();
+        this.restClient = restClient;
     }
 
     /**
@@ -839,7 +841,7 @@ public class HardcoverSyncService {
     private Map<String, Object> executeGraphQL(GraphQLRequest request) {
         try {
             return restClient.post()
-                    .uri("")
+                    .uri(HARDCOVER_API_URL)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getApiToken())
                     .body(request)

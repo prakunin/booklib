@@ -1,6 +1,6 @@
 import {Component, effect, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
-import {Tooltip} from 'primeng/tooltip';
+import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {ChartConfiguration, ChartData} from 'chart.js';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {sortStrings} from '../../../../../../shared/util/string-sort.util';
@@ -51,8 +51,7 @@ export class PublicationEraChartComponent {
             return `${ctx.dataset.label}: ${ctx.parsed.y} books`;
           }
         }
-      },
-      datalabels: {display: false}
+      }
     },
     scales: {
       x: {

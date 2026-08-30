@@ -3,7 +3,7 @@ import {FormsModule} from '@angular/forms';
 import {BaseChartDirective} from 'ng2-charts';
 import {ChartConfiguration, ChartData, TooltipItem} from 'chart.js';
 import {BehaviorSubject, Observable} from 'rxjs';
-import {Select} from 'primeng/select';
+import {Select} from '@openng/optimus-ui/select';
 import {ReadStatus} from '../../../../../book/model/book.model';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {NgClass, AsyncPipe} from '@angular/common';
@@ -176,9 +176,6 @@ export class TopItemsChartComponent implements OnInit {
             },
             label: this.formatTooltipLabel.bind(this)
           }
-        },
-        datalabels: {
-          display: false
         }
       },
       interaction: {

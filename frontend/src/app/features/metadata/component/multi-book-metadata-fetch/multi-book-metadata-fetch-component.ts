@@ -4,14 +4,14 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {MetadataRefreshType} from '../../model/request/metadata-refresh-type.enum';
 import {MetadataRefreshOptions} from '../../model/request/metadata-refresh-options.model';
 
-import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
-import {MessageService} from 'primeng/api';
+import {DynamicDialogConfig, DynamicDialogRef} from '@openng/optimus-ui/dynamicdialog';
+import {MessageService} from '@openng/optimus-ui/api';
 import {BookService} from '../../../book/service/book.service';
 import {AppSettingsService} from '../../../../shared/service/app-settings.service';
 import {Book} from '../../../book/model/book.model';
 import {FormsModule} from '@angular/forms';
 import {MetadataFetchOptionsComponent} from '../metadata-options-dialog/metadata-fetch-options/metadata-fetch-options.component';
-import {Button} from 'primeng/button';
+import {Button} from '@openng/optimus-ui/button';
 
 @Component({
   selector: 'app-multi-book-metadata-fetch-component',

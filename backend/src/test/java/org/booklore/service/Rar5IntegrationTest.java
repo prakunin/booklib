@@ -36,7 +36,6 @@ import org.mockito.Mockito;
 /**
  * Integration tests that feed a real RAR5 archive into the service layer
  */
-@EnabledIf("org.booklore.service.ArchiveService#isAvailable")
 @ExtendWith(MockitoExtension.class)
 class Rar5IntegrationTest {
 

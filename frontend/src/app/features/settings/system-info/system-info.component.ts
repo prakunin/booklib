@@ -1,8 +1,8 @@
 import {ChangeDetectionStrategy, Component, computed, inject, input} from '@angular/core';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
-import {Button} from 'primeng/button';
-import {Toast} from 'primeng/toast';
-import {MessageService} from 'primeng/api';
+import {Button} from '@openng/optimus-ui/button';
+import {Toast} from '@openng/optimus-ui/toast';
+import {MessageService} from '@openng/optimus-ui/api';
 import {PathStatus, SystemInfo, SystemInfoService} from '../../../core/services/system-info.service';
 import {TagColor, TagComponent} from '../../../shared/components/tag/tag.component';
 

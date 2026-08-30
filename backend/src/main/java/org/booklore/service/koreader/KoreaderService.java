@@ -25,6 +25,8 @@ import java.util.Map;
 @AllArgsConstructor
 @Service
 public class KoreaderService {
+    private static final String DEFAULT_DEVICE_NAME = "Grimmory";
+    private static final String DEFAULT_DEVICE_ID = "Grimmory";
 
     private final UserBookProgressRepository progressRepository;
     private final UserBookFileProgressRepository fileProgressRepository;
@@ -57,13 +59,21 @@ public class KoreaderService {
                 ? progress.getKoreaderLastSyncTime().getEpochSecond()
                 : null;
 
+        String device = progress.getKoreaderDevice() != null ?
+                progress.getKoreaderDevice() :
+                DEFAULT_DEVICE_NAME;
+
+        String deviceId = progress.getKoreaderDeviceId() != null ?
+                progress.getKoreaderDeviceId() :
+                DEFAULT_DEVICE_ID;
+
         return KoreaderProgress.builder()
                 .timestamp(timestamp)
                 .document(bookHash)
                 .progress(progress.getKoreaderProgress())
                 .percentage(progress.getKoreaderProgressPercent())
-                .device("BookLore")
-                .deviceId("BookLore")
+                .device(device)
+                .deviceId(deviceId)
                 .build();
     }
 

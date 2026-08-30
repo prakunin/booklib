@@ -71,7 +71,7 @@ class OpdsBookServiceTest {
 
     private OpdsUserDetails legacyUserDetails() {
         OpdsUserV2 v2 = OpdsUserV2.builder().userId(999L).username("legacy").build();
-        return new OpdsUserDetails(v2);
+        return new OpdsUserDetails(null, v2);
     }
 
     private OpdsUserDetails v2UserDetails(Long userId, boolean isAdmin, Set<Long> libraryIds) {
@@ -92,7 +92,7 @@ class OpdsBookServiceTest {
         }
         when(user.getAssignedLibraries()).thenReturn(libraries);
 
-        return new OpdsUserDetails(v2);
+        return new OpdsUserDetails(null, v2);
     }
 
     @Test

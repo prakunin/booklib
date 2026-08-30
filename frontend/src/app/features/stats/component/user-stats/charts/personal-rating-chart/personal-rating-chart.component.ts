@@ -1,7 +1,7 @@
 import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
 import {ChartConfiguration, ChartData} from 'chart.js';
-import {Tooltip} from 'primeng/tooltip';
+import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {UserStatsService} from '../../../../../settings/user-management/user-stats.service';
@@ -91,7 +91,6 @@ export class PersonalRatingChartComponent {
           }
         }
       },
-      datalabels: {display: false}
     },
     scales: {
       x: {

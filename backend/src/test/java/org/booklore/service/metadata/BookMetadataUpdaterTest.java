@@ -96,7 +96,7 @@ class BookMetadataUpdaterTest {
         bookEntity = BookEntity.builder()
                 .id(1L)
                 .metadata(metadataEntity)
-                .bookFiles(new ArrayList<>())
+                .bookFiles(new HashSet<>())
                 .build();
         metadataEntity.setBook(bookEntity);
     }
@@ -1772,7 +1772,7 @@ class BookMetadataUpdaterTest {
         void movesFile_whenSettingEnabled() {
             BookFileEntity primaryFile = BookFileEntity.builder()
                     .fileName(TEST_BOOK_EPUB).bookType(BookFileType.EPUB).build();
-            bookEntity.setBookFiles(new ArrayList<>(List.of(primaryFile)));
+            bookEntity.setBookFiles(new HashSet<>(List.of(primaryFile)));
 
             BookMetadata newMeta = BookMetadata.builder().title("T").build();
             MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
@@ -1805,7 +1805,7 @@ class BookMetadataUpdaterTest {
         void moveFileException_doesNotFailUpdate() {
             BookFileEntity primaryFile = BookFileEntity.builder()
                     .fileName(TEST_BOOK_EPUB).bookType(BookFileType.EPUB).build();
-            bookEntity.setBookFiles(new ArrayList<>(List.of(primaryFile)));
+            bookEntity.setBookFiles(new HashSet<>(List.of(primaryFile)));
 
             BookMetadata newMeta = BookMetadata.builder().title("T").build();
             MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
@@ -1882,7 +1882,7 @@ class BookMetadataUpdaterTest {
                     .bookType(BookFileType.EPUB)
                     .isBookFormat(true)
                     .build();
-            bookEntity.setBookFiles(new ArrayList<>(List.of(bookFile)));
+            bookEntity.setBookFiles(Set.of(bookFile));
 
             BookMetadata newMeta = BookMetadata.builder().title("New Title").build();
             MetadataUpdateContext context = buildContext(newMeta, MetadataReplaceMode.REPLACE_ALL);
@@ -1912,7 +1912,7 @@ class BookMetadataUpdaterTest {
 
             bookEntity.setLibraryPath(LibraryPathEntity.builder().path(tempDir.toString()).build());
             primaryFile = BookFileEntity.builder().fileName(TEST_BOOK_EPUB).fileSubPath("").bookType(BookFileType.EPUB).build();
-            bookEntity.setBookFiles(new ArrayList<>(List.of(primaryFile)));
+            bookEntity.setBookFiles(new HashSet<>(List.of(primaryFile)));
         }
 
         @AfterEach

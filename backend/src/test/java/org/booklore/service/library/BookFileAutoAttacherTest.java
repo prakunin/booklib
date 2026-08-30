@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Path;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,7 +48,7 @@ class BookFileAutoAttacherTest {
         BookEntity book = BookEntity.builder()
                 .id(7L)
                 .libraryPath(libraryPath)
-                .bookFiles(List.of(primary))
+                .bookFiles(Set.of(primary))
                 .build();
         Path documentPath = Path.of("/library/book.docx");
         when(bookRepository.findByIdWithBookFiles(7L)).thenReturn(Optional.of(book));

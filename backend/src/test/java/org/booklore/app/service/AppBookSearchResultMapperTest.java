@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Month;
+import java.util.Set;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +29,7 @@ class AppBookSearchResultMapperTest {
         BookEntity book = BookEntity.builder()
                 .id(9L)
                 .metadata(BookMetadataEntity.builder().title("Report").build())
-                .bookFiles(List.of(file))
+                .bookFiles(Set.of(file))
                 .build();
 
         var result = AppBookSearchResultMapper.toResult(book);
@@ -59,7 +60,7 @@ class AppBookSearchResultMapperTest {
         BookEntity book = BookEntity.builder()
                 .id(10L)
                 .metadata(metadata)
-                .bookFiles(List.of(file))
+                .bookFiles(Set.of(file))
                 .build();
 
         var result = AppBookSearchResultMapper.toResult(book);

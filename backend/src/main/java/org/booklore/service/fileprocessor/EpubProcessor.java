@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -183,7 +184,7 @@ public class EpubProcessor extends AbstractFileProcessor implements BookFileProc
 
         bookEntity.getBookFiles().stream()
             .filter(bf -> bf.getBookType() == BookFileType.EPUB && bf.isBook())
-            .findFirst()
+            .min(Comparator.comparingLong(BookFileEntity::getId))
             .ifPresent(ent -> ent.setFixedLayout(Boolean.TRUE.equals(epubMetadata.getIsFixedLayout())));
     }
 }

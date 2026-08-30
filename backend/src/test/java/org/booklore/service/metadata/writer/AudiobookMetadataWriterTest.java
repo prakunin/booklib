@@ -107,7 +107,7 @@ class AudiobookMetadataWriterTest {
         file.setFileName(fileName);
         file.setBookType(BookFileType.AUDIOBOOK);
         file.setFolderBased(folderBased);
-        book.setBookFiles(List.of(file));
+        book.setBookFiles(Set.of(file));
         return book;
     }
 
@@ -444,7 +444,7 @@ class AudiobookMetadataWriterTest {
         @Test
         void noAudiobookFileReturnsWithoutThrowing() {
             BookEntity noFiles = new BookEntity();
-            noFiles.setBookFiles(Collections.emptyList());
+            noFiles.setBookFiles(Collections.emptySet());
             assertDoesNotThrow(() -> writer.replaceCoverImageFromBytes(noFiles, new byte[]{1, 2, 3}));
         }
 
@@ -497,7 +497,7 @@ class AudiobookMetadataWriterTest {
             file.setFileName(folder.getFileName().toString());
             file.setBookType(BookFileType.AUDIOBOOK);
             file.setFolderBased(true);
-            book.setBookFiles(List.of(file));
+            book.setBookFiles(Set.of(file));
 
             byte[] pngSignature = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
             writer.replaceCoverImageFromBytes(book, pngSignature);

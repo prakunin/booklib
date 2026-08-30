@@ -304,7 +304,7 @@ public class DuplicateDetectionService {
         if (alreadyGrouped.contains(book.getId())) return;
         if (book.getLibraryPath() == null) return;
 
-        List<BookFileEntity> bookFiles = book.getBookFiles();
+        Set<BookFileEntity> bookFiles = book.getBookFiles();
         if (bookFiles == null || bookFiles.isEmpty()) return;
 
         BookFileEntity primary = bookFiles.stream()
@@ -335,7 +335,7 @@ public class DuplicateDetectionService {
     private void collectFilenameGroup(BookEntity book, Map<String, List<BookEntity>> nameGroups, Set<Long> alreadyGrouped) {
         if (alreadyGrouped.contains(book.getId())) return;
 
-        List<BookFileEntity> bookFiles = book.getBookFiles();
+        Set<BookFileEntity> bookFiles = book.getBookFiles();
         if (bookFiles == null || bookFiles.isEmpty()) return;
 
         BookFileEntity primary = bookFiles.stream()

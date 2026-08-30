@@ -37,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -194,7 +195,7 @@ public class BookCoverService {
         // Find the audiobook file
         var audiobookFile = bookEntity.getBookFiles().stream()
                 .filter(f -> f.getBookType() == BookFileType.AUDIOBOOK)
-                .findFirst()
+                .min(Comparator.comparingLong(BookFileEntity::getId))
                 .orElseThrow(() -> ApiError.FAILED_TO_REGENERATE_COVER.createException("no audiobook file found"));
 
         BookFileProcessor processor = processorRegistry.getProcessorOrThrow(audiobookFile.getBookType());
@@ -432,7 +433,7 @@ public class BookCoverService {
                 }
                 var match = bookFiles.stream()
                         .filter(bf -> bf.isBookFormat() && bf.getBookType() == format)
-                        .findFirst();
+                        .min(Comparator.comparingLong(BookFileEntity::getId));
                 if (match.isPresent()) {
                     return match.get();
                 }
@@ -442,7 +443,7 @@ public class BookCoverService {
         // Fallback: return first non-audiobook file
         return bookFiles.stream()
                 .filter(f -> f.getBookType() != BookFileType.AUDIOBOOK)
-                .findFirst()
+                .min(Comparator.comparingLong(BookFileEntity::getId))
                 .orElse(null);
     }
 
@@ -775,7 +776,7 @@ public class BookCoverService {
         }
         var audiobookFile = bookEntity.getBookFiles().stream()
                 .filter(f -> f.getBookType() == BookFileType.AUDIOBOOK)
-                .findFirst()
+                .min(Comparator.comparingLong(BookFileEntity::getId))
                 .orElse(null);
 
         if (audiobookFile == null) {

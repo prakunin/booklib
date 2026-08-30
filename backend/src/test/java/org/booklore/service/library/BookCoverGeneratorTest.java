@@ -91,7 +91,7 @@ class BookCoverGeneratorTest {
         book.setId(2L);
         BookFileEntity primary = new BookFileEntity();
         primary.setBookType(primaryType);
-        book.setBookFiles(java.util.List.of(primary));
+        book.setBookFiles(java.util.Set.of(primary));
         return book;
     }
 

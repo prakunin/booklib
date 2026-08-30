@@ -63,7 +63,6 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import java.util.ArrayList;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -270,7 +269,7 @@ class KoboEntitlementServiceTest {
         primaryFile.setBook(book);
         primaryFile.setBookType(BookFileType.CBX);
         primaryFile.setFileSizeKb(1024L);
-        book.setBookFiles(List.of(primaryFile));
+        book.setBookFiles(Set.of(primaryFile));
 
         BookMetadataEntity metadata = new BookMetadataEntity();
         metadata.setTitle("Test CBX Book");
@@ -521,7 +520,7 @@ class KoboEntitlementServiceTest {
     private BookEntity createEpubBookEntity(Long id) {
         BookEntity book = new BookEntity();
         book.setId(id);
-        book.setBookFiles(new ArrayList<>());
+        book.setBookFiles(new HashSet<>());
 
         BookFileEntity bookFile = BookFileEntity.builder()
                 .book(book)
@@ -774,7 +773,7 @@ class KoboEntitlementServiceTest {
             primaryFile.setId(10L);
             primaryFile.setBook(book);
             primaryFile.setBookType(BookFileType.EPUB);
-            book.setBookFiles(List.of(primaryFile));
+            book.setBookFiles(Set.of(primaryFile));
 
             UserBookProgressEntity progress = new UserBookProgressEntity();
             progress.setBook(book);
@@ -831,7 +830,7 @@ class KoboEntitlementServiceTest {
             alternateAudiobook.setBook(book);
             alternateAudiobook.setBookType(BookFileType.AUDIOBOOK);
 
-            book.setBookFiles(List.of(primaryEpub, alternateAudiobook));
+            book.setBookFiles(Set.of(primaryEpub, alternateAudiobook));
 
             UserBookProgressEntity progress = new UserBookProgressEntity();
             progress.setBook(book);

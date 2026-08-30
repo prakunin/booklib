@@ -13,10 +13,10 @@ import {
 import {AuthService} from '../../service/auth.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {FormsModule, NgForm} from '@angular/forms';
-import {Password} from 'primeng/password';
-import {Button} from 'primeng/button';
-import {Message} from 'primeng/message';
-import {InputText} from 'primeng/inputtext';
+import {Password} from '@openng/optimus-ui/password';
+import {Button} from '@openng/optimus-ui/button';
+import {Message} from '@openng/optimus-ui/message';
+import {InputText} from '@openng/optimus-ui/inputtext';
 import {take} from 'rxjs/operators';
 import {AppSettingsService} from '../../service/app-settings.service';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';

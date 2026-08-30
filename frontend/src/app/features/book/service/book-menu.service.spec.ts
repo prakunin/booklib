@@ -1,5 +1,5 @@
 import {TestBed} from '@angular/core/testing';
-import {ConfirmationService, MessageService} from 'primeng/api';
+import {ConfirmationService, MessageService} from '@openng/optimus-ui/api';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {LoadingService} from '../../../core/services/loading.service';

@@ -68,8 +68,7 @@ export class PageCountChartComponent {
               : this.t.translate('statsLibrary.pageCount.tooltipLabelPlural', {value});
           }
         }
-      },
-      datalabels: {display: false}
+      }
     },
     scales: {
       x: {

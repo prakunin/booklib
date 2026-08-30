@@ -79,7 +79,7 @@ class BookFileAttachmentServiceTest {
                 .library(library)
                 .libraryPath(libraryPath)
                 .build();
-        book.setBookFiles(new ArrayList<>());
+        book.setBookFiles(new HashSet<>());
         return book;
     }
 
@@ -208,7 +208,7 @@ class BookFileAttachmentServiceTest {
                     .id(2L)
                     .library(otherLibrary)
                     .libraryPath(libraryPath)
-                    .bookFiles(new ArrayList<>())
+                    .bookFiles(new HashSet<>())
                     .build();
             createBookFile(20L, source, "source.epub", "sub2", true, false);
 
@@ -414,7 +414,7 @@ class BookFileAttachmentServiceTest {
 
             BookEntity source = createBook(2L);
             createBookFile(20L, source, "source.pdf", "source_dir", true, false);
-            source.getBookFiles().getFirst().setBookType(BookFileType.PDF);
+            source.getBookFiles().iterator().next().setBookType(BookFileType.PDF);
 
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
@@ -457,7 +457,7 @@ class BookFileAttachmentServiceTest {
 
             BookEntity source = createBook(2L);
             createBookFile(20L, source, "source.pdf", "source_dir", true, false);
-            source.getBookFiles().getFirst().setBookType(BookFileType.PDF);
+            source.getBookFiles().iterator().next().setBookType(BookFileType.PDF);
 
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
@@ -480,7 +480,7 @@ class BookFileAttachmentServiceTest {
 
             BookEntity source = createBook(2L);
             createBookFile(20L, source, "source.pdf", "source_dir", true, false);
-            source.getBookFiles().getFirst().setBookType(BookFileType.PDF);
+            source.getBookFiles().iterator().next().setBookType(BookFileType.PDF);
 
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
@@ -503,7 +503,7 @@ class BookFileAttachmentServiceTest {
 
             BookEntity source = createBook(2L);
             createBookFile(20L, source, "source.pdf", "source_dir", true, false);
-            source.getBookFiles().getFirst().setBookType(BookFileType.PDF);
+            source.getBookFiles().iterator().next().setBookType(BookFileType.PDF);
 
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
@@ -543,7 +543,7 @@ class BookFileAttachmentServiceTest {
 
             BookEntity source = createBook(2L);
             createBookFile(20L, source, "source.pdf", "source_dir", true, false);
-            source.getBookFiles().getFirst().setBookType(BookFileType.PDF);
+            source.getBookFiles().iterator().next().setBookType(BookFileType.PDF);
 
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
@@ -563,7 +563,7 @@ class BookFileAttachmentServiceTest {
 
             BookEntity source = createBook(2L);
             createBookFile(20L, source, "source.pdf", "source_dir", true, false);
-            source.getBookFiles().getFirst().setBookType(BookFileType.PDF);
+            source.getBookFiles().iterator().next().setBookType(BookFileType.PDF);
 
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
@@ -584,7 +584,7 @@ class BookFileAttachmentServiceTest {
 
             BookEntity source = createBook(2L);
             createBookFile(20L, source, "source.pdf", "source_dir", true, false);
-            source.getBookFiles().getFirst().setBookType(BookFileType.PDF);
+            source.getBookFiles().iterator().next().setBookType(BookFileType.PDF);
 
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
@@ -604,11 +604,11 @@ class BookFileAttachmentServiceTest {
 
             BookEntity source1 = createBook(2L);
             createBookFile(20L, source1, "source1.pdf", "source_dir1", true, false);
-            source1.getBookFiles().getFirst().setBookType(BookFileType.PDF);
+            source1.getBookFiles().iterator().next().setBookType(BookFileType.PDF);
 
             BookEntity source2 = createBook(3L);
             createBookFile(30L, source2, "source2.mobi", "source_dir2", true, false);
-            source2.getBookFiles().getFirst().setBookType(BookFileType.MOBI);
+            source2.getBookFiles().iterator().next().setBookType(BookFileType.MOBI);
 
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source1));
@@ -756,7 +756,7 @@ class BookFileAttachmentServiceTest {
 
             BookEntity source = createBook(2L);
             createBookFile(20L, source, "source.pdf", "source_dir", true, false);
-            source.getBookFiles().getFirst().setBookType(BookFileType.PDF);
+            source.getBookFiles().iterator().next().setBookType(BookFileType.PDF);
 
             when(bookRepository.findByIdWithBookFiles(1L)).thenReturn(Optional.of(target));
             when(bookRepository.findByIdWithBookFiles(2L)).thenReturn(Optional.of(source));
@@ -788,7 +788,7 @@ class BookFileAttachmentServiceTest {
                     .library(library)
                     .libraryPath(otherLibraryPath)
                     .build();
-            source.setBookFiles(new ArrayList<>());
+            source.setBookFiles(new HashSet<>());
             BookFileEntity sourceFile = BookFileEntity.builder()
                     .id(20L)
                     .book(source)

@@ -83,7 +83,7 @@ class DocProcessorTest {
                 .isBookFormat(true)
                 .build();
         book = BookEntity.builder()
-                .bookFiles(List.of(bookFile))
+                .bookFiles(Set.of(bookFile))
                 .libraryPath(LibraryPathEntity.builder().path(tempDir.toString()).build())
                 .metadata(BookMetadataEntity.builder().build())
                 .build();

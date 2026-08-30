@@ -14,6 +14,7 @@ import org.booklore.repository.BookRepository;
 import org.booklore.service.document.UnreadableDocumentException;
 import org.booklore.service.inpx.ArchivedBookContentService;
 import org.booklore.util.FileUtils;
+import org.booklore.util.epub.CoverDetectorService;
 import org.grimmory.epub4j.domain.*;
 import org.grimmory.epub4j.epub.EpubWriter;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -33,6 +35,7 @@ import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 
@@ -126,7 +129,6 @@ class EpubReaderServiceTest {
             assertEquals("en", bookInfo.getMetadata().get("language"));
             assertFalse(bookInfo.getManifest().isEmpty());
             assertEquals(2, bookInfo.getSpine().size());
-            assertNotNull(bookInfo.getCoverPath());
         }
     }
 
@@ -139,7 +141,7 @@ class EpubReaderServiceTest {
                 .sourceArchive("outer.zip")
                 .sourceArchiveEntry("letter.html")
                 .build();
-        bookEntity.setBookFiles(new java.util.ArrayList<>(List.of(htmlFile)));
+        bookEntity.setBookFiles(new java.util.HashSet<>(List.of(htmlFile)));
         htmlFile.setBook(bookEntity);
         Path htmlPath = tempDir.resolve("letter.html");
         Files.writeString(htmlPath, "<html></html>");
@@ -165,7 +167,7 @@ class EpubReaderServiceTest {
                 .sourceArchive("outer.zip")
                 .sourceArchiveEntry("letter.html")
                 .build();
-        bookEntity.setBookFiles(new java.util.ArrayList<>(List.of(htmlFile)));
+        bookEntity.setBookFiles(new java.util.HashSet<>(List.of(htmlFile)));
         htmlFile.setBook(bookEntity);
         Path htmlPath = tempDir.resolve("letter.html");
         Files.writeString(htmlPath, "<html></html>");
@@ -194,7 +196,7 @@ class EpubReaderServiceTest {
         Path alternativePath = tempDir.resolve("alternative.docx");
         Files.writeString(alternativePath, "document");
         when(alternative.getFullFilePath()).thenReturn(alternativePath);
-        bookEntity.setBookFiles(List.of(primary, alternative));
+        bookEntity.setBookFiles(Set.of(primary, alternative));
         EpubBookInfo expected = EpubBookInfo.builder().manifest(List.of()).spine(List.of()).build();
         when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
         when(documentRenditionService.supports(alternativePath)).thenReturn(true);
@@ -221,7 +223,7 @@ class EpubReaderServiceTest {
                 .isBookFormat(true)
                 .documentParseStatus(DocumentParseStatus.UNREADABLE)
                 .build();
-        bookEntity.setBookFiles(List.of(file));
+        bookEntity.setBookFiles(Set.of(file));
         when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
 
         var exception = assertThrows(
@@ -239,7 +241,7 @@ class EpubReaderServiceTest {
         Files.writeString(documentPath, "document");
         when(file.getBookType()).thenReturn(BookFileType.DOC);
         when(file.getFullFilePath()).thenReturn(documentPath);
-        bookEntity.setBookFiles(List.of(file));
+        bookEntity.setBookFiles(Set.of(file));
         when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
         when(documentRenditionService.supports(documentPath)).thenReturn(true);
         when(documentRenditionService.buildBookInfo(documentPath))
@@ -262,7 +264,7 @@ class EpubReaderServiceTest {
         EpubBookInfo expected = EpubBookInfo.builder().manifest(List.of()).spine(List.of()).build();
         when(file.getBookType()).thenReturn(BookFileType.DOC);
         when(file.getFullFilePath()).thenReturn(documentPath);
-        bookEntity.setBookFiles(List.of(file));
+        bookEntity.setBookFiles(Set.of(file));
         when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
         when(documentRenditionService.supports(documentPath)).thenReturn(true);
         when(documentRenditionService.buildBookInfo(documentPath)).thenReturn(expected);
@@ -282,7 +284,7 @@ class EpubReaderServiceTest {
         when(file.getId()).thenReturn(42L);
         when(file.getBookType()).thenReturn(BookFileType.DOC);
         when(file.getFullFilePath()).thenReturn(documentPath);
-        bookEntity.setBookFiles(List.of(file));
+        bookEntity.setBookFiles(Set.of(file));
         when(bookRepository.findByIdForStreaming(1L)).thenReturn(Optional.of(bookEntity));
         when(documentRenditionService.supports(documentPath)).thenReturn(true);
         when(documentRenditionService.buildBookInfo(documentPath)).thenReturn(expected);

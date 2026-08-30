@@ -185,7 +185,7 @@ class ReadingProgressServiceTest {
         primaryFile.setId(1L);
         primaryFile.setBook(book);
         primaryFile.setBookType(BookFileType.EPUB);
-        book.setBookFiles(List.of(primaryFile));
+        book.setBookFiles(Set.of(primaryFile));
 
         BookLoreUser user = mock(BookLoreUser.class);
         when(user.getId()).thenReturn(2L);
@@ -223,7 +223,7 @@ class ReadingProgressServiceTest {
         primaryFile.setId(1L);
         primaryFile.setBook(book);
         primaryFile.setBookType(BookFileType.EPUB);
-        book.setBookFiles(List.of(primaryFile));
+        book.setBookFiles(Set.of(primaryFile));
 
         BookLoreUser user = mock(BookLoreUser.class);
         when(user.getId()).thenReturn(2L);
@@ -268,7 +268,7 @@ class ReadingProgressServiceTest {
         primaryFile.setId(1L);
         primaryFile.setBook(book);
         primaryFile.setBookType(BookFileType.PDF);
-        book.setBookFiles(List.of(primaryFile));
+        book.setBookFiles(Set.of(primaryFile));
 
         BookLoreUser user = mock(BookLoreUser.class);
         when(user.getId()).thenReturn(2L);
@@ -308,7 +308,7 @@ class ReadingProgressServiceTest {
         primaryFile.setId(1L);
         primaryFile.setBook(book);
         primaryFile.setBookType(BookFileType.EPUB);
-        book.setBookFiles(List.of(primaryFile));
+        book.setBookFiles(Set.of(primaryFile));
 
         BookLoreUser user = mock(BookLoreUser.class);
         when(user.getId()).thenReturn(2L);
@@ -345,7 +345,7 @@ class ReadingProgressServiceTest {
         primaryFile.setId(1L);
         primaryFile.setBook(book);
         primaryFile.setBookType(BookFileType.PDF);
-        book.setBookFiles(List.of(primaryFile));
+        book.setBookFiles(Set.of(primaryFile));
 
         BookLoreUser user = mock(BookLoreUser.class);
         when(user.getId()).thenReturn(2L);
@@ -380,7 +380,7 @@ class ReadingProgressServiceTest {
         primaryFile.setId(1L);
         primaryFile.setBook(book);
         primaryFile.setBookType(BookFileType.EPUB);
-        book.setBookFiles(List.of(primaryFile));
+        book.setBookFiles(Set.of(primaryFile));
 
         BookLoreUser user = mock(BookLoreUser.class);
         when(user.getId()).thenReturn(2L);

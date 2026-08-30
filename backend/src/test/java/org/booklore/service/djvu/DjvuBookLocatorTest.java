@@ -9,6 +9,7 @@ import org.booklore.service.inpx.ArchivedBookContentService;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,7 +42,7 @@ class DjvuBookLocatorTest {
                 .sourceArchive(sourceArchive)
                 .sourceArchiveEntry(sourceArchiveEntry)
                 .build();
-        book.setBookFiles(List.of(file));
+        book.setBookFiles(Set.of(file));
         when(bookRepository.findByIdForStreaming(BOOK_ID)).thenReturn(Optional.of(book));
         return file;
     }

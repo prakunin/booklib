@@ -374,7 +374,7 @@ class MetadataManagementServiceTest {
         libraryPath.setPath(tempDir.toString());
         BookEntity book = BookEntity.builder()
                 .id(1L)
-                .bookFiles(new ArrayList<>(List.of(bookFile)))
+                .bookFiles(Set.of(bookFile))
                 .libraryPath(libraryPath)
                 .build();
         BookMetadataEntity metadata = BookMetadataEntity.builder()
@@ -435,7 +435,7 @@ class MetadataManagementServiceTest {
         libraryPath.setPath(tempDir.toString());
         BookEntity book = BookEntity.builder()
                 .id(1L)
-                .bookFiles(new ArrayList<>(List.of(bookFile)))
+                .bookFiles(Set.of(bookFile))
                 .libraryPath(libraryPath)
                 .build();
         BookMetadataEntity metadata = BookMetadataEntity.builder()
@@ -605,7 +605,7 @@ class MetadataManagementServiceTest {
         libraryPath.setPath("/example");
         BookEntity book = BookEntity.builder()
                 .id(1L)
-                .bookFiles(List.of())
+                .bookFiles(Set.of())
                 .libraryPath(libraryPath)
                 .build();
         BookMetadataEntity metadata = BookMetadataEntity.builder()
@@ -640,7 +640,7 @@ class MetadataManagementServiceTest {
         libraryPath.setPath(tempDir.toString());
         BookEntity book = BookEntity.builder()
                 .id(1L)
-                .bookFiles(new ArrayList<>(List.of(bookFile)))
+                .bookFiles(Set.of(bookFile))
                 .libraryPath(libraryPath)
                 .build();
         BookMetadataEntity metadata = BookMetadataEntity.builder()
@@ -694,7 +694,7 @@ class MetadataManagementServiceTest {
         libraryPath.setPath(tempDir.toString());
         BookEntity book = BookEntity.builder()
                 .id(1L)
-                .bookFiles(new ArrayList<>(List.of(bookFile)))
+                .bookFiles(Set.of(bookFile))
                 .libraryPath(libraryPath)
                 .build();
         BookMetadataEntity metadata = BookMetadataEntity.builder()
@@ -740,7 +740,7 @@ class MetadataManagementServiceTest {
         libraryPath.setPath("/fake/path");
         BookEntity book = BookEntity.builder()
                 .id(1L)
-                .bookFiles(new ArrayList<>(List.of(bookFile)))
+                .bookFiles(Set.of(bookFile))
                 .libraryPath(libraryPath)
                 .build();
         BookMetadataEntity metadata = BookMetadataEntity.builder()
@@ -769,7 +769,7 @@ class MetadataManagementServiceTest {
         BookEntity physicalBook = BookEntity.builder()
                 .id(1L)
                 .isPhysical(true)
-                .bookFiles(new ArrayList<>())
+                .bookFiles(new HashSet<>())
                 .build();
         BookMetadataEntity metadata = BookMetadataEntity.builder()
                 .authors(new ArrayList<>(List.of(oldAuthor)))

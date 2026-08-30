@@ -10,7 +10,7 @@ import org.booklore.model.enums.DocumentParseStatus;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
-import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,7 +48,7 @@ class BookMapperV2Test {
         supplementaryFile.setBookType(BookFileType.EPUB);
         supplementaryFile.setFileSizeKb(256L);
 
-        entity.setBookFiles(List.of(primaryFile, supplementaryFile));
+        entity.setBookFiles(Set.of(primaryFile, supplementaryFile));
         entity.setLibrary(library);
         entity.setLibraryPath(libraryPath);
 

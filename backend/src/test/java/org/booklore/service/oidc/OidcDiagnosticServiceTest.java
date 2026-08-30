@@ -10,6 +10,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -34,7 +35,7 @@ class OidcDiagnosticServiceTest {
     private static final String END_SESSION_CHECK = "End Session Endpoint";
     private static final String BACKCHANNEL_LOGOUT_CHECK = "Back-Channel Logout";
 
-    private final OidcDiagnosticService service = new OidcDiagnosticService();
+    private final OidcDiagnosticService service = new OidcDiagnosticService(new RestTemplate());
 
     private HttpServer server;
 

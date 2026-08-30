@@ -104,7 +104,7 @@ class PendingDeletionPoolTest {
         BookFileEntity file2 = BookFileEntity.builder()
                 .id(101L).book(book).fileName("test2.epub").fileSubPath("subfolder")
                 .currentHash("def456").isBookFormat(true).folderBased(false).bookType(BookFileType.EPUB).build();
-        book.setBookFiles(List.of(bookFile, file2));
+        book.setBookFiles(Set.of(bookFile, file2));
 
         ScheduledFuture<?> timer = mock(ScheduledFuture.class);
         pool.addFolderDeletion(Path.of("/library/subfolder"), 1L, List.of(book), timer);
@@ -118,7 +118,7 @@ class PendingDeletionPoolTest {
         BookFileEntity file2 = BookFileEntity.builder()
                 .id(101L).book(book).fileName("test2.epub").fileSubPath("subfolder")
                 .currentHash("def456").isBookFormat(true).folderBased(false).bookType(BookFileType.EPUB).build();
-        book.setBookFiles(List.of(bookFile, file2));
+        book.setBookFiles(Set.of(bookFile, file2));
 
         ScheduledFuture<?> timer = mock(ScheduledFuture.class);
         pool.addFolderDeletion(Path.of("/library/subfolder"), 1L, List.of(book), timer);
@@ -136,7 +136,7 @@ class PendingDeletionPoolTest {
 
     @Test
     void matchFolderByHashes_rejectsLowOverlap() {
-        book.setBookFiles(List.of(bookFile));
+        book.setBookFiles(Set.of(bookFile));
 
         ScheduledFuture<?> timer = mock(ScheduledFuture.class);
         pool.addFolderDeletion(Path.of("/library/subfolder"), 1L, List.of(book), timer);
@@ -197,7 +197,7 @@ class PendingDeletionPoolTest {
 
     @Test
     void expireFolderDeletion_marksAllBooksDeleted() {
-        book.setBookFiles(List.of(bookFile));
+        book.setBookFiles(Set.of(bookFile));
 
         ScheduledFuture<?> timer = mock(ScheduledFuture.class);
         pool.addFolderDeletion(Path.of("/library/subfolder"), 1L, List.of(book), timer);

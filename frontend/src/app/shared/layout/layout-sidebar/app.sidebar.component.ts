@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AppSidebarSectionComponent } from './app.sidebar-section.component';
-import { Menu } from 'primeng/menu';
+import { Menu } from '@openng/optimus-ui/menu';
 import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { CdkConnectedOverlay, CdkOverlayOrigin, ConnectedPosition } from '@angular/cdk/overlay';
 import { BookDialogHelperService } from '../../../features/book/components/book-browser/book-dialog-helper.service';
@@ -38,8 +38,8 @@ import { CommandPaletteService } from '../../../features/command-palette/command
 import { AuthService } from '../../service/auth.service';
 import { LayoutService } from '../layout.service';
 import { TranslocoDirective, TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { Tooltip } from 'primeng/tooltip';
-import type { MenuItem } from 'primeng/api';
+import { Tooltip } from '@openng/optimus-ui/tooltip';
+import type { MenuItem } from '@openng/optimus-ui/api';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavItem, SidebarSection } from '../navigation/nav-item.model';
 import { buildCreateActionNavItems } from '../navigation/nav-catalog';

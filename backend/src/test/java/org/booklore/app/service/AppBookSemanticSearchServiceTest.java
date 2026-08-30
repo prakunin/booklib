@@ -362,6 +362,6 @@ class AppBookSemanticSearchServiceTest {
                 .fileName(title + ".epub")
                 .bookType(BookFileType.EPUB)
                 .build();
-        return BookEntity.builder().id(id).metadata(metadata).bookFiles(List.of(file)).build();
+        return BookEntity.builder().id(id).metadata(metadata).bookFiles(Set.of(file)).build();
     }
 }

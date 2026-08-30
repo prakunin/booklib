@@ -80,9 +80,6 @@ export class BookFormatsChartComponent {
             return this.t.translate('statsLibrary.bookFormats.tooltipLabel', {label: context.label, value, percentage});
           }
         }
-      },
-      datalabels: {
-        display: false
       }
     }
   };

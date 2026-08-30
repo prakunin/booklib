@@ -22,9 +22,9 @@ import org.mockito.MockitoAnnotations;
 
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
@@ -105,7 +105,7 @@ class BookFileTransactionalHandlerTest {
                 .library(library)
                 .libraryPath(libraryPath)
                 .deleted(deleted)
-                .bookFiles(new ArrayList<>())
+                .bookFiles(Set.of())
                 .build();
     }
 
@@ -153,7 +153,7 @@ class BookFileTransactionalHandlerTest {
         void existingAtPath_deletedBook_restoresIt() {
             BookEntity book = buildBook(10L, true);
             BookFileEntity bookFile = buildBookFile(100L, book, "test.epub", "oldhash");
-            book.setBookFiles(List.of(bookFile));
+            book.setBookFiles(Set.of(bookFile));
 
             when(bookFilePersistenceService.findBookFileByLibraryPathSubPathAndFileName(1L, "sub", "test.epub"))
                     .thenReturn(Optional.of(bookFile));
@@ -170,7 +170,7 @@ class BookFileTransactionalHandlerTest {
         void existingAtPath_sameHash_skipsProcessing() {
             BookEntity book = buildBook(10L, false);
             BookFileEntity bookFile = buildBookFile(100L, book, "test.epub", "hash123");
-            book.setBookFiles(List.of(bookFile));
+            book.setBookFiles(Set.of(bookFile));
 
             when(bookFilePersistenceService.findBookFileByLibraryPathSubPathAndFileName(1L, "sub", "test.epub"))
                     .thenReturn(Optional.of(bookFile));
@@ -185,7 +185,7 @@ class BookFileTransactionalHandlerTest {
         void existingAtPath_hashChanged_updatesHash() {
             BookEntity book = buildBook(10L, false);
             BookFileEntity bookFile = buildBookFile(100L, book, "test.epub", "oldhash");
-            book.setBookFiles(List.of(bookFile));
+            book.setBookFiles(Set.of(bookFile));
 
             when(bookFilePersistenceService.findBookFileByLibraryPathSubPathAndFileName(1L, "sub", "test.epub"))
                     .thenReturn(Optional.of(bookFile));
@@ -261,7 +261,7 @@ class BookFileTransactionalHandlerTest {
 
             BookEntity existingBook = buildBook(20L, false);
             BookFileEntity primaryFile = buildBookFile(200L, existingBook, "test.epub", "otherhash");
-            existingBook.setBookFiles(new ArrayList<>(List.of(primaryFile)));
+            existingBook.setBookFiles(Set.of(primaryFile));
             when(bookRepository.findAllByLibraryPathIdAndFileSubPath(1L, "sub")).thenReturn(List.of(existingBook));
 
             // Both files should produce the same grouping key (extension stripped)
@@ -315,7 +315,7 @@ class BookFileTransactionalHandlerTest {
 
             BookEntity existingBook = buildBook(20L, false);
             BookFileEntity primaryFile = buildBookFile(200L, existingBook, "existing.epub", "otherhash");
-            existingBook.setBookFiles(new ArrayList<>(List.of(primaryFile)));
+            existingBook.setBookFiles(Set.of(primaryFile));
             when(bookRepository.findAllByLibraryPathIdAndFileSubPath(1L, "sub")).thenReturn(List.of(existingBook));
 
             handler.handleNewBookFile(1L, Path.of("/library/sub/new.pdf"));
@@ -355,7 +355,7 @@ class BookFileTransactionalHandlerTest {
             BookEntity parentBook = buildBook(30L, false);
             BookFileEntity ebookFile = buildBookFile(300L, parentBook, "book.epub", "ebookhash");
             ebookFile.setBookType(BookFileType.EPUB);
-            parentBook.setBookFiles(new ArrayList<>(List.of(ebookFile)));
+            parentBook.setBookFiles(Set.of(ebookFile));
             when(bookRepository.findAllByLibraryPathIdAndFileSubPath(1L, "author/book")).thenReturn(List.of(parentBook));
 
             handler.handleNewBookFile(1L, Path.of("/library/author/book/audio/chapter1.m4b"));
@@ -419,11 +419,11 @@ class BookFileTransactionalHandlerTest {
 
             BookEntity book1 = buildBook(20L, false);
             BookFileEntity file1 = buildBookFile(200L, book1, "mybook.epub", "h1");
-            book1.setBookFiles(new ArrayList<>(List.of(file1)));
+            book1.setBookFiles(Set.of(file1));
 
             BookEntity book2 = buildBook(21L, false);
             BookFileEntity file2 = buildBookFile(201L, book2, "otherbook.epub", "h2");
-            book2.setBookFiles(new ArrayList<>(List.of(file2)));
+            book2.setBookFiles(Set.of(file2));
 
             when(bookRepository.findAllByLibraryPathIdAndFileSubPath(1L, "sub")).thenReturn(List.of(book1, book2));
             // Make groupingKey different to avoid exact match, but similarity high for book1
@@ -467,12 +467,12 @@ class BookFileTransactionalHandlerTest {
 
             BookEntity smallBook = buildBook(20L, false);
             BookFileEntity f1 = buildBookFile(200L, smallBook, "a.epub", "h1");
-            smallBook.setBookFiles(new ArrayList<>(List.of(f1)));
+            smallBook.setBookFiles(Set.of(f1));
 
             BookEntity bigBook = buildBook(21L, false);
             BookFileEntity f2 = buildBookFile(201L, bigBook, "b.epub", "h2");
             BookFileEntity f3 = buildBookFile(202L, bigBook, "b.pdf", "h3");
-            bigBook.setBookFiles(new ArrayList<>(List.of(f2, f3)));
+            bigBook.setBookFiles(Set.of(f2, f3));
 
             when(bookRepository.findAllByLibraryPathIdAndFileSubPath(1L, "sub")).thenReturn(List.of(smallBook, bigBook));
 
@@ -486,7 +486,7 @@ class BookFileTransactionalHandlerTest {
         void existingAtPath_deletedBook_matchesPendingDeletionHash() {
             BookEntity book = buildBook(10L, true);
             BookFileEntity bookFile = buildBookFile(100L, book, "test.epub", "oldhash");
-            book.setBookFiles(List.of(bookFile));
+            book.setBookFiles(Set.of(bookFile));
 
             when(bookFilePersistenceService.findBookFileByLibraryPathSubPathAndFileName(1L, "sub", "test.epub"))
                     .thenReturn(Optional.of(bookFile));
@@ -525,7 +525,7 @@ class BookFileTransactionalHandlerTest {
 
             BookEntity deletedBook = buildBook(20L, true);
             BookFileEntity file = buildBookFile(200L, deletedBook, "test.epub", "h1");
-            deletedBook.setBookFiles(new ArrayList<>(List.of(file)));
+            deletedBook.setBookFiles(Set.of(file));
             when(bookRepository.findAllByLibraryPathIdAndFileSubPath(1L, "sub")).thenReturn(List.of(deletedBook));
 
             handler.handleNewBookFile(1L, Path.of("/library/sub/test.pdf"));
@@ -586,7 +586,7 @@ class BookFileTransactionalHandlerTest {
 
             BookEntity existingBook = buildBook(20L, false);
             BookFileEntity primaryFile = buildBookFile(200L, existingBook, "audiobook.epub", "h1");
-            existingBook.setBookFiles(new ArrayList<>(List.of(primaryFile)));
+            existingBook.setBookFiles(Set.of(primaryFile));
             when(bookRepository.findAllByLibraryPathIdAndFileSubPath(anyLong(), anyString())).thenReturn(List.of(existingBook));
 
             // Folder name "audiobook" and file "audiobook.epub" should produce same grouping key
@@ -616,7 +616,7 @@ class BookFileTransactionalHandlerTest {
 
             BookEntity deletedBook = buildBook(20L, true);
             BookFileEntity file = buildBookFile(200L, deletedBook, "audiobook.epub", "h1");
-            deletedBook.setBookFiles(new ArrayList<>(List.of(file)));
+            deletedBook.setBookFiles(Set.of(file));
             when(bookRepository.findAllByLibraryPathIdAndFileSubPath(anyLong(), anyString())).thenReturn(List.of(deletedBook));
 
             handler.handleNewFolderAudiobook(1L, Path.of("/library/sub/audiobook"));

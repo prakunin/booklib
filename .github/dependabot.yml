@@ -80,6 +80,8 @@ updates:
         versions: [">=22.0.0"]
       - dependency-name: "@angular/service-worker"
         versions: [">=22.0.0"]
+      - dependency-name: "@tanstack/angular-table"
+        versions: [">=9.0.0"]
       - dependency-name: "angular-eslint"
         versions: [">=22.0.0"]
       - dependency-name: "ngx-infinite-scroll"
@@ -90,6 +92,10 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
     labels:
       - "dependencies"
       - "ci"

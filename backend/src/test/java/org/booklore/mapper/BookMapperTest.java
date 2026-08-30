@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,7 +42,7 @@ class BookMapperTest {
         primaryFile.setBookFormat(true);
         primaryFile.setBookType(BookFileType.EPUB);
         primaryFile.setSourceArchive("catalog.zip");
-        entity.setBookFiles(List.of(primaryFile));
+        entity.setBookFiles(Set.of(primaryFile));
         entity.setLibrary(library);
         entity.setLibraryPath(libraryPath);
 

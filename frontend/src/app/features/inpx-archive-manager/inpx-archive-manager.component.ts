@@ -2,11 +2,11 @@ import {ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DatePipe} from '@angular/common';
 import {ActivatedRoute, Router} from '@angular/router';
-import {TableModule} from 'primeng/table';
-import {Button} from 'primeng/button';
-import {Tag} from 'primeng/tag';
-import {ProgressSpinner} from 'primeng/progressspinner';
-import {ConfirmationService, MessageService} from 'primeng/api';
+import {TableModule} from '@openng/optimus-ui/table';
+import {Button} from '@openng/optimus-ui/button';
+import {Tag} from '@openng/optimus-ui/tag';
+import {ProgressSpinner} from '@openng/optimus-ui/progressspinner';
+import {ConfirmationService, MessageService} from '@openng/optimus-ui/api';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {catchError, EMPTY, exhaustMap, filter, finalize, map, Subscription, take, tap, timer} from 'rxjs';
 import {InpxArchive, InpxArchiveScanStatus, InpxArchiveScanTask, LocalCatalogStatus} from './inpx-archive.model';

@@ -27,7 +27,7 @@ public class AuthorEntity {
     @Column(name = "name")
     private String name;
 
-    @Column(name = "sort_name")
+    @Column(name = "sort_name", length = 255)
     private String sortName;
 
     @Column(name = "sort_name_locked", nullable = false)

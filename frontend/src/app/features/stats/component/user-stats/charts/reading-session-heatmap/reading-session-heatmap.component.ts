@@ -1,6 +1,6 @@
 import {Component, inject, Input, OnDestroy, OnInit} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
-import {Tooltip} from 'primeng/tooltip';
+import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {Chart, ChartConfiguration, ChartData, registerables} from 'chart.js';
 import {MatrixController, MatrixElement} from 'chartjs-chart-matrix';
 import {BehaviorSubject, EMPTY, Observable, Subject} from 'rxjs';
@@ -88,6 +88,7 @@ export class ReadingSessionHeatmapComponent implements OnInit, OnDestroy {
               const point = context[0].raw as MatrixDataPoint;
               const date = new Date(point.date);
               return date.toLocaleDateString('en-US', {
+                timeZone: 'UTC',
                 weekday: 'short',
                 year: 'numeric',
                 month: 'short',
@@ -101,8 +102,7 @@ export class ReadingSessionHeatmapComponent implements OnInit, OnDestroy {
                 : this.translocoService.translate('statsUser.sessionHeatmap.readingSessions_plural', {count: point.v});
             }
           }
-        },
-        datalabels: {display: false}
+        }
       },
       scales: {
         x: {

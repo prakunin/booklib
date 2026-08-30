@@ -21,6 +21,7 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 
@@ -75,7 +76,7 @@ class InpxArchiveBookRefreshServiceTest {
                 .build();
         BookEntity managedBook = BookEntity.builder()
                 .id(42L)
-                .bookFiles(List.of(archivedFile))
+                .bookFiles(Set.of(archivedFile))
                 .build();
         BookMetadata extractedMetadata = BookMetadata.builder().title("Updated title").build();
 
@@ -111,7 +112,7 @@ class InpxArchiveBookRefreshServiceTest {
         BookEntity managedBook = BookEntity.builder()
                 .id(42L)
                 .coverProbedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"))
-                .bookFiles(List.of(archivedFile))
+                .bookFiles(Set.of(archivedFile))
                 .build();
 
         when(bookRepository.findByIdForInpxArchiveRefresh(42L)).thenReturn(Optional.of(managedBook));
@@ -134,7 +135,7 @@ class InpxArchiveBookRefreshServiceTest {
                 .build();
         BookEntity managedBook = BookEntity.builder()
                 .id(42L)
-                .bookFiles(List.of(archivedFile))
+                .bookFiles(Set.of(archivedFile))
                 .build();
 
         when(bookRepository.findByIdForInpxArchiveRefresh(42L)).thenReturn(Optional.of(managedBook));
@@ -165,7 +166,7 @@ class InpxArchiveBookRefreshServiceTest {
                 .build();
         BookEntity managedBook = BookEntity.builder()
                 .id(42L)
-                .bookFiles(List.of(archivedFile))
+                .bookFiles(Set.of(archivedFile))
                 .build();
 
         when(bookRepository.findByIdForInpxArchiveRefresh(42L)).thenReturn(Optional.of(managedBook));
@@ -189,7 +190,7 @@ class InpxArchiveBookRefreshServiceTest {
                 .fileName("letter.html")
                 .bookType(BookFileType.HTML)
                 .build();
-        BookEntity managedBook = BookEntity.builder().id(42L).bookFiles(List.of(archivedFile)).build();
+        BookEntity managedBook = BookEntity.builder().id(42L).bookFiles(Set.of(archivedFile)).build();
         when(bookRepository.findByIdForInpxArchiveRefresh(42L)).thenReturn(Optional.of(managedBook));
         when(entryMetadataRecognizer.hasExtractor("letter.html")).thenReturn(false);
         when(archivedBookContentService.resolveRevalidated(archivedFile)).thenReturn(Path.of("letter.html"));
@@ -208,7 +209,7 @@ class InpxArchiveBookRefreshServiceTest {
                 .fileName("comic.zip")
                 .bookType(BookFileType.CBX)
                 .build();
-        BookEntity managedBook = BookEntity.builder().id(42L).bookFiles(List.of(archivedFile)).build();
+        BookEntity managedBook = BookEntity.builder().id(42L).bookFiles(Set.of(archivedFile)).build();
         when(bookRepository.findByIdForInpxArchiveRefresh(42L)).thenReturn(Optional.of(managedBook));
         when(entryMetadataRecognizer.hasExtractor("comic.zip")).thenReturn(false);
         when(entryMetadataRecognizer.isGenericArchive("comic.zip")).thenReturn(true);
@@ -228,7 +229,7 @@ class InpxArchiveBookRefreshServiceTest {
                 .build();
         BookEntity managedBook = BookEntity.builder()
                 .id(42L)
-                .bookFiles(List.of(archivedFile))
+                .bookFiles(Set.of(archivedFile))
                 .build();
         when(bookRepository.findByIdForInpxArchiveRefresh(42L)).thenReturn(Optional.of(managedBook));
         when(entryMetadataRecognizer.hasExtractor("??????.fb2")).thenReturn(true);

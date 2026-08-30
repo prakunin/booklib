@@ -1,6 +1,6 @@
 import {Component, computed, inject} from '@angular/core';
 import {BaseChartDirective} from 'ng2-charts';
-import {Tooltip} from 'primeng/tooltip';
+import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {ChartConfiguration, ChartData} from 'chart.js';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {toSignal} from '@angular/core/rxjs-interop';
@@ -59,8 +59,7 @@ export class ReadingSurvivalChartComponent {
           title: (context) => this.t.translate('statsUser.readingSurvival.tooltipProgress', {label: context[0].label}),
           label: (context) => this.t.translate('statsUser.readingSurvival.tooltipSurvival', {value: (context.parsed.y ?? 0).toFixed(1)})
         }
-      },
-      datalabels: {display: false}
+      }
     },
     scales: {
       x: {

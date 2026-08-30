@@ -1,11 +1,11 @@
 import {Component, computed, inject, signal} from '@angular/core';
-import {Button} from 'primeng/button';
-import {Checkbox} from 'primeng/checkbox';
+import {Button} from '@openng/optimus-ui/button';
+import {Checkbox} from '@openng/optimus-ui/checkbox';
 import {FormsModule} from '@angular/forms';
-import {RadioButton} from 'primeng/radiobutton';
-import {ProgressBar} from 'primeng/progressbar';
-import {DynamicDialogConfig, DynamicDialogRef} from 'primeng/dynamicdialog';
-import {MessageService} from 'primeng/api';
+import {RadioButton} from '@openng/optimus-ui/radiobutton';
+import {ProgressBar} from '@openng/optimus-ui/progressbar';
+import {DynamicDialogConfig, DynamicDialogRef} from '@openng/optimus-ui/dynamicdialog';
+import {MessageService} from '@openng/optimus-ui/api';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {EnrichmentService} from '../../service/enrichment.service';

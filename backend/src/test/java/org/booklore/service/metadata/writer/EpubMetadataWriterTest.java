@@ -98,7 +98,7 @@ class EpubMetadataWriterTest {
         bookEntity.setLibraryPath(libraryPath);
         BookFileEntity primaryFile = new BookFileEntity();
         primaryFile.setBook(bookEntity);
-        bookEntity.setBookFiles(Collections.singletonList(primaryFile));
+        bookEntity.setBookFiles(Set.of(primaryFile));
         bookEntity.getPrimaryBookFile().setFileSubPath("");
         bookEntity.getPrimaryBookFile().setFileName("test.epub");
     }
@@ -995,7 +995,7 @@ class EpubMetadataWriterTest {
             entity.setLibraryPath(libraryPath);
             BookFileEntity primaryFile = new BookFileEntity();
             primaryFile.setBook(entity);
-            entity.setBookFiles(Collections.singletonList(primaryFile));
+            entity.setBookFiles(Set.of(primaryFile));
             entity.getPrimaryBookFile().setFileSubPath("");
             entity.getPrimaryBookFile().setFileName(epubFile.getName());
             return entity;
@@ -1438,7 +1438,7 @@ class EpubMetadataWriterTest {
             entity.setLibraryPath(libraryPath);
             BookFileEntity primaryFile = new BookFileEntity();
             primaryFile.setBook(entity);
-            entity.setBookFiles(Collections.singletonList(primaryFile));
+            entity.setBookFiles(Set.of(primaryFile));
             entity.getPrimaryBookFile().setFileSubPath("");
             entity.getPrimaryBookFile().setFileName(epubFile.getName());
             return entity;

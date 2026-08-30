@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Set;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -211,7 +212,7 @@ class InpxArchiveReconciliationServiceTest {
                 .sourceArchive("outer.zip")
                 .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("publication.zip", "img/00.gif")))
                 .build();
-        imageBook.setBookFiles(List.of(image));
+        imageBook.setBookFiles(Set.of(image));
         when(bookFileRepository.findBookFilesByArchives(7L, List.of("outer.zip")))
                 .thenReturn(List.of(html, image));
 
@@ -238,7 +239,7 @@ class InpxArchiveReconciliationServiceTest {
                 .book(pageBook).fileName("page.jpg").bookType(BookFileType.OTHER)
                 .sourceArchive("outer.zip")
                 .sourceArchiveEntry(NestedArchiveLocator.encode(List.of("comic.zip", "page.jpg"))).build();
-        pageBook.setBookFiles(List.of(page));
+        pageBook.setBookFiles(Set.of(page));
         BookEntity otherLeafBook = BookEntity.builder().id(32L).deleted(false).build();
         BookFileEntity otherLeaf = BookFileEntity.builder()
                 .book(otherLeafBook).fileName("book.fb2").bookType(BookFileType.FB2)
@@ -277,7 +278,7 @@ class InpxArchiveReconciliationServiceTest {
                 .build();
         BookFileEntity retained = BookFileEntity.builder()
                 .book(groupedBook).fileName("notes.txt").bookType(BookFileType.OTHER).build();
-        groupedBook.setBookFiles(List.of(image, retained));
+        groupedBook.setBookFiles(Set.of(image, retained));
         when(bookFileRepository.findBookFilesByArchives(7L, List.of("outer.zip")))
                 .thenReturn(List.of(html, image));
 

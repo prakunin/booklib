@@ -1,7 +1,7 @@
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, Router} from '@angular/router';
 import {TranslocoService} from '@jsverse/transloco';
-import {MessageService} from 'primeng/api';
+import {MessageService} from '@openng/optimus-ui/api';
 import {EMPTY, of} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
