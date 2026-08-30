@@ -22,10 +22,10 @@ import java.util.regex.Pattern;
 @Service
 public class CoverImageGenerator {
 
-    private static final int WIDTH = 1200;
+    static final int WIDTH = 1200;
     private static final int HEIGHT = 1600;
     private static final int SQUARE_SIZE = 1200;
-    private static final int SCALE = 2;
+    static final int SCALE = 2;
     private static final double PHI = 1.618033988749;
     private static final double PHI_INV = 1.0 / PHI;
     private static final double PHI_SQ_INV = 1.0 / (PHI * PHI);
@@ -149,7 +149,7 @@ public class CoverImageGenerator {
     private record Palette(Color primary, Color secondary, Color tertiary, Color accent,
                            Color textMain, Color textSub, Color ornament) {}
 
-    private int calcMargin(int w) {
+    int calcMargin(int w) {
         int frameOuter = (int) (w * PHI_SQ_INV * 0.12);
         int frameInner = (int) (frameOuter * PHI);
         return frameInner + (int) (w * 0.04);
@@ -346,11 +346,11 @@ public class CoverImageGenerator {
         int bottomBound = (int) (h * PHI_INV);
 
         String text = title.toUpperCase();
-        Font font = resolveFont(g, text, maxW, titleSize(title.length()), MAX_TITLE_LINES, true);
-        g.setFont(font);
+        FittedText fitted = fitText(g, text, maxW, titleSize(title.length()), MAX_TITLE_LINES, true);
+        g.setFont(fitted.font());
         FontMetrics fm = g.getFontMetrics();
 
-        List<String> lines = wrapText(text, fm, maxW, MAX_TITLE_LINES);
+        List<String> lines = fitted.lines();
         int lineH = (int) (fm.getHeight() * 1.12);
         int totalH = lines.size() * lineH;
 
@@ -512,18 +512,18 @@ public class CoverImageGenerator {
         int maxW = w - margin * 2;
         int bottomBound = h - margin;
 
-        Font subtitleFont = resolveFont(g, subtitle, maxW, subtitleSize(subtitle.length()), 2, false);
-        g.setFont(subtitleFont);
+        FittedText fitted = fitText(g, subtitle, maxW, subtitleSize(subtitle.length()), 2, false);
+        g.setFont(fitted.font());
         FontMetrics subtitleFm = g.getFontMetrics();
 
-        List<String> lines = wrapText(subtitle, subtitleFm, maxW, 2);
+        List<String> lines = fitted.lines();
         int subtitleLineH = (int) (subtitleFm.getHeight() * 1.12);
 
         // Position subtitle below the title with some spacing
         int spacing = (int) (subtitleLineH * 0.5);
         int startY = titleEnd + spacing + subtitleFm.getAscent();
 
-        g.setFont(subtitleFont);
+        g.setFont(fitted.font());
         float tracking = 0.06f;
 
         int lastY = startY;
@@ -637,52 +637,114 @@ public class CoverImageGenerator {
                 Math.min(255, (int) (c.getBlue() + (255 - c.getBlue()) * f)));
     }
 
+    /**
+     * A block of text together with the font it was measured at.
+     * <p>
+     * Laying out and measuring are the same step on purpose: the size is only accepted because
+     * these exact lines fit, so handing the lines back is what keeps the drawn text identical to
+     * the measured text.
+     */
+    record FittedText(Font font, List<String> lines) {
+    }
+
+    /**
+     * Picks the largest font at which the text still fits the column, and returns the lines it
+     * fits on.
+     * <p>
+     * Two properties matter here. Words are never split while a smaller size would keep them
+     * whole - a one-word title shrinks instead of rendering as "VOZMEZDI / E". And the search
+     * measures with the same letter tracking the text is drawn with, so a line that passes here
+     * cannot overflow the margin once drawn.
+     */
+    FittedText fitText(Graphics2D g, String text, int maxW, int startSize, int maxLines, boolean isTitle) {
+        String family = selectFamily(startSize, isTitle);
+        int style = isTitle ? Font.BOLD : Font.PLAIN;
+        float tracking = trackingFor(isTitle);
+
+        for (int size = startSize; size >= MIN_FONT; size -= 2) {
+            Font font = new Font(family, style, size);
+            g.setFont(font);
+            FontMetrics fm = g.getFontMetrics();
+            if (!wordsFit(text, fm, maxW, tracking)) continue;
+            List<String> lines = wrapLines(text, fm, maxW, tracking, false);
+            if (lines.size() <= maxLines) return new FittedText(font, lines);
+        }
+
+        // Nothing fits whole even at the floor - a single word wider than the column, or more
+        // text than maxLines can hold. Hyphenate and ellipsize at the smallest size, which is
+        // still better than drawing past the margin.
+        Font font = new Font(family, style, MIN_FONT);
+        g.setFont(font);
+        return new FittedText(font, wrapText(text, g.getFontMetrics(), maxW, maxLines, tracking));
+    }
+
+    /**
+     * The font {@link #fitText} settles on, for callers that lay the text out themselves.
+     */
     private Font resolveFont(Graphics2D g, String text, int maxW, int startSize, int maxLines, boolean isTitle) {
+        return fitText(g, text, maxW, startSize, maxLines, isTitle).font();
+    }
+
+    private String selectFamily(int size, boolean isTitle) {
         String[] serif = {"Palatino Linotype", "Garamond", "Georgia", "Book Antiqua"};
         String[] sans = {"Optima", "Gill Sans", "Helvetica Neue", "Calibri"};
         String[] preferred = isTitle ? serif : sans;
-        String fallback = isTitle ? Font.SERIF : Font.SANS_SERIF;
         int style = isTitle ? Font.BOLD : Font.PLAIN;
 
-        String selected = fallback;
         for (String name : preferred) {
-            Font test = new Font(name, style, startSize);
-            if (test.getFamily().equalsIgnoreCase(name)) {
-                selected = name;
-                break;
-            }
+            Font test = new Font(name, style, size);
+            if (test.getFamily().equalsIgnoreCase(name)) return name;
         }
-
-        float tracking = isTitle ? 0.05f : 0.08f;
-
-        for (int size = startSize; size >= MIN_FONT; size -= 2) {
-            Font font = new Font(selected, style, size);
-            g.setFont(font);
-            FontMetrics fm = g.getFontMetrics();
-            List<String> lines = wrapText(text, fm, maxW, maxLines);
-            if (lines.stream().allMatch(l -> trackedWidth(fm, l, tracking) <= maxW)) return font;
-        }
-
-        return new Font(selected, style, MIN_FONT);
+        return isTitle ? Font.SERIF : Font.SANS_SERIF;
     }
 
-    private List<String> wrapText(String text, FontMetrics fm, int maxW, int maxLines) {
+    private static float trackingFor(boolean isTitle) {
+        return isTitle ? 0.05f : 0.08f;
+    }
+
+    private boolean wordsFit(String text, FontMetrics fm, int maxW, float tracking) {
+        for (String word : WS.split(text.trim())) {
+            if (trackedWidth(fm, word, tracking) > maxW) return false;
+        }
+        return true;
+    }
+
+    private List<String> wrapText(String text, FontMetrics fm, int maxW, int maxLines, float tracking) {
+        List<String> lines = wrapLines(text, fm, maxW, tracking, true);
+        if (lines.size() <= maxLines) return lines;
+
+        lines = new ArrayList<>(lines.subList(0, maxLines));
+        String last = lines.get(maxLines - 1);
+        while (!last.isEmpty() && trackedWidth(fm, last + "\u2026", tracking) > maxW)
+            last = last.substring(0, last.length() - 1).trim();
+        lines.set(maxLines - 1, last + "\u2026");
+        return lines;
+    }
+
+    /**
+     * Breaks the text into lines that each fit {@code maxW}, without limiting how many.
+     *
+     * @param allowBreak whether a word wider than the column may be split mid-word. The size
+     *                   search passes {@code false} so that an overlong word rejects the size
+     *                   instead of being hyphenated at it.
+     */
+    private List<String> wrapLines(String text, FontMetrics fm, int maxW, float tracking, boolean allowBreak) {
         List<String> lines = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
 
         for (String word : WS.split(text.trim())) {
-            if (fm.stringWidth(word) > maxW) {
+            if (allowBreak && trackedWidth(fm, word, tracking) > maxW) {
                 if (!cur.isEmpty()) {
                     lines.add(cur.toString().trim());
                     cur = new StringBuilder();
                 }
-                lines.addAll(breakWord(word, fm, maxW));
+                lines.addAll(breakWord(word, fm, maxW, tracking));
                 continue;
             }
 
             if (cur.isEmpty()) {
                 cur.append(word);
-            } else if (fm.stringWidth(cur + " " + word) <= maxW) {
+            } else if (trackedWidth(fm, cur + " " + word, tracking) <= maxW) {
                 cur.append(" ").append(word);
             } else {
                 lines.add(cur.toString().trim());
@@ -692,23 +754,15 @@ public class CoverImageGenerator {
 
         if (!cur.isEmpty()) lines.add(cur.toString().trim());
 
-        if (lines.size() > maxLines) {
-            lines = new ArrayList<>(lines.subList(0, maxLines));
-            String last = lines.get(maxLines - 1);
-            while (!last.isEmpty() && fm.stringWidth(last + "…") > maxW)
-                last = last.substring(0, last.length() - 1).trim();
-            lines.set(maxLines - 1, last + "…");
-        }
-
         return lines;
     }
 
-    private List<String> breakWord(String word, FontMetrics fm, int maxW) {
+    private List<String> breakWord(String word, FontMetrics fm, int maxW, float tracking) {
         List<String> parts = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
 
         for (char c : word.toCharArray()) {
-            if (fm.stringWidth(cur.toString() + c) > maxW && !cur.isEmpty()) {
+            if (trackedWidth(fm, cur.toString() + c, tracking) > maxW && !cur.isEmpty()) {
                 parts.add(cur.toString());
                 cur = new StringBuilder();
             }
@@ -719,7 +773,7 @@ public class CoverImageGenerator {
         return parts;
     }
 
-    private int titleSize(int len) {
+    int titleSize(int len) {
         if (len < 8) return 150 * SCALE;
         if (len < 15) return 130 * SCALE;
         if (len < 25) return 110 * SCALE;
@@ -800,11 +854,11 @@ public class CoverImageGenerator {
         int maxW = size - margin * 2;
 
         String text = title.toUpperCase();
-        Font font = resolveFont(g, text, maxW, squareTitleSize(title.length()), 3, true);
-        g.setFont(font);
+        FittedText fitted = fitText(g, text, maxW, squareTitleSize(title.length()), 3, true);
+        g.setFont(fitted.font());
         FontMetrics fm = g.getFontMetrics();
 
-        List<String> lines = wrapText(text, fm, maxW, 3);
+        List<String> lines = fitted.lines();
         int lineH = (int) (fm.getHeight() * 1.12);
         int totalH = lines.size() * lineH;
 
@@ -828,11 +882,11 @@ public class CoverImageGenerator {
     private void renderSquareAuthor(Graphics2D g, String author, Palette p, int size, int margin) {
         int maxW = size - margin * 2;
 
-        Font authorFont = resolveFont(g, author, maxW, squareAuthorSize(author.length()), 2, false);
-        g.setFont(authorFont);
+        FittedText fittedAuthor = fitText(g, author, maxW, squareAuthorSize(author.length()), 2, false);
+        g.setFont(fittedAuthor.font());
         FontMetrics authorFm = g.getFontMetrics();
 
-        List<String> lines = wrapText(author, authorFm, maxW, 2);
+        List<String> lines = fittedAuthor.lines();
         int authorLineH = (int) (authorFm.getHeight() * 1.15);
         int totalH = lines.size() * authorLineH;
 

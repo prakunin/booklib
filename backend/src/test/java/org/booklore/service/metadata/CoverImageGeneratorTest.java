@@ -5,9 +5,11 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -145,6 +147,55 @@ class CoverImageGeneratorTest {
             byte[] jpeg = generator.generateSquareCover(longTitle, longAuthor);
 
             decode(jpeg);
+        }
+    }
+
+    @Nested
+    @DisplayName("title line breaking")
+    class TitleLineBreakingTest {
+
+        private static final int RENDER_WIDTH = CoverImageGenerator.WIDTH * CoverImageGenerator.SCALE;
+
+        /**
+         * Lays a title out exactly as {@code renderTitle} does, so the assertions below describe
+         * what actually reaches the cover rather than an approximation of it.
+         */
+        private List<String> layOutTitle(String title) {
+            BufferedImage canvas = new BufferedImage(RENDER_WIDTH, 10, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = canvas.createGraphics();
+            try {
+                int maxW = RENDER_WIDTH - generator.calcMargin(RENDER_WIDTH) * 2;
+                String text = title.toUpperCase();
+                return generator.fitText(g, text, maxW, generator.titleSize(title.length()), 5, true).lines();
+            } finally {
+                g.dispose();
+                canvas.flush();
+            }
+        }
+
+        @Test
+        void singleWordTitle_shrinksTheFontRatherThanSplittingTheWord() {
+            assertThat(layOutTitle("Возмездие")).containsExactly("ВОЗМЕЗДИЕ");
+        }
+
+        @Test
+        void longSingleWordTitle_staysWholeOnOneLine() {
+            assertThat(layOutTitle("Неотвратимость")).containsExactly("НЕОТВРАТИМОСТЬ");
+        }
+
+        @Test
+        void multiWordTitle_breaksBetweenWordsOnly() {
+            List<String> lines = layOutTitle("Наемный убийца возвращается домой");
+
+            assertThat(lines).isNotEmpty();
+            assertThat(String.join(" ", lines)).isEqualTo("НАЕМНЫЙ УБИЙЦА ВОЗВРАЩАЕТСЯ ДОМОЙ");
+        }
+
+        @Test
+        void wordTooLongEvenAtTheSmallestFont_isStillBrokenAcrossLines() {
+            List<String> lines = layOutTitle("Ш".repeat(120));
+
+            assertThat(lines).hasSizeGreaterThan(1);
         }
     }
 }
