@@ -252,6 +252,16 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
       }
     });
 
+    if (permissions?.canEditMetadata || permissions?.admin) {
+      items.push({
+        label: this.t.translate('metadata.viewer.menuEnrich'),
+        icon: 'pi pi-wand',
+        command: () => {
+          void this.bookDialogHelperService.openEnrichmentDialog(new Set([book.id])).catch(() => undefined);
+        },
+      });
+    }
+
     if (permissions?.canManageLibrary || permissions?.admin) {
       const isPhysical = book.isPhysical ?? false;
       items.push({

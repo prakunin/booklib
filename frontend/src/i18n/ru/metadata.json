@@ -403,13 +403,14 @@
             "detachFileBtn": "",
             "sendAnyway": ""
         },
-        "menuMarkPhysical": "",
-        "menuUnmarkPhysical": "",
+        "menuMarkPhysical": "Отметить как физическую",
+        "menuUnmarkPhysical": "Снять отметку физической",
         "firstAuthorBadge": "",
         "shelvesLabel": "",
         "audiobookAbridged": "",
         "smartEnrichBtn": "Умное дополнение",
-        "smartEnrichTooltip": "Определить произведение в интернете и предложить недостающие метаданные"
+        "smartEnrichTooltip": "Определить произведение в интернете и предложить недостающие метаданные",
+        "menuEnrich": "Обогатить…"
     },
     "sidecar": {
         "title": "Сопроводительные метаданные",
@@ -675,7 +676,9 @@
             "title": "Название",
             "authors": "Авторы",
             "language": "Язык"
-        }
+        },
+        "apply": "Применить из каталога",
+        "applyTooltip": "Откроет обогащение с выбранными только локальными источниками и заменой существующих значений"
     },
     "enrichment": {
         "title": "Обогащение",

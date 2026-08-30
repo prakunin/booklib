@@ -14,12 +14,21 @@
     } @else {
       @let catalog = view()!;
 
-      @if (catalogKey(); as key) {
-        <p class="local-catalog-key" [title]="t('keyTooltip')">
-          <i class="pi pi-key"></i>
-          <code>{{ key }}</code>
-        </p>
-      }
+      <div class="local-catalog-header">
+        @if (catalogKey(); as key) {
+          <p class="local-catalog-key" [title]="t('keyTooltip')">
+            <i class="pi pi-key"></i>
+            <code>{{ key }}</code>
+          </p>
+        }
+        <app-button
+          variant="soft"
+          tone="primary"
+          size="sm"
+          [label]="t('apply')"
+          [title]="t('applyTooltip')"
+          (clicked)="applyFromCatalog()"/>
+      </div>
 
       @if (catalog.description) {
         <section class="local-catalog-section">

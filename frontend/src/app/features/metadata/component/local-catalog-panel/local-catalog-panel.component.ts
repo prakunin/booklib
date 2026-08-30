@@ -4,9 +4,12 @@ import {injectQuery} from '@tanstack/angular-query-experimental';
 import {TranslocoDirective} from '@jsverse/transloco';
 import {lastValueFrom} from 'rxjs';
 
+import {AppButtonComponent} from '../../../../shared/ui/button/app-button.component';
 import {AppSpinnerComponent} from '../../../../shared/ui/spinner/app-spinner.component';
 import {AppTagComponent} from '../../../../shared/ui/tag/app-tag.component';
+import {BookDialogHelperService} from '../../../book/components/book-browser/book-dialog-helper.service';
 import {EnrichmentService} from '../../service/enrichment.service';
+import {LOCAL_CATALOG_ENRICHMENT_STEPS} from '../../model/enrichment.model';
 import {LocalCatalogBookView} from '../../model/local-catalog.model';
 
 /**
@@ -22,7 +25,7 @@ import {LocalCatalogBookView} from '../../model/local-catalog.model';
   selector: 'app-local-catalog-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, TranslocoDirective, AppSpinnerComponent, AppTagComponent],
+  imports: [DatePipe, TranslocoDirective, AppButtonComponent, AppSpinnerComponent, AppTagComponent],
   templateUrl: './local-catalog-panel.component.html',
   styleUrl: './local-catalog-panel.component.scss',
 })
@@ -30,6 +33,7 @@ export class LocalCatalogPanelComponent {
   readonly bookId = input.required<number>();
 
   private readonly enrichmentService = inject(EnrichmentService);
+  private readonly bookDialogHelperService = inject(BookDialogHelperService);
 
   /**
    * The catalog is a set of files on disk that only ever changes when an operator replaces them, so
@@ -80,5 +84,18 @@ export class LocalCatalogPanelComponent {
    */
   applied(field: string): boolean {
     return this.view()?.fieldsFromCatalog.includes(field) ?? false;
+  }
+
+  /**
+   * Opens the enrichment dialog already narrowed to the catalog steps and set to replace, because
+   * that is the run this panel is evidence for. It is a preset rather than a silent apply: the
+   * dialog still shows every source and every policy, and replacing is a decision — a field the
+   * catalog disagrees with may be one somebody corrected by hand.
+   */
+  async applyFromCatalog(): Promise<void> {
+    await this.bookDialogHelperService.openEnrichmentDialog(new Set([this.bookId()]), {
+      steps: LOCAL_CATALOG_ENRICHMENT_STEPS,
+      writePolicy: 'AUTO',
+    });
   }
 }

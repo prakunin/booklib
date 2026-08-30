@@ -47,8 +47,14 @@ export class EnrichmentComponent {
   readonly libraryBookCount: number = this.config.data.libraryBookCount ?? 0;
 
   readonly selectableSteps = SELECTABLE_ENRICHMENT_STEPS;
-  readonly selectedSteps = signal<EnrichmentStepType[]>([...SELECTABLE_ENRICHMENT_STEPS]);
-  readonly writePolicy = signal<EnrichmentWritePolicy>('AUTO_IF_EMPTY');
+  /**
+   * A caller that already knows which sources it means — the local-catalog panel, say — passes them
+   * in. The dialog still shows every box, because the preset is a starting point the user may
+   * disagree with, not a restriction.
+   */
+  readonly selectedSteps = signal<EnrichmentStepType[]>(
+    this.config.data.steps ?? [...SELECTABLE_ENRICHMENT_STEPS]);
+  readonly writePolicy = signal<EnrichmentWritePolicy>(this.config.data.writePolicy ?? 'AUTO_IF_EMPTY');
   readonly agentAllowed = signal(false);
   readonly submitting = signal(false);
 

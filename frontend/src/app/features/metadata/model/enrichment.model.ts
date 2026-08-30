@@ -77,3 +77,17 @@ export const SELECTABLE_ENRICHMENT_STEPS: readonly EnrichmentStepType[] = [
   'REVIEWS',
   'AUTHOR_BIO',
 ] as const;
+
+/**
+ * The steps that read only the library's local catalog: no network, no provider, no agent. Offered
+ * as one preset because "apply what the catalog holds" is a single intent, and assembling it by
+ * unticking five provider boxes every time is how a user ends up letting a provider overwrite the
+ * very field they came to fix.
+ */
+export const LOCAL_CATALOG_ENRICHMENT_STEPS: readonly EnrichmentStepType[] = [
+  'LOCAL_CATALOG',
+  'LOCAL_LANGUAGE',
+  'LOCAL_COMPILATION',
+  'REVIEWS',
+  'AUTHOR_BIO',
+] as const;

@@ -1,15 +1,17 @@
 import {ComponentFixture, TestBed} from '@angular/core/testing';
 import {HttpTestingController} from '@angular/common/http/testing';
-import {beforeEach, describe, expect, it} from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {createQueryClientHarness, flushQueryAsync} from '../../../../core/testing/query-testing';
 import {getTranslocoModule} from '../../../../core/testing/transloco-testing';
+import {BookDialogHelperService} from '../../../book/components/book-browser/book-dialog-helper.service';
 import {LocalCatalogBookView} from '../../model/local-catalog.model';
 import {LocalCatalogPanelComponent} from './local-catalog-panel.component';
 
 describe('LocalCatalogPanelComponent', () => {
   let fixture: ComponentFixture<LocalCatalogPanelComponent>;
   let httpMock: HttpTestingController;
+  let openEnrichmentDialog: ReturnType<typeof vi.fn>;
 
   function emptyView(overrides: Partial<LocalCatalogBookView> = {}): LocalCatalogBookView {
     return {
@@ -37,9 +39,13 @@ describe('LocalCatalogPanelComponent', () => {
 
   beforeEach(() => {
     const harness = createQueryClientHarness();
+    openEnrichmentDialog = vi.fn(() => Promise.resolve(null));
     TestBed.configureTestingModule({
       imports: [LocalCatalogPanelComponent, getTranslocoModule()],
-      providers: harness.providers,
+      providers: [
+        ...harness.providers,
+        {provide: BookDialogHelperService, useValue: {openEnrichmentDialog}},
+      ],
     });
     fixture = TestBed.createComponent(LocalCatalogPanelComponent);
     httpMock = TestBed.inject(HttpTestingController);
@@ -89,5 +95,16 @@ describe('LocalCatalogPanelComponent', () => {
     }));
 
     expect(fixture.nativeElement.textContent).toContain('Showing 1 of 120.');
+  });
+
+  it('opens enrichment narrowed to the catalog sources and set to replace', async () => {
+    await respondWith(emptyView({description: 'annotation'}), 77);
+
+    await fixture.componentInstance.applyFromCatalog();
+
+    expect(openEnrichmentDialog).toHaveBeenCalledWith(new Set([77]), {
+      steps: ['LOCAL_CATALOG', 'LOCAL_LANGUAGE', 'LOCAL_COMPILATION', 'REVIEWS', 'AUTHOR_BIO'],
+      writePolicy: 'AUTO',
+    });
   });
 });

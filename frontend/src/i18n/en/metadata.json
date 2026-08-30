@@ -410,7 +410,8 @@
       "sendAnyway": "Send Anyway"
     },
     "smartEnrichBtn": "Smart Enrich",
-    "smartEnrichTooltip": "Identify the work online and suggest missing metadata"
+    "smartEnrichTooltip": "Identify the work online and suggest missing metadata",
+    "menuEnrich": "Enrich…"
   },
   "sidecar": {
     "title": "Sidecar Metadata",
@@ -754,6 +755,8 @@
       "title": "Title",
       "authors": "Authors",
       "language": "Language"
-    }
+    },
+    "apply": "Apply from catalog",
+    "applyTooltip": "Opens enrichment with only the local catalog sources selected, set to replace existing values"
   }
 }

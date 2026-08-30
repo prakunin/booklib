@@ -2,6 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {DynamicDialogRef} from '@openng/optimus-ui/dynamicdialog';
 import {DialogLauncherService, DialogSize, DialogStyle} from '../../../../shared/services/dialog-launcher.service';
 import {MetadataRefreshType} from '../../../metadata/model/request/metadata-refresh-type.enum';
+import {EnrichmentStepType, EnrichmentWritePolicy} from '../../../metadata/model/enrichment.model';
 import {SmartEnrichmentApplyMode} from '../../../metadata/model/smart-enrichment.model';
 import {Book} from '../../model/book.model';
 
@@ -200,7 +201,10 @@ export class BookDialogHelperService {
    * The unified enrichment dialog. Unlike the smart-enrichment one it does not show results — the
    * run is queued and can outlive any dialog, so progress arrives over the websocket instead.
    */
-  async openEnrichmentDialog(bookIds: Set<number>): Promise<DynamicDialogRef | null> {
+  async openEnrichmentDialog(
+    bookIds: Set<number>,
+    preset?: {steps?: readonly EnrichmentStepType[]; writePolicy?: EnrichmentWritePolicy},
+  ): Promise<DynamicDialogRef | null> {
     return this.dialogLauncherService.launchLazyDialog(async () => {
       const {EnrichmentComponent} = await import('../../../metadata/component/enrichment/enrichment.component');
       return this.openDialog(EnrichmentComponent, {
@@ -209,6 +213,8 @@ export class BookDialogHelperService {
         data: {
           scope: bookIds.size === 1 ? 'BOOK' : 'BOOKS',
           bookIds: Array.from(bookIds),
+          steps: preset?.steps ? [...preset.steps] : undefined,
+          writePolicy: preset?.writePolicy,
         },
       });
     });
