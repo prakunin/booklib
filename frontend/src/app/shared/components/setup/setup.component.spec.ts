@@ -74,7 +74,7 @@ describe('SetupComponent', () => {
     component.onSubmit();
 
     expect(component.loading()).toBe(true);
-    expect(component.error).toBe(null);
+    expect(component.error).toBeNull();
     expect(setupService.createAdmin).toHaveBeenCalledWith({
       name: 'Admin User',
       username: 'admin',

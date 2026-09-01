@@ -1,4 +1,18 @@
 {
+    "local": {
+        "title": "Local Settings",
+        "description": "Browser level settings that only affect the current device. These settings are stored in the browser's local storage and will not be synced across devices.",
+        "cacheTitle": "Cache Storage Settings",
+        "cacheDesc": "Configure Cache Storage to improve performance and reduce server requests.",
+        "enableCache": "Enable Cache Storage",
+        "enableCacheDesc": "Store data locally in your browser for faster access",
+        "usageLabel": "Cache Storage Usage (MB)",
+        "usageDesc": "Current size occupied by Cache Storage",
+        "usageValue": "{{ value }} MB",
+        "refresh": "Refresh",
+        "clearCache": "Clear Cache",
+        "clearCacheDesc": "Remove all data stored in Cache Storage"
+    },
     "title": "Preferências do Leitor",
     "description": "Configure as definições de experiência de leitura para sua biblioteca. Defina preferências padrão que servem como substituições para livros individuais, ou permita que cada livro mantenha suas próprias configurações personalizadas para formatos PDF, EPUB, FB2, MOBI, AZW3 e CBX.",
     "appMode": {
@@ -137,6 +151,9 @@
         "preferencesUpdatedDetail": "Suas preferências foram salvas com sucesso."
     },
     "fonts": {
+        "previewParagraph": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        "previewParagraphSmall": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+        "previewCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789",
         "sectionTitle": "Biblioteca de Fontes Personalizadas",
         "sectionDesc": "Personalize sua experiência de leitura enviando fontes personalizadas para usar com formatos de eBook (EPUB, FB2, MOBI, AZW3). Envie até 10 arquivos de fontes personalizadas que estarão disponíveis para seleção nas configurações do leitor de eBook.",
         "emptyTitle": "Nenhuma Fonte Personalizada Ainda",

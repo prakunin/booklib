@@ -1,254 +1,258 @@
-<div class="icon-picker">
-  <header class="dialog-header">
-    <div class="header-content">
-      <div class="header-icon">
-        <svg lucidePalette aria-hidden="true"></svg>
+<ng-container *transloco="let t; prefix: 'shared.iconPicker'">
+  <div class="icon-picker">
+    <header class="dialog-header">
+      <div class="header-content">
+        <div class="header-icon">
+          <svg lucidePalette aria-hidden="true"></svg>
+        </div>
+        <div class="header-text">
+          <h1>{{ t('title') }}</h1>
+          <p>{{ t('subtitle') }}</p>
+        </div>
       </div>
-      <div class="header-text">
-        <h1>Choose an Icon</h1>
-        <p>Select from library or add custom SVGs</p>
-      </div>
-    </div>
-    <p-button
-      icon="pi pi-times"
-      [text]="true"
-      [rounded]="true"
-      severity="secondary"
-      (onClick)="ref.close()"
-    />
-  </header>
+      <p-button
+        icon="pi pi-times"
+        [text]="true"
+        [rounded]="true"
+        severity="secondary"
+        (onClick)="ref.close()"
+      />
+    </header>
 
-  <div class="dialog-body">
-    <p-tabs [(value)]="activeTabIndex">
-      <p-tablist>
-        <p-tab value="0">
-          <svg lucideSparkles aria-hidden="true"></svg>
-          <span>Default</span>
-        </p-tab>
-        <p-tab value="1">
-          <svg lucideImages aria-hidden="true"></svg>
-          <span>SVG Library</span>
-        </p-tab>
-        @if (canManageIcons) {
-          <p-tab value="2">
-            <svg lucideCirclePlus aria-hidden="true"></svg>
-            <span>Add Custom</span>
+    <div class="dialog-body">
+      <p-tabs [(value)]="activeTabIndex">
+        <p-tablist>
+          <p-tab value="0">
+            <svg lucideSparkles aria-hidden="true"></svg>
+            <span>{{ t('tabDefault') }}</span>
           </p-tab>
-        }
-      </p-tablist>
+          <p-tab value="1">
+            <svg lucideImages aria-hidden="true"></svg>
+            <span>{{ t('tabSvgLibrary') }}</span>
+          </p-tab>
+          @if (canManageIcons) {
+            <p-tab value="2">
+              <svg lucideCirclePlus aria-hidden="true"></svg>
+              <span>{{ t('tabAddCustom') }}</span>
+            </p-tab>
+          }
+        </p-tablist>
 
-      <p-tabpanels>
-        <p-tabpanel value="0">
-          <div class="tab-content">
-            <div class="search-container">
-              <svg lucideSearch class="search-icon" aria-hidden="true"></svg>
-              <input
-                type="text"
-                pInputText
-                placeholder="Search icons"
-                [(ngModel)]="searchText"
-                class="search-input"
-              />
-            </div>
-
-            <div class="icon-grid">
-              @for (icon of filteredIcons(); track icon) {
-                <button
-                  type="button"
-                  class="icon-item"
-                  (click)="selectIcon(icon)"
-                  [class.selected]="icon === selectedIcon"
-                  [title]="displayIconName(icon)"
-                >
-                  @if (getLucideIconData(icon); as iconData) {
-                    <svg [lucideIcon]="iconData" aria-hidden="true"></svg>
-                  }
-                </button>
-              }
-            </div>
-          </div>
-        </p-tabpanel>
-
-        <!-- SVG Library Tab -->
-        <p-tabpanel value="1">
-          <div class="tab-content">
-            @if (isLoadingSvgIcons()) {
-              <div class="loading-state">
-                <i class="pi pi-spin pi-spinner"></i>
-                <span>Loading icons...</span>
-              </div>
-            } @else if (svgIconsError()) {
-              <div class="error-state">
-                <i class="pi pi-exclamation-triangle"></i>
-                <span>{{ svgIconsError() }}</span>
-              </div>
-            } @else {
+        <p-tabpanels>
+          <p-tabpanel value="0">
+            <div class="tab-content">
               <div class="search-container">
-                <i class="pi pi-search search-icon"></i>
+                <svg lucideSearch class="search-icon" aria-hidden="true"></svg>
                 <input
                   type="text"
                   pInputText
-                  placeholder="Search SVG icons..."
-                  [(ngModel)]="svgSearchText"
+                  [placeholder]="t('searchIcons')"
+                  [attr.aria-label]="t('searchIcons')"
+                  [(ngModel)]="searchText"
                   class="search-input"
                 />
               </div>
 
               <div class="icon-grid">
-                @for (iconName of filteredSvgIcons(); track iconName) {
+                @for (icon of filteredIcons(); track icon) {
                   <button
                     type="button"
-                    class="icon-item svg-icon-item"
-                    (click)="selectSvgIcon(iconName)"
-                    [class.selected]="iconName === selectedSvgIcon"
-                    [title]="iconName"
-                    draggable="true"
-                    (dragstart)="onSvgIconDragStart(iconName)"
-                    (dragend)="onSvgIconDragEnd()"
+                    class="icon-item"
+                    (click)="selectIcon(icon)"
+                    [class.selected]="icon === selectedIcon"
+                    [title]="displayIconName(icon)"
                   >
-                    <span class="svg-icon-inline" [appSvgContent]="getSvgContent(iconName)"></span>
+                    @if (getLucideIconData(icon); as iconData) {
+                      <svg [lucideIcon]="iconData" aria-hidden="true"></svg>
+                    }
                   </button>
                 }
               </div>
+            </div>
+          </p-tabpanel>
 
-              @if (canManageIcons) {
-                <div class="trash-zone-container">
-                  <div
-                    class="trash-zone"
-                    [class.active]="isTrashHover"
-                    (dragover)="onTrashDragOver($event)"
-                    (dragleave)="onTrashDragLeave($event)"
-                    (drop)="onTrashDrop($event)"
-                  >
-                    <i class="pi pi-trash"></i>
-                    <span>Drop here to delete</span>
-                  </div>
-                </div>
-              }
-            }
-          </div>
-        </p-tabpanel>
-
-        <!-- Add Custom SVG Tab -->
-        @if (canManageIcons) {
-          <p-tabpanel value="2">
+          <!-- SVG Library Tab -->
+          <p-tabpanel value="1">
             <div class="tab-content">
-              <section class="form-section">
-                <div class="section-header">
-                  <i class="pi pi-code"></i>
-                  <span>SVG Input</span>
+              @if (isLoadingSvgIcons()) {
+                <div class="loading-state">
+                  <i class="pi pi-spin pi-spinner"></i>
+                  <span>{{ t('loadingIcons') }}</span>
                 </div>
-
-                <div class="form-fields">
-                  <div class="form-field">
-                    <label for="icon-picker-svg-name">Icon Name</label>
-                    <input
-                      id="icon-picker-svg-name"
-                      type="text"
-                      pInputText
-                      [(ngModel)]="svgName"
-                      placeholder="e.g., my-custom-icon"
-                      class="input-full"
-                    />
-                  </div>
-
-                  <div class="form-field">
-                    <label for="icon-picker-svg-code">SVG Code</label>
-                    <textarea
-                      id="icon-picker-svg-code"
-                      pInputTextarea
-                      [(ngModel)]="svgContent"
-                      (ngModelChange)="onSvgContentChange()"
-                      placeholder="<svg>...</svg>"
-                      [rows]="6"
-                      class="code-textarea"
-                    ></textarea>
-                  </div>
-
-                  @if (svgContent && svgPreview) {
-                    <div class="preview-card">
-                      <div class="preview-label">Preview</div>
-                      <div class="preview-content" [appSvgContent]="svgPreview"></div>
-                    </div>
-                  }
-
-                  @if (errorMessage()) {
-                    <div class="error-message">
-                      <i class="pi pi-exclamation-circle"></i>
-                      <span>{{ errorMessage() }}</span>
-                    </div>
-                  }
+              } @else if (svgIconsError()) {
+                <div class="error-state">
+                  <i class="pi pi-exclamation-triangle"></i>
+                  <span>{{ svgIconsError() }}</span>
                 </div>
-
-                <div class="form-actions">
-                  <p-button
-                    label="Add to Queue"
-                    icon="pi pi-plus"
-                    [outlined]="true"
-                    [disabled]="!svgContent || !svgName"
-                    (onClick)="addSvgEntry()"
+              } @else {
+                <div class="search-container">
+                  <i class="pi pi-search search-icon"></i>
+                  <input
+                    type="text"
+                    pInputText
+                    [placeholder]="t('searchSvgIcons')"
+                    [attr.aria-label]="t('searchSvgIcons')"
+                    [(ngModel)]="svgSearchText"
+                    class="search-input"
                   />
                 </div>
-              </section>
 
-              @if (svgEntries().length > 0) {
-                <section class="form-section queue-section">
-                  <div class="section-header">
-                    <i class="pi pi-list"></i>
-                    <span>Queue</span>
-                    <span class="section-badge">{{ svgEntries().length }}</span>
-                    <div class="section-actions">
-                      <p-button
-                        label="Clear All"
-                        icon="pi pi-times"
-                        severity="danger"
-                        [text]="true"
-                        size="small"
-                        (onClick)="clearAllEntries()"
-                      />
+                <div class="icon-grid">
+                  @for (iconName of filteredSvgIcons(); track iconName) {
+                    <button
+                      type="button"
+                      class="icon-item svg-icon-item"
+                      (click)="selectSvgIcon(iconName)"
+                      [class.selected]="iconName === selectedSvgIcon"
+                      [title]="iconName"
+                      draggable="true"
+                      (dragstart)="onSvgIconDragStart(iconName)"
+                      (dragend)="onSvgIconDragEnd()"
+                    >
+                      <span class="svg-icon-inline" [appSvgContent]="getSvgContent(iconName)"></span>
+                    </button>
+                  }
+                </div>
+
+                @if (canManageIcons) {
+                  <div class="trash-zone-container">
+                    <div
+                      class="trash-zone"
+                      [class.active]="isTrashHover"
+                      (dragover)="onTrashDragOver($event)"
+                      (dragleave)="onTrashDragLeave($event)"
+                      (drop)="onTrashDrop($event)"
+                    >
+                      <i class="pi pi-trash"></i>
+                      <span>{{ t('dropToDelete') }}</span>
                     </div>
                   </div>
+                }
+              }
+            </div>
+          </p-tabpanel>
 
-                  <div class="queue-grid">
-                    @for (entry of svgEntries(); track entry.name; let i = $index) {
-                      <div class="queue-item" [class.has-error]="entry.error">
-                        <div class="queue-item-header">
-                          <span class="queue-item-name">{{ entry.name }}</span>
-                          <button class="queue-item-remove" (click)="removeSvgEntry(i)" type="button">
-                            <i class="pi pi-times"></i>
-                          </button>
-                        </div>
-                        <div class="queue-item-preview" [appSvgContent]="entry.preview"></div>
-                        @if (entry.error) {
-                          <div class="queue-item-error">{{ entry.error }}</div>
-                        }
+          <!-- Add Custom SVG Tab -->
+          @if (canManageIcons) {
+            <p-tabpanel value="2">
+              <div class="tab-content">
+                <section class="form-section">
+                  <div class="section-header">
+                    <i class="pi pi-code"></i>
+                    <span>{{ t('svgInput') }}</span>
+                  </div>
+
+                  <div class="form-fields">
+                    <div class="form-field">
+                      <label for="icon-picker-svg-name">{{ t('iconName') }}</label>
+                      <input
+                        id="icon-picker-svg-name"
+                        type="text"
+                        pInputText
+                        [(ngModel)]="svgName"
+                        [placeholder]="t('iconNamePlaceholder')"
+                        class="input-full"
+                      />
+                    </div>
+
+                    <div class="form-field">
+                      <label for="icon-picker-svg-code">{{ t('svgCode') }}</label>
+                      <textarea
+                        id="icon-picker-svg-code"
+                        pInputTextarea
+                        [(ngModel)]="svgContent"
+                        (ngModelChange)="onSvgContentChange()"
+                        placeholder="<svg>...</svg>"
+                        [rows]="6"
+                        class="code-textarea"
+                      ></textarea>
+                    </div>
+
+                    @if (svgContent && svgPreview) {
+                      <div class="preview-card">
+                        <div class="preview-label">{{ t('preview') }}</div>
+                        <div class="preview-content" [appSvgContent]="svgPreview"></div>
+                      </div>
+                    }
+
+                    @if (errorMessage()) {
+                      <div class="error-message">
+                        <i class="pi pi-exclamation-circle"></i>
+                        <span>{{ errorMessage() }}</span>
                       </div>
                     }
                   </div>
 
-                  @if (batchErrorMessage()) {
-                    <div class="error-message">
-                      <i class="pi pi-exclamation-circle"></i>
-                      <span>{{ batchErrorMessage() }}</span>
-                    </div>
-                  }
-
                   <div class="form-actions">
                     <p-button
-                      label="Save All Icons"
-                      icon="pi pi-save"
-                      severity="success"
-                      [loading]="isSavingBatch()"
-                      [disabled]="svgEntries().length === 0"
-                      (onClick)="saveAllSvgs()"
+                      [label]="t('addToQueue')"
+                      icon="pi pi-plus"
+                      [outlined]="true"
+                      [disabled]="!svgContent || !svgName"
+                      (onClick)="addSvgEntry()"
                     />
                   </div>
                 </section>
-              }
-            </div>
-          </p-tabpanel>
-        }
-      </p-tabpanels>
-    </p-tabs>
+
+                @if (svgEntries().length > 0) {
+                  <section class="form-section queue-section">
+                    <div class="section-header">
+                      <i class="pi pi-list"></i>
+                      <span>{{ t('queue') }}</span>
+                      <span class="section-badge">{{ svgEntries().length }}</span>
+                      <div class="section-actions">
+                        <p-button
+                          [label]="t('clearAll')"
+                          icon="pi pi-times"
+                          severity="danger"
+                          [text]="true"
+                          size="small"
+                          (onClick)="clearAllEntries()"
+                        />
+                      </div>
+                    </div>
+
+                    <div class="queue-grid">
+                      @for (entry of svgEntries(); track entry.name; let i = $index) {
+                        <div class="queue-item" [class.has-error]="entry.error">
+                          <div class="queue-item-header">
+                            <span class="queue-item-name">{{ entry.name }}</span>
+                            <button class="queue-item-remove" (click)="removeSvgEntry(i)" type="button" [attr.aria-label]="t('removeFromQueue')">
+                              <i class="pi pi-times"></i>
+                            </button>
+                          </div>
+                          <div class="queue-item-preview" [appSvgContent]="entry.preview"></div>
+                          @if (entry.error) {
+                            <div class="queue-item-error">{{ entry.error }}</div>
+                          }
+                        </div>
+                      }
+                    </div>
+
+                    @if (batchErrorMessage()) {
+                      <div class="error-message">
+                        <i class="pi pi-exclamation-circle"></i>
+                        <span>{{ batchErrorMessage() }}</span>
+                      </div>
+                    }
+
+                    <div class="form-actions">
+                      <p-button
+                        [label]="t('saveAllIcons')"
+                        icon="pi pi-save"
+                        severity="success"
+                        [loading]="isSavingBatch()"
+                        [disabled]="svgEntries().length === 0"
+                        (onClick)="saveAllSvgs()"
+                      />
+                    </div>
+                  </section>
+                }
+              </div>
+            </p-tabpanel>
+          }
+        </p-tabpanels>
+      </p-tabs>
+    </div>
   </div>
-</div>
+</ng-container>

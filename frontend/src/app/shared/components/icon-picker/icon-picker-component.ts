@@ -14,6 +14,7 @@ import {catchError, mergeMap, toArray} from 'rxjs/operators';
 import {LucideCirclePlus, LucideDynamicIcon, LucideImages, LucidePalette, LucideSearch, LucideSparkles, provideLucideConfig, type LucideIconData, type LucideIconNode} from '@lucide/angular';
 import iconNodes from 'lucide-static/icon-nodes.json';
 import {SvgContentDirective} from '../icon/svg-content.directive';
+import {TranslocoDirective} from '@jsverse/transloco';
 
 interface SvgEntry {
   name: string;
@@ -41,6 +42,7 @@ const lucideIconNodes = iconNodes as unknown as Record<string, LucideIconNode[]>
   selector: 'app-icon-picker-component',
   imports: [
     FormsModule,
+    TranslocoDirective,
     Button,
     Tabs, TabList, Tab, TabPanels, TabPanel,
     SvgContentDirective,

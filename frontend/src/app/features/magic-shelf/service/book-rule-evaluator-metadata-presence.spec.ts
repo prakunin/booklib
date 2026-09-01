@@ -64,9 +64,9 @@ describe('BookRuleEvaluatorService - metadataPresence', () => {
       expect(service.evaluateGroup(book, rule('equals', 'subtitle'))).toBe(true);
     });
 
-    it('should detect missing subtitle', () => {
+    it.each(['subtitle', 'publishedDate'])('should detect missing %s', (field) => {
       const book = createBook({metadata: {bookId: 1}});
-      expect(service.evaluateGroup(book, rule('equals', 'subtitle'))).toBe(false);
+      expect(service.evaluateGroup(book, rule('equals', field))).toBe(false);
     });
 
     it('should detect present description', () => {
@@ -74,9 +74,9 @@ describe('BookRuleEvaluatorService - metadataPresence', () => {
       expect(service.evaluateGroup(book, rule('equals', 'description'))).toBe(true);
     });
 
-    it('should detect missing description', () => {
+    it.each(['description', 'thumbnailUrl'])('should detect missing %s with not_equals', (field) => {
       const book = createBook({metadata: {bookId: 1}});
-      expect(service.evaluateGroup(book, rule('not_equals', 'description'))).toBe(true);
+      expect(service.evaluateGroup(book, rule('not_equals', field))).toBe(true);
     });
 
     it('should detect present publisher', () => {
@@ -89,11 +89,6 @@ describe('BookRuleEvaluatorService - metadataPresence', () => {
       expect(service.evaluateGroup(book, rule('equals', 'publishedDate'))).toBe(true);
     });
 
-    it('should detect missing publishedDate', () => {
-      const book = createBook({metadata: {bookId: 1}});
-      expect(service.evaluateGroup(book, rule('equals', 'publishedDate'))).toBe(false);
-    });
-
     it('should detect present language', () => {
       const book = createBook({metadata: {bookId: 1, language: 'en'}});
       expect(service.evaluateGroup(book, rule('equals', 'language'))).toBe(true);
@@ -102,11 +97,6 @@ describe('BookRuleEvaluatorService - metadataPresence', () => {
     it('should detect present thumbnailUrl', () => {
       const book = createBook({metadata: {bookId: 1, thumbnailUrl: 'https://example.com/cover.jpg'}});
       expect(service.evaluateGroup(book, rule('equals', 'thumbnailUrl'))).toBe(true);
-    });
-
-    it('should detect missing thumbnailUrl', () => {
-      const book = createBook({metadata: {bookId: 1}});
-      expect(service.evaluateGroup(book, rule('not_equals', 'thumbnailUrl'))).toBe(true);
     });
 
     it('should detect present narrator', () => {

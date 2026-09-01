@@ -657,7 +657,6 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   private loadAnnotations(): void {
     this.pdfAnnotationService.getAnnotations(this.bookId).subscribe({
       next: async (response) => {
-        console.info('[PDF Annotations] GET response:', response);
         if (response?.data) {
           this.lastAnnotationData = response.data;
           const allItems = parseStoredAnnotations(response.data);
@@ -688,7 +687,6 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
                   await new Promise(r => setTimeout(r, 0));
                 }
               }
-              console.info('[PDF Annotations] Import complete');
             } catch (err) {
               console.error('[PDF Annotations] Import failed:', err);
             } finally {
@@ -700,7 +698,6 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
             return;
           }
         }
-        console.info('[PDF Annotations] No stored annotations, annotationsLoaded=true');
         this.annotationsLoaded = true;
         this.refreshAnnotationList();
       },
@@ -716,7 +713,6 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     try {
       const allItems = await this.embedPdfBook.exportAnnotations();
       const items = this.filterAndDeduplicateAnnotations(allItems);
-      console.info(`[PDF Annotations] refresh list: exported ${allItems.length}, kept ${items.length}`);
       this.annotationListItems.set(items.map(item => {
         const ann = item.annotation as unknown as Record<string, unknown>;
         return {
@@ -1588,7 +1584,6 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
 
   private async persistAnnotations(): Promise<void> {
     if (!this.annotationsLoaded || !this.bookId || this.viewerMode() === 'document' || !this.annotationsDirty) {
-      console.info('[PDF Annotations] Skip save: loaded=', this.annotationsLoaded, 'dirty=', this.annotationsDirty);
       return;
     }
 
@@ -1597,7 +1592,6 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
       const items = this.filterAndDeduplicateAnnotations(allItems);
       const data = serializeAnnotations(items);
 
-      console.info(`[PDF Annotations] Initiating save: exported ${allItems.length}, kept ${items.length}`);
 
       this.lastAnnotationData = data;
       this.annotationsDirty = false; // Speculatively clear to avoid double-save
@@ -1616,9 +1610,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
         credentials: 'include',
         body: JSON.stringify({ data }),
       }).then(res => {
-        if (res.ok) {
-          console.info('[PDF Annotations] Saved', items.length, 'annotations for book', this.bookId);
-        } else {
+        if (!res.ok) {
           this.annotationsDirty = true;
           console.error('[PDF Annotations] Save failed:', res.status);
         }
@@ -1633,7 +1625,6 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
 
   private persistAnnotationsSync(): void {
     if (!this.bookId || this.lastAnnotationData === null || !this.annotationsDirty) {
-      console.info('[PDF Annotations Sync] Skip sync save: dirty=', this.annotationsDirty);
       return;
     }
     this.annotationsDirty = false;
@@ -1644,7 +1635,6 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     if (syncToken) {
       headers['Authorization'] = `Bearer ${syncToken}`;
     }
-    console.info('[PDF Annotations Sync] Sending sync save request');
     fetch(url, {
       method: 'PUT',
       headers,
@@ -1658,7 +1648,6 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
     this.embedPdfBook.exportAnnotations().then(allItems => {
       const items = this.filterAndDeduplicateAnnotations(allItems);
       this.lastAnnotationData = serializeAnnotations(items);
-      console.info(`[PDF Annotations] Cache updated: ${items.length} items`);
     }).catch(() => { /* fire-and-forget */ });
   }
 

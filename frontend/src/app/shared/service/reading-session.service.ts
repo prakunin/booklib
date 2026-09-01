@@ -49,12 +49,10 @@ export class ReadingSessionService {
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.currentSession) {
-        this.log('Tab hidden, pausing session');
         this.hiddenAt = Date.now();
         this.pauseIdleDetection();
       } else if (!document.hidden && this.currentSession) {
         if (this.hiddenAt && Date.now() - this.hiddenAt > this.IDLE_TIMEOUT_MS) {
-          this.log('Tab was hidden too long, ending session');
           this.stopIdleDetection();
           const cappedEndTime = new Date(this.hiddenAt + this.IDLE_TIMEOUT_MS);
           this.currentSession.endTime = cappedEndTime;
@@ -68,7 +66,6 @@ export class ReadingSessionService {
           }
           this.currentSession = null;
         } else {
-          this.log('Tab visible, resuming session');
           this.resumeIdleDetection();
         }
         this.hiddenAt = null;
@@ -89,12 +86,6 @@ export class ReadingSessionService {
       startProgress
     };
 
-    this.log('Reading session started', {
-      bookId,
-      startTime: this.currentSession.startTime.toISOString(),
-      startLocation,
-      startProgress: startProgress != null ? `${startProgress.toFixed(1)}%` : 'N/A'
-    });
 
     this.startIdleDetection();
   }
@@ -129,10 +120,6 @@ export class ReadingSessionService {
 
     if (this.currentSession.durationSeconds >= this.MIN_SESSION_DURATION_SECONDS) {
       this.sendSessionToBackend(this.currentSession);
-    } else {
-      this.log('Session too short, discarding', {
-        durationSeconds: this.currentSession.durationSeconds
-      });
     }
 
     this.currentSession = null;
@@ -161,7 +148,6 @@ export class ReadingSessionService {
       durationSeconds
     );
 
-    this.log('Reading session ended (sync)', sessionData);
 
     const success = this.apiService.sendSessionBeacon(sessionData);
     if (!success) {
@@ -183,10 +169,8 @@ export class ReadingSessionService {
       session.durationSeconds
     );
 
-    this.log('Reading session completed', sessionData);
 
     this.apiService.createSession(sessionData).subscribe({
-      next: () => this.log('Session saved to backend'),
       error: (err: HttpErrorResponse) => this.logError('Failed to save session', err)
     });
   }
@@ -267,7 +251,6 @@ export class ReadingSessionService {
     }
 
     this.idleTimer = setTimeout(() => {
-      this.log('User idle detected, ending session');
       this.endSession();
     }, this.IDLE_TIMEOUT_MS);
   }
@@ -283,14 +266,6 @@ export class ReadingSessionService {
 
   isSessionActive(): boolean {
     return this.currentSession !== null;
-  }
-
-  private log(message: string, data?: unknown): void {
-    if (data) {
-      console.log(`[ReadingSession] ${message}`, data);
-    } else {
-      console.log(`[ReadingSession] ${message}`);
-    }
   }
 
   private logError(message: string, error?: unknown): void {

@@ -65,7 +65,7 @@ describe('ShelfMembershipMenuComponent', () => {
   it('hides the filter input for a short, scannable list', async () => {
     await render(shelves(8));
     expect(menuElement().querySelector('input')).toBeNull();
-    expect(rowLabels().length).toBe(8);
+    expect(rowLabels()).toHaveLength(8);
   });
 
   it('shows the filter input past the threshold and filters rows by name', async () => {
@@ -135,7 +135,7 @@ describe('ShelfMembershipMenuComponent', () => {
 
     const retainedInput = menuElement().querySelector('input') as HTMLInputElement;
     expect(retainedInput.value).toBe('');
-    expect(rowLabels().length).toBe(8);
+    expect(rowLabels()).toHaveLength(8);
     expect(fixture.componentInstance.menu().isOpen()).toBe(true);
     expect(document.activeElement).toBe(retainedInput);
 
@@ -147,7 +147,7 @@ describe('ShelfMembershipMenuComponent', () => {
 
     await render(shelves(12));
     expect((menuElement().querySelector('input') as HTMLInputElement).value).toBe('');
-    expect(rowLabels().length).toBe(12);
+    expect(rowLabels()).toHaveLength(12);
 
     fixture.componentRef.setInput('shelves', shelves(8));
     fixture.componentInstance.menu().close();

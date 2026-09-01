@@ -618,7 +618,6 @@ export class EmbedPdfBookService {
           patched = patched.replace(
             'await runner.prepare();',
             'await runner.prepare();\n' +
-            '      console.log("[Worker] prepare() OK, posting ready");\n' +
             '      self.postMessage({ type: "ready" });'
           );
           parts = [patched];

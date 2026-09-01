@@ -454,11 +454,15 @@ describe('BookRuleEvaluatorService', () => {
       expect(service.evaluateGroup(b2, rule('seriesGaps', 'equals', 'missing_first'), allBooks)).toBe(true);
     });
 
-    it('should not match "missing_first" when book 1 exists', () => {
+    it.each([
+      ['missing_first', 'book 1 exists'],
+      ['missing_latest', 'no seriesTotal is set'],
+      ['duplicate_number', 'all numbers are unique'],
+    ])('should not match "%s" when %s', (gapType) => {
       const b1 = seriesBook(1, ReadStatus.READ);
       const b2 = seriesBook(2, ReadStatus.UNREAD);
       const allBooks = [b1, b2];
-      expect(service.evaluateGroup(b1, rule('seriesGaps', 'equals', 'missing_first'), allBooks)).toBe(false);
+      expect(service.evaluateGroup(b1, rule('seriesGaps', 'equals', gapType), allBooks)).toBe(false);
     });
 
     it('should match "missing_latest" when final book is absent', () => {
@@ -475,26 +479,12 @@ describe('BookRuleEvaluatorService', () => {
       expect(service.evaluateGroup(b1, rule('seriesGaps', 'equals', 'missing_latest'), allBooks)).toBe(false);
     });
 
-    it('should not match "missing_latest" when no seriesTotal is set', () => {
-      const b1 = seriesBook(1, ReadStatus.READ);
-      const b2 = seriesBook(2, ReadStatus.UNREAD);
-      const allBooks = [b1, b2];
-      expect(service.evaluateGroup(b1, rule('seriesGaps', 'equals', 'missing_latest'), allBooks)).toBe(false);
-    });
-
     it('should match "duplicate_number" when two books share a number', () => {
       const b1 = seriesBook(1, ReadStatus.READ);
       const b1dup = seriesBook(1, ReadStatus.UNREAD);
       b1dup.id = 999;
       const allBooks = [b1, b1dup];
       expect(service.evaluateGroup(b1, rule('seriesGaps', 'equals', 'duplicate_number'), allBooks)).toBe(true);
-    });
-
-    it('should not match "duplicate_number" when all numbers are unique', () => {
-      const b1 = seriesBook(1, ReadStatus.READ);
-      const b2 = seriesBook(2, ReadStatus.UNREAD);
-      const allBooks = [b1, b2];
-      expect(service.evaluateGroup(b1, rule('seriesGaps', 'equals', 'duplicate_number'), allBooks)).toBe(false);
     });
 
     it('should return false for book without series', () => {

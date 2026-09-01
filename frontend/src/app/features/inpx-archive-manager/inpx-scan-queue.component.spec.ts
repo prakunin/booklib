@@ -86,7 +86,7 @@ describe('InpxScanQueueComponent', () => {
     vi.advanceTimersByTime(10000);  // further ticks must not poll anymore
 
     expect(callsWhenIdle).toBe(2);
-    expect(archiveService.getScanQueue.mock.calls.length).toBe(callsWhenIdle);
+    expect(archiveService.getScanQueue.mock.calls).toHaveLength(callsWhenIdle);
     fixture.destroy();
   });
 });

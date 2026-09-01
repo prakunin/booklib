@@ -1,4 +1,18 @@
 {
+    "local": {
+        "title": "Local Settings",
+        "description": "Browser level settings that only affect the current device. These settings are stored in the browser's local storage and will not be synced across devices.",
+        "cacheTitle": "Cache Storage Settings",
+        "cacheDesc": "Configure Cache Storage to improve performance and reduce server requests.",
+        "enableCache": "Enable Cache Storage",
+        "enableCacheDesc": "Store data locally in your browser for faster access",
+        "usageLabel": "Cache Storage Usage (MB)",
+        "usageDesc": "Current size occupied by Cache Storage",
+        "usageValue": "{{ value }} MB",
+        "refresh": "Refresh",
+        "clearCache": "Clear Cache",
+        "clearCacheDesc": "Remove all data stored in Cache Storage"
+    },
     "title": "Настройки читалки",
     "description": "Настройте параметры чтения для Вашей библиотеки. Установите предпочтения по умолчанию, которые будут переопределениями для отдельных книг, или позвольте каждой книге сохранять собственные настройки для форматов PDF, EPUB, FB2, MOBI, AZW3 и CBX.",
     "appMode": {
@@ -138,6 +152,9 @@
         "preferencesUpdatedDetail": "Ваши настройки успешно сохранены."
     },
     "fonts": {
+        "previewParagraph": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        "previewParagraphSmall": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+        "previewCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789",
         "sectionTitle": "Библиотека пользовательских шрифтов",
         "sectionDesc": "Персонализируйте чтение, загрузив пользовательские шрифты для форматов электронных книг (EPUB, FB2, MOBI, AZW3). Загрузите до 10 пользовательских шрифтов, которые будут доступны для выбора в настройках eBook-читалки.",
         "emptyTitle": "Пользовательских шрифтов пока нет",

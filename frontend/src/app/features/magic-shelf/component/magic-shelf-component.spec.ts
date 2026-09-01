@@ -72,24 +72,8 @@ describe('MagicShelfComponent (Part 3)', () => {
       expect(operators[1].label).toContain('hasNot');
     });
 
-    it('should include relative date operators for date fields', () => {
-      const operators = component.getOperatorOptionsForField('dateFinished');
-      const values = operators.map(o => o.value);
-      expect(values).toContain('within_last');
-      expect(values).toContain('older_than');
-      expect(values).toContain('this_period');
-    });
-
-    it('should include relative date operators for addedOn', () => {
-      const operators = component.getOperatorOptionsForField('addedOn');
-      const values = operators.map(o => o.value);
-      expect(values).toContain('within_last');
-      expect(values).toContain('older_than');
-      expect(values).toContain('this_period');
-    });
-
-    it('should include relative date operators for publishedDate', () => {
-      const operators = component.getOperatorOptionsForField('publishedDate');
+    it.each(['dateFinished', 'addedOn', 'publishedDate'] as const)('should include relative date operators for %s', (field) => {
+      const operators = component.getOperatorOptionsForField(field);
       const values = operators.map(o => o.value);
       expect(values).toContain('within_last');
       expect(values).toContain('older_than');
@@ -500,13 +484,13 @@ describe('MagicShelfComponent (Part 3)', () => {
       const group = component.createGroup();
       expect(group.get('type')?.value).toBe('group');
       expect(group.get('join')?.value).toBe('and');
-      expect((group.get('rules') as FormArray).length).toBe(0);
+      expect(group.get('rules') as FormArray).toHaveLength(0);
     });
   });
 
   describe('fieldOptions completeness', () => {
     it('should have 9 groups total', () => {
-      expect(component.fieldOptions.length).toBe(9);
+      expect(component.fieldOptions).toHaveLength(9);
     });
 
     it('should map categories field to genre translation key', () => {
@@ -656,11 +640,11 @@ describe('MagicShelfComponent (Part 3)', () => {
       const result = component.buildGroupFromData(groupData);
       expect(result.get('join')?.value).toBe('or');
       const rulesArray = result.get('rules') as FormArray;
-      expect(rulesArray.length).toBe(2);
+      expect(rulesArray).toHaveLength(2);
       const nestedGroup = rulesArray.at(1);
       const nestedRules = nestedGroup.get('rules') as FormArray;
       expect(nestedRules).toBeDefined();
-      expect(nestedRules.length).toBe(1);
+      expect(nestedRules).toHaveLength(1);
     });
 
     it('should preserve join type', () => {

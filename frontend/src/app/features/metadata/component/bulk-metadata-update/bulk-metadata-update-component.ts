@@ -14,6 +14,7 @@ import {Checkbox} from '@openng/optimus-ui/checkbox';
 import {AutoComplete, AutoCompleteSelectEvent} from '@openng/optimus-ui/autocomplete';
 import {ProgressSpinner} from '@openng/optimus-ui/progressspinner';
 import {AppBooksApiService} from '../../../book/service/app-books-api.service';
+import {TranslocoDirective} from '@jsverse/transloco';
 
 @Component({
   selector: 'app-bulk-metadata-update-component',
@@ -27,7 +28,8 @@ import {AppBooksApiService} from '../../../book/service/app-books-api.service';
     DatePicker,
     Checkbox,
     ProgressSpinner,
-    AutoComplete
+    AutoComplete,
+    TranslocoDirective
 ],
   providers: [MessageService],
   templateUrl: './bulk-metadata-update-component.html',

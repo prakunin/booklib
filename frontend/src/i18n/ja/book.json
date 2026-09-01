@@ -141,6 +141,21 @@
         }
     },
     "notes": {
+        "loading": "Loading notes...",
+        "addNote": "Add New Note",
+        "emptyTitle": "No notes yet for this book",
+        "emptySubtitle": "Click \"Add Note\" to create your first note and start capturing your thoughts",
+        "updatedAt": "Updated {{ date }}",
+        "createdAt": "Created {{ date }}",
+        "editNote": "Edit Note",
+        "deleteNote": "Delete note",
+        "titleLabel": "Title",
+        "titlePlaceholder": "Enter note title",
+        "contentLabel": "Content",
+        "contentPlaceholder": "Enter your note content...",
+        "cancel": "Cancel",
+        "saveNote": "Save Note",
+        "updateNote": "Update Note",
         "confirm": {
             "deleteMessage": "メモ「{{ title }}」を削除してもよろしいですか？",
             "deleteHeader": "削除の確認"

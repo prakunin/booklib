@@ -75,13 +75,13 @@
                   } @else {
                     <div class="font-preview" [style.font-family]="font.fontName">
                       <p class="preview-paragraph">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                        {{ t('previewParagraph') }}
                       </p>
                       <p class="preview-paragraph-small">
-                        Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+                        {{ t('previewParagraphSmall') }}
                       </p>
                       <div class="preview-characters">
-                        <span>ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789</span>
+                        <span>{{ t('previewCharacters') }}</span>
                       </div>
                     </div>
                   }

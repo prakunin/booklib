@@ -9,7 +9,7 @@ import {ConfirmDialog} from '@openng/optimus-ui/confirmdialog';
 import {ProgressSpinner} from '@openng/optimus-ui/progressspinner';
 import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {ConfirmationService, MessageService} from '@openng/optimus-ui/api';
-import {TranslocoService} from '@jsverse/transloco';
+import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
 import {BookNote, BookNoteService, CreateBookNoteRequest} from '../../../../shared/service/book-note.service';
 
 @Component({
@@ -23,7 +23,8 @@ import {BookNote, BookNoteService, CreateBookNoteRequest} from '../../../../shar
     Textarea,
     ConfirmDialog,
     ProgressSpinner,
-    Tooltip
+    Tooltip,
+    TranslocoDirective
   ],
   templateUrl: './book-notes-component.html',
   styleUrl: './book-notes-component.scss'

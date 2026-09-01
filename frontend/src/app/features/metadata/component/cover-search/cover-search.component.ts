@@ -105,11 +105,6 @@ export class CoverSearchComponent implements OnInit {
             console.error('Error fetching covers:', error);
           }
         });
-    } else {
-      console.log('Form invalid', {
-        formErrors: this.searchForm.errors,
-        titleErrors: this.searchForm.get('title')?.errors
-      });
     }
   }
 

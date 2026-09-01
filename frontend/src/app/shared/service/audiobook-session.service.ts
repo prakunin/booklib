@@ -71,11 +71,6 @@ export class AudiobookSessionService {
       lastPlayStartTime: new Date()
     };
 
-    this.log('Audiobook session started', {
-      bookId,
-      startPosition: this.formatMs(startPositionMs),
-      playbackRate
-    });
 
     this.startPeriodicSave();
   }
@@ -97,11 +92,6 @@ export class AudiobookSessionService {
     this.currentSession.currentPositionMs = currentPositionMs;
     this.currentSession.lastPlayStartTime = undefined;
 
-    this.log('Audiobook session paused', {
-      addedSeconds: Math.round(adjustedDurationSeconds),
-      totalSeconds: Math.round(this.currentSession.totalListeningSeconds),
-      position: this.formatMs(currentPositionMs)
-    });
   }
 
   /**
@@ -115,9 +105,6 @@ export class AudiobookSessionService {
     this.currentSession.lastPlayStartTime = new Date();
     this.currentSession.currentPositionMs = currentPositionMs;
 
-    this.log('Audiobook session resumed', {
-      position: this.formatMs(currentPositionMs)
-    });
   }
 
   /**
@@ -152,7 +139,6 @@ export class AudiobookSessionService {
     }
 
     this.currentSession.playbackRate = rate;
-    this.log('Playback rate changed', { rate });
   }
 
   /**
@@ -181,8 +167,6 @@ export class AudiobookSessionService {
 
     if (totalSeconds >= this.MIN_SESSION_DURATION_SECONDS) {
       this.sendSessionToBackend(this.currentSession);
-    } else {
-      this.log('Session too short, discarding', { totalSeconds });
     }
 
     this.currentSession = null;
@@ -244,7 +228,6 @@ export class AudiobookSessionService {
 
     const sessionData = this.buildSessionData(this.currentSession);
 
-    this.log('Audiobook session ended (sync)', sessionData);
 
     const success = this.apiService.sendSessionBeacon(sessionData);
     if (!success) {
@@ -291,12 +274,8 @@ export class AudiobookSessionService {
 
     const sessionData = this.buildSessionData(this.currentSession, Math.round(totalSeconds));
 
-    this.log('Sending intermediate session', {
-      listeningSeconds: Math.round(totalSeconds)
-    });
 
     this.apiService.createSession(sessionData).subscribe({
-      next: () => this.log('Intermediate session saved'),
       error: (err: HttpErrorResponse) => this.logError('Failed to save intermediate session', err)
     });
 
@@ -310,10 +289,8 @@ export class AudiobookSessionService {
   private sendSessionToBackend(session: AudiobookSession): void {
     const sessionData = this.buildSessionData(session);
 
-    this.log('Audiobook session completed', sessionData);
 
     this.apiService.createSession(sessionData).subscribe({
-      next: () => this.log('Session saved to backend'),
       error: (err: HttpErrorResponse) => this.logError('Failed to save session', err)
     });
   }
@@ -366,14 +343,6 @@ export class AudiobookSessionService {
   private cleanup(): void {
     this.stopPeriodicSave();
     this.currentSession = null;
-  }
-
-  private log(message: string, data?: unknown): void {
-    if (data) {
-      console.log(`[AudiobookSession] ${message}`, data);
-    } else {
-      console.log(`[AudiobookSession] ${message}`);
-    }
   }
 
   private logError(message: string, error?: unknown): void {

@@ -1,4 +1,18 @@
 {
+    "local": {
+        "title": "Local Settings",
+        "description": "Browser level settings that only affect the current device. These settings are stored in the browser's local storage and will not be synced across devices.",
+        "cacheTitle": "Cache Storage Settings",
+        "cacheDesc": "Configure Cache Storage to improve performance and reduce server requests.",
+        "enableCache": "Enable Cache Storage",
+        "enableCacheDesc": "Store data locally in your browser for faster access",
+        "usageLabel": "Cache Storage Usage (MB)",
+        "usageDesc": "Current size occupied by Cache Storage",
+        "usageValue": "{{ value }} MB",
+        "refresh": "Refresh",
+        "clearCache": "Clear Cache",
+        "clearCacheDesc": "Remove all data stored in Cache Storage"
+    },
     "title": "Predvoľby čítačky",
     "description": "Nakonfigurujte nastavenia čítania vo vašej knižnici. Nastavte predvolené preferencie, ktoré môžu prepisovať nastavenia jednotlivých kníh, alebo umožnite každej knihe zachovať vlastné prispôsobené nastavenia pre formáty PDF, EPUB, FB2, MOBI, AZW3 a CBX.",
     "ebook": {
@@ -69,6 +83,9 @@
         "fitMode": ""
     },
     "fonts": {
+        "previewParagraph": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        "previewParagraphSmall": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+        "previewCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789",
         "upload": {
             "fileTooLarge": "",
             "selectFile": "",

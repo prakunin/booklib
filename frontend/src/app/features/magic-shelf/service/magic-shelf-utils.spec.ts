@@ -371,7 +371,7 @@ describe('magic-shelf-utils', () => {
     });
 
     it('should have length 3', () => {
-      expect(MULTI_VALUE_OPERATORS.length).toBe(3);
+      expect(MULTI_VALUE_OPERATORS).toHaveLength(3);
     });
   });
 
@@ -381,7 +381,7 @@ describe('magic-shelf-utils', () => {
     });
 
     it('should have length 2', () => {
-      expect(EMPTY_CHECK_OPERATORS.length).toBe(2);
+      expect(EMPTY_CHECK_OPERATORS).toHaveLength(2);
     });
   });
 });

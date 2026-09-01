@@ -1,4 +1,18 @@
 {
+    "local": {
+        "title": "Local Settings",
+        "description": "Browser level settings that only affect the current device. These settings are stored in the browser's local storage and will not be synced across devices.",
+        "cacheTitle": "Cache Storage Settings",
+        "cacheDesc": "Configure Cache Storage to improve performance and reduce server requests.",
+        "enableCache": "Enable Cache Storage",
+        "enableCacheDesc": "Store data locally in your browser for faster access",
+        "usageLabel": "Cache Storage Usage (MB)",
+        "usageDesc": "Current size occupied by Cache Storage",
+        "usageValue": "{{ value }} MB",
+        "refresh": "Refresh",
+        "clearCache": "Clear Cache",
+        "clearCacheDesc": "Remove all data stored in Cache Storage"
+    },
     "title": "阅读器偏好",
     "description": "配置书库的阅读体验设置。设置默认偏好作为个别图书的覆盖设置，或允许每本书保留自己的自定义设置，适用于 PDF、EPUB、FB2、MOBI、AZW3 和 CBX 格式。",
     "appMode": {
@@ -137,6 +151,9 @@
         "preferencesUpdatedDetail": "您的偏好已成功保存。"
     },
     "fonts": {
+        "previewParagraph": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        "previewParagraphSmall": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+        "previewCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789",
         "sectionTitle": "自定义字体库",
         "sectionDesc": "通过上传自定义字体来个性化您的阅读体验，用于电子书格式（EPUB、FB2、MOBI、AZW3）。最多上传 10 个自定义字体文件，它们将在电子书阅读器设置中可供选择。",
         "emptyTitle": "尚无自定义字体",

@@ -69,7 +69,7 @@ describe('TableColumnPreferenceService', () => {
   it('falls back to defaults when no saved preferences exist', () => {
     service.initPreferences(undefined);
 
-    expect(service.preferences().length).toBe(service.allColumns.length);
+    expect(service.preferences()).toHaveLength(service.allColumns.length);
     expect(service.visibleColumns[0]).toEqual({
       field: 'readStatus',
       header: 't:book.columnPref.columns.readStatus'

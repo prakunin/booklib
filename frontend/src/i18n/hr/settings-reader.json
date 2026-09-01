@@ -1,4 +1,18 @@
 {
+    "local": {
+        "title": "Local Settings",
+        "description": "Browser level settings that only affect the current device. These settings are stored in the browser's local storage and will not be synced across devices.",
+        "cacheTitle": "Cache Storage Settings",
+        "cacheDesc": "Configure Cache Storage to improve performance and reduce server requests.",
+        "enableCache": "Enable Cache Storage",
+        "enableCacheDesc": "Store data locally in your browser for faster access",
+        "usageLabel": "Cache Storage Usage (MB)",
+        "usageDesc": "Current size occupied by Cache Storage",
+        "usageValue": "{{ value }} MB",
+        "refresh": "Refresh",
+        "clearCache": "Clear Cache",
+        "clearCacheDesc": "Remove all data stored in Cache Storage"
+    },
     "title": "Postavke čitača",
     "description": "Konfigurirajte postavke čitanja za vašu knjižnicu. Postavite zadane postavke koje služe kao zamjene za pojedine knjige, ili dopustite svakoj knjizi da zadrži vlastite prilagođene postavke za PDF, EPUB, FB2, MOBI, AZW3 i CBX formate.",
     "appMode": {
@@ -137,6 +151,9 @@
         "preferencesUpdatedDetail": "Vaše postavke su uspješno spremljene."
     },
     "fonts": {
+        "previewParagraph": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        "previewParagraphSmall": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+        "previewCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789",
         "sectionTitle": "Biblioteka prilagođenih fontova",
         "sectionDesc": "Personalizirajte svoje iskustvo čitanja učitavanjem prilagođenih fontova za korištenje s formatima e-knjiga (EPUB, FB2, MOBI, AZW3). Učitajte do 10 prilagođenih datoteka fontova koji će biti dostupni za odabir u postavkama čitača e-knjiga.",
         "emptyTitle": "Još nema prilagođenih fontova",
