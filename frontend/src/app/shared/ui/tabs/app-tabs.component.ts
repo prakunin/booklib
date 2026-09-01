@@ -114,13 +114,15 @@ export class AppTabsComponent {
   protected readonly indicatorWidth = signal(0);
   private readonly indicatorReady = signal(false);
 
-  protected readonly rowClass = computed(() =>
-    this.collapsed()
-      ? 'pointer-events-none invisible absolute left-0 top-0 w-max max-w-full overflow-hidden'
-      : this.collapse() === 'scroll'
-        ? 'block overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-        : 'block',
-  );
+  protected readonly rowClass = computed(() => {
+    if (this.collapsed()) {
+      return 'pointer-events-none invisible absolute left-0 top-0 w-max max-w-full overflow-hidden';
+    }
+    if (this.collapse() === 'scroll') {
+      return 'block overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+    }
+    return 'block';
+  });
   protected readonly rootClass = computed(() => appTabsRootVariants({ placement: this.placement() }));
   protected readonly listClass = computed(() => appTabsListVariants({ variant: this.variant(), placement: this.placement() }));
   protected readonly tabClass = computed(() => appTabVariants({ variant: this.variant(), size: this.size() }));

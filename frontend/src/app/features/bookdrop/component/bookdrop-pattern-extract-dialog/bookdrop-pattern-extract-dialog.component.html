@@ -25,7 +25,7 @@
         severity="secondary"
         [disabled]="!hasValidPattern"
         [ariaLabel]="t('previewAriaLabel')"
-        (click)="previewPattern()">
+        (onClick)="previewPattern()">
       </p-button>
     </div>
   </div>
@@ -39,7 +39,10 @@
           [pTooltip]="getPlaceholderTooltip(placeholder)"
           tooltipPosition="top"
           class="placeholder-chip"
-          (click)="insertPlaceholder(placeholder.name)">
+          tabindex="0"
+          (click)="insertPlaceholder(placeholder.name)"
+          (keydown.enter)="insertPlaceholder(placeholder.name)"
+          (keydown.space)="insertPlaceholder(placeholder.name); $event.preventDefault()">
         </p-chip>
       }
     </div>
@@ -54,7 +57,7 @@
           severity="secondary"
           size="small"
           outlined
-          (click)="applyCommonPattern(commonPattern.pattern)">
+          (onClick)="applyCommonPattern(commonPattern.pattern)">
         </p-button>
       }
     </div>
@@ -108,14 +111,14 @@
       icon="pi pi-times"
       severity="secondary"
       [disabled]="isExtracting"
-      (click)="cancel()">
+      (onClick)="cancel()">
     </p-button>
     <p-button
       [label]="t('extractAndApply')"
       icon="pi pi-check"
       severity="success"
       [disabled]="!hasValidPattern || isExtracting"
-      (click)="extract()">
+      (onClick)="extract()">
     </p-button>
   </div>
 </div>

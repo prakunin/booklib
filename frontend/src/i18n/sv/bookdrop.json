@@ -20,6 +20,7 @@
         "tags": "Taggar"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "Fildata",
         "fetchedData": "Hämtad data",
         "copyMissingTooltip": "Kopiera saknade fält från hämtad metadata",

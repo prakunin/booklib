@@ -94,7 +94,7 @@ export class LanguageResolverService {
     }
 
     try {
-      const canonical = Intl.getCanonicalLocales(lower.replace(/_/g, '-'))[0];
+      const canonical = Intl.getCanonicalLocales(lower.replaceAll('_', '-'))[0];
       if (!canonical) {
         return {base: lower, tag: lower};
       }

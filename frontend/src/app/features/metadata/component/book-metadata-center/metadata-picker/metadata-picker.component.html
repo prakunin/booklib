@@ -209,9 +209,9 @@
                     <i [class]="metadataForm.get(field.lockedKey)?.value ? 'pi pi-lock' : 'pi pi-lock-open'"></i>
                   </button>
                   @if (field.controlName === 'publishedDate') {
-                    <input pInputText formControlName="{{field.controlName}}" class="field-input" placeholder="YYYY-MM-DD"/>
+                    <input pInputText formControlName="{{field.controlName}}" class="field-input" [attr.aria-label]="field.label" placeholder="YYYY-MM-DD"/>
                   } @else {
-                    <input pInputText formControlName="{{field.controlName}}" class="field-input"/>
+                    <input pInputText formControlName="{{field.controlName}}" class="field-input" [attr.aria-label]="field.label"/>
                   }
                 </div>
 
@@ -229,7 +229,7 @@
                 </button>
 
                 <div class="field-side fetched">
-                  <input pInputText [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-input" readonly/>
+                  <input pInputText [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-input" [attr.aria-label]="t('columnFetched') + ': ' + field.label" readonly/>
                 </div>
               </div>
             </div>
@@ -268,12 +268,11 @@
                           @if ($index === 0) { <span class="main-author-badge">m</span> }
                           {{ author }}
                           @if (!metadataForm.get('authors')?.disabled) {
-                            <i
+                            <button
+                              type="button"
                               class="pi pi-times author-chip-remove"
-                              role="button"
-                              tabindex="0"
-                              (click)="removeAuthor($index)"
-                              (keydown.enter)="removeAuthor($index)"></i>
+                              [attr.aria-label]="t('removeAuthor')"
+                              (click)="removeAuthor($index)"></button>
                           }
                         </span>
                       }
@@ -360,7 +359,7 @@
                   >
                     <i [class]="metadataForm.get(field.lockedKey)?.value ? 'pi pi-lock' : 'pi pi-lock-open'"></i>
                   </button>
-                  <textarea pTextarea formControlName="{{field.controlName}}" class="field-textarea" rows="4"></textarea>
+                  <textarea pTextarea formControlName="{{field.controlName}}" class="field-textarea" [attr.aria-label]="field.label" rows="4"></textarea>
                 </div>
 
                 <button
@@ -377,7 +376,7 @@
                 </button>
 
                 <div class="field-side fetched">
-                  <textarea pTextarea [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-textarea" rows="4" readonly></textarea>
+                  <textarea pTextarea [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-textarea" rows="4" [attr.aria-label]="t('columnFetched') + ': ' + field.label" readonly></textarea>
                 </div>
               </div>
             </div>
@@ -406,7 +405,7 @@
                   >
                     <i [class]="metadataForm.get(field.lockedKey)?.value ? 'pi pi-lock' : 'pi pi-lock-open'"></i>
                   </button>
-                  <input pInputText formControlName="{{field.controlName}}" class="field-input"/>
+                  <input pInputText formControlName="{{field.controlName}}" class="field-input" [attr.aria-label]="field.label"/>
                 </div>
 
                 <button
@@ -423,7 +422,7 @@
                 </button>
 
                 <div class="field-side fetched">
-                  <input pInputText [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-input" readonly/>
+                  <input pInputText [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-input" [attr.aria-label]="t('columnFetched') + ': ' + field.label" readonly/>
                 </div>
               </div>
             </div>
@@ -452,7 +451,7 @@
                   >
                     <i [class]="metadataForm.get(field.lockedKey)?.value ? 'pi pi-lock' : 'pi pi-lock-open'"></i>
                   </button>
-                  <input pInputText formControlName="{{field.controlName}}" class="field-input"/>
+                  <input pInputText formControlName="{{field.controlName}}" class="field-input" [attr.aria-label]="field.label"/>
                 </div>
 
                 <button
@@ -469,7 +468,7 @@
                 </button>
 
                 <div class="field-side fetched">
-                  <input pInputText [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-input" readonly/>
+                  <input pInputText [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-input" [attr.aria-label]="t('columnFetched') + ': ' + field.label" readonly/>
                 </div>
               </div>
             </div>
@@ -480,19 +479,18 @@
       <!-- Comic Book Details Section -->
       @if (shouldShowComicSection()) {
         <section class="form-section">
-          <div
-            class="section-header collapsible-header"
-            role="button"
-            tabindex="0"
-            (click)="comicSectionExpanded = !comicSectionExpanded"
-            (keydown.enter)="comicSectionExpanded = !comicSectionExpanded">
+          <button
+            type="button"
+            class="section-header collapsible-header w-full"
+            [attr.aria-expanded]="comicSectionExpanded"
+            (click)="comicSectionExpanded = !comicSectionExpanded">
             <i class="pi pi-bolt"></i>
             <span>{{ t('sectionComicDetails') }}</span>
             @if (!hasAnyFetchedComicData() && !hasAnyCurrentComicData()) {
               <span class="section-empty-badge">{{ t('nonePresent') }}</span>
             }
             <i [class]="comicSectionExpanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" class="section-toggle"></i>
-          </div>
+          </button>
 
           @if (comicSectionExpanded) {
             <div class="section-content">
@@ -517,7 +515,7 @@
                           class="field-checkbox"
                         />
                       } @else {
-                        <input pInputText formControlName="{{field.controlName}}" class="field-input"/>
+                        <input pInputText formControlName="{{field.controlName}}" class="field-input" [attr.aria-label]="field.label"/>
                       }
                     </div>
 
@@ -544,7 +542,7 @@
                           class="field-checkbox"
                         />
                       } @else {
-                        <input pInputText [value]="getFetchedComicValue(field.fetchedKey) ?? ''" class="field-input" readonly/>
+                        <input pInputText [value]="getFetchedComicValue(field.fetchedKey) ?? ''" class="field-input" [attr.aria-label]="t('columnFetched') + ': ' + field.label" readonly/>
                       }
                     </div>
                   </div>
@@ -622,7 +620,7 @@
                       >
                         <i [class]="metadataForm.get(field.lockedKey)?.value ? 'pi pi-lock' : 'pi pi-lock-open'"></i>
                       </button>
-                      <textarea pTextarea formControlName="{{field.controlName}}" class="field-textarea" rows="3"></textarea>
+                      <textarea pTextarea formControlName="{{field.controlName}}" class="field-textarea" [attr.aria-label]="field.label" rows="3"></textarea>
                     </div>
 
                     <button
@@ -639,7 +637,7 @@
                     </button>
 
                     <div class="field-side fetched">
-                      <textarea pTextarea [value]="getFetchedComicValue(field.fetchedKey) ?? ''" class="field-textarea" rows="3" readonly></textarea>
+                      <textarea pTextarea [value]="getFetchedComicValue(field.fetchedKey) ?? ''" class="field-textarea" rows="3" [attr.aria-label]="t('columnFetched') + ': ' + field.label" readonly></textarea>
                     </div>
                   </div>
                 </div>
@@ -678,7 +676,7 @@
                         class="field-checkbox"
                       />
                     } @else {
-                      <input pInputText formControlName="{{field.controlName}}" class="field-input"/>
+                      <input pInputText formControlName="{{field.controlName}}" class="field-input" [attr.aria-label]="field.label"/>
                     }
                   </div>
 
@@ -705,7 +703,7 @@
                         class="field-checkbox"
                       />
                     } @else {
-                      <input pInputText [value]="getFetchedAudiobookValue(field.fetchedKey) ?? ''" class="field-input" readonly/>
+                      <input pInputText [value]="getFetchedAudiobookValue(field.fetchedKey) ?? ''" class="field-input" [attr.aria-label]="t('columnFetched') + ': ' + field.label" readonly/>
                     }
                   </div>
                 </div>
@@ -737,7 +735,7 @@
                     >
                       <i [class]="metadataForm.get(field.lockedKey)?.value ? 'pi pi-lock' : 'pi pi-lock-open'"></i>
                     </button>
-                    <input pInputText formControlName="{{field.controlName}}" class="field-input"/>
+                    <input pInputText formControlName="{{field.controlName}}" class="field-input" [attr.aria-label]="field.label"/>
                   </div>
 
                   <button
@@ -754,7 +752,7 @@
                   </button>
 
                   <div class="field-side fetched">
-                    <input pInputText [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-input" readonly/>
+                    <input pInputText [value]="fetchedMetadata[field.fetchedKey] ?? ''" class="field-input" [attr.aria-label]="t('columnFetched') + ': ' + field.label" readonly/>
                   </div>
                 </div>
               </div>

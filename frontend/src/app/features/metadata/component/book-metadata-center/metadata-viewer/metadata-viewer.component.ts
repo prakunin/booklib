@@ -8,7 +8,7 @@ import {FormsModule} from '@angular/forms';
 import {Book, BookFile, BookMetadata, BookRecommendation, BookType, ComicMetadata, FileInfo, isReadableBookType, ReadStatus} from '../../../../book/model/book.model';
 import {UrlHelperService} from '../../../../../shared/service/url-helper.service';
 import {CoverComponent} from '../../../../../shared/components/cover/cover.component';
-import {UserService} from '../../../../settings/user-management/user.service';
+import {User, UserService} from '../../../../settings/user-management/user.service';
 import {SplitButton} from '@openng/optimus-ui/splitbutton';
 import {ConfirmationService, MenuItem, MessageService} from '@openng/optimus-ui/api';
 import {DynamicDialogRef} from '@openng/optimus-ui/dynamicdialog';
@@ -263,16 +263,7 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
     }
 
     if (permissions?.canManageLibrary || permissions?.admin) {
-      const isPhysical = book.isPhysical ?? false;
-      items.push({
-        label: isPhysical
-          ? this.t.translate('metadata.viewer.menuUnmarkPhysical')
-          : this.t.translate('metadata.viewer.menuMarkPhysical'),
-        icon: isPhysical ? 'pi pi-times-circle' : 'pi pi-book',
-        command: () => {
-          this.bookService.togglePhysicalFlag(book.id, !isPhysical).subscribe();
-        }
-      });
+      items.push(this.buildPhysicalToggleItem(book));
     }
 
     if (permissions?.canUpload || permissions?.admin) {
@@ -286,8 +277,32 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
     }
 
     const hasFiles = this.hasAnyFiles(book);
+    items.push(...this.buildFileActionItems(book, permissions, hasFiles, appSettings?.diskType));
 
-    if (hasFiles && (permissions?.canManageLibrary || permissions?.admin) && appSettings?.diskType === 'LOCAL') {
+    if (permissions?.canDeleteBook || permissions?.admin) {
+      items.push(...this.buildDeleteMenuItems(book, hasFiles));
+    }
+
+    return items;
+  });
+
+  private buildPhysicalToggleItem(book: Book): MenuItem {
+    const isPhysical = book.isPhysical ?? false;
+    return {
+      label: isPhysical
+        ? this.t.translate('metadata.viewer.menuUnmarkPhysical')
+        : this.t.translate('metadata.viewer.menuMarkPhysical'),
+      icon: isPhysical ? 'pi pi-times-circle' : 'pi pi-book',
+      command: () => {
+        this.bookService.togglePhysicalFlag(book.id, !isPhysical).subscribe();
+      }
+    };
+  }
+
+  private buildFileActionItems(book: Book, permissions: User['permissions'], hasFiles: boolean, diskType: string | undefined): MenuItem[] {
+    const items: MenuItem[] = [];
+
+    if (hasFiles && (permissions?.canManageLibrary || permissions?.admin) && diskType === 'LOCAL') {
       items.push({
         label: this.t.translate('metadata.viewer.menuOrganizeFiles'),
         icon: 'pi pi-arrows-h',
@@ -331,117 +346,120 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
       });
     }
 
-    if (permissions?.canDeleteBook || permissions?.admin) {
-      const deleteFormatItems: MenuItem[] = [];
-      const hasMultipleFormats = (book.alternativeFormats?.length ?? 0) > 0;
+    return items;
+  }
 
-      if (book.primaryFile) {
-        const extension = this.getFileExtension(book.primaryFile.filePath);
-        const isPrimaryOnly = !hasMultipleFormats;
-        const truncatedName = this.truncateFileName(book.primaryFile.fileName, 25);
-        deleteFormatItems.push({
-          label: `${truncatedName} (${this.formatFileSize(book.primaryFile)}) [Primary]`,
-          icon: this.getFileIcon(extension),
-          tooltipOptions: {tooltipLabel: book.primaryFile.fileName, tooltipPosition: 'left'},
-          command: () => this.deleteBookFile(book, book.primaryFile!.id, book.primaryFile!.fileName || 'file', true, isPrimaryOnly)
-        });
-      }
+  private buildDeleteMenuItems(book: Book, hasFiles: boolean): MenuItem[] {
+    const deleteItems: MenuItem[] = [];
+    const deleteFormatItems: MenuItem[] = [];
+    const hasMultipleFormats = (book.alternativeFormats?.length ?? 0) > 0;
 
-      if (book.alternativeFormats?.length) {
-        book.alternativeFormats.forEach(format => {
-          const extension = this.getFileExtension(format.filePath);
-          const truncatedName = this.truncateFileName(format.fileName, 25);
-          deleteFormatItems.push({
-            label: `${truncatedName} (${this.formatFileSize(format)})`,
-            icon: this.getFileIcon(extension),
-            tooltipOptions: {tooltipLabel: format.fileName, tooltipPosition: 'left'},
-            command: () => this.deleteBookFile(book, format.id, format.fileName || 'file', false, false)
-          });
-        });
-      }
-
-      if (deleteFormatItems.length > 0) {
-        items.push({
-          label: this.t.translate('metadata.viewer.menuDeleteFileFormats'),
-          icon: 'pi pi-file',
-          items: deleteFormatItems
-        });
-      }
-
-      if (book.supplementaryFiles?.length) {
-        const deleteSupplementaryItems: MenuItem[] = [];
-        book.supplementaryFiles.forEach(file => {
-          const extension = this.getFileExtension(file.filePath);
-          const truncatedName = this.truncateFileName(file.fileName, 25);
-          deleteSupplementaryItems.push({
-            label: `${truncatedName} (${this.formatFileSize(file)})`,
-            icon: this.getFileIcon(extension),
-            tooltipOptions: {tooltipLabel: file.fileName, tooltipPosition: 'left'},
-            command: () => this.deleteAdditionalFile(book.id, file.id, file.fileName || 'file')
-          });
-        });
-
-        items.push({
-          label: this.t.translate('metadata.viewer.menuDeleteSupplementaryFiles'),
-          icon: 'pi pi-paperclip',
-          items: deleteSupplementaryItems
-        });
-      }
-
-      const allFormats: string[] = [];
-      if (book.primaryFile?.fileName) {
-        allFormats.push(book.primaryFile.fileName);
-      }
-      book.alternativeFormats?.forEach(f => {
-        if (f.fileName) allFormats.push(f.fileName);
-      });
-      book.supplementaryFiles?.forEach(f => {
-        if (f.fileName) allFormats.push(f.fileName);
-      });
-
-      const isPhysical = !hasFiles;
-      const fileListMessage = allFormats.length > 0
-        ? `\n\nThe following files will be permanently deleted:\n• ${allFormats.join('\n• ')}`
-        : '';
-
-      const deleteLabel = isPhysical ? this.t.translate('metadata.viewer.menuDeleteBook') : this.t.translate('metadata.viewer.menuDeleteBookAllFiles');
-      const deleteMessage = isPhysical
-        ? this.t.translate('metadata.viewer.confirm.deleteBookMessage', { title: book.metadata?.title })
-        : this.t.translate('metadata.viewer.confirm.deleteBookAllFilesMessage', { title: book.metadata?.title, fileList: fileListMessage });
-      const deleteAcceptLabel = isPhysical ? this.t.translate('common.delete') : this.t.translate('metadata.viewer.confirm.deleteEverythingBtn');
-
-      items.push({
-        label: deleteLabel,
-        icon: 'pi pi-trash',
-        command: () => {
-          this.confirmationService.confirm({
-            message: deleteMessage,
-            header: deleteLabel,
-            icon: 'pi pi-exclamation-triangle',
-            acceptIcon: 'pi pi-trash',
-            rejectIcon: 'pi pi-times',
-            acceptLabel: deleteAcceptLabel,
-            rejectLabel: this.t.translate('common.cancel'),
-            acceptButtonStyleClass: 'p-button-danger',
-            rejectButtonStyleClass: 'p-button-outlined',
-            accept: () => {
-              this.bookService.deleteBooks(new Set([book.id])).subscribe({
-                next: () => {
-                  if (this.metadataCenterViewMode === 'route') {
-                    this.router.navigate(['/dashboard']);
-                  } else {
-                    this.dialogRef?.close();
-                  }
-                },
-              });
-            }
-          });
-        },
+    if (book.primaryFile) {
+      const extension = this.getFileExtension(book.primaryFile.filePath);
+      const isPrimaryOnly = !hasMultipleFormats;
+      const truncatedName = this.truncateFileName(book.primaryFile.fileName, 25);
+      deleteFormatItems.push({
+        label: `${truncatedName} (${this.formatFileSize(book.primaryFile)}) [Primary]`,
+        icon: this.getFileIcon(extension),
+        tooltipOptions: {tooltipLabel: book.primaryFile.fileName, tooltipPosition: 'left'},
+        command: () => this.deleteBookFile(book, book.primaryFile!.id, book.primaryFile!.fileName || 'file', true, isPrimaryOnly)
       });
     }
 
-    return items;
-  });
+    if (book.alternativeFormats?.length) {
+      book.alternativeFormats.forEach(format => {
+        const extension = this.getFileExtension(format.filePath);
+        const truncatedName = this.truncateFileName(format.fileName, 25);
+        deleteFormatItems.push({
+          label: `${truncatedName} (${this.formatFileSize(format)})`,
+          icon: this.getFileIcon(extension),
+          tooltipOptions: {tooltipLabel: format.fileName, tooltipPosition: 'left'},
+          command: () => this.deleteBookFile(book, format.id, format.fileName || 'file', false, false)
+        });
+      });
+    }
+
+    if (deleteFormatItems.length > 0) {
+      deleteItems.push({
+        label: this.t.translate('metadata.viewer.menuDeleteFileFormats'),
+        icon: 'pi pi-file',
+        items: deleteFormatItems
+      });
+    }
+
+    if (book.supplementaryFiles?.length) {
+      const deleteSupplementaryItems: MenuItem[] = [];
+      book.supplementaryFiles.forEach(file => {
+        const extension = this.getFileExtension(file.filePath);
+        const truncatedName = this.truncateFileName(file.fileName, 25);
+        deleteSupplementaryItems.push({
+          label: `${truncatedName} (${this.formatFileSize(file)})`,
+          icon: this.getFileIcon(extension),
+          tooltipOptions: {tooltipLabel: file.fileName, tooltipPosition: 'left'},
+          command: () => this.deleteAdditionalFile(book.id, file.id, file.fileName || 'file')
+        });
+      });
+
+      deleteItems.push({
+        label: this.t.translate('metadata.viewer.menuDeleteSupplementaryFiles'),
+        icon: 'pi pi-paperclip',
+        items: deleteSupplementaryItems
+      });
+    }
+
+    const allFormats: string[] = [];
+    if (book.primaryFile?.fileName) {
+      allFormats.push(book.primaryFile.fileName);
+    }
+    book.alternativeFormats?.forEach(f => {
+      if (f.fileName) allFormats.push(f.fileName);
+    });
+    book.supplementaryFiles?.forEach(f => {
+      if (f.fileName) allFormats.push(f.fileName);
+    });
+
+    const isPhysical = !hasFiles;
+    const fileListMessage = allFormats.length > 0
+      ? `\n\nThe following files will be permanently deleted:\n• ${allFormats.join('\n• ')}`
+      : '';
+
+    const deleteLabel = isPhysical ? this.t.translate('metadata.viewer.menuDeleteBook') : this.t.translate('metadata.viewer.menuDeleteBookAllFiles');
+    const deleteMessage = isPhysical
+      ? this.t.translate('metadata.viewer.confirm.deleteBookMessage', { title: book.metadata?.title })
+      : this.t.translate('metadata.viewer.confirm.deleteBookAllFilesMessage', { title: book.metadata?.title, fileList: fileListMessage });
+    const deleteAcceptLabel = isPhysical ? this.t.translate('common.delete') : this.t.translate('metadata.viewer.confirm.deleteEverythingBtn');
+
+    deleteItems.push({
+      label: deleteLabel,
+      icon: 'pi pi-trash',
+      command: () => {
+        this.confirmationService.confirm({
+          message: deleteMessage,
+          header: deleteLabel,
+          icon: 'pi pi-exclamation-triangle',
+          acceptIcon: 'pi pi-trash',
+          rejectIcon: 'pi pi-times',
+          acceptLabel: deleteAcceptLabel,
+          rejectLabel: this.t.translate('common.cancel'),
+          acceptButtonStyleClass: 'p-button-danger',
+          rejectButtonStyleClass: 'p-button-outlined',
+          accept: () => {
+            this.bookService.deleteBooks(new Set([book.id])).subscribe({
+              next: () => {
+                if (this.metadataCenterViewMode === 'route') {
+                  this.router.navigate(['/dashboard']);
+                } else {
+                  this.dialogRef?.close();
+                }
+              },
+            });
+          }
+        });
+      },
+    });
+    return deleteItems;
+  }
+
   get bookInSeries(): Book[] {
     return this.bookInSeriesSignal();
   }
@@ -964,7 +982,7 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
 
   private extractYear(dateString: string | null | undefined): string | null {
     if (!dateString) return null;
-    const yearMatch = dateString.match(/\d{4}/);
+    const yearMatch = /\d{4}/.exec(dateString);
     return yearMatch ? yearMatch[0] : null;
   }
 
@@ -1004,7 +1022,12 @@ export class MetadataViewerComponent implements OnInit, AfterViewChecked {
       unitIndex++;
     }
 
-    const decimals = size >= 100 ? 0 : size >= 10 ? 1 : 2;
+    let decimals = 2;
+    if (size >= 100) {
+      decimals = 0;
+    } else if (size >= 10) {
+      decimals = 1;
+    }
     return `${size.toFixed(decimals)} ${units[unitIndex]}`;
   }
 

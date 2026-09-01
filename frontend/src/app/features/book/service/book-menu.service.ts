@@ -2,7 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {ConfirmationService, MenuItem, MessageService} from '@openng/optimus-ui/api';
 import {BookService} from './book.service';
 import {BookMetadataManageService} from './book-metadata-manage.service';
-import {AGE_RATING_OPTIONS, CONTENT_RATING_LABELS, readStatusLabels} from '../components/book-browser/book-filter/book-filter.config';
+import {AGE_RATING_OPTIONS, CONTENT_RATING_LABELS, RangeConfig, readStatusLabels} from '../components/book-browser/book-filter/book-filter.config';
 import {ReadStatus} from '../model/book.model';
 import {ResetProgressTypes} from '../../../shared/constants/reset-progress-type';
 import {catchError, EMPTY, finalize} from 'rxjs';
@@ -92,8 +92,7 @@ export class BookMenuService {
         label: this.t.translate('book.menuService.menu.bulkMetadataEditor'),
         icon: 'pi pi-table',
         command: bulkEditMetadata
-      });
-      items.push({
+      }, {
         label: this.t.translate('book.menuService.menu.multiBookMetadataEditor'),
         icon: 'pi pi-clone',
         command: multiBookEditMetadata
@@ -105,8 +104,7 @@ export class BookMenuService {
         label: this.t.translate('book.menuService.menu.regenerateCovers'),
         icon: 'pi pi-image',
         command: regenerateCovers
-      });
-      items.push({
+      }, {
         label: this.t.translate('book.menuService.menu.generateCustomCovers'),
         icon: 'pi pi-palette',
         command: generateCustomCovers
@@ -142,31 +140,7 @@ export class BookMenuService {
                 label: this.t.translate('common.no'),
                 severity: 'secondary'
               },
-              accept: () => {
-                const loader = this.loadingService.show(this.t.translate('book.menuService.loading.updatingReadStatus', {count}));
-
-                this.bookService.updateBookReadStatus(Array.from(selectedBooks), status as ReadStatus)
-                  .pipe(finalize(() => this.loadingService.hide(loader)))
-                  .subscribe({
-                    next: () => {
-                      this.messageService.add({
-                        severity: 'success',
-                        summary: this.t.translate('book.menuService.toast.readStatusUpdatedSummary'),
-                        detail: this.t.translate('book.menuService.toast.readStatusUpdatedDetail', {label}),
-                        life: 2000
-                      });
-                    },
-                    error: (err: HttpErrorResponse) => {
-                      const apiError = err.error as APIException;
-                      this.messageService.add({
-                        severity: 'error',
-                        summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
-                        detail: apiError?.message || this.t.translate('book.menuService.toast.readStatusFailedDetail'),
-                        life: 3000
-                      });
-                    }
-                  });
-              }
+              accept: () => this.updateReadStatus(selectedBooks, status as ReadStatus, label, count)
             });
           }
         }))
@@ -187,32 +161,7 @@ export class BookMenuService {
                 icon: 'pi pi-exclamation-triangle',
                 acceptLabel: this.t.translate('common.yes'),
                 rejectLabel: this.t.translate('common.no'),
-                accept: () => {
-                  const loader = this.loadingService.show(this.t.translate('book.menuService.loading.settingAgeRating', {count}));
-                  this.bookMetadataManageService.updateBooksMetadata({
-                    bookIds: Array.from(selectedBooks),
-                    ageRating: option.id
-                  }).pipe(finalize(() => this.loadingService.hide(loader)))
-                    .subscribe({
-                      next: () => {
-                        this.messageService.add({
-                          severity: 'success',
-                          summary: this.t.translate('book.menuService.toast.ageRatingUpdatedSummary'),
-                          detail: this.t.translate('book.menuService.toast.ageRatingUpdatedDetail', {label: option.label}),
-                          life: 2000
-                        });
-                      },
-                      error: (err: HttpErrorResponse) => {
-                        const apiError = err.error as APIException;
-                        this.messageService.add({
-                          severity: 'error',
-                          summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
-                          detail: apiError?.message || this.t.translate('book.menuService.toast.ageRatingFailedDetail'),
-                          life: 3000
-                        });
-                      }
-                    });
-                }
+                accept: () => this.setAgeRating(selectedBooks, option, count)
               });
             }
           })),
@@ -229,39 +178,12 @@ export class BookMenuService {
                 icon: 'pi pi-exclamation-triangle',
                 acceptLabel: this.t.translate('common.yes'),
                 rejectLabel: this.t.translate('common.no'),
-                accept: () => {
-                  const loader = this.loadingService.show(this.t.translate('book.menuService.loading.clearingAgeRating', {count}));
-                  this.bookMetadataManageService.updateBooksMetadata({
-                    bookIds: Array.from(selectedBooks),
-                    clearAgeRating: true
-                  }).pipe(finalize(() => this.loadingService.hide(loader)))
-                    .subscribe({
-                      next: () => {
-                        this.messageService.add({
-                          severity: 'success',
-                          summary: this.t.translate('book.menuService.toast.ageRatingClearedSummary'),
-                          detail: this.t.translate('book.menuService.toast.ageRatingClearedDetail'),
-                          life: 2000
-                        });
-                      },
-                      error: (err: HttpErrorResponse) => {
-                        const apiError = err.error as APIException;
-                        this.messageService.add({
-                          severity: 'error',
-                          summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
-                          detail: apiError?.message || this.t.translate('book.menuService.toast.clearAgeRatingFailedDetail'),
-                          life: 3000
-                        });
-                      }
-                    });
-                }
+                accept: () => this.clearAgeRating(selectedBooks, count)
               });
             }
           }
         ]
-      });
-
-      items.push({
+      }, {
         label: this.t.translate('book.menuService.menu.setContentRating'),
         icon: 'pi pi-shield',
         items: [
@@ -274,32 +196,7 @@ export class BookMenuService {
                 icon: 'pi pi-exclamation-triangle',
                 acceptLabel: this.t.translate('common.yes'),
                 rejectLabel: this.t.translate('common.no'),
-                accept: () => {
-                  const loader = this.loadingService.show(this.t.translate('book.menuService.loading.settingContentRating', {count}));
-                  this.bookMetadataManageService.updateBooksMetadata({
-                    bookIds: Array.from(selectedBooks),
-                    contentRating: value
-                  }).pipe(finalize(() => this.loadingService.hide(loader)))
-                    .subscribe({
-                      next: () => {
-                        this.messageService.add({
-                          severity: 'success',
-                          summary: this.t.translate('book.menuService.toast.contentRatingUpdatedSummary'),
-                          detail: this.t.translate('book.menuService.toast.contentRatingUpdatedDetail', {label}),
-                          life: 2000
-                        });
-                      },
-                      error: (err: HttpErrorResponse) => {
-                        const apiError = err.error as APIException;
-                        this.messageService.add({
-                          severity: 'error',
-                          summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
-                          detail: apiError?.message || this.t.translate('book.menuService.toast.contentRatingFailedDetail'),
-                          life: 3000
-                        });
-                      }
-                    });
-                }
+                accept: () => this.setContentRating(selectedBooks, value, label, count)
               });
             }
           })),
@@ -316,32 +213,7 @@ export class BookMenuService {
                 icon: 'pi pi-exclamation-triangle',
                 acceptLabel: this.t.translate('common.yes'),
                 rejectLabel: this.t.translate('common.no'),
-                accept: () => {
-                  const loader = this.loadingService.show(this.t.translate('book.menuService.loading.clearingContentRating', {count}));
-                  this.bookMetadataManageService.updateBooksMetadata({
-                    bookIds: Array.from(selectedBooks),
-                    clearContentRating: true
-                  }).pipe(finalize(() => this.loadingService.hide(loader)))
-                    .subscribe({
-                      next: () => {
-                        this.messageService.add({
-                          severity: 'success',
-                          summary: this.t.translate('book.menuService.toast.contentRatingClearedSummary'),
-                          detail: this.t.translate('book.menuService.toast.contentRatingClearedDetail'),
-                          life: 2000
-                        });
-                      },
-                      error: (err: HttpErrorResponse) => {
-                        const apiError = err.error as APIException;
-                        this.messageService.add({
-                          severity: 'error',
-                          summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
-                          detail: apiError?.message || this.t.translate('book.menuService.toast.clearContentRatingFailedDetail'),
-                          life: 3000
-                        });
-                      }
-                    });
-                }
+                accept: () => this.clearContentRating(selectedBooks, count)
               });
             }
           }
@@ -361,38 +233,7 @@ export class BookMenuService {
              icon: 'pi pi-exclamation-triangle',
              acceptLabel: this.t.translate('common.yes'),
              rejectLabel: this.t.translate('common.no'),
-             accept: () => {
-               const loader = this.loadingService.show(this.t.translate('book.menuService.loading.removingFromShelves', {count}));
-               this.bookService.getBooksByIds(Array.from(selectedBooks)).pipe(
-                 catchError(() => {
-                   this.loadingService.hide(loader);
-                   this.messageService.add({severity: 'error', summary: this.t.translate('common.error'), detail: this.t.translate('book.menuService.toast.unshelveFailedDetail')});
-                   return EMPTY;
-                 })
-               ).subscribe(books => {
-               const allShelfIds = new Set<number>();
-               books.forEach(b => b.shelves?.forEach(s => {
-                 if (s.id) allShelfIds.add(s.id);
-               }));
-
-               if (allShelfIds.size === 0) {
-                 this.loadingService.hide(loader);
-                 this.messageService.add({ severity: 'info', summary: this.t.translate('common.info'), detail: this.t.translate('book.menuService.toast.noBooksOnShelvesDetail') });
-                 return;
-               }
-
-               this.bookService.updateBookShelves(selectedBooks, new Set(), allShelfIds)
-                 .pipe(finalize(() => this.loadingService.hide(loader)))
-                 .subscribe({
-                   next: () => {
-                     this.messageService.add({severity: 'success', summary: this.t.translate('common.success'), detail: this.t.translate('book.menuService.toast.unshelveSuccessDetail')});
-                   },
-                   error: () => {
-                     this.messageService.add({severity: 'error', summary: this.t.translate('common.error'), detail: this.t.translate('book.menuService.toast.unshelveFailedDetail')});
-                   }
-                 });
-               });
-             }
+             accept: () => this.removeFromAllShelves(selectedBooks, count)
            });
          }
        });
@@ -481,5 +322,172 @@ export class BookMenuService {
     }
 
     return items;
+  }
+
+  private updateReadStatus(selectedBooks: Set<number>, status: ReadStatus, label: string, count: number): void {
+    const loader = this.loadingService.show(this.t.translate('book.menuService.loading.updatingReadStatus', {count}));
+
+    this.bookService.updateBookReadStatus(Array.from(selectedBooks), status)
+      .pipe(finalize(() => this.loadingService.hide(loader)))
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: this.t.translate('book.menuService.toast.readStatusUpdatedSummary'),
+            detail: this.t.translate('book.menuService.toast.readStatusUpdatedDetail', {label}),
+            life: 2000
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          const apiError = err.error as APIException;
+          this.messageService.add({
+            severity: 'error',
+            summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
+            detail: apiError?.message || this.t.translate('book.menuService.toast.readStatusFailedDetail'),
+            life: 3000
+          });
+        }
+      });
+  }
+
+  private setAgeRating(selectedBooks: Set<number>, option: RangeConfig, count: number): void {
+    const loader = this.loadingService.show(this.t.translate('book.menuService.loading.settingAgeRating', {count}));
+    this.bookMetadataManageService.updateBooksMetadata({
+      bookIds: Array.from(selectedBooks),
+      ageRating: option.id
+    }).pipe(finalize(() => this.loadingService.hide(loader)))
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: this.t.translate('book.menuService.toast.ageRatingUpdatedSummary'),
+            detail: this.t.translate('book.menuService.toast.ageRatingUpdatedDetail', {label: option.label}),
+            life: 2000
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          const apiError = err.error as APIException;
+          this.messageService.add({
+            severity: 'error',
+            summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
+            detail: apiError?.message || this.t.translate('book.menuService.toast.ageRatingFailedDetail'),
+            life: 3000
+          });
+        }
+      });
+  }
+
+  private clearAgeRating(selectedBooks: Set<number>, count: number): void {
+    const loader = this.loadingService.show(this.t.translate('book.menuService.loading.clearingAgeRating', {count}));
+    this.bookMetadataManageService.updateBooksMetadata({
+      bookIds: Array.from(selectedBooks),
+      clearAgeRating: true
+    }).pipe(finalize(() => this.loadingService.hide(loader)))
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: this.t.translate('book.menuService.toast.ageRatingClearedSummary'),
+            detail: this.t.translate('book.menuService.toast.ageRatingClearedDetail'),
+            life: 2000
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          const apiError = err.error as APIException;
+          this.messageService.add({
+            severity: 'error',
+            summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
+            detail: apiError?.message || this.t.translate('book.menuService.toast.clearAgeRatingFailedDetail'),
+            life: 3000
+          });
+        }
+      });
+  }
+
+  private setContentRating(selectedBooks: Set<number>, value: string, label: string, count: number): void {
+    const loader = this.loadingService.show(this.t.translate('book.menuService.loading.settingContentRating', {count}));
+    this.bookMetadataManageService.updateBooksMetadata({
+      bookIds: Array.from(selectedBooks),
+      contentRating: value
+    }).pipe(finalize(() => this.loadingService.hide(loader)))
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: this.t.translate('book.menuService.toast.contentRatingUpdatedSummary'),
+            detail: this.t.translate('book.menuService.toast.contentRatingUpdatedDetail', {label}),
+            life: 2000
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          const apiError = err.error as APIException;
+          this.messageService.add({
+            severity: 'error',
+            summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
+            detail: apiError?.message || this.t.translate('book.menuService.toast.contentRatingFailedDetail'),
+            life: 3000
+          });
+        }
+      });
+  }
+
+  private clearContentRating(selectedBooks: Set<number>, count: number): void {
+    const loader = this.loadingService.show(this.t.translate('book.menuService.loading.clearingContentRating', {count}));
+    this.bookMetadataManageService.updateBooksMetadata({
+      bookIds: Array.from(selectedBooks),
+      clearContentRating: true
+    }).pipe(finalize(() => this.loadingService.hide(loader)))
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: this.t.translate('book.menuService.toast.contentRatingClearedSummary'),
+            detail: this.t.translate('book.menuService.toast.contentRatingClearedDetail'),
+            life: 2000
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          const apiError = err.error as APIException;
+          this.messageService.add({
+            severity: 'error',
+            summary: this.t.translate('book.menuService.toast.updateFailedSummary'),
+            detail: apiError?.message || this.t.translate('book.menuService.toast.clearContentRatingFailedDetail'),
+            life: 3000
+          });
+        }
+      });
+  }
+
+  private removeFromAllShelves(selectedBooks: Set<number>, count: number): void {
+    const loader = this.loadingService.show(this.t.translate('book.menuService.loading.removingFromShelves', {count}));
+    this.bookService.getBooksByIds(Array.from(selectedBooks)).pipe(
+      catchError(() => {
+        this.loadingService.hide(loader);
+        this.messageService.add({severity: 'error', summary: this.t.translate('common.error'), detail: this.t.translate('book.menuService.toast.unshelveFailedDetail')});
+        return EMPTY;
+      })
+    ).subscribe(books => {
+      const allShelfIds = new Set<number>();
+      books.forEach(b => b.shelves?.forEach(s => {
+        if (s.id) allShelfIds.add(s.id);
+      }));
+
+      if (allShelfIds.size === 0) {
+        this.loadingService.hide(loader);
+        this.messageService.add({severity: 'info', summary: this.t.translate('common.info'), detail: this.t.translate('book.menuService.toast.noBooksOnShelvesDetail')});
+        return;
+      }
+
+      this.bookService.updateBookShelves(selectedBooks, new Set(), allShelfIds)
+        .pipe(finalize(() => this.loadingService.hide(loader)))
+        .subscribe({
+          next: () => {
+            this.messageService.add({severity: 'success', summary: this.t.translate('common.success'), detail: this.t.translate('book.menuService.toast.unshelveSuccessDetail')});
+          },
+          error: () => {
+            this.messageService.add({severity: 'error', summary: this.t.translate('common.error'), detail: this.t.translate('book.menuService.toast.unshelveFailedDetail')});
+          }
+        });
+    });
   }
 }

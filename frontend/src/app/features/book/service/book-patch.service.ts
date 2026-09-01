@@ -2,10 +2,9 @@ import {inject, Injectable} from '@angular/core';
 import {HttpClient, HttpParams} from '@angular/common/http';
 import {Observable, Subject} from 'rxjs';
 import {distinctUntilChanged, exhaustMap, map, share, tap} from 'rxjs/operators';
-import {Book, BookFileProgress, ReadStatus} from '../model/book.model';
+import {Book, BookFileProgress, BookStatusUpdateResponse, PersonalRatingUpdateResponse, ReadStatus} from '../model/book.model';
 import {API_CONFIG} from '../../../core/config/api-config';
 import {ResetProgressType, ResetProgressTypes} from '../../../shared/constants/reset-progress-type';
-import {BookStatusUpdateResponse, PersonalRatingUpdateResponse} from '../model/book.model';
 import {QueryClient} from '@tanstack/angular-query-experimental';
 import {
   patchBooksInCache,

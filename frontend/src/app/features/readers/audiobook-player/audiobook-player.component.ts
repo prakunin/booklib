@@ -243,41 +243,13 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
     const requestedTrackIndex = this.getRequestedTrackIndex();
 
     if (book.audiobookProgress) {
-      this.savedPosition = book.audiobookProgress.positionMs
-        ? book.audiobookProgress.positionMs / 1000
-        : 0;
-
-      // If audio is already loaded, seek to saved position
-      const audio = this.audioElement?.nativeElement;
-      if (audio && audio.readyState >= 1 && this.savedPosition > 0) {
-        audio.currentTime = this.savedPosition;
-        this.currentTime = this.savedPosition;
-        this.updateCurrentChapter();
-      }
-
-      // Handle track index for folder-based audiobooks
-      if (info.folderBased && info.tracks && info.tracks.length > 0) {
-        const trackIndex = book.audiobookProgress?.trackIndex ?? 0;
-        if (trackIndex !== this.currentTrackIndex) {
-          this.currentTrackIndex = trackIndex;
-          this.loadTrack(trackIndex, false);
-          const track = info.tracks[trackIndex];
-          if (track?.durationMs) {
-            this.duration = track.durationMs / 1000;
-          }
-        }
-      }
+      this.restoreSavedProgress(book.audiobookProgress, info);
     }
 
     if (requestedPositionMs !== null) {
       this.savedPosition = requestedPositionMs / 1000;
       if (info.folderBased && requestedTrackIndex !== null && info.tracks?.[requestedTrackIndex]) {
-        this.currentTrackIndex = requestedTrackIndex;
-        this.loadTrack(requestedTrackIndex, false);
-        const track = info.tracks[requestedTrackIndex];
-        if (track?.durationMs) {
-          this.duration = track.durationMs / 1000;
-        }
+        this.switchToTrack(info, requestedTrackIndex);
       }
     }
 
@@ -286,6 +258,37 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
       this.updateCurrentChapter();
     }
     this.updateCurrentChapter();
+  }
+
+  private restoreSavedProgress(progress: NonNullable<Book['audiobookProgress']>, info: AudiobookInfo): void {
+    this.savedPosition = progress.positionMs
+      ? progress.positionMs / 1000
+      : 0;
+
+    // If audio is already loaded, seek to saved position
+    const audio = this.audioElement?.nativeElement;
+    if (audio && audio.readyState >= 1 && this.savedPosition > 0) {
+      audio.currentTime = this.savedPosition;
+      this.currentTime = this.savedPosition;
+      this.updateCurrentChapter();
+    }
+
+    // Handle track index for folder-based audiobooks
+    if (info.folderBased && info.tracks && info.tracks.length > 0) {
+      const trackIndex = progress.trackIndex ?? 0;
+      if (trackIndex !== this.currentTrackIndex) {
+        this.switchToTrack(info, trackIndex);
+      }
+    }
+  }
+
+  private switchToTrack(info: AudiobookInfo, trackIndex: number): void {
+    this.currentTrackIndex = trackIndex;
+    this.loadTrack(trackIndex, false);
+    const track = info.tracks?.[trackIndex];
+    if (track?.durationMs) {
+      this.duration = track.durationMs / 1000;
+    }
   }
 
   private getRequestedPositionMs(): number | null {
@@ -412,7 +415,7 @@ export class AudiobookPlayerComponent implements OnInit, OnDestroy {
       }
     }
 
-    this.currentChapterIdx = chapterIdx >= 0 ? chapterIdx : 0;
+    this.currentChapterIdx = Math.max(chapterIdx, 0);
     this.currentChapter = chapterIdx >= 0 ? chapters[chapterIdx] : undefined;
   }
 

@@ -69,6 +69,7 @@
         "description": "Wybierz jeden lub więcej katalogów z systemu plików",
         "currentPath": "Bieżąca ścieżka:",
         "searchPlaceholder": "Szukaj folderów...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "Przejdź poziom wyżej",
         "selectAllBtn": "Zaznacz wszystkie",
         "selectAllTooltip": "Zaznacz wszystkie widoczne foldery",

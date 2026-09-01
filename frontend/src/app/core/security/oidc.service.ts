@@ -15,6 +15,16 @@ interface OidcAuthorizationState {
   codeChallengeMethod: string;
 }
 
+interface OidcAuthUrlParams {
+  clientId: string;
+  redirectUri: string;
+  scope: string;
+  codeChallenge: string;
+  state: string;
+  nonce: string;
+  codeChallengeMethod: string;
+}
+
 interface OidcTokenResponse {
   accessToken: string;
   refreshToken: string;
@@ -40,19 +50,21 @@ export class OidcService {
     const redirectUri = `${globalThis.location.origin}/oauth2-callback`;
     const scope = scopes?.trim() || 'openid profile email groups offline_access';
 
+    const params: OidcAuthUrlParams = {clientId, redirectUri, scope, codeChallenge, state, nonce, codeChallengeMethod};
+
     if (authorizationEndpoint) {
-      return Promise.resolve(this.buildUrl(authorizationEndpoint, clientId, redirectUri, scope, codeChallenge, state, nonce, codeChallengeMethod));
+      return Promise.resolve(this.buildUrl(authorizationEndpoint, params));
     }
 
     // Fetch from discovery if authorization_endpoint not provided
-    return fetch(`${issuerUri.replace(/\/+$/, '')}/.well-known/openid-configuration`)
+    return fetch(`${issuerUri.replace(/(?<!\/)\/+$/, '')}/.well-known/openid-configuration`)
       .then(res => res.json())
       .then(doc => {
         const endpoint = doc.authorization_endpoint;
         if (!endpoint) {
           throw new Error('authorization_endpoint not found in discovery document');
         }
-        return this.buildUrl(endpoint, clientId, redirectUri, scope, codeChallenge, state, nonce, codeChallengeMethod);
+        return this.buildUrl(endpoint, params);
       });
   }
 
@@ -88,16 +100,7 @@ export class OidcService {
     }
   }
 
-  private buildUrl(
-    endpoint: string,
-    clientId: string,
-    redirectUri: string,
-    scope: string,
-    codeChallenge: string,
-    state: string,
-    nonce: string,
-    codeChallengeMethod: string
-  ): string {
+  private buildUrl(endpoint: string, {clientId, redirectUri, scope, codeChallenge, state, nonce, codeChallengeMethod}: OidcAuthUrlParams): string {
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,

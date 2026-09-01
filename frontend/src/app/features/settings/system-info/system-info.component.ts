@@ -153,16 +153,18 @@ export class SystemInfoComponent {
     const na = tr('notAvailable');
     const lines: string[] = [];
 
-    lines.push(tr('title'));
-    lines.push(`${tr('application.title')}: ${info.application.version ?? na} (${tr('application.springBootVersion')} ${info.application.springBootVersion ?? na})`);
-    lines.push(`${tr('runtime.title')}: ${tr('runtime.javaVersion')} ${info.runtime.javaVersion ?? na} (${info.runtime.javaVendor ?? na}), `
-      + `${tr('runtime.uptime')} ${this.formatUptime(info.runtime.jvmUptimeMillis)}, `
-      + `${tr('runtime.processors')} ${info.runtime.availableProcessors ?? na}`);
-    lines.push(`${tr('runtime.heap')}: ${this.formatBytes(info.runtime.heapUsedBytes)} / ${this.formatBytes(info.runtime.heapMaxBytes)}`);
-    lines.push(`${tr('os.title')}: ${info.os.name ?? na} ${info.os.version ?? na} (${info.os.arch ?? na})`);
-    lines.push(`${tr('database.title')}: ${info.database.status}`
-      + (info.database.vendor ? ` - ${info.database.vendor} ${info.database.version ?? ''}` : ''));
-    lines.push(`${tr('storage.title')}: ${info.storage.diskType ?? na}`);
+    lines.push(
+      tr('title'),
+      `${tr('application.title')}: ${info.application.version ?? na} (${tr('application.springBootVersion')} ${info.application.springBootVersion ?? na})`,
+      `${tr('runtime.title')}: ${tr('runtime.javaVersion')} ${info.runtime.javaVersion ?? na} (${info.runtime.javaVendor ?? na}), `
+        + `${tr('runtime.uptime')} ${this.formatUptime(info.runtime.jvmUptimeMillis)}, `
+        + `${tr('runtime.processors')} ${info.runtime.availableProcessors ?? na}`,
+      `${tr('runtime.heap')}: ${this.formatBytes(info.runtime.heapUsedBytes)} / ${this.formatBytes(info.runtime.heapMaxBytes)}`,
+      `${tr('os.title')}: ${info.os.name ?? na} ${info.os.version ?? na} (${info.os.arch ?? na})`,
+      `${tr('database.title')}: ${info.database.status}`
+        + (info.database.vendor ? ` - ${info.database.vendor} ${info.database.version ?? ''}` : ''),
+      `${tr('storage.title')}: ${info.storage.diskType ?? na}`
+    );
 
     if (info.filesystems.length) {
       lines.push(`${tr('storage.filesystems')}:`);

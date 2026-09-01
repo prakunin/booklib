@@ -69,6 +69,7 @@
         "description": "Wählen Sie ein oder mehrere Verzeichnisse aus Ihrem Dateisystem",
         "currentPath": "Aktueller Pfad:",
         "searchPlaceholder": "Ordner suchen...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "Eine Ebene nach oben",
         "selectAllBtn": "Alle auswählen",
         "selectAllTooltip": "Alle sichtbaren Ordner auswählen",

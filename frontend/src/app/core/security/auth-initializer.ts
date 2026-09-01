@@ -6,6 +6,22 @@ import {QueryClient} from '@tanstack/angular-query-experimental';
 
 const SETTINGS_TIMEOUT_MS = 10000;
 
+function remoteLoginThenInitialize(authService: AuthService, authInitService: AuthInitializationService): Promise<void> {
+  return new Promise<void>(resolve => {
+    authService.remoteLogin().subscribe({
+      next: () => {
+        authInitService.markAsInitialized();
+        resolve();
+      },
+      error: err => {
+        console.error('[Remote Login] failed:', err);
+        authInitService.markAsInitialized();
+        resolve();
+      }
+    });
+  });
+}
+
 export function initializeAuthFactory() {
   return () => {
     const appSettingsService = inject(AppSettingsService);
@@ -25,27 +41,15 @@ export function initializeAuthFactory() {
         return;
       }
 
-      if (publicSettings.remoteAuthEnabled) {
-        return new Promise<void>(resolve => {
-          authService.remoteLogin().subscribe({
-            next: () => {
-              authInitService.markAsInitialized();
-              resolve();
-            },
-            error: err => {
-              console.error('[Remote Login] failed:', err);
-              authInitService.markAsInitialized();
-              resolve();
-            }
-          });
-        });
-      } else {
+      if (!publicSettings.remoteAuthEnabled) {
         if (authService.getInternalAccessToken()) {
           websocketInitializer(authService)();
         }
         authInitService.markAsInitialized();
         return;
       }
+
+      return remoteLoginThenInitialize(authService, authInitService);
     });
   };
 }

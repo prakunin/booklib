@@ -274,6 +274,7 @@
         "errorDetailDefault": "Spremanje čarobne police nije uspjelo."
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "Uvoz",
         "apply": "Primijeni",
         "emptyError": "Prvo zalijepite JSON konfiguraciju.",

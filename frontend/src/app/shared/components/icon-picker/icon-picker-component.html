@@ -53,19 +53,17 @@
 
             <div class="icon-grid">
               @for (icon of filteredIcons(); track icon) {
-                <div
+                <button
+                  type="button"
                   class="icon-item"
-                  role="button"
-                  tabindex="0"
                   (click)="selectIcon(icon)"
-                  (keydown.enter)="selectIcon(icon)"
                   [class.selected]="icon === selectedIcon"
                   [title]="displayIconName(icon)"
                 >
                   @if (getLucideIconData(icon); as iconData) {
                     <svg [lucideIcon]="iconData" aria-hidden="true"></svg>
                   }
-                </div>
+                </button>
               }
             </div>
           </div>
@@ -98,20 +96,18 @@
 
               <div class="icon-grid">
                 @for (iconName of filteredSvgIcons(); track iconName) {
-                  <div
+                  <button
+                    type="button"
                     class="icon-item svg-icon-item"
-                    role="button"
-                    tabindex="0"
                     (click)="selectSvgIcon(iconName)"
-                    (keydown.enter)="selectSvgIcon(iconName)"
                     [class.selected]="iconName === selectedSvgIcon"
                     [title]="iconName"
                     draggable="true"
                     (dragstart)="onSvgIconDragStart(iconName)"
                     (dragend)="onSvgIconDragEnd()"
                   >
-                    <div class="svg-icon-inline" [appSvgContent]="getSvgContent(iconName)"></div>
-                  </div>
+                    <span class="svg-icon-inline" [appSvgContent]="getSvgContent(iconName)"></span>
+                  </button>
                 }
               </div>
 

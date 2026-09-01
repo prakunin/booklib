@@ -124,7 +124,7 @@ export class AppThemeService {
       });
     }
 
-    const themeSyncEnabled = state.themeSyncEnabled === false ? false : true;
+    const themeSyncEnabled = state.themeSyncEnabled !== false;
     return this.withDefaults({
       themePreference: state.themePreference,
       appearancePreference: state.appearancePreference,

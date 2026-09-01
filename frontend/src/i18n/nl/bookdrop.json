@@ -20,6 +20,7 @@
         "tags": "Tags"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "Bestandsgegevens",
         "fetchedData": "Opgehaalde gegevens",
         "copyMissingTooltip": "Ontbrekende velden kopiëren van opgehaalde metadata",

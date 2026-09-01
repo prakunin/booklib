@@ -231,9 +231,7 @@ export class ReaderLeftSidebarService {
   }
 
   navigateToSearchResult(cfi: string): void {
-    this.viewManager.goToAnnotation(cfi)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.close());
+    this.navigateToNote(cfi);
   }
 
   reset(): void {

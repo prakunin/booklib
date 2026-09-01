@@ -146,7 +146,7 @@ export class AppMenuItemComponent {
       host.removeEventListener('keydown', blockInertActivation, true);
       host.removeEventListener('click', blockInertActivation, true);
       const submenu = this.menuItem.submenu();
-      if (submenu && submenu.parent() === this.menuItem) {
+      if (submenu?.parent() === this.menuItem) {
         submenu.parent.set(undefined);
       }
     });

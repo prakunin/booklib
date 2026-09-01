@@ -1,5 +1,5 @@
 import {effect, inject, Injectable, signal} from '@angular/core';
-import {EntityViewPreference, UserService} from '../../../settings/user-management/user.service';
+import {EntityViewPreference, EntityViewPreferences, UserService} from '../../../settings/user-management/user.service';
 
 interface LegacyOverlayPreference extends Partial<EntityViewPreference> {
   showBookTypePill?: boolean;
@@ -41,27 +41,32 @@ export class BookCardOverlayPreferenceService {
     if (prefs) {
       const legacyGlobalPrefs = prefs.global as LegacyOverlayPreference;
       show = prefs.global?.overlayBookType ?? legacyGlobalPrefs.showBookTypePill ?? true;
-
-      if (this.currentContext) {
-        const override = prefs.overrides?.find(o =>
-          o.entityType === this.currentContext?.type && o.entityId === this.currentContext?.id
-        );
-        if (override) {
-          if (override.preferences.overlayBookType !== undefined) {
-            show = override.preferences.overlayBookType;
-          } else {
-            const legacyOverridePrefs = override.preferences as LegacyOverlayPreference;
-            if (legacyOverridePrefs.showBookTypePill !== undefined) {
-              show = legacyOverridePrefs.showBookTypePill;
-            }
-          }
-        }
-      }
+      show = this.applyContextOverride(prefs, show);
     }
 
     if (this._showBookTypePill() !== show) {
       this._showBookTypePill.set(show);
     }
+  }
+
+  private applyContextOverride(prefs: EntityViewPreferences, show: boolean): boolean {
+    if (!this.currentContext) {
+      return show;
+    }
+    const override = prefs.overrides?.find(o =>
+      o.entityType === this.currentContext?.type && o.entityId === this.currentContext?.id
+    );
+    if (!override) {
+      return show;
+    }
+    if (override.preferences.overlayBookType !== undefined) {
+      return override.preferences.overlayBookType;
+    }
+    const legacyOverridePrefs = override.preferences as LegacyOverlayPreference;
+    if (legacyOverridePrefs.showBookTypePill !== undefined) {
+      return legacyOverridePrefs.showBookTypePill;
+    }
+    return show;
   }
 
   private schedulePersist(show: boolean): void {

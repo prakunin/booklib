@@ -29,7 +29,7 @@
               [text]="true"
               [rounded]="true"
               severity="secondary"
-              (click)="onClear()"
+              (onClick)="onClear()"
               [pTooltip]="t('resetTooltip')"
               tooltipPosition="top">
             </p-button>
@@ -85,7 +85,7 @@
                 }
                 <div class="photo-overlay">
                   <p-button
-                    (click)="selectAndUploadPhoto(photo)"
+                    (onClick)="selectAndUploadPhoto(photo)"
                     [label]="t('selectBtn')"
                     icon="pi pi-check"
                     size="small">

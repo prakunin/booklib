@@ -115,77 +115,49 @@ export class AppComponent implements OnInit, OnDestroy {
         this.libraryImportProgressService.recordBookAdded(book.metadata?.title || this.translocoService.translate('book.unknownTitle'));
         this.bookService.handleNewlyCreatedBook(book);
         this.authorService.handleNewlyCreatedBook(book);
-      })
-    );
-    this.subscriptions.push(
+      }),
       this.rxStompService.watch('/user/queue/library-scan-complete').subscribe(() => {
         this.bookService.handleLibraryScanComplete();
-      })
-    );
-    this.subscriptions.push(
+      }),
       this.rxStompService.watch('/user/queue/library-scan-progress').subscribe(msg => {
         this.libraryImportProgressService.applyScanProgress(JSON.parse(msg.body));
-      })
-    );
-    this.subscriptions.push(
+      }),
       this.rxStompService.watch('/user/queue/book-update').subscribe(msg =>
         this.bookService.handleBookUpdate(JSON.parse(msg.body))
-      )
-    );
-    this.subscriptions.push(
+      ),
       this.rxStompService.watch('/user/queue/books-cover-update').subscribe(msg =>
         this.bookService.handleMultipleBookCoverPatches(JSON.parse(msg.body))
-      )
-    );
-    this.subscriptions.push(
+      ),
       this.rxStompService.watch('/user/queue/books-remove').subscribe(msg =>
         this.bookService.handleRemovedBookIds(JSON.parse(msg.body))
-      )
-    );
-    this.subscriptions.push(
+      ),
       this.rxStompService.watch('/user/queue/book-metadata-update').subscribe(msg =>
         this.bookService.handleBookUpdate(JSON.parse(msg.body))
-      )
-    );
-    this.subscriptions.push(
+      ),
       this.rxStompService.watch('/user/queue/book-metadata-batch-update').subscribe(msg =>
         this.bookService.handleMultipleBookUpdates(JSON.parse(msg.body))
-      )
-    );
-    this.subscriptions.push(
+      ),
       this.rxStompService.watch('/user/queue/book-metadata-batch-progress').subscribe(msg =>
         this.metadataProgressService.handleIncomingProgress(JSON.parse(msg.body) as MetadataBatchProgressNotification)
-      )
-    );
-    this.subscriptions.push(
+      ),
       this.rxStompService.watch('/user/queue/book-recommendations-update').subscribe(msg =>
         this.bookService.handleBookRecommendationsUpdate(JSON.parse(msg.body) as number)
-      )
-    );
-    this.subscriptions.push(
+      ),
       this.rxStompService.watch('/user/queue/enrichment-progress').subscribe(msg =>
         this.enrichmentProgressService.handleProgress(JSON.parse(msg.body) as EnrichmentProgressEvent)
-      )
-    );
-    this.subscriptions.push(
+      ),
       this.rxStompService.watch('/user/queue/log').subscribe(msg => {
         const logNotification = parseLogNotification(msg.body);
         this.notificationEventService.handleNewNotification(logNotification);
-      })
-    );
-    this.subscriptions.push(
+      }),
       this.rxStompService.watch('/user/queue/bookdrop-file').subscribe(msg => {
         const notification = JSON.parse(msg.body) as BookdropFileNotification;
         this.bookdropFileService.handleIncomingFile(notification);
-      })
-    );
-    this.subscriptions.push(
+      }),
       this.rxStompService.watch('/user/queue/task-progress').subscribe(msg => {
         const progress = JSON.parse(msg.body) as TaskProgressPayload;
         this.taskService.handleTaskProgress(progress);
-      })
-    );
-    this.subscriptions.push(
+      }),
       this.rxStompService.watch('/user/queue/session-revoked').subscribe(() => {
         this.authService.forceLogout('session_revoked');
       })

@@ -32,7 +32,7 @@
             <span>{{ t('form.shelfIcon') }}</span>
             @if (selectedIcon) {
               <div class="selected-icon-display">
-                <div class="icon-display-container" (click)="openIconPicker()" (keydown.enter)="openIconPicker()" tabindex="0" role="button">
+                <button type="button" class="icon-display-container" (click)="openIconPicker()">
                   <app-icon-display
                     [icon]="selectedIcon"
                     [size]="'16px'"
@@ -40,7 +40,7 @@
                     alt="Selected shelf icon">
                   </app-icon-display>
                   <span class="icon-label">{{ t('form.clickToChange') }}</span>
-                </div>
+                </button>
                 <p-button
                   icon="pi pi-times"
                   severity="danger"
@@ -53,12 +53,12 @@
                 />
               </div>
             } @else {
-              <div class="icon-display-container" (click)="openIconPicker()" (keydown.enter)="openIconPicker()" tabindex="0" role="button">
-                <div class="icon-placeholder">
+              <button type="button" class="icon-display-container w-full" (click)="openIconPicker()">
+                <span class="icon-placeholder">
                   <i class="pi pi-plus"></i>
                   <span>{{ t('form.selectIcon') }}</span>
-                </div>
-              </div>
+                </span>
+              </button>
             }
           </div>
         </div>
@@ -74,7 +74,7 @@
 
       @if (showImportPanel) {
         <div class="import-panel">
-          <textarea pTextarea [(ngModel)]="importJson" [ngModelOptions]="{standalone: true}" rows="10" [placeholder]="t('importJson.placeholder')" class="import-textarea"></textarea>
+          <textarea pTextarea [(ngModel)]="importJson" [ngModelOptions]="{standalone: true}" rows="10" [placeholder]="t('importJson.placeholder')" [attr.aria-label]="t('importJson.textareaLabel')" class="import-textarea"></textarea>
           <div class="import-actions">
             <p-button [label]="t('actions.cancel')" severity="secondary" [outlined]="true" (onClick)="toggleImportPanel()" size="small"/>
             <p-button [label]="t('importJson.apply')" icon="pi pi-check" severity="success" (onClick)="applyImportedJson()" size="small"/>
@@ -121,10 +121,10 @@
       <div class="group-header">
         <label [for]="getControlId(group.get('join'), 'magic-shelf-group-join')">{{ t('group.condition') }}</label>
         <p-select [inputId]="getControlId(group.get('join'), 'magic-shelf-group-join')" [options]="conditionOptions" formControlName="join" class="condition-select" appendTo="body" [showClear]="false"/>
-        <p-button icon="pi pi-plus" size="small" text (click)="addRule(group)" [label]="t('actions.addRule')" outlined></p-button>
-        <p-button icon="pi pi-folder-open" size="small" text (click)="addGroup(group)" [label]="t('actions.addGroup')" outlined></p-button>
+        <p-button icon="pi pi-plus" size="small" text (onClick)="addRule(group)" [label]="t('actions.addRule')" outlined></p-button>
+        <p-button icon="pi pi-folder-open" size="small" text (onClick)="addGroup(group)" [label]="t('actions.addGroup')" outlined></p-button>
         @if (group.parent) {
-          <p-button icon="pi pi-trash" text (click)="deleteGroup(group)" severity="danger"></p-button>
+          <p-button icon="pi pi-trash" text (onClick)="deleteGroup(group)" severity="danger"></p-button>
         }
       </div>
 
@@ -159,8 +159,8 @@
                     <p-inputNumber [formControl]="ruleCtrl.get('valueStart')" mode="decimal" [minFractionDigits]="1" [maxFractionDigits]="1" [min]="0" [max]="numericFieldConfigMap.get(ruleCtrl.get('field')?.value)?.max || 10" class="value-input" [placeholder]="t('placeholders.startValue')" [showButtons]="true"></p-inputNumber>
                     <p-inputNumber [formControl]="ruleCtrl.get('valueEnd')" mode="decimal" [minFractionDigits]="1" [maxFractionDigits]="1" [min]="0" [max]="numericFieldConfigMap.get(ruleCtrl.get('field')?.value)?.max || 10" class="value-input" [placeholder]="t('placeholders.endValue')" [showButtons]="true"></p-inputNumber>
                   } @else {
-                    <input pInputText [formControl]="ruleCtrl.get('valueStart')" class="value-input" [placeholder]="t('placeholders.startValue')"/>
-                    <input pInputText [formControl]="ruleCtrl.get('valueEnd')" class="value-input" [placeholder]="t('placeholders.endValue')"/>
+                    <input pInputText [formControl]="ruleCtrl.get('valueStart')" class="value-input" [placeholder]="t('placeholders.startValue')" [attr.aria-label]="t('placeholders.startValue')"/>
+                    <input pInputText [formControl]="ruleCtrl.get('valueEnd')" class="value-input" [placeholder]="t('placeholders.endValue')" [attr.aria-label]="t('placeholders.endValue')"/>
                   }
                 } @else {
                   @if (ruleCtrl.get('field')?.value === 'publishedDate') {
@@ -212,11 +212,11 @@
                   } @else if (ruleCtrl.get('field')?.value === 'contentRating') {
                     <p-select [options]="contentRatingOptions" formControlName="value" [placeholder]="t('placeholders.selectContentRating')" appendTo="body" class="value-input"></p-select>
                   } @else {
-                    <input pInputText formControlName="value" class="value-input" [placeholder]="t('placeholders.value')"/>
+                    <input pInputText formControlName="value" class="value-input" [placeholder]="t('placeholders.value')" [attr.aria-label]="t('placeholders.value')"/>
                   }
                 }
               }
-              <p-button icon="pi pi-trash" text severity="danger" (click)="removeRule(group, i)"></p-button>
+              <p-button icon="pi pi-trash" text severity="danger" (onClick)="removeRule(group, i)"></p-button>
             }
           </div>
         }

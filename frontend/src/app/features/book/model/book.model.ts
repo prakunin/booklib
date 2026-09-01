@@ -450,7 +450,7 @@ export function computeSeriesReadStatus(books: Book[]): ReadStatus {
   );
   if (isAnyReading) return ReadStatus.READING;
 
-  if (statuses.some(s => s === ReadStatus.READ)) return ReadStatus.PARTIALLY_READ;
+  if (statuses.includes(ReadStatus.READ)) return ReadStatus.PARTIALLY_READ;
   if (statuses.every(s => s === ReadStatus.UNREAD)) return ReadStatus.UNREAD;
 
   return ReadStatus.PARTIALLY_READ;

@@ -21,6 +21,7 @@
         "audio": "オーディオ"
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "ebookCover": "電子書籍カバー",
         "audiobookCover": "オーディオブックカバー",
         "regenerateCoverTooltip": "カバーを再生成（ファイルから）",
@@ -135,6 +136,7 @@
         "writtenToFileTooltip": ""
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "loadingMetadata": "完全なメタデータを読み込み中...",
         "columnCurrent": "現在",
         "columnFetched": "取得済み",
@@ -234,6 +236,9 @@
         "startTime": ""
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "metadataLocked": "この本のメタデータはロックされています。",
         "metadataUnlocked": "この本のメタデータはロック解除されています。",
         "genresLabel": "ジャンル：",

@@ -8,7 +8,7 @@
   <app-cbx-sidebar></app-cbx-sidebar>
 
   @if (showWebtoonSuggestion()) {
-  <div class="webtoon-suggestion-banner" role="region" [attr.aria-label]="'readerCbx.webtoonHint.regionLabel' | transloco">
+  <section class="webtoon-suggestion-banner" [attr.aria-label]="'readerCbx.webtoonHint.regionLabel' | transloco">
     <p class="webtoon-suggestion-text">{{ 'readerCbx.webtoonHint.message' | transloco }}</p>
     <div class="webtoon-suggestion-actions">
       <button type="button" class="webtoon-btn primary" (click)="onWebtoonSuggestSwitchToLongStrip()">
@@ -21,7 +21,7 @@
         {{ 'readerCbx.webtoonHint.never' | transloco }}
       </button>
     </div>
-  </div>
+  </section>
   }
 
   @if (showQuickSettings()) {
@@ -81,7 +81,7 @@
         </app-canvas-renderer>
         } @else {
         @for (url of currentImageUrls(); track url; let i = $index) {
-        <img [src]="url" alt="Page Image" class="page-image" (load)="onPageImageLoad($event, currentPage() + i)" />
+        <img [src]="url" [alt]="'readerCbx.pageInfo' | transloco: {pageNumber: currentPage() + i + 1}" class="page-image" (load)="onPageImageLoad($event, currentPage() + i)" />
         }
         }
       </div>

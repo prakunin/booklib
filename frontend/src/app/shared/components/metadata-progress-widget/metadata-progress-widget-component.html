@@ -52,7 +52,7 @@
                 icon="pi pi-search"
                 size="small"
                 outlined
-                (click)="reviewTask(task.key)">
+                (onClick)="reviewTask(task.key)">
               </p-button>
             }
 
@@ -64,7 +64,7 @@
               [pTooltip]="task.value.review ? t('discardTooltip') : ''"
               [tooltipPosition]="task.value.review ? 'top' : undefined"
               outlined
-              (click)="clearTask(task.key)">
+              (onClick)="clearTask(task.key)">
             </p-button>
           </div>
         } @else if (task.value.status === 'IN_PROGRESS') {
@@ -77,7 +77,7 @@
               [pTooltip]="t('cancelTooltip')"
               tooltipPosition="top"
               outlined
-              (click)="cancelTask(task.key)">
+              (onClick)="cancelTask(task.key)">
             </p-button>
           </div>
         }

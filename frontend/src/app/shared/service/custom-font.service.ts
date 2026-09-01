@@ -99,7 +99,11 @@ export class CustomFontService {
 
   public appendToken(url: string): string {
     const token = this.getToken();
-    return token ? `${url}${url.includes('?') ? '&' : '?'}token=${token}` : url;
+    if (!token) {
+      return url;
+    }
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}token=${token}`;
   }
 
   async loadFontFace(font: CustomFont): Promise<void> {

@@ -21,6 +21,7 @@
         "headerProgressDelta": ""
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "title": "Judul",
         "subtitle": "Subjudul",
         "language": "Bahasa",
@@ -135,6 +136,7 @@
         "audibleReviewCount": ""
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "columnFetched": "Dimuat",
         "sectionDescription": "Deskripsi",
         "coverLabelEbook": "Ebook",
@@ -234,6 +236,9 @@
         "moreInSeries": ""
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "genresLabel": "Genre:",
         "tagsLabel": "Tag:",
         "libraryLabel": "Perpustakaan:",

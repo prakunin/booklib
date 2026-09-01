@@ -154,9 +154,6 @@ export class ReaderNoteService {
   }
 
   reset(): void {
-    this._dialogState.set({
-      visible: false,
-      data: null
-    });
+    this.closeDialog();
   }
 }

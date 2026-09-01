@@ -69,6 +69,7 @@
         "description": "从文件系统中选择一个或多个目录",
         "currentPath": "当前路径：",
         "searchPlaceholder": "搜索文件夹...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "返回上一级",
         "selectAllBtn": "全选",
         "selectAllTooltip": "选择所有可见文件夹",

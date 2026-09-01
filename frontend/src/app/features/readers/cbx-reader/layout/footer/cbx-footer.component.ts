@@ -49,40 +49,28 @@ export class CbxFooterComponent {
 
   get sliderTicks(): number[] {
     const totalPages = this.state().totalPages;
-    if (totalPages <= 10) {
+    if (totalPages <= 20) {
       return Array.from({length: totalPages}, (_, i) => i + 1);
-    } else if (totalPages <= 20) {
-      return Array.from({length: totalPages}, (_, i) => i + 1);
-    } else if (totalPages <= 50) {
-      const ticks: number[] = [];
-      for (let i = 1; i <= totalPages; i += 2) {
-        ticks.push(i);
-      }
-      if (!ticks.includes(totalPages)) {
-        ticks.push(totalPages);
-      }
-      return ticks;
-    } else if (totalPages <= 100) {
-      const ticks: number[] = [];
-      const step = 5;
-      for (let i = 1; i <= totalPages; i += step) {
-        ticks.push(i);
-      }
-      if (!ticks.includes(totalPages)) {
-        ticks.push(totalPages);
-      }
-      return ticks;
-    } else {
-      const ticks: number[] = [];
-      const step = Math.ceil(totalPages / 20);
-      for (let i = 1; i <= totalPages; i += step) {
-        ticks.push(i);
-      }
-      if (!ticks.includes(totalPages)) {
-        ticks.push(totalPages);
-      }
-      return ticks;
     }
+    if (totalPages <= 50) {
+      return CbxFooterComponent.buildTicks(totalPages, 2);
+    }
+    if (totalPages <= 100) {
+      return CbxFooterComponent.buildTicks(totalPages, 5);
+    }
+    return CbxFooterComponent.buildTicks(totalPages, Math.ceil(totalPages / 20));
+  }
+
+  /** Every `step`-th page starting at 1, always ending with the last page. */
+  private static buildTicks(totalPages: number, step: number): number[] {
+    const ticks: number[] = [];
+    for (let i = 1; i <= totalPages; i += step) {
+      ticks.push(i);
+    }
+    if (!ticks.includes(totalPages)) {
+      ticks.push(totalPages);
+    }
+    return ticks;
   }
 
   onPreviousPage(): void {

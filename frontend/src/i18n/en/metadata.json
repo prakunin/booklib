@@ -24,6 +24,7 @@
     "tooltip": "Filled in from {{ provider }}"
   },
   "editor": {
+    "removeAuthor": "Remove author",
     "ebookCover": "Ebook Cover",
     "audiobookCover": "Audiobook Cover",
     "regenerateCoverTooltip": "Create cover from file",
@@ -139,6 +140,7 @@
     }
   },
   "picker": {
+    "removeAuthor": "Remove author",
     "loadingMetadata": "Loading complete metadata...",
     "columnCurrent": "Current",
     "columnFetched": "Fetched",
@@ -241,6 +243,9 @@
     "localCatalog": "Catalog"
   },
   "viewer": {
+    "toggleFilePath": "Show or hide file path",
+    "editDateFinished": "Edit date finished",
+    "editReadStatus": "Edit read status",
     "metadataLocked": "This book metadata is locked.",
     "metadataUnlocked": "This book metadata is unlocked.",
     "genresLabel": "Genres:",

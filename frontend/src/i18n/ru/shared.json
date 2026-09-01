@@ -92,6 +92,7 @@
         "description": "Выберите один или несколько каталогов из файловой системы",
         "currentPath": "Текущий путь:",
         "searchPlaceholder": "Поиск папок...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "На уровень вверх",
         "selectAllBtn": "Выбрать все",
         "selectAllTooltip": "Выбрать все видимые папки",

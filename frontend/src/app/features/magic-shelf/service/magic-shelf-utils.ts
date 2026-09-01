@@ -19,7 +19,7 @@ export const RELATIVE_DATE_OPERATORS: RuleOperator[] = [
 
 function parseDate(val: unknown): Date | null {
   if (typeof val === "string") {
-    if (val.match("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
       // If `val` is a date-only string, add midnight local time to it
       // when parsing so we don't get UTC time leading to confusion.
       val = Date.parse(val + 'T00:00:00');

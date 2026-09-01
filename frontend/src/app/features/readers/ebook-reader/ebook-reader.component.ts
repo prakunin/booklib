@@ -4,12 +4,12 @@ import {forkJoin, from, Observable, of, throwError} from 'rxjs';
 import {catchError, map, switchMap, tap} from 'rxjs/operators';
 import {MessageService} from '@openng/optimus-ui/api';
 import {ReaderLoaderService} from './core/loader.service';
-import {ReaderViewManagerService} from './core/view-manager.service';
+import {ReaderViewManagerService, ViewEvent} from './core/view-manager.service';
 import {ReaderStateService} from './state/reader-state.service';
 import {ReaderStyleService} from './core/style.service';
 import {ReaderBookmarkService} from './features/bookmarks/bookmark.service';
 import {ReaderAnnotationHttpService} from './features/annotations/annotation.service';
-import {ReaderProgressService} from './state/progress.service';
+import {ReaderProgressService, RelocateProgressData} from './state/progress.service';
 import {ReaderSelectionService} from './features/selection/selection.service';
 import {ReaderSidebarService} from './layout/sidebar/sidebar.service';
 import {ReaderLeftSidebarService} from './layout/panel/panel.service';
@@ -34,9 +34,7 @@ import {ReaderFootnoteService} from './features/footnotes/footnote.service';
 import {FootnotePopupComponent} from './shared/footnote-popup.component';
 import {EbookShortcutsHelpComponent} from './dialogs/shortcuts-help.component';
 import {TranslocoPipe} from '@jsverse/transloco';
-import {RelocateProgressData} from './state/progress.service';
 import {WakeLockService} from '../../../shared/service/wake-lock.service';
-import {ViewEvent} from './core/view-manager.service';
 import {ReaderFullscreenService} from '../shared/reader-fullscreen.service';
 import {shouldUseStreamingRendition} from './streaming-book-type.util';
 
@@ -363,20 +361,7 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
             this.updateSectionFractions();
             break;
           case 'relocate':
-            this.updateSectionBoundaryChrome(event.detail);
-            if (this.handlePendingInitialChapterRestore(event.detail)) {
-              break;
-            }
-
-            if (this.relocateTimeout) clearTimeout(this.relocateTimeout);
-            this.relocateTimeout = setTimeout(() => {
-              this.handleRelocateProgress(event.detail);
-            }, 100);
-
-            if (this.sectionFractionsTimeout) clearTimeout(this.sectionFractionsTimeout);
-            this.sectionFractionsTimeout = setTimeout(() => {
-              this.updateSectionFractions();
-            }, 500);
+            this.handleRelocate(event.detail);
             break;
           case 'middle-single-tap':
             if (this.immersiveMode()) {
@@ -418,28 +403,50 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
             this.leftSidebarService.toggle('notes');
             break;
           case 'escape-pressed':
-            if (this.footnoteState().visible) {
-              this.footnoteService.close();
-            } else if (this.showShortcutsHelp()) {
-              this.showShortcutsHelp.set(false);
-            } else if (this.noteDialogState().visible) {
-              this.noteService.closeDialog();
-            } else if (this.showControls()) {
-              if (this.settingsDialog) {
-                this.settingsDialog.cancel();
-              } else {
-                this.showControls.set(false);
-              }
-            } else if (this.showQuickSettings()) {
-              this.showQuickSettings.set(false);
-            } else if (this.showMetadata()) {
-              this.showMetadata.set(false);
-            } else if (this.isFullscreen()) {
-              this.exitFullscreen();
-            }
+            this.handleEscapePressed();
             break;
         }
       });
+  }
+
+  private handleRelocate(detail: RelocateProgressData): void {
+    this.updateSectionBoundaryChrome(detail);
+    if (this.handlePendingInitialChapterRestore(detail)) {
+      return;
+    }
+
+    if (this.relocateTimeout) clearTimeout(this.relocateTimeout);
+    this.relocateTimeout = setTimeout(() => {
+      this.handleRelocateProgress(detail);
+    }, 100);
+
+    if (this.sectionFractionsTimeout) clearTimeout(this.sectionFractionsTimeout);
+    this.sectionFractionsTimeout = setTimeout(() => {
+      this.updateSectionFractions();
+    }, 500);
+  }
+
+  /** Escape closes the topmost open overlay only: footnote, shortcuts help, note dialog, settings, ... */
+  private handleEscapePressed(): void {
+    if (this.footnoteState().visible) {
+      this.footnoteService.close();
+    } else if (this.showShortcutsHelp()) {
+      this.showShortcutsHelp.set(false);
+    } else if (this.noteDialogState().visible) {
+      this.noteService.closeDialog();
+    } else if (this.showControls()) {
+      if (this.settingsDialog) {
+        this.settingsDialog.cancel();
+      } else {
+        this.showControls.set(false);
+      }
+    } else if (this.showQuickSettings()) {
+      this.showQuickSettings.set(false);
+    } else if (this.showMetadata()) {
+      this.showMetadata.set(false);
+    } else if (this.isFullscreen()) {
+      this.exitFullscreen();
+    }
   }
 
   private updateSectionFractions(): void {
@@ -864,9 +871,9 @@ export class EbookReaderComponent implements AfterViewInit, OnInit {
     const rounded = Math.round(percent);
 
     let stablePercent = current;
-    if (rounded > current && percent >= current + EbookReaderComponent.PINCH_PERCENT_HYSTERESIS) {
-      stablePercent = rounded;
-    } else if (rounded < current && percent <= current - EbookReaderComponent.PINCH_PERCENT_HYSTERESIS) {
+    const hysteresis = EbookReaderComponent.PINCH_PERCENT_HYSTERESIS;
+    if ((rounded > current && percent >= current + hysteresis)
+      || (rounded < current && percent <= current - hysteresis)) {
       stablePercent = rounded;
     }
 

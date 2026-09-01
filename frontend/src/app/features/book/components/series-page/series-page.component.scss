@@ -174,18 +174,6 @@ $meta-card-colors: (
   }
 }
 
-:host-context(.dark) {
-  @each $variant, $color in $meta-card-colors {
-    .meta-card-#{$variant} {
-      color: var(--color-#{$color}-300);
-
-      i {
-        color: var(--color-#{$color}-400);
-      }
-    }
-  }
-}
-
 .publisher-link {
   color: inherit;
 }
@@ -797,6 +785,16 @@ $list-action-btn-colors: (
 }
 
 :host-context(.dark) {
+  @each $variant, $color in $meta-card-colors {
+    .meta-card-#{$variant} {
+      color: var(--color-#{$color}-300);
+
+      i {
+        color: var(--color-#{$color}-400);
+      }
+    }
+  }
+
   @each $variant, $color in $list-action-btn-colors {
     .list-action-btn.btn-#{$variant} {
       color: var(--color-#{$color}-300);

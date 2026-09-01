@@ -313,16 +313,9 @@ export class AuthorUniverseChartComponent {
       insights.push(this.t.translate('statsLibrary.authorUniverse.insightMostPages', {name: mostPages.name, count: mostPages.totalPages.toLocaleString()}));
     }
 
-    // Best completion rate (with at least 3 books)
-    const completionCandidates = authorStats.filter(a => a.bookCount >= 3);
-    if (completionCandidates.length > 0) {
-      const bestCompletion = completionCandidates.reduce((a, b) =>
-        a.completionRate > b.completionRate ? a : b,
-        completionCandidates[0]
-      );
-      if (bestCompletion.completionRate > 0) {
-        insights.push(this.t.translate('statsLibrary.authorUniverse.insightMostRead', {name: bestCompletion.name, percent: Math.round(bestCompletion.completionRate)}));
-      }
+    const bestCompletionInsight = this.bestCompletionInsight(authorStats);
+    if (bestCompletionInsight) {
+      insights.push(bestCompletionInsight);
     }
 
     // Hidden gem - high rated but fewer books (quality over quantity)
@@ -332,40 +325,19 @@ export class AuthorUniverseChartComponent {
       insights.push(this.t.translate('statsLibrary.authorUniverse.insightHiddenGem', {name: gem.name, rating: `${gem.avgRating.toFixed(1)}\u2605`, count: gem.bookCount}));
     }
 
-    // Biggest backlog - author with most unread books
-    const authorsWithBacklog = authorStats.filter(a => a.bookCount - a.readCount > 0);
-    if (authorsWithBacklog.length > 0) {
-      const biggestBacklog = authorsWithBacklog.reduce((a, b) =>
-        (a.bookCount - a.readCount) > (b.bookCount - b.readCount) ? a : b,
-        authorsWithBacklog[0]
-      );
-      const unreadCount = biggestBacklog.bookCount - biggestBacklog.readCount;
-      if (unreadCount >= 2) {
-        insights.push(this.t.translate('statsLibrary.authorUniverse.insightBiggestBacklog', {name: biggestBacklog.name, count: unreadCount}));
-      }
+    const biggestBacklogInsight = this.biggestBacklogInsight(authorStats);
+    if (biggestBacklogInsight) {
+      insights.push(biggestBacklogInsight);
     }
 
-    // Author concentration - what % of total books come from top 3 authors
-    if (authorStats.length >= 3) {
-      const totalBooks = authorStats.reduce((sum, a) => sum + a.bookCount, 0);
-      const top3Books = authorStats.slice(0, 3).reduce((sum, a) => sum + a.bookCount, 0);
-      const concentration = Math.round((top3Books / totalBooks) * 100);
-      if (concentration >= 25) {
-        insights.push(this.t.translate('statsLibrary.authorUniverse.insightTop3Concentration', {percent: concentration}));
-      }
+    const concentrationInsight = this.top3ConcentrationInsight(authorStats);
+    if (concentrationInsight) {
+      insights.push(concentrationInsight);
     }
 
-    // Longest reads - author with highest avg pages per book
-    const authorsWithPages = authorStats.filter(a => a.totalPages > 0);
-    if (authorsWithPages.length > 0) {
-      const longestReads = authorsWithPages.reduce((a, b) =>
-        (a.totalPages / a.bookCount) > (b.totalPages / b.bookCount) ? a : b,
-        authorsWithPages[0]
-      );
-      const avgPages = Math.round(longestReads.totalPages / longestReads.bookCount);
-      if (avgPages >= 300) {
-        insights.push(this.t.translate('statsLibrary.authorUniverse.insightLongestReads', {name: longestReads.name, pages: avgPages}));
-      }
+    const longestReadsInsight = this.longestReadsInsight(authorStats);
+    if (longestReadsInsight) {
+      insights.push(longestReadsInsight);
     }
 
     // Most versatile - author appearing in most genres
@@ -394,6 +366,62 @@ export class AuthorUniverseChartComponent {
     }
 
     return insights;
+  }
+
+  // Best completion rate (with at least 3 books)
+  private bestCompletionInsight(authorStats: AuthorStats[]): string | null {
+    const completionCandidates = authorStats.filter(a => a.bookCount >= 3);
+    if (completionCandidates.length === 0) return null;
+    const bestCompletion = completionCandidates.reduce((a, b) =>
+      a.completionRate > b.completionRate ? a : b,
+      completionCandidates[0]
+    );
+    if (bestCompletion.completionRate > 0) {
+      return this.t.translate('statsLibrary.authorUniverse.insightMostRead', {name: bestCompletion.name, percent: Math.round(bestCompletion.completionRate)});
+    }
+    return null;
+  }
+
+  // Biggest backlog - author with most unread books
+  private biggestBacklogInsight(authorStats: AuthorStats[]): string | null {
+    const authorsWithBacklog = authorStats.filter(a => a.bookCount - a.readCount > 0);
+    if (authorsWithBacklog.length === 0) return null;
+    const biggestBacklog = authorsWithBacklog.reduce((a, b) =>
+      (a.bookCount - a.readCount) > (b.bookCount - b.readCount) ? a : b,
+      authorsWithBacklog[0]
+    );
+    const unreadCount = biggestBacklog.bookCount - biggestBacklog.readCount;
+    if (unreadCount >= 2) {
+      return this.t.translate('statsLibrary.authorUniverse.insightBiggestBacklog', {name: biggestBacklog.name, count: unreadCount});
+    }
+    return null;
+  }
+
+  // Author concentration - what % of total books come from top 3 authors
+  private top3ConcentrationInsight(authorStats: AuthorStats[]): string | null {
+    if (authorStats.length < 3) return null;
+    const totalBooks = authorStats.reduce((sum, a) => sum + a.bookCount, 0);
+    const top3Books = authorStats.slice(0, 3).reduce((sum, a) => sum + a.bookCount, 0);
+    const concentration = Math.round((top3Books / totalBooks) * 100);
+    if (concentration >= 25) {
+      return this.t.translate('statsLibrary.authorUniverse.insightTop3Concentration', {percent: concentration});
+    }
+    return null;
+  }
+
+  // Longest reads - author with highest avg pages per book
+  private longestReadsInsight(authorStats: AuthorStats[]): string | null {
+    const authorsWithPages = authorStats.filter(a => a.totalPages > 0);
+    if (authorsWithPages.length === 0) return null;
+    const longestReads = authorsWithPages.reduce((a, b) =>
+      (a.totalPages / a.bookCount) > (b.totalPages / b.bookCount) ? a : b,
+      authorsWithPages[0]
+    );
+    const avgPages = Math.round(longestReads.totalPages / longestReads.bookCount);
+    if (avgPages >= 300) {
+      return this.t.translate('statsLibrary.authorUniverse.insightLongestReads', {name: longestReads.name, pages: avgPages});
+    }
+    return null;
   }
 
   private escapeHtml(value: string): string {

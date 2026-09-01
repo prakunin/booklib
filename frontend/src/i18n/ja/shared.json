@@ -69,6 +69,7 @@
         "description": "ファイルシステムから1つ以上のディレクトリを選択してください",
         "currentPath": "現在のパス：",
         "searchPlaceholder": "フォルダを検索...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "一つ上の階層へ",
         "selectAllBtn": "すべて選択",
         "selectAllTooltip": "表示されているすべてのフォルダを選択",

@@ -150,7 +150,10 @@ export function toCollectionHttpParams(params: BookCollectionFilterParams): Http
 }
 
 function compareCodeUnits(first: string, second: string): number {
-  return first < second ? -1 : first > second ? 1 : 0;
+  if (first < second) {
+    return -1;
+  }
+  return first > second ? 1 : 0;
 }
 
 function normalizeFacetValueMap(facets: FacetValueMap): FacetValueMap {

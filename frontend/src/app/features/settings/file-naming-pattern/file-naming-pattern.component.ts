@@ -92,7 +92,7 @@ export class FileNamingPatternComponent {
   }
 
   validatePattern(pattern: string): boolean {
-    const validPatternRegex = /^[\w\s\-{}[/().<>.,:'"#|\]]*$/;
+    const validPatternRegex = /^[\w\s\-{}[/()<>.,:'"#|\]]*$/;
     return validPatternRegex.test(pattern);
   }
 

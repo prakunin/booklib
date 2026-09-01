@@ -509,7 +509,7 @@ export class EmbedPdfBookService {
     interface EpdfBookmark {
       title?: string;
       target?: {
-        type?: 'destination' | 'action' | string;
+        type?: string;
         destination?: {pageIndex?: number};
         action?: {
           type?: number;
@@ -724,7 +724,7 @@ export class EmbedPdfBookService {
       }
 
       const style = document.createElement('style');
-      style.setAttribute('data-grimmory-book', '');
+      style.dataset['grimmoryBook'] = '';
       style.textContent = `
         /* ── Grimmory book-mode overrides ── */
 

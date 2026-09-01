@@ -33,6 +33,9 @@
         "moreInSeries": ""
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "comicAltSeries": "",
         "toast": {
             "quickSendSuccessSummary": "",
@@ -297,6 +300,7 @@
         "multiValuePlaceholder": ""
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "audibleId": "",
         "toast": {
             "partialSuccessSummary": "",
@@ -411,6 +415,7 @@
         "audibleReviewCount": ""
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "toast": {
             "fieldLockedDetail": "",
             "allFieldsUnlocked": "",

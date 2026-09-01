@@ -274,6 +274,7 @@
         "errorDetailDefault": "Falha ao salvar prateleira mágica."
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "",
         "successDetail": "",
         "structureError": "",

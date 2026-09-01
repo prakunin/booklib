@@ -1,11 +1,10 @@
 import {Component, DestroyRef, inject, OnInit} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Button} from '@openng/optimus-ui/button';
-import {MessageService} from '@openng/optimus-ui/api';
+import {ConfirmationService, MessageService} from '@openng/optimus-ui/api';
 import {CustomFontService} from '../../../shared/service/custom-font.service';
 import {CustomFont, formatFileSize} from '../../../shared/model/custom-font.model';
 import {ConfirmDialog} from '@openng/optimus-ui/confirmdialog';
-import {ConfirmationService} from '@openng/optimus-ui/api';
 import {Tooltip} from '@openng/optimus-ui/tooltip';
 import {DialogService, DynamicDialogRef} from '@openng/optimus-ui/dynamicdialog';
 import {FontUploadDialogComponent} from './font-upload-dialog/font-upload-dialog.component';

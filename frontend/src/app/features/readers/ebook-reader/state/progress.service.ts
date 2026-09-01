@@ -3,8 +3,7 @@ import {Subject} from 'rxjs';
 import {TranslocoService} from '@jsverse/transloco';
 import {BookPatchService} from '../../../book/service/book-patch.service';
 import {ReadingSessionService} from '../../../../shared/service/reading-session.service';
-import {PageInfo, ThemeInfo} from '../core/view-manager.service';
-import {ReaderViewManagerService} from '../core/view-manager.service';
+import {PageInfo, ReaderViewManagerService, ThemeInfo} from '../core/view-manager.service';
 import {ReaderStateService} from './reader-state.service';
 import {ReaderAnnotationHttpService} from '../features/annotations/annotation.service';
 import {ReaderBookmarkService} from '../features/bookmarks/bookmark.service';
@@ -126,21 +125,9 @@ export class ReaderProgressService {
     }
 
     if (detail?.section) {
-      const percentCompleted = Math.round(((detail.fraction ?? 0) * 100) * 10) / 10;
-      const totalMinutes = detail.time?.section ?? 0;
-
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = Math.floor(totalMinutes % 60);
-      const seconds = Math.round((totalMinutes - Math.floor(totalMinutes)) * 60);
-
-      const parts: string[] = [];
-      if (hours) parts.push(`${hours}h`);
-      if (minutes) parts.push(`${minutes}m`);
-      if (seconds || parts.length === 0) parts.push(`${seconds}s`);
-
       this._currentPageInfo = {
-        percentCompleted,
-        sectionTimeText: parts.join(' ')
+        percentCompleted: Math.round(((detail.fraction ?? 0) * 100) * 10) / 10,
+        sectionTimeText: ReaderProgressService.formatSectionTime(detail.time?.section ?? 0)
       };
     }
 
@@ -202,5 +189,18 @@ export class ReaderProgressService {
     this._currentPageInfo = undefined;
     this._currentProgressData = null;
     this.hasStartedSession = false;
+  }
+
+  /** Formats a duration given in (fractional) minutes as e.g. `1h 5m 30s`, `0s` when empty. */
+  private static formatSectionTime(totalMinutes: number): string {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = Math.floor(totalMinutes % 60);
+    const seconds = Math.round((totalMinutes - Math.floor(totalMinutes)) * 60);
+
+    const parts: string[] = [];
+    if (hours) parts.push(`${hours}h`);
+    if (minutes) parts.push(`${minutes}m`);
+    if (seconds || parts.length === 0) parts.push(`${seconds}s`);
+    return parts.join(' ');
   }
 }

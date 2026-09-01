@@ -274,6 +274,7 @@
         "errorDetailDefault": "Magisches Regal konnte nicht gespeichert werden."
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "Import",
         "apply": "Anwenden",
         "emptyError": "Bitte fügen Sie zunächst eine JSON-Konfiguration ein.",

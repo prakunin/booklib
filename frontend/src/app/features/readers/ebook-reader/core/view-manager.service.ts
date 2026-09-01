@@ -227,14 +227,13 @@ export class ReaderViewManagerService {
     this.view = null;
   }
 
-  goTo(target?: string | number | null): Observable<void> {
-    const resolvedTarget = target ?? 0;
+  goTo(target: string | number | null = 0): Observable<void> {
     if (!this.view) {
       return of(undefined);
     }
     const view = this.view;
     return defer(() =>
-      from(view.goTo(resolvedTarget))
+      from(view.goTo(target ?? 0))
     ).pipe(
       map(() => undefined)
     );

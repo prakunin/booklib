@@ -69,6 +69,7 @@
         "description": "Scegli una o più cartelle dal tuo file system",
         "currentPath": "Percorso attuale:",
         "searchPlaceholder": "Cerca cartelle...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "Vai al livello superiore",
         "selectAllBtn": "Seleziona tutto",
         "selectAllTooltip": "Seleziona tutte le cartelle visibili",

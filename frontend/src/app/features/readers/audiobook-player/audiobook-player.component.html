@@ -290,7 +290,7 @@
 
     <!-- Track/Chapter list sidebar -->
     @if (showTrackList) {
-      <aside class="track-list-sidebar">
+      <aside class="track-list-sidebar" [attr.aria-label]="audiobookInfo.folderBased ? t('sidebar.tracks') : t('sidebar.chapters')">
         <div class="sidebar-header">
           <h2>{{ audiobookInfo.folderBased ? t('sidebar.tracks') : t('sidebar.chapters') }}</h2>
           <p-button
@@ -351,7 +351,7 @@
 
     <!-- Bookmark list sidebar -->
     @if (showBookmarkList) {
-      <aside class="track-list-sidebar bookmark-sidebar">
+      <aside class="track-list-sidebar bookmark-sidebar" [attr.aria-label]="t('bookmarks.title')">
         <div class="sidebar-header">
           <h2>{{ t('bookmarks.title') }}</h2>
           <p-button

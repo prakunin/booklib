@@ -274,6 +274,7 @@
         "errorDetailDefault": "マジックシェルフの保存に失敗しました。"
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "",
         "successDetail": "",
         "structureError": "",

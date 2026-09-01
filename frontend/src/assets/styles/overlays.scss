@@ -34,6 +34,10 @@
   --menu-item-radius: 5px;
   --menu-item-focus-ring: var(--control-focus-ring-color);
   --menu-item-danger-bg-hover: color-mix(in srgb, var(--p-red-500) 12%, transparent);
+
+  display: flex;
+  flex-direction: column;
+  width: min(15.3125rem, calc(100vw - 0.875rem));
 }
 
 .user-account-popover .menu-item {
@@ -113,12 +117,6 @@
 
 .sidebar-notification-popover {
   display: block;
-}
-
-.user-account-popover {
-  display: flex;
-  flex-direction: column;
-  width: min(15.3125rem, calc(100vw - 0.875rem));
 }
 
 .user-account-popover-header {

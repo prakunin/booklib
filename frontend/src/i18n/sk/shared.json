@@ -87,6 +87,7 @@
         "currentPath": "",
         "foldersWillBeSelected": "",
         "searchPlaceholder": "",
+        "clearSearch": "Clear search",
         "deselectAllTooltip": "",
         "folderWillBeSelected": "",
         "goUpTooltip": "",

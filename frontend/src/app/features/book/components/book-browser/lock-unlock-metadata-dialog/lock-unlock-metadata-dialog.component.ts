@@ -84,7 +84,7 @@ export class LockUnlockMetadataDialogComponent implements OnInit {
   }
 
   toggleLockAll(action: 'LOCK' | 'UNLOCK'): void {
-    const lockState = action === 'LOCK' ? true : false;
+    const lockState = action === 'LOCK';
     this.lockableFields.forEach(field => {
       this.fieldLocks[field] = lockState;
     });
@@ -98,7 +98,8 @@ export class LockUnlockMetadataDialogComponent implements OnInit {
 
   getLockIcon(field: string): string {
     const state = this.fieldLocks[field];
-    return state === undefined ? '' : state ? 'pi pi-lock' : 'pi pi-lock-open';
+    if (state === undefined) return '';
+    return state ? 'pi pi-lock' : 'pi pi-lock-open';
   }
 
   resetFieldLocks(): void {

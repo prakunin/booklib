@@ -64,7 +64,7 @@
           icon="pi pi-save"
           severity="success"
           size="small"
-          (click)="savePasswordPolicy()"
+          (onClick)="savePasswordPolicy()"
           [disabled]="passwordPolicy.minimumLength < 1 || passwordPolicy.minimumLength > 72">
         </p-button>
       </div>
@@ -312,12 +312,9 @@
       <div class="provider-actions-row">
         <div class="test-results-inline">
           @if (testConnectionResult()) {
-            <div class="test-results-toggle"
+            <button type="button" class="test-results-toggle w-full text-start"
                  [style.border-radius]="showTestDetails() ? '6px 6px 0 0' : '6px'"
-                 role="button"
-                 tabindex="0"
-                 (click)="toggleTestDetails()"
-                 (keydown.enter)="toggleTestDetails()">
+                 (click)="toggleTestDetails()">
               @if (testConnectionResult()?.success) {
                 <i class="pi pi-check-circle text-emerald-700 dark:text-emerald-300"></i>
                 <span>{{ t('testConnection.passed') }}</span>
@@ -329,7 +326,7 @@
                 ({{ testConnectionResult()?.checks?.length ?? 0 }} {{ t('testConnection.checks') }})
               </span>
               <i class="pi pi-chevron-right toggle-chevron" [class.expanded]="showTestDetails()"></i>
-            </div>
+            </button>
           }
         </div>
         <div class="provider-action-buttons">
@@ -339,7 +336,7 @@
             [icon]="isTestingConnection() ? 'pi pi-spin pi-spinner' : 'pi pi-bolt'"
             severity="info"
             size="small"
-            (click)="testConnection()"
+            (onClick)="testConnection()"
             [disabled]="!oidcProvider.issuerUri || isTestingConnection()">
           </p-button>
           <p-button
@@ -348,7 +345,7 @@
             icon="pi pi-save"
             severity="success"
             size="small"
-            (click)="saveOidcProvider()"
+            (onClick)="saveOidcProvider()"
             [disabled]="!isOidcFormComplete()">
           </p-button>
         </div>
@@ -403,7 +400,7 @@
                 severity="secondary"
                 size="small"
                 [style]="{'min-width': '2rem'}"
-                (click)="copyToClipboard(item.value)">
+                (onClick)="copyToClipboard(item.value)">
               </p-button>
             </div>
           </div>
@@ -559,7 +556,7 @@
                   [outlined]="true"
                   severity="success"
                   size="small"
-                  (click)="saveOidcAutoProvisionSettings()">
+                  (onClick)="saveOidcAutoProvisionSettings()">
                 </p-button>
               </div>
             </div>
@@ -587,7 +584,7 @@
             [outlined]="true"
             severity="success"
             size="small"
-            (click)="openNewGroupMapping()">
+            (onClick)="openNewGroupMapping()">
           </p-button>
         </div>
       </div>
@@ -614,7 +611,7 @@
               icon="pi pi-save"
               severity="success"
               size="small"
-              (click)="saveGroupSyncMode()">
+              (onClick)="saveGroupSyncMode()">
             </p-button>
           </div>
         </div>
@@ -652,8 +649,8 @@
                 <td>{{ mapping.description }}</td>
                 <td>
                   <div style="display: flex; gap: 0.4375rem;">
-                    <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="info" size="small" (click)="openEditGroupMapping(mapping)"></p-button>
-                    <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger" size="small" (click)="deleteGroupMapping(mapping)"></p-button>
+                    <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="info" size="small" (onClick)="openEditGroupMapping(mapping)"></p-button>
+                    <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger" size="small" (onClick)="deleteGroupMapping(mapping)"></p-button>
                   </div>
                 </td>
               </tr>
@@ -733,7 +730,7 @@
         <p-button
           [label]="'common.save' | transloco"
           icon="pi pi-check"
-          (click)="saveGroupMapping()"
+          (onClick)="saveGroupMapping()"
           [disabled]="!groupMappingDraft()?.oidcGroupClaim">
         </p-button>
       </ng-template>

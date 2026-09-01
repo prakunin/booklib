@@ -69,6 +69,7 @@
         "description": "Elige uno o más directorios de tu sistema de archivos",
         "currentPath": "Ruta actual:",
         "searchPlaceholder": "Buscar carpetas...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "Subir un nivel",
         "selectAllBtn": "Seleccionar todo",
         "selectAllTooltip": "Seleccionar todas las carpetas visibles",

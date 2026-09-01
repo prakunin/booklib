@@ -274,6 +274,7 @@
         "errorDetailDefault": "Échec de l'enregistrement de l'étagère magique."
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "",
         "successDetail": "",
         "structureError": "",

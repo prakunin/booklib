@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, Output} from '@angular/core';
-import {TranslocoDirective} from '@jsverse/transloco';
+import {TranslocoDirective, TranslocoPipe} from '@jsverse/transloco';
 import {ReaderIconComponent} from './icon.component';
 
 export type AnnotationStyle = 'highlight' | 'underline' | 'strikethrough' | 'squiggly';
@@ -15,7 +15,7 @@ export interface TextSelectionAction {
 @Component({
   selector: 'app-text-selection-popup',
   standalone: true,
-  imports: [TranslocoDirective, ReaderIconComponent],
+  imports: [TranslocoDirective, TranslocoPipe, ReaderIconComponent],
   templateUrl: './selection-popup.component.html',
   styleUrls: ['./selection-popup.component.scss']
 })

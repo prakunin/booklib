@@ -223,11 +223,7 @@ export class CbxSidebarService {
   }
 
   navigateToNote(pageNumber: string): void {
-    const page = Number.parseInt(pageNumber, 10);
-    if (!Number.isNaN(page)) {
-      this._navigateToPage.next(page);
-      this.close();
-    }
+    this.navigateToBookmark(pageNumber);
   }
 
   setNotesSearchQuery(query: string): void {

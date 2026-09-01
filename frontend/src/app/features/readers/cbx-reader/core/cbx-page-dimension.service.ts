@@ -27,7 +27,11 @@ export class CbxPageDimensionService {
 
   private appendToken(url: string): string {
     const token = this.getToken();
-    return token ? `${url}${url.includes('?') ? '&' : '?'}token=${token}` : url;
+    if (!token) {
+      return url;
+    }
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}token=${token}`;
   }
 
   getPageDimensions(bookId: number, bookType?: string): Observable<CbxPageDimension[]> {
@@ -120,39 +124,10 @@ export class CbxPageDimensionService {
       const ratio = dim.height / dim.width;
       totalRatio += ratio;
       widths.push(dim.width);
-
-      let pageScore = 0;
-
-      // Aspect ratio scoring
       if (ratio >= 2.2) {
-        pageScore += 1;
         highRatioCount++;
-      } else if (ratio >= 1.8) {
-        pageScore += 0.5;
-      } else if (ratio >= 1.5) {
-        pageScore += 0.2;
-      } else if (ratio < 1.2) {
-        pageScore -= 0.5;
       }
-
-      // Narrow width bonus
-      if (dim.width <= 750) {
-        pageScore += 0.2;
-      }
-
-      // Tall page bonus
-      if (dim.height > 2000) {
-        pageScore += 0.5;
-      } else if (dim.height > 1500) {
-        pageScore += 0.3;
-      }
-
-      // Large area bonus
-      if (dim.width * dim.height > 1_500_000) {
-        pageScore += 0.3;
-      }
-
-      totalScore += pageScore;
+      totalScore += CbxPageDimensionService.scoreWebtoonPage(dim, ratio);
     }
 
     const validCount = widths.length;
@@ -184,5 +159,40 @@ export class CbxPageDimensionService {
     );
 
     return {isWebtoon, score: avgScore};
+  }
+
+  /** Per-page webtoon score; see {@link detectWebtoon} for the scoring table. */
+  private static scoreWebtoonPage(dim: CbxPageDimension, ratio: number): number {
+    let pageScore = 0;
+
+    // Aspect ratio scoring
+    if (ratio >= 2.2) {
+      pageScore += 1;
+    } else if (ratio >= 1.8) {
+      pageScore += 0.5;
+    } else if (ratio >= 1.5) {
+      pageScore += 0.2;
+    } else if (ratio < 1.2) {
+      pageScore -= 0.5;
+    }
+
+    // Narrow width bonus
+    if (dim.width <= 750) {
+      pageScore += 0.2;
+    }
+
+    // Tall page bonus
+    if (dim.height > 2000) {
+      pageScore += 0.5;
+    } else if (dim.height > 1500) {
+      pageScore += 0.3;
+    }
+
+    // Large area bonus
+    if (dim.width * dim.height > 1_500_000) {
+      pageScore += 0.3;
+    }
+
+    return pageScore;
   }
 }

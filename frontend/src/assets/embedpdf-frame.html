@@ -98,7 +98,7 @@
   })();
 </script>
 <script type="module">
-  import EmbedPDF from '/assets/embedpdf/embedpdf.js';
+  import EmbedPDF from './embedpdf/embedpdf.js';
 
   let viewer = null;
   let objectUrl = null;
@@ -127,8 +127,7 @@
 
 
 
-  function injectGrimmoryStyles(targetEl, attempt) {
-    if (attempt === undefined) attempt = 0;
+  function injectGrimmoryStyles(targetEl, attempt = 0) {
     const container = targetEl.querySelector('embedpdf-container');
     const shadow = container?.shadowRoot;
     if (!shadow) {
@@ -140,7 +139,7 @@
     }
 
     const style = document.createElement('style');
-    style.setAttribute('data-grimmory', '');
+    style.dataset.grimmory = '';
     style.textContent = `
       /* ── Grimmory theme overrides ── */
 
@@ -408,7 +407,9 @@
                   zoomPlugin.requestZoom('fit-page');
                 }
               }
-            } catch (_) { /* no active document yet */ }
+            } catch (err) {
+              console.debug('[EmbedPDF-frame] fit-page refresh skipped (no active document yet):', err);
+            }
           });
           observer.observe(target);
         }

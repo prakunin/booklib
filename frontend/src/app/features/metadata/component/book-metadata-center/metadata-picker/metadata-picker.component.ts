@@ -374,16 +374,7 @@ export class MetadataPickerComponent {
     const metadata: Record<string, unknown> = {bookId: this.currentBookId};
 
     for (const field of ALL_METADATA_FIELDS) {
-      if (field.type === 'array') {
-        metadata[field.controlName] = this.getArrayValue(field.controlName);
-      } else if (field.type === 'number') {
-        metadata[field.controlName] = this.getNumberValue(field.controlName);
-      } else if (field.type === 'boolean') {
-        metadata[field.controlName] = this.getBooleanValue(field.controlName);
-      } else {
-        metadata[field.controlName] = this.getStringValue(field.controlName);
-      }
-
+      metadata[field.controlName] = this.readFieldValue(field.type, field.controlName);
       metadata[field.lockedKey] = this.metadataForm.get(field.lockedKey)?.value ?? false;
     }
 
@@ -393,29 +384,37 @@ export class MetadataPickerComponent {
 
     // Set audiobook content metadata (narrator/abridged) at top level
     for (const field of AUDIOBOOK_METADATA_FIELDS) {
-      if (field.type === 'boolean') {
-        metadata[field.controlName] = this.getBooleanValue(field.controlName);
-      } else {
-        metadata[field.controlName] = this.getStringValue(field.controlName);
-      }
+      metadata[field.controlName] = this.readFieldValue(field.type, field.controlName);
       metadata[field.lockedKey] = this.metadataForm.get(field.lockedKey)?.value ?? false;
     }
 
     // Build comic metadata from form controls
     const comicMetadata: Record<string, unknown> = {};
     for (const field of ALL_COMIC_METADATA_FIELDS) {
-      if (field.type === 'array') {
-        comicMetadata[field.fetchedKey] = this.getArrayValue(field.controlName);
-      } else if (field.type === 'number') {
-        comicMetadata[field.fetchedKey] = this.getNumberValue(field.controlName);
-      } else if (field.type === 'boolean') {
-        comicMetadata[field.fetchedKey] = this.getBooleanValue(field.controlName);
-      } else {
-        comicMetadata[field.fetchedKey] = this.getStringValue(field.controlName);
-      }
+      comicMetadata[field.fetchedKey] = this.readFieldValue(field.type, field.controlName);
     }
-    // Consolidate lock states back to model lock keys using the form-to-model mapping.
-    // If ANY field in a group is locked, the backend group lock is set to true.
+    this.applyComicLockGroups(comicMetadata);
+    metadata['comicMetadata'] = comicMetadata;
+
+    return metadata as BookMetadata;
+  }
+
+  private readFieldValue(type: string, controlName: string): unknown {
+    if (type === 'array') {
+      return this.getArrayValue(controlName);
+    }
+    if (type === 'number') {
+      return this.getNumberValue(controlName);
+    }
+    if (type === 'boolean') {
+      return this.getBooleanValue(controlName);
+    }
+    return this.getStringValue(controlName);
+  }
+
+  // Consolidate lock states back to model lock keys using the form-to-model mapping.
+  // If ANY field in a group is locked, the backend group lock is set to true.
+  private applyComicLockGroups(comicMetadata: Record<string, unknown>): void {
     const lockGroups: Record<string, boolean> = {};
     for (const [formKey, modelKey] of Object.entries(COMIC_FORM_TO_MODEL_LOCK)) {
       const value = this.metadataForm.get(formKey)?.value ?? false;
@@ -428,9 +427,6 @@ export class MetadataPickerComponent {
     for (const [modelKey, value] of Object.entries(lockGroups)) {
       comicMetadata[modelKey] = value;
     }
-    metadata['comicMetadata'] = comicMetadata;
-
-    return metadata as BookMetadata;
   }
 
   private getStringValue(field: string): string {
@@ -486,18 +482,7 @@ export class MetadataPickerComponent {
 
     for (const field of ALL_METADATA_FIELDS) {
       const key = field.controlName as keyof BookMetadata;
-      const curr = current[key];
-      const orig = original[key];
-
-      if (field.type === 'array') {
-        flags[key] = !(curr as string[])?.length && !!(orig as string[])?.length;
-      } else if (field.type === 'number') {
-        flags[key] = curr === null && orig !== null;
-      } else if (field.type === 'boolean') {
-        flags[key] = curr === null && orig !== null;
-      } else {
-        flags[key] = !curr && !!orig;
-      }
+      flags[key] = this.isClearedValue(field.type, current[key], original[key]);
     }
 
     flags['cover'] = this.copiedFields['thumbnailUrl'] === false && !current.thumbnailUrl && !!original.thumbnailUrl;
@@ -505,14 +490,7 @@ export class MetadataPickerComponent {
     // Handle audiobook metadata clear flags (now at top-level of BookMetadata)
     for (const field of AUDIOBOOK_METADATA_FIELDS) {
       const key = field.controlName as keyof BookMetadata;
-      const curr = current[key];
-      const orig = original[key];
-
-      if (field.type === 'boolean') {
-        flags[key] = curr === null && orig !== null;
-      } else {
-        flags[key] = !curr && !!orig;
-      }
+      flags[key] = this.isClearedValue(field.type, current[key], original[key]);
     }
 
     // Handle comic metadata clear flags
@@ -521,22 +499,21 @@ export class MetadataPickerComponent {
     if (origComic) {
       for (const field of ALL_COMIC_METADATA_FIELDS) {
         const key = field.fetchedKey as keyof ComicMetadata;
-        const curr = currComic?.[key];
-        const orig = origComic[key];
-
-        if (field.type === 'array') {
-          flags[`comic_${key}`] = !(curr as string[])?.length && !!(orig as string[])?.length;
-        } else if (field.type === 'boolean') {
-          flags[`comic_${key}`] = curr === null && orig !== null;
-        } else if (field.type === 'number') {
-          flags[`comic_${key}`] = curr === null && orig !== null;
-        } else {
-          flags[`comic_${key}`] = !curr && !!orig;
-        }
+        flags[`comic_${key}`] = this.isClearedValue(field.type, currComic?.[key], origComic[key]);
       }
     }
 
     return flags as MetadataClearFlags;
+  }
+
+  private isClearedValue(type: string, curr: unknown, orig: unknown): boolean {
+    if (type === 'array') {
+      return !(curr as string[])?.length && !!(orig as string[])?.length;
+    }
+    if (type === 'number' || type === 'boolean') {
+      return curr === null && orig !== null;
+    }
+    return !curr && !!orig;
   }
 
   getThumbnail(): string | null {
@@ -727,7 +704,13 @@ export class MetadataPickerComponent {
     const comicConfig = this.getComicFieldConfig(field);
     if (comicConfig) {
       const value = this.originalMetadata?.comicMetadata?.[comicConfig.fetchedKey as keyof ComicMetadata];
-      this.metadataForm.get(field)?.setValue(value ?? (comicConfig.type === 'array' ? [] : comicConfig.type === 'boolean' ? null : ''));
+      let fallback: string[] | null | string = '';
+      if (comicConfig.type === 'array') {
+        fallback = [];
+      } else if (comicConfig.type === 'boolean') {
+        fallback = null;
+      }
+      this.metadataForm.get(field)?.setValue(value ?? fallback);
       this.copiedFields[field] = false;
       this.hoveredFields[field] = false;
       return;

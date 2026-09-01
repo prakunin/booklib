@@ -273,14 +273,12 @@ export class TaskManagementComponent implements OnInit {
           const name = this.getTaskDisplayName(type);
           if (isAsync) {
             this.showMessage('info', this.t.translate('settingsTasks.toast.taskQueued'), this.t.translate('settingsTasks.toast.taskQueuedDetail', {name}));
+          } else if (response.status === TaskStatus.COMPLETED) {
+            this.showMessage('success', this.t.translate('settingsTasks.toast.taskCompleted'), this.t.translate('settingsTasks.toast.taskCompletedDetail', {name}));
+          } else if (response.status === TaskStatus.FAILED) {
+            this.showMessage('error', this.t.translate('settingsTasks.toast.taskFailed'), response.message || this.t.translate('settingsTasks.toast.taskFailedDetail', {name}));
           } else {
-            if (response.status === TaskStatus.COMPLETED) {
-              this.showMessage('success', this.t.translate('settingsTasks.toast.taskCompleted'), this.t.translate('settingsTasks.toast.taskCompletedDetail', {name}));
-            } else if (response.status === TaskStatus.FAILED) {
-              this.showMessage('error', this.t.translate('settingsTasks.toast.taskFailed'), response.message || this.t.translate('settingsTasks.toast.taskFailedDetail', {name}));
-            } else {
-              this.showMessage('success', this.t.translate('settingsTasks.toast.taskStarted'), this.t.translate('settingsTasks.toast.taskStartedDetail', {name}));
-            }
+            this.showMessage('success', this.t.translate('settingsTasks.toast.taskStarted'), this.t.translate('settingsTasks.toast.taskStartedDetail', {name}));
           }
           this.loadTasks();
         },

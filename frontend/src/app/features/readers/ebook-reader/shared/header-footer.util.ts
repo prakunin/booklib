@@ -82,13 +82,11 @@ export class PageDecorator {
 
       headerContent.appendChild(spacer);
       headerContent.appendChild(chapterSpan);
-    } else {
-      if (index === 0) {
-        const chapterSpan = document.createElement('span');
-        chapterSpan.textContent = chapterName || '';
-        chapterSpan.style.textAlign = 'left';
-        headerContent.appendChild(chapterSpan);
-      }
+    } else if (index === 0) {
+      const chapterSpan = document.createElement('span');
+      chapterSpan.textContent = chapterName || '';
+      chapterSpan.style.textAlign = 'left';
+      headerContent.appendChild(chapterSpan);
     }
 
     return headerContent;
@@ -111,24 +109,22 @@ export class PageDecorator {
 
       footerContent.appendChild(timeSpan);
       footerContent.appendChild(progressSpan);
-    } else {
-      if (index === 0) {
-        const timeSpan = document.createElement('span');
-        timeSpan.textContent = text;
-        timeSpan.style.textAlign = 'left';
-        footerContent.appendChild(timeSpan);
+    } else if (index === 0) {
+      const timeSpan = document.createElement('span');
+      timeSpan.textContent = text;
+      timeSpan.style.textAlign = 'left';
+      footerContent.appendChild(timeSpan);
 
-        const spacer = document.createElement('span');
-        footerContent.appendChild(spacer);
-      } else if (index === totalColumns - 1) {
-        const spacer = document.createElement('span');
-        footerContent.appendChild(spacer);
+      const spacer = document.createElement('span');
+      footerContent.appendChild(spacer);
+    } else if (index === totalColumns - 1) {
+      const spacer = document.createElement('span');
+      footerContent.appendChild(spacer);
 
-        const progressSpan = document.createElement('span');
-        progressSpan.textContent = `${pageInfo.percentCompleted}%`;
-        progressSpan.style.textAlign = 'right';
-        footerContent.appendChild(progressSpan);
-      }
+      const progressSpan = document.createElement('span');
+      progressSpan.textContent = `${pageInfo.percentCompleted}%`;
+      progressSpan.style.textAlign = 'right';
+      footerContent.appendChild(progressSpan);
     }
 
     return footerContent;

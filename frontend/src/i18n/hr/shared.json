@@ -69,6 +69,7 @@
         "description": "Odaberite jedan ili više direktorija iz vašeg datotečnog sustava",
         "currentPath": "Trenutna putanja:",
         "searchPlaceholder": "Pretraži mape...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "Idi razinu gore",
         "selectAllBtn": "Odaberi sve",
         "selectAllTooltip": "Odaberi sve vidljive mape",

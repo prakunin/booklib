@@ -12,7 +12,7 @@
     </div>
     <p-button
       icon="pi pi-times"
-      (click)="cancel()"
+      (onClick)="cancel()"
       severity="secondary"
       [text]="true"
       [rounded]="true"
@@ -30,32 +30,31 @@
       </div>
 
       @if (!selectedFile) {
-        <div class="upload-zone"
+        <input
+          #fileInput
+          type="file"
+          accept=".ttf,.otf,.woff,.woff2"
+          [disabled]="isUploading"
+          [attr.aria-label]="t('selectFile')"
+          (change)="onFileInputChange($event)"
+          style="display: none;"
+        />
+        <button type="button"
+             class="upload-zone block"
              [class.drag-over]="isDragOver"
-             role="button"
-             tabindex="0"
              (click)="onUploadZoneClick()"
-             (keydown.enter)="onUploadZoneClick()"
              (drop)="onDrop($event)"
              (dragover)="onDragOver($event)"
              (dragleave)="onDragLeave($event)">
-          <input
-            #fileInput
-            type="file"
-            accept=".ttf,.otf,.woff,.woff2"
-            [disabled]="isUploading"
-            (change)="onFileInputChange($event)"
-            style="display: none;"
-          />
-          <div class="empty-state">
-            <div class="empty-icon-wrapper">
+          <span class="empty-state">
+            <span class="empty-icon-wrapper">
               <i class="pi pi-cloud-upload empty-icon"></i>
-            </div>
+            </span>
             <h3 class="empty-title">{{ t('dragDrop') }}</h3>
             <p class="empty-description" [innerHTML]="t('supportedFormats')"></p>
             <p class="empty-description">{{ t('maxSize') }}</p>
-          </div>
-        </div>
+          </span>
+        </button>
       } @else {
       <div class="file-selected">
         <div class="file-info-card">
@@ -119,13 +118,13 @@
       icon="pi pi-times"
       severity="secondary"
       [outlined]="true"
-      (click)="cancel()"
+      (onClick)="cancel()"
       [disabled]="isUploading"
     ></p-button>
     <p-button
       [label]="t('uploadBtn')"
       icon="pi pi-upload"
-      (click)="uploadFont()"
+      (onClick)="uploadFont()"
       [disabled]="isUploading || !selectedFile || !uploadedFontName.trim()"
       [loading]="isUploading"
     ></p-button>

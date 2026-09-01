@@ -92,7 +92,7 @@ export class DirectoryPickerComponent implements OnInit {
       return;
     }
 
-    const parts = path.split('/').filter(p => p);
+    const parts = path.split('/').filter(Boolean);
     this.breadcrumbItems = parts.map((part, index) => {
       const fullPath = '/' + parts.slice(0, index + 1).join('/');
       return {
@@ -115,9 +115,7 @@ export class DirectoryPickerComponent implements OnInit {
   }
 
   onRowClick(path: string): void {
-    this.selectedProductName = path;
-    this.getFolders(path);
-    this.searchQuery = '';
+    this.navigateToPath(path);
   }
 
   onCheckboxChange(path: string, checked: boolean): void {
@@ -188,6 +186,6 @@ export class DirectoryPickerComponent implements OnInit {
   }
 
   getFolderName(path: string): string {
-    return path.split('/').filter(p => p).pop() || path;
+    return path.split('/').filter(Boolean).pop() || path;
   }
 }

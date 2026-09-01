@@ -122,7 +122,7 @@ export class ReadStatusChartComponent {
         labels,
         datasets: [{
           data: dataValues,
-          backgroundColor: colors.length > 0 ? colors : [...Object.values(STATUS_COLOR_MAP)]
+          backgroundColor: colors.length > 0 ? colors : Object.values(STATUS_COLOR_MAP)
         }]
       };
     } catch (error) {
@@ -131,7 +131,7 @@ export class ReadStatusChartComponent {
         labels: [],
         datasets: [{
           data: [],
-          backgroundColor: [...Object.values(STATUS_COLOR_MAP)]
+          backgroundColor: Object.values(STATUS_COLOR_MAP)
         }]
       };
     }

@@ -20,6 +20,7 @@
         "tags": "Теги"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "Данные файла",
         "fetchedData": "Полученные данные",
         "copyMissingTooltip": "Скопировать отсутствующие поля из полученных метаданных",

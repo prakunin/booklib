@@ -1,8 +1,7 @@
 import {DestroyRef, inject, Injectable, signal} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {Subject} from 'rxjs';
+import {of, Subject} from 'rxjs';
 import {switchMap, tap} from 'rxjs/operators';
-import {of} from 'rxjs';
 import {Annotation} from '../../../../../shared/service/annotation.service';
 import {ReaderViewManagerService} from '../../core/view-manager.service';
 import {ReaderAnnotationHttpService} from '../annotations/annotation.service';
@@ -245,7 +244,7 @@ export class ReaderSelectionService {
     const commaIndex = inner.indexOf(',');
     if (commaIndex <= 0) {
       // Not a range CFI, might be a point CFI - treat as zero-width range
-      const offsetMatch = inner.match(/:(\d+)$/);
+      const offsetMatch = /:(\d+)$/.exec(inner);
       if (offsetMatch) {
         const basePath = inner.replace(/:\d+$/, '');
         const offset = Number.parseInt(offsetMatch[1], 10);
@@ -266,8 +265,8 @@ export class ReaderSelectionService {
     const relativeEnd = relativeParts[1];
 
     // Extract character offsets from relative parts
-    const startOffsetMatch = relativeStart.match(/:(\d+)$/);
-    const endOffsetMatch = relativeEnd.match(/:(\d+)$/);
+    const startOffsetMatch = /:(\d+)$/.exec(relativeStart);
+    const endOffsetMatch = /:(\d+)$/.exec(relativeEnd);
 
     if (!startOffsetMatch || !endOffsetMatch) return null;
 

@@ -69,6 +69,7 @@
     "description": "",
     "currentPath": "",
     "searchPlaceholder": "",
+    "clearSearch": "Clear search",
     "goUpTooltip": "",
     "selectAllBtn": "",
     "selectAllTooltip": "",

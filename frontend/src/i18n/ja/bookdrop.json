@@ -20,6 +20,7 @@
         "tags": "タグ"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "ファイルデータ",
         "fetchedData": "取得データ",
         "copyMissingTooltip": "取得したメタデータから欠損フィールドをコピー",

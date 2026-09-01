@@ -10,7 +10,7 @@
     </div>
     <p-button
       icon="pi pi-times"
-      (click)="close()"
+      (onClick)="close()"
       severity="secondary"
       [text]="true"
       [rounded]="true"
@@ -68,6 +68,7 @@
                   [(ngModel)]="pasteText"
                   rows="6"
                   [placeholder]="t('pastePlaceholder')"
+                  [attr.aria-label]="t('pastePlaceholder')"
                   class="input-full"></textarea>
                 <p-button
                   [label]="t('parseButton')"
@@ -101,11 +102,11 @@
               {{ t('validCount', { count: entries.length }) }}
             </div>
             @if (skipped.length > 0) {
-              <div class="summary-stat warn" role="button" tabindex="0" (click)="showSkipped = !showSkipped" (keydown.enter)="showSkipped = !showSkipped">
+              <button type="button" class="summary-stat warn" (click)="showSkipped = !showSkipped">
                 <i class="pi pi-exclamation-triangle"></i>
                 {{ t('skippedCount', { count: skipped.length }) }}
                 <i class="pi" [class.pi-chevron-down]="!showSkipped" [class.pi-chevron-up]="showSkipped"></i>
-              </div>
+              </button>
             }
             @if (duplicatesRemoved > 0) {
               <div class="summary-stat info">

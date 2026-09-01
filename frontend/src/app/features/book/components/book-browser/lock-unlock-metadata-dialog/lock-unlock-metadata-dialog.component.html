@@ -13,7 +13,7 @@
       [rounded]="true"
       [text]="true"
       severity="secondary"
-      (click)="dialogRef.close()"
+      (onClick)="dialogRef.close()"
       class="close-button">
     </p-button>
   </div>
@@ -28,7 +28,7 @@
             [label]="getLockLabel(field)"
             [icon]="getLockIcon(field)"
             [severity]="fieldLocks[field] === true ? 'danger' : fieldLocks[field] === false ? 'success' : 'secondary'"
-            (click)="cycleLockState(field)"
+            (onClick)="cycleLockState(field)"
           ></p-button>
         </div>
       }

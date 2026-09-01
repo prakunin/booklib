@@ -274,6 +274,7 @@
         "errorDetailDefault": "Salvataggio scaffale magico fallito."
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "",
         "successDetail": "",
         "structureError": "",

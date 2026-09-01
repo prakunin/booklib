@@ -120,7 +120,7 @@ export class ReadingSessionTimelineComponent implements OnInit {
 
   private initializeHourLabels(): void {
     for (let i = 0; i < 24; i++) {
-      const hour = i === 0 ? 12 : i > 12 ? i - 12 : i;
+      const hour = this.toDisplayHour(i);
       const period = i < 12 ? 'AM' : 'PM';
       this.hourLabels.push(`${hour} ${period}`);
     }
@@ -339,10 +339,20 @@ export class ReadingSessionTimelineComponent implements OnInit {
   }
 
   public formatTime(hour: number, minute: number): string {
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    const displayHour = this.toDisplayHour(hour);
     const period = hour < 12 ? 'AM' : 'PM';
     const displayMinute = minute.toString().padStart(2, '0');
     return `${displayHour}:${displayMinute} ${period}`;
+  }
+
+  private toDisplayHour(hour: number): number {
+    if (hour === 0) {
+      return 12;
+    }
+    if (hour > 12) {
+      return hour - 12;
+    }
+    return hour;
   }
 
   public formatDuration(minutes: number): string {

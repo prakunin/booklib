@@ -67,66 +67,12 @@ export class BookBrowserQueryParamsService {
     const filters = this.deserializeFilters(filterParams);
 
     // Determine effective preferences
-    const globalPrefs = userPrefs?.global;
-    const currentEntityTypeStr = entityType?.toString().toUpperCase().replaceAll(' ', '_');
-    const override = userPrefs?.overrides?.find(o =>
-      o.entityType?.toUpperCase() === currentEntityTypeStr &&
-      o.entityId === entityId
-    );
-
-    const effectivePrefs: EntityViewPreference = override?.preferences ?? globalPrefs ?? {
-      sortKey: 'addedOn',
-      sortDir: 'ASC',
-      view: 'GRID',
-      coverSize: 1,
-      seriesCollapsed: true,
-      overlayBookType: true
-    };
+    const effectivePrefs = this.resolveEffectivePreferences(userPrefs, entityType, entityId);
 
     // Parse sort criteria - supports both legacy and new multi-sort format
-    let sortCriteria: SortOption[];
-
-    if (sortParam) {
-      // Check if it's new multi-sort format (contains colons like "author:asc,title:desc")
-      if (sortParam.includes(':')) {
-        sortCriteria = this.deserializeSort(sortParam, sortOptions);
-      } else {
-        // Legacy format: separate sort and direction params
-        const effectiveSortDir = directionParam
-          ? (directionParam.toLowerCase() === SORT_DIRECTION.DESCENDING ? SortDirection.DESCENDING : SortDirection.ASCENDING)
-          : SortDirection.ASCENDING;
-        const matchedSort = sortOptions.find(opt => opt.field === sortParam);
-        sortCriteria = matchedSort ? [{
-          label: matchedSort.label,
-          field: matchedSort.field,
-          direction: effectiveSortDir
-        }] : [];
-      }
-    } else {
-      // Use user preferences
-      if (effectivePrefs.sortCriteria && effectivePrefs.sortCriteria.length > 0) {
-        sortCriteria = effectivePrefs.sortCriteria.map((c: SortCriterion) => {
-          const matchedSort = sortOptions.find(opt => opt.field === c.field);
-          return {
-            label: matchedSort?.label ?? c.field,
-            field: c.field,
-            direction: c.direction === 'DESC' ? SortDirection.DESCENDING : SortDirection.ASCENDING
-          };
-        });
-      } else {
-        // Fall back to legacy single sort preference
-        const userSortKey = effectivePrefs.sortKey;
-        const userSortDir = effectivePrefs.sortDir?.toUpperCase() === 'DESC'
-          ? SortDirection.DESCENDING
-          : SortDirection.ASCENDING;
-        const matchedSort = sortOptions.find(opt => opt.field === userSortKey);
-        sortCriteria = matchedSort ? [{
-          label: matchedSort.label,
-          field: matchedSort.field,
-          direction: userSortDir
-        }] : [];
-      }
-    }
+    let sortCriteria = sortParam
+      ? this.parseSortFromParams(sortParam, directionParam, sortOptions)
+      : this.parseSortFromPreferences(effectivePrefs, sortOptions);
 
     // Ensure we have at least a default sort
     if (sortCriteria.length === 0) {
@@ -142,11 +88,7 @@ export class BookBrowserQueryParamsService {
 
     // Determine view mode
     const viewModeFromToggle = fromParam === 'toggle';
-    const viewMode = viewModeFromToggle
-      ? (viewParam === VIEW_MODES.TABLE || viewParam === VIEW_MODES.GRID
-        ? viewParam
-        : VIEW_MODES.GRID)
-      : (effectivePrefs.view?.toLowerCase() ?? VIEW_MODES.GRID);
+    const viewMode = this.resolveViewMode(viewModeFromToggle, viewParam, effectivePrefs);
 
     return {
       viewMode,
@@ -156,6 +98,79 @@ export class BookBrowserQueryParamsService {
       filterMode,
       viewModeFromToggle
     };
+  }
+
+  private resolveEffectivePreferences(
+    userPrefs: EntityViewPreferences | undefined,
+    entityType: EntityType | undefined,
+    entityId: number | undefined
+  ): EntityViewPreference {
+    const globalPrefs = userPrefs?.global;
+    const currentEntityTypeStr = entityType?.toString().toUpperCase().replaceAll(' ', '_');
+    const override = userPrefs?.overrides?.find(o =>
+      o.entityType?.toUpperCase() === currentEntityTypeStr &&
+      o.entityId === entityId
+    );
+
+    return override?.preferences ?? globalPrefs ?? {
+      sortKey: 'addedOn',
+      sortDir: 'ASC',
+      view: 'GRID',
+      coverSize: 1,
+      seriesCollapsed: true,
+      overlayBookType: true
+    };
+  }
+
+  private parseSortFromParams(sortParam: string, directionParam: string | null, sortOptions: SortOption[]): SortOption[] {
+    // Check if it's new multi-sort format (contains colons like "author:asc,title:desc")
+    if (sortParam.includes(':')) {
+      return this.deserializeSort(sortParam, sortOptions);
+    }
+    // Legacy format: separate sort and direction params
+    const effectiveSortDir = this.parseLegacyDirection(directionParam);
+    return this.matchSingleSort(sortParam, effectiveSortDir, sortOptions);
+  }
+
+  private parseLegacyDirection(directionParam: string | null): SortDirection {
+    if (!directionParam) {
+      return SortDirection.ASCENDING;
+    }
+    return directionParam.toLowerCase() === SORT_DIRECTION.DESCENDING ? SortDirection.DESCENDING : SortDirection.ASCENDING;
+  }
+
+  private parseSortFromPreferences(effectivePrefs: EntityViewPreference, sortOptions: SortOption[]): SortOption[] {
+    if (effectivePrefs.sortCriteria && effectivePrefs.sortCriteria.length > 0) {
+      return effectivePrefs.sortCriteria.map((c: SortCriterion) => {
+        const matchedSort = sortOptions.find(opt => opt.field === c.field);
+        return {
+          label: matchedSort?.label ?? c.field,
+          field: c.field,
+          direction: c.direction === 'DESC' ? SortDirection.DESCENDING : SortDirection.ASCENDING
+        };
+      });
+    }
+    // Fall back to legacy single sort preference
+    const userSortDir = effectivePrefs.sortDir?.toUpperCase() === 'DESC'
+      ? SortDirection.DESCENDING
+      : SortDirection.ASCENDING;
+    return this.matchSingleSort(effectivePrefs.sortKey, userSortDir, sortOptions);
+  }
+
+  private matchSingleSort(field: string | undefined, direction: SortDirection, sortOptions: SortOption[]): SortOption[] {
+    const matchedSort = sortOptions.find(opt => opt.field === field);
+    return matchedSort ? [{
+      label: matchedSort.label,
+      field: matchedSort.field,
+      direction
+    }] : [];
+  }
+
+  private resolveViewMode(viewModeFromToggle: boolean, viewParam: string | null, effectivePrefs: EntityViewPreference): string {
+    if (!viewModeFromToggle) {
+      return effectivePrefs.view?.toLowerCase() ?? VIEW_MODES.GRID;
+    }
+    return viewParam === VIEW_MODES.TABLE || viewParam === VIEW_MODES.GRID ? viewParam : VIEW_MODES.GRID;
   }
 
   updateViewMode(mode: 'grid' | 'table'): void {

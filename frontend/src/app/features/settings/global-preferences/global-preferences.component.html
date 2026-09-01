@@ -392,7 +392,8 @@
                     type="text"
                     pInputText
                     [(ngModel)]="maxFileUploadSizeInMb"
-                    [placeholder]="t('fileManagement.maxUploadPlaceholder')"/>
+                    [placeholder]="t('fileManagement.maxUploadPlaceholder')"
+                    [attr.aria-label]="t('fileManagement.maxUploadSize')"/>
                   <span class="unit">MB</span>
                 </div>
                 <p-button [label]="'common.save' | transloco" outlined severity="success" (onClick)="saveFileSize()"></p-button>
@@ -419,7 +420,8 @@
                     type="text"
                     pInputText
                     [(ngModel)]="inpxExtractionCacheSizeInMb"
-                    [placeholder]="t('fileManagement.inpxCachePlaceholder')"/>
+                    [placeholder]="t('fileManagement.inpxCachePlaceholder')"
+                    [attr.aria-label]="t('fileManagement.inpxCacheSize')"/>
                   <span class="unit">MB</span>
                 </div>
                 <p-button [label]="'common.save' | transloco" outlined severity="success" (onClick)="saveInpxExtractionCacheSize()"></p-button>

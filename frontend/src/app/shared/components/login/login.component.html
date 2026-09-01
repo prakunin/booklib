@@ -96,7 +96,7 @@
                   [label]="isOidcLoginInProgress ? t('redirectingTo', {provider: oidcName}) : oidcName"
                   [icon]="isOidcLoginInProgress ? 'pi pi-spin pi-spinner' : 'pi pi-id-card'"
                   [disabled]="isOidcLoginInProgress"
-                  (click)="loginWithOidc()"
+                  (onClick)="loginWithOidc()"
                   class="oidc-button"/>
               }
             </form>
@@ -109,7 +109,7 @@
                   [label]="isOidcLoginInProgress ? t('redirectingTo', {provider: oidcName}) : oidcName"
                   [icon]="isOidcLoginInProgress ? 'pi pi-spin pi-spinner' : 'pi pi-id-card'"
                   [disabled]="isOidcLoginInProgress"
-                  (click)="loginWithOidc()"
+                  (onClick)="loginWithOidc()"
                   class="oidc-button"/>
               </div>
             }

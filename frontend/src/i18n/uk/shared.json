@@ -69,6 +69,7 @@
         "description": "Виберіть один або кілька каталогів із вашої файлової системи",
         "currentPath": "Поточний шлях:",
         "searchPlaceholder": "Пошук папок...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "Піднятися на один рівень вище",
         "selectAllBtn": "Вибрати все",
         "selectAllTooltip": "Вибрати всі видимі папки",

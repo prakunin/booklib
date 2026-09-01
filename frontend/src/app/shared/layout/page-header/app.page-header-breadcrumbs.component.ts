@@ -156,7 +156,7 @@ export class AppPageHeaderBreadcrumbsComponent {
   }
 
   breadcrumbKey(breadcrumb: PageHeaderBreadcrumb): string {
-    const commands = breadcrumb.commands?.map(command => String(command)).join('/') ?? '';
+    const commands = breadcrumb.commands?.map(String).join('/') ?? '';
     return `${commands}|${breadcrumb.label}`;
   }
 }

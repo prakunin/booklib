@@ -121,60 +121,79 @@ export class ReaderStateService {
         const globalSettings = myself.userSettings.ebookReaderSetting;
         const individualSetting = bookSetting?.ebookSettings;
         const settings = settingScope === 'Global' ? globalSettings : (individualSetting || globalSettings);
-        const newState: Partial<ReaderState> = {};
-        if (settings.fontSize != null) newState.fontSize = this.clampFontSize(settings.fontSize);
-        if (settings.lineHeight != null) newState.lineHeight = settings.lineHeight;
-
-        if (settings.fontFamily != null) {
-          if (settings.fontFamily.startsWith('custom:')) {
-            newState.fontFamily = settings.fontFamily;
-          } else {
-            const numericId = Number.parseInt(settings.fontFamily, 10);
-            if (!Number.isNaN(numericId) && numericId.toString() === settings.fontFamily) {
-              newState.fontFamily = `custom:${numericId}`;
-            } else {
-              newState.fontFamily = settings.fontFamily;
-            }
-          }
-        } else {
-          const legacySettings = settings as LegacyViewerSetting;
-          if (legacySettings.customFontId != null) {
-            newState.fontFamily = `custom:${legacySettings.customFontId}`;
-          }
-        }
-
-        if (settings.gap != null) newState.gap = Math.min(settings.gap, 0.5);
-        if (settings.hyphenate != null) newState.hyphenate = settings.hyphenate;
-        if (settings.justify != null) newState.justify = settings.justify;
-        if (settings.maxColumnCount != null) newState.maxColumnCount = settings.maxColumnCount;
-        if (settings.maxInlineSize != null) newState.maxInlineSize = settings.maxInlineSize;
-        if (settings.maxBlockSize != null) newState.maxBlockSize = settings.maxBlockSize;
-        if (settings.pageMargin != null) newState.pageMargin = this.clampPageMargin(settings.pageMargin);
-        if (settings.isDark != null) newState.isDark = settings.isDark;
-        if (settings.flow) newState.flow = this.normalizeFlow(settings.flow);
-        if (settings.backgroundSaturation != null) {
-          newState.backgroundSaturation = this.clampBackgroundSaturation(settings.backgroundSaturation);
-        }
-        if (settings.backgroundTransparency != null) {
-          newState.backgroundTransparency = this.clampBackgroundTransparency(settings.backgroundTransparency);
-        }
-        if (settings.theme) {
-          const theme = this.themes.find(t => t.name === settings.theme);
-          if (theme) {
-            newState.theme = {
-              ...theme,
-              fg: settings.isDark ? theme.dark.fg : theme.light.fg,
-              bg: settings.isDark ? theme.dark.bg : theme.light.bg,
-              link: settings.isDark ? theme.dark.link : theme.light.link,
-            };
-          }
-        }
+        const newState = this.buildStateFromSettings(settings);
         if (Object.keys(newState).length > 0) {
           this.updateState(newState);
         }
       }),
       map(() => void 0)
     );
+  }
+
+  /** Maps a persisted viewer setting onto the reader state, skipping fields the setting does not carry. */
+  private buildStateFromSettings(settings: EbookViewerSetting): Partial<ReaderState> {
+    const newState: Partial<ReaderState> = {};
+    if (settings.fontSize != null) newState.fontSize = this.clampFontSize(settings.fontSize);
+    if (settings.lineHeight != null) newState.lineHeight = settings.lineHeight;
+
+    const fontFamily = this.resolveFontFamily(settings);
+    if (fontFamily !== undefined) newState.fontFamily = fontFamily;
+
+    if (settings.gap != null) newState.gap = Math.min(settings.gap, 0.5);
+    if (settings.hyphenate != null) newState.hyphenate = settings.hyphenate;
+    if (settings.justify != null) newState.justify = settings.justify;
+    if (settings.maxColumnCount != null) newState.maxColumnCount = settings.maxColumnCount;
+    if (settings.maxInlineSize != null) newState.maxInlineSize = settings.maxInlineSize;
+    if (settings.maxBlockSize != null) newState.maxBlockSize = settings.maxBlockSize;
+    if (settings.pageMargin != null) newState.pageMargin = this.clampPageMargin(settings.pageMargin);
+    if (settings.isDark != null) newState.isDark = settings.isDark;
+    if (settings.flow) newState.flow = this.normalizeFlow(settings.flow);
+    if (settings.backgroundSaturation != null) {
+      newState.backgroundSaturation = this.clampBackgroundSaturation(settings.backgroundSaturation);
+    }
+    if (settings.backgroundTransparency != null) {
+      newState.backgroundTransparency = this.clampBackgroundTransparency(settings.backgroundTransparency);
+    }
+    if (settings.theme) {
+      const theme = this.resolveTheme(settings.theme, settings.isDark);
+      if (theme) newState.theme = theme;
+    }
+    return newState;
+  }
+
+  /**
+   * Resolves the stored font family: `custom:<id>` as is, a bare numeric id as `custom:<id>`,
+   * a legacy `customFontId` when no font family is stored; `undefined` when nothing is stored.
+   */
+  private resolveFontFamily(settings: EbookViewerSetting): string | undefined {
+    if (settings.fontFamily != null) {
+      if (settings.fontFamily.startsWith('custom:')) {
+        return settings.fontFamily;
+      }
+      const numericId = Number.parseInt(settings.fontFamily, 10);
+      if (!Number.isNaN(numericId) && numericId.toString() === settings.fontFamily) {
+        return `custom:${numericId}`;
+      }
+      return settings.fontFamily;
+    }
+    const legacySettings = settings as LegacyViewerSetting;
+    if (legacySettings.customFontId != null) {
+      return `custom:${legacySettings.customFontId}`;
+    }
+    return undefined;
+  }
+
+  private resolveTheme(themeName: string, isDark: boolean): Theme | undefined {
+    const theme = this.themes.find(t => t.name === themeName);
+    if (!theme) {
+      return undefined;
+    }
+    return {
+      ...theme,
+      fg: isDark ? theme.dark.fg : theme.light.fg,
+      bg: isDark ? theme.dark.bg : theme.light.bg,
+      link: isDark ? theme.dark.link : theme.light.link,
+    };
   }
 
   updateLineHeight(delta: number): void {
@@ -305,7 +324,7 @@ export class ReaderStateService {
     });
   }
 
-  private normalizeFlow(flow: ReaderFlow | string): ReaderFlow {
+  private normalizeFlow(flow: string): ReaderFlow {
     if (flow === 'continuous' || flow === 'scrolled') return 'scrolled';
     return 'paginated';
   }

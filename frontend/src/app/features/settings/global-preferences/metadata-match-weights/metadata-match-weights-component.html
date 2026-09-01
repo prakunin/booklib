@@ -22,7 +22,7 @@
             icon="pi pi-refresh"
             [label]="t('recalculateBtn')"
             [disabled]="isRecalculating"
-            (click)="recalculate()"
+            (onClick)="recalculate()"
             outlined>
           </p-button>
         </div>
@@ -58,7 +58,7 @@
               icon="pi pi-save"
               outlined
               [disabled]="isSaving"
-              (click)="save()">
+              (onClick)="save()">
             </p-button>
           </div>
         </form>

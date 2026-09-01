@@ -359,14 +359,12 @@ export class MetadataSearcherComponent implements OnDestroy, OnChanges {
         if (newFilters.size === 0) {
           newFilters.add('all');
         }
+      } else if (newFilters.has(providerLower) && newFilters.size === 1) {
+        newFilters.clear();
+        newFilters.add('all');
       } else {
-        if (newFilters.has(providerLower) && newFilters.size === 1) {
-          newFilters.clear();
-          newFilters.add('all');
-        } else {
-          newFilters.clear();
-          newFilters.add(providerLower);
-        }
+        newFilters.clear();
+        newFilters.add(providerLower);
       }
       return newFilters;
     });
@@ -490,8 +488,9 @@ export class MetadataSearcherComponent implements OnDestroy, OnChanges {
       return `https://hardcover.app/books/${metadata.hardcoverId}`;
     }
 
-    if (metadata['doubanId']) {
-      return `https://book.douban.com/subject/${metadata['doubanId']}`;
+    const doubanId = metadata['doubanId'] as string | undefined;
+    if (doubanId) {
+      return `https://book.douban.com/subject/${doubanId}`;
     }
 
     if (metadata['lubimyczytacId']) {

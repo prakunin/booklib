@@ -69,6 +69,7 @@
         "description": "Välj en eller flera mappar från ditt filsystem",
         "currentPath": "Aktuell sökväg:",
         "searchPlaceholder": "Sök mappar...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "Gå upp en nivå",
         "selectAllBtn": "Välj alla",
         "selectAllTooltip": "Välj alla synliga mappar",

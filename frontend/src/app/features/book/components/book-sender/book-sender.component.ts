@@ -121,7 +121,12 @@ export class BookSenderComponent implements OnInit {
       unitIndex++;
     }
 
-    const decimals = size >= 100 ? 0 : size >= 10 ? 1 : 2;
+    let decimals = 2;
+    if (size >= 100) {
+      decimals = 0;
+    } else if (size >= 10) {
+      decimals = 1;
+    }
     return `${size.toFixed(decimals)} ${units[unitIndex]}`;
   }
 

@@ -2,9 +2,12 @@ import { cn } from '../cn';
 import {
   overlayListItemRowClass,
   overlayListSectionLabelClass,
-  overlayListSeparatorClass,
-  overlayListShortcutClass,
   overlayListSurfaceClass,
+} from '../overlay-list.styles';
+
+export {
+  overlayListSeparatorClass as appMenuSeparatorClass,
+  overlayListShortcutClass as appMenuShortcutClass,
 } from '../overlay-list.styles';
 
 export type AppMenuItemVariant = 'default' | 'destructive';
@@ -57,10 +60,8 @@ export const appMenuBadgeSlotClass = cn(appMenuLeadingSlotClass, 'text-xs font-m
 export const appMenuIconClass = 'size-3.5 shrink-0';
 export const appMenuSpinnerClass = 'size-4 shrink-0 border-2';
 export const appMenuLabelClass = 'min-w-0 flex-1 truncate leading-5';
-export const appMenuShortcutClass = overlayListShortcutClass;
 export const appMenuTrailingTextClass = 'text-xs text-text-muted';
 export const appMenuTrailingIconClass = cn('ml-2 size-3.5 shrink-0', menuIconToneClass);
 export const appMenuSubmenuIconClass = cn(appMenuTrailingIconClass, 'ml-auto');
 export const appMenuCheckIconClass = 'size-4 shrink-0 text-primary';
 export const appMenuSectionClass = cn(overlayListSectionLabelClass, 'text-text-muted');
-export const appMenuSeparatorClass = overlayListSeparatorClass;

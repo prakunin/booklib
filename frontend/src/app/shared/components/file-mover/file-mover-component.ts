@@ -251,7 +251,7 @@ export class FileMoverComponent implements OnDestroy {
   private updatePreviewPaths(preview: FilePreview, book: Book): void {
     const meta = book.metadata!;
     const fileName = book.fileName ?? '';
-    const extension = fileName.match(/\.[^.]+$/)?.[0] ?? '';
+    const extension = /\.[^.]+$/.exec(fileName)?.[0] ?? '';
     const pattern = this.getPatternForLibrary(preview.targetLibraryId);
 
     const values: Record<string, string> = {
@@ -339,7 +339,7 @@ export class FileMoverComponent implements OnDestroy {
       .replaceAll(/[\\/:*?"<>|]/g, '')
       .split('')
       .filter(char => {
-        const code = char.charCodeAt(0);
+        const code = char.codePointAt(0) ?? 0;
         return code >= 32 && code !== 127;
       })
       .join('');
@@ -349,7 +349,7 @@ export class FileMoverComponent implements OnDestroy {
 
   formatYear(dateStr?: string): string {
     if (!dateStr) return '';
-    const yearMatch = dateStr.match(/^(\d{4})/);
+    const yearMatch = /^(\d{4})/.exec(dateStr);
     if (yearMatch) {
       return yearMatch[1];
     }
@@ -366,7 +366,7 @@ export class FileMoverComponent implements OnDestroy {
     } else {
       // For decimal numbers, format integer part with leading zero
       const intPart = Math.floor(seriesNumber);
-      const decimalPart = (seriesNumber % 1).toFixed(10).substring(1).replace(/0+$/, '');
+      const decimalPart = (seriesNumber % 1).toFixed(10).substring(1).replace(/(?<!0)0+$/, '');
       return this.sanitize(intPart.toString().padStart(2, '0') + decimalPart);
     }
   }

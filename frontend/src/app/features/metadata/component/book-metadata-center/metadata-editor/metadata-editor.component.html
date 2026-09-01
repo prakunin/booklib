@@ -229,12 +229,11 @@
                       @if ($first) { <span class="main-author-badge">m</span> }
                       {{ author }}
                       @if (!metadataForm.get('authors')?.disabled) {
-                        <i
+                        <button
+                          type="button"
                           class="pi pi-times author-chip-remove"
-                          role="button"
-                          tabindex="0"
-                          (click)="removeAuthor($index)"
-                          (keydown.enter)="removeAuthor($index)"></i>
+                          [attr.aria-label]="t('removeAuthor')"
+                          (click)="removeAuthor($index)"></button>
                       }
                     </span>
                   }
@@ -437,7 +436,7 @@
             <div class="field-group small-field">
               <span>{{ t('publicReviews') }}</span>
               <div class="field-with-lock">
-                <input pSize="small" pInputText [disabled]="true" [value]="t('noValue')"/>
+                <input pSize="small" pInputText [disabled]="true" [value]="t('noValue')" [attr.aria-label]="t('publicReviews')"/>
                 @if (!book.metadata!['reviewsLocked']) {
                   <p-button icon="pi pi-lock-open" [outlined]="true" (onClick)="toggleLock('reviews')" severity="success"></p-button>
                 }
@@ -535,16 +534,15 @@
       <!-- Audiobook Metadata Section -->
       @if (isAudiobook(book)) {
         <div class="collapsible-section" [class.expanded]="audiobookSectionExpanded">
-          <div
-            class="collapsible-header"
-            role="button"
-            tabindex="0"
-            (click)="audiobookSectionExpanded = !audiobookSectionExpanded"
-            (keydown.enter)="audiobookSectionExpanded = !audiobookSectionExpanded">
+          <button
+            type="button"
+            class="collapsible-header w-full"
+            [attr.aria-expanded]="audiobookSectionExpanded"
+            (click)="audiobookSectionExpanded = !audiobookSectionExpanded">
             <i class="pi pi-headphones"></i>
             <span>{{ t('audiobookDetails') }}</span>
             <i [class]="audiobookSectionExpanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" class="section-toggle"></i>
-          </div>
+          </button>
           @if (audiobookSectionExpanded) {
             <div class="collapsible-content">
               <div class="field-row metadata-ids-row">
@@ -555,7 +553,7 @@
                       @if (field.type === 'boolean') {
                         <p-select [formControlName]="field.controlName" [options]="booleanOptions" optionLabel="label" optionValue="value" appendTo="body"></p-select>
                       } @else {
-                        <input pInputText [formControlName]="field.controlName"/>
+                        <input pInputText [formControlName]="field.controlName" [attr.aria-label]="field.label"/>
                       }
                       @if (!metadataForm.get(field.lockedKey)?.value) {
                         <p-button icon="pi pi-lock-open" [outlined]="true" (onClick)="toggleLock(field.controlName)" severity="success"></p-button>
@@ -575,16 +573,15 @@
       <!-- Comic Book Metadata Section -->
       @if (isCBX(book)) {
         <div class="collapsible-section" [class.expanded]="comicSectionExpanded">
-          <div
-            class="collapsible-header"
-            role="button"
-            tabindex="0"
-            (click)="comicSectionExpanded = !comicSectionExpanded"
-            (keydown.enter)="comicSectionExpanded = !comicSectionExpanded">
+          <button
+            type="button"
+            class="collapsible-header w-full"
+            [attr.aria-expanded]="comicSectionExpanded"
+            (click)="comicSectionExpanded = !comicSectionExpanded">
             <i class="pi pi-bolt"></i>
             <span>{{ t('comicBookDetails') }}</span>
             <i [class]="comicSectionExpanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" class="section-toggle"></i>
-          </div>
+          </button>
           @if (comicSectionExpanded) {
             <div class="collapsible-content">
               <!-- Text/number/boolean fields in grid -->
@@ -596,7 +593,7 @@
                       @if (field.type === 'boolean') {
                         <p-select [formControlName]="field.controlName" [options]="booleanOptions" optionLabel="label" optionValue="value" size="small" appendTo="body"></p-select>
                       } @else {
-                        <input pSize="small" pInputText [formControlName]="field.controlName"/>
+                        <input pSize="small" pInputText [formControlName]="field.controlName" [attr.aria-label]="field.label"/>
                       }
                       @if (!metadataForm.get(field.lockedKey)?.value) {
                         <p-button size="small" icon="pi pi-lock-open" [outlined]="true" (onClick)="toggleLock(field.controlName)" severity="success"></p-button>
@@ -644,7 +641,7 @@
                   <div class="field-group full-width">
                     <span>{{ field.label }} @if (isEmbeddable(field.controlName, book)) { <i class="pi pi-file-export embeddable-indicator" [pTooltip]="t('writtenToFileTooltip')" tooltipPosition="top"></i> }</span>
                     <div class="field-with-lock description-with-lock">
-                      <textarea pTextarea [formControlName]="field.controlName" rows="4"></textarea>
+                      <textarea pTextarea [formControlName]="field.controlName" rows="4" [attr.aria-label]="field.label"></textarea>
                       @if (!metadataForm.get(field.lockedKey)?.value) {
                         <p-button size="small" icon="pi pi-lock-open" [outlined]="true" (onClick)="toggleLock(field.controlName)" severity="success"></p-button>
                       }
@@ -662,16 +659,15 @@
 
       <!-- Provider Metadata Section (collapsible) -->
       <div class="collapsible-section" [class.expanded]="providerSectionExpanded">
-        <div
-          class="collapsible-header"
-          role="button"
-          tabindex="0"
-          (click)="providerSectionExpanded = !providerSectionExpanded"
-          (keydown.enter)="providerSectionExpanded = !providerSectionExpanded">
+        <button
+          type="button"
+          class="collapsible-header w-full"
+          [attr.aria-expanded]="providerSectionExpanded"
+          (click)="providerSectionExpanded = !providerSectionExpanded">
           <i class="pi pi-database"></i>
           <span>{{ t('providerMetadata') }}</span>
           <i [class]="providerSectionExpanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" class="section-toggle"></i>
-        </div>
+        </button>
         @if (providerSectionExpanded) {
           <div class="collapsible-content">
             <div class="field-row metadata-ids-row">

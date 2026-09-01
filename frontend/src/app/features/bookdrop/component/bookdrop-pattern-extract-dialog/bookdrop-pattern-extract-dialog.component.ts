@@ -128,7 +128,7 @@ export class BookdropPatternExtractDialogComponent implements OnInit {
   }
 
   private removeExistingPlaceholder(pattern: string, placeholderName: string): string {
-    const existingPlaceholderRegex = new RegExp(`\\{${placeholderName}(?::[^}]*)?\\}`, 'g');
+    const existingPlaceholderRegex = new RegExp(String.raw`\{${placeholderName}(?::[^}]*)?\}`, 'g');
     return pattern.replace(existingPlaceholderRegex, '');
   }
 
@@ -136,7 +136,7 @@ export class BookdropPatternExtractDialogComponent implements OnInit {
     let cursorPosition = inputElement.selectionStart ?? modifiedPattern.length;
 
     if (originalPattern !== modifiedPattern) {
-      const existingPlaceholderRegex = new RegExp(`\\{\\w+(?::[^}]*)?\\}`, 'g');
+      const existingPlaceholderRegex = /\{\w+(?::[^}]*)?\}/g;
       const matchBefore = originalPattern.substring(0, cursorPosition).match(existingPlaceholderRegex);
       if (matchBefore) {
         cursorPosition -= matchBefore.reduce((sum, match) => sum + match.length, 0);
@@ -246,7 +246,7 @@ export class BookdropPatternExtractDialogComponent implements OnInit {
     if (!this.patternForm.valid || !pattern) {
       return false;
     }
-    const placeholderRegex = /\{[a-zA-Z0-9_]+(?::[^{}]+)?\}|\*/;
+    const placeholderRegex = /\{\w+(?::[^{}]+)?\}|\*/;
     return placeholderRegex.test(pattern);
   }
 

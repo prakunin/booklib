@@ -104,17 +104,15 @@
 
   @if (!bottomBarHidden()) {
     <div class="book-title-container">
-      <div class="read-status-indicator"
-           [ngClass]="readStatusClass()"
-           [pTooltip]="readStatusTooltip()"
-           tooltipPosition="bottom"
-           (click)="toggleReadStatusMenu($event, readStatusMenu)"
-           (keydown.enter)="toggleReadStatusMenu($event, readStatusMenu)"
-           role="button"
-           tabindex="0"
-           [attr.aria-label]="'book.card.alt.readStatusMenu' | transloco">
+      <button type="button"
+              class="read-status-indicator"
+              [ngClass]="readStatusClass()"
+              [pTooltip]="readStatusTooltip()"
+              tooltipPosition="bottom"
+              (click)="toggleReadStatusMenu($event, readStatusMenu)"
+              [attr.aria-label]="'book.card.alt.readStatusMenu' | transloco">
         <i [class]="readStatusIcon()" style="font-size: 0.9rem"></i>
-      </div>
+      </button>
       <p-tieredmenu #readStatusMenu [model]="readStatusMenuItems()" [popup]="true" appendTo="body"></p-tieredmenu>
       <h4 class="book-title"
           tooltipPosition="bottom"

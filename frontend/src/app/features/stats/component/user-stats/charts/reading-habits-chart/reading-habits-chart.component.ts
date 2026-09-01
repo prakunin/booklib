@@ -474,7 +474,12 @@ export class ReadingHabitsChartComponent {
   }
 
   private getHabitDescription(habitKey: string, score: number): string {
-    const level = score < 33 ? 'low' : score < 67 ? 'mid' : 'high';
+    let level = 'high';
+    if (score < 33) {
+      level = 'low';
+    } else if (score < 67) {
+      level = 'mid';
+    }
     return this.t.translate(`statsUser.readingHabits.descriptions.${habitKey}.${level}`);
   }
 

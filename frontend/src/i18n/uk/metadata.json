@@ -21,6 +21,7 @@
         "audio": "Аудіо"
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "ebookCover": "Обкладинка ebook",
         "audiobookCover": "Обкладинка аудіокниги",
         "regenerateCoverTooltip": "Оновити обкладинку (з файлу)",
@@ -135,6 +136,7 @@
         "writtenToFileTooltip": "Це поле записується у фізичний файл"
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "loadingMetadata": "Завантаження повних метаданих...",
         "columnCurrent": "Поточні",
         "columnFetched": "Отримані",
@@ -234,6 +236,9 @@
         "fileName": "Файл"
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "metadataLocked": "Метадані цієї книги заблоковано.",
         "metadataUnlocked": "Метадані цієї книги розблоковано.",
         "genresLabel": "Жанри:",

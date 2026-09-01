@@ -113,11 +113,14 @@ export class ReadingSurvivalChartComponent {
     const completionRate = Math.round(survivalValues.at(-1)!);
 
     const medianIdx = survivalValues.findIndex(v => v < 50);
-    const medianDropout = medianIdx === -1
-      ? '100%+'
-      : medianIdx === 0
-        ? `${THRESHOLDS[0]}%`
-        : `${THRESHOLDS[medianIdx - 1]}-${THRESHOLDS[medianIdx]}%`;
+    let medianDropout: string;
+    if (medianIdx === -1) {
+      medianDropout = '100%+';
+    } else if (medianIdx === 0) {
+      medianDropout = `${THRESHOLDS[0]}%`;
+    } else {
+      medianDropout = `${THRESHOLDS[medianIdx - 1]}-${THRESHOLDS[medianIdx]}%`;
+    }
 
     let maxDrop = 0;
     let dangerIdx = 0;

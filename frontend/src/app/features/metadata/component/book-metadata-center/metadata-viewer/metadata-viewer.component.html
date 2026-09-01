@@ -123,10 +123,10 @@
               <p class="authors">
                 @for (author of book?.metadata!.authors; track $index; let isLast = $last; let isFirst = $first) {
                   @if (isFirst && book!.metadata!.authors!.length > 1) {
-                    <a class="author-link" role="button" tabindex="0" (click)="goToAuthorBooks(author)" (keydown.enter)="goToAuthorBooks(author)">{{ author }}</a>
+                    <button type="button" class="author-link" (click)="goToAuthorBooks(author)">{{ author }}</button>
                     <span class="first-author-badge">{{ t('firstAuthorBadge') }}</span>
                   } @else {
-                    <a class="author-link" role="button" tabindex="0" (click)="goToAuthorBooks(author)" (keydown.enter)="goToAuthorBooks(author)">{{ author }}</a>
+                    <button type="button" class="author-link" (click)="goToAuthorBooks(author)">{{ author }}</button>
                   }
                   @if (!isLast) {
                     <span class="author-separator">, </span>
@@ -137,22 +137,22 @@
 
             <div class="formats-inline">
               @if (getDisplayFormat(book?.primaryFile); as displayFormat) {
-                <span class="format-tag-wrapper primary-format" role="button" tabindex="0" (click)="goToFileType(book?.primaryFile?.filePath)" (keydown.enter)="goToFileType(book?.primaryFile?.filePath)" [pTooltip]="book?.primaryFile?.fileName ?? ''" tooltipPosition="top">
+                <button type="button" class="format-tag-wrapper primary-format" (click)="goToFileType(book?.primaryFile?.filePath)" [pTooltip]="book?.primaryFile?.fileName ?? ''" tooltipPosition="top">
                   <app-tag size="3xs" variant="pill" [customBgColor]="getFileTypeBgColor(displayFormat)" customTextColor="#fff">
                     {{ displayFormat }}
                   </app-tag>
                   <span class="format-badge">{{ t('primaryBadge') }}</span>
-                </span>
+                </button>
               }
               @if (getDisplayFormat(book?.primaryFile) && getUniqueAlternativeFormats(book).length > 0) {
                 <span class="format-pipe">|</span>
               }
               @for (formatExt of getUniqueAlternativeFormats(book); track formatExt) {
-                <span class="format-tag-wrapper" role="button" tabindex="0" (click)="goToFileType('.' + formatExt)" (keydown.enter)="goToFileType('.' + formatExt)" [pTooltip]="formatExt" tooltipPosition="top">
+                <button type="button" class="format-tag-wrapper" (click)="goToFileType('.' + formatExt)" [pTooltip]="formatExt" tooltipPosition="top">
                   <app-tag size="3xs" variant="pill" [customBgColor]="getFileTypeBgColor(formatExt)" customTextColor="#fff">
                     {{ formatExt }}
                   </app-tag>
-                </span>
+                </button>
               }
               @if (book?.isPhysical) {
                 <app-tag size="3xs" variant="pill" [customBgColor]="'var(--book-type-physical-color)'" customTextColor="#fff">{{ t('physicalBadge') }}</app-tag>
@@ -316,9 +316,9 @@
                 <div class="tag-scroll">
                   <div class="tag-container">
                     @for (category of book.metadata!.categories; track category) {
-                      <a role="button" tabindex="0" (click)="goToCategory(category)" (keydown.enter)="goToCategory(category)" class="tag-clickable">
+                      <button type="button" class="tag-clickable" (click)="goToCategory(category)">
                         <app-tag color="red" size="xs">{{ category }}</app-tag>
-                      </a>
+                      </button>
                     }
                   </div>
                 </div>
@@ -331,9 +331,9 @@
                 <div class="tag-scroll">
                   <div class="tag-container">
                     @for (mood of book.metadata!.moods; track mood) {
-                      <a role="button" tabindex="0" (click)="goToMood(mood)" (keydown.enter)="goToMood(mood)" class="tag-clickable">
+                      <button type="button" class="tag-clickable" (click)="goToMood(mood)">
                         <app-tag color="indigo" size="xs">{{ mood }}</app-tag>
-                      </a>
+                      </button>
                     }
                   </div>
                 </div>
@@ -346,9 +346,9 @@
                 <div class="tag-scroll">
                   <div class="tag-container">
                     @for (tag of book.metadata!.tags; track tag) {
-                      <a role="button" tabindex="0" (click)="goToTag(tag)" (keydown.enter)="goToTag(tag)" class="tag-clickable">
+                      <button type="button" class="tag-clickable" (click)="goToTag(tag)">
                         <app-tag color="green" size="xs">{{ tag }}</app-tag>
-                      </a>
+                      </button>
                     }
                   </div>
                 </div>
@@ -360,9 +360,9 @@
             <div class="metadata-item">
               <span class="metadata-key">{{ t('libraryLabel') }}</span>
               @if (book?.libraryName) {
-                <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToLibrary(book.libraryId!)" (keydown.enter)="goToLibrary(book.libraryId!)">
+                <button type="button" class="metadata-value metadata-link text-start" (click)="goToLibrary(book.libraryId!)">
                   {{ book?.libraryName }}
-                </span>
+                </button>
               } @else {
                 <span class="metadata-value">-</span>
               }
@@ -373,9 +373,9 @@
                 <span class="metadata-key">{{ t('shelvesLabel') }}</span>
                 <div class="metadata-value-group">
                   @for (shelf of book.shelves; track shelf.id; let isLast = $last) {
-                    <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToShelf(shelf.id!)" (keydown.enter)="goToShelf(shelf.id!)">
+                    <button type="button" class="metadata-value metadata-link text-start" (click)="goToShelf(shelf.id!)">
                       {{ shelf.name }}
-                    </span>
+                    </button>
                     @if (!isLast) {
                       <span class="separator">, </span>
                     }
@@ -387,9 +387,9 @@
             <div class="metadata-item">
               <span class="metadata-key">{{ t('publisherLabel') }}</span>
               @if (book?.metadata?.publisher) {
-                <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToPublisher(book?.metadata?.publisher!)" (keydown.enter)="goToPublisher(book?.metadata?.publisher!)">
+                <button type="button" class="metadata-value metadata-link text-start" (click)="goToPublisher(book?.metadata?.publisher!)">
                   {{ book?.metadata?.publisher }}
-                </span>
+                </button>
               } @else {
                 <span class="metadata-value">-</span>
               }
@@ -398,9 +398,9 @@
             <div class="metadata-item">
               <span class="metadata-key">{{ t('publishedLabel') }}</span>
               @if (book?.metadata!.publishedDate) {
-                <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToPublishedYear(book?.metadata!.publishedDate!)" (keydown.enter)="goToPublishedYear(book?.metadata!.publishedDate!)">
+                <button type="button" class="metadata-value metadata-link text-start" (click)="goToPublishedYear(book?.metadata!.publishedDate!)">
                   {{ book?.metadata!.publishedDate }}
-                </span>
+                </button>
               } @else {
                 <span class="metadata-value">-</span>
               }
@@ -409,9 +409,9 @@
             <div class="metadata-item">
               <span class="metadata-key">{{ t('languageLabel') }}</span>
               @if (book?.metadata!.language) {
-                <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToLanguage(book?.metadata!.language!)" (keydown.enter)="goToLanguage(book?.metadata!.language!)">
+                <button type="button" class="metadata-value metadata-link text-start" (click)="goToLanguage(book?.metadata!.language!)">
                   {{ book?.metadata!.language }}
-                </span>
+                </button>
               } @else {
                 <span class="metadata-value">-</span>
               }
@@ -441,11 +441,11 @@
             <div class="metadata-item">
               <span class="metadata-key">{{ t('metadataMatchLabel') }}</span>
               @if (book?.metadataMatchScore !== null && book?.metadataMatchScore !== undefined) {
-                <span role="button" tabindex="0" (click)="goToMatchScoreRange(book?.metadataMatchScore!)" (keydown.enter)="goToMatchScoreRange(book?.metadataMatchScore!)" style="cursor: pointer;">
+                <button type="button" class="text-start" (click)="goToMatchScoreRange(book?.metadataMatchScore!)" style="cursor: pointer;">
                   <app-tag size="3xs" variant="pill" [color]="getMatchScoreColor(book?.metadataMatchScore!)">
                     {{ (book?.metadataMatchScore!) | number:'1.0-0' }}%
                   </app-tag>
-                </span>
+                </button>
               } @else {
                 <span class="metadata-value">-</span>
               }
@@ -469,12 +469,12 @@
             <div class="metadata-item">
               <span class="metadata-key">{{ t('readStatusLabel') }}</span>
               <span class="metadata-value-group">
-                <span role="button" tabindex="0" (click)="goToReadStatus(selectedReadStatus)" (keydown.enter)="goToReadStatus(selectedReadStatus)" style="cursor: pointer;">
+                <button type="button" (click)="goToReadStatus(selectedReadStatus)" style="cursor: pointer;">
                   <app-tag size="3xs" variant="pill" [color]="getStatusColor(selectedReadStatus)">
                     {{ getStatusLabel(selectedReadStatus) }}
                   </app-tag>
-                </span>
-                <i class="pi pi-pencil edit-icon" role="button" tabindex="0" (click)="menu.toggle($event)" (keydown.enter)="menu.toggle($event)"></i>
+                </button>
+                <button type="button" class="pi pi-pencil edit-icon" [attr.aria-label]="t('editReadStatus')" (click)="menu.toggle($event)"></button>
                 <p-menu #menu [popup]="true" appendTo="body" [model]="readStatusMenuItems"></p-menu>
               </span>
             </div>
@@ -528,7 +528,7 @@
                   @if (!isEditingDateFinished) {
                     <span class="metadata-value-group">
                       <span class="metadata-value">{{ formatDate(book.dateFinished) }}</span>
-                      <i class="pi pi-pencil edit-icon" role="button" tabindex="0" (click)="toggleDateFinishedEdit(book)" (keydown.enter)="toggleDateFinishedEdit(book)"></i>
+                      <button type="button" class="pi pi-pencil edit-icon" [attr.aria-label]="t('editDateFinished')" (click)="toggleDateFinishedEdit(book)"></button>
                     </span>
                   } @else {
                     <span class="metadata-value-group">
@@ -552,9 +552,9 @@
             <div class="metadata-item">
               <span class="metadata-key">{{ t('pageCountLabel') }}</span>
               @if (book?.metadata!.pageCount) {
-                <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToPageCountRange(book?.metadata!.pageCount!)" (keydown.enter)="goToPageCountRange(book?.metadata!.pageCount!)">
+                <button type="button" class="metadata-value metadata-link text-start" (click)="goToPageCountRange(book?.metadata!.pageCount!)">
                   {{ book?.metadata!.pageCount }}
-                </span>
+                </button>
               } @else {
                 <span class="metadata-value">-</span>
               }
@@ -563,9 +563,9 @@
             <div class="metadata-item">
               <span class="metadata-key">{{ t('ageRatingLabel') }}</span>
               @if (book?.metadata?.ageRating !== null && book?.metadata?.ageRating !== undefined) {
-                <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToAgeRating(book?.metadata?.ageRating!)" (keydown.enter)="goToAgeRating(book?.metadata?.ageRating!)">
+                <button type="button" class="metadata-value metadata-link text-start" (click)="goToAgeRating(book?.metadata?.ageRating!)">
                   {{ getAgeRatingLabel(book?.metadata?.ageRating) }}
-                </span>
+                </button>
               } @else {
                 <span class="metadata-value">-</span>
               }
@@ -574,9 +574,9 @@
             <div class="metadata-item">
               <span class="metadata-key">{{ t('contentRatingLabel') }}</span>
               @if (book?.metadata?.contentRating) {
-                <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToContentRating(book?.metadata?.contentRating!)" (keydown.enter)="goToContentRating(book?.metadata?.contentRating!)">
+                <button type="button" class="metadata-value metadata-link text-start" (click)="goToContentRating(book?.metadata?.contentRating!)">
                   {{ getContentRatingLabel(book?.metadata?.contentRating) }}
-                </span>
+                </button>
               } @else {
                 <span class="metadata-value">-</span>
               }
@@ -587,9 +587,9 @@
               @if (book.metadata?.narrator) {
                 <div class="metadata-item">
                   <span class="metadata-key">{{ t('audiobookNarrator') }}</span>
-                  <a class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToNarrator(book.metadata!.narrator!)" (keydown.enter)="goToNarrator(book.metadata!.narrator!)">
+                  <button type="button" class="metadata-value metadata-link text-start" (click)="goToNarrator(book.metadata!.narrator!)">
                     {{ book.metadata?.narrator }}
-                  </a>
+                  </button>
                 </div>
               }
               @if (audio.durationSeconds) {
@@ -616,9 +616,9 @@
               <div class="metadata-item">
                 <span class="metadata-key">{{ t('fileSizeLabel') }}</span>
                 @if (book?.primaryFile?.fileSizeKb) {
-                  <span class="metadata-value metadata-link" role="button" tabindex="0" (click)="goToFileSizeRange(book?.primaryFile?.fileSizeKb!)" (keydown.enter)="goToFileSizeRange(book?.primaryFile?.fileSizeKb!)">
+                  <button type="button" class="metadata-value metadata-link text-start" (click)="goToFileSizeRange(book?.primaryFile?.fileSizeKb!)">
                     {{ formatFileSize(book?.primaryFile) }}
-                  </span>
+                  </button>
                 } @else {
                   <span class="metadata-value">-</span>
                 }
@@ -629,7 +629,7 @@
           @if (hasDigitalFile(book)) {
             <div class="file-path-section">
               <span class="metadata-key">{{ t('filePathLabel') }}</span>
-              <i class="pi eye-icon" role="button" tabindex="0" [ngClass]="showFilePath ? 'pi-eye-slash' : 'pi-eye'" (click)="showFilePath = !showFilePath" (keydown.enter)="showFilePath = !showFilePath"></i>
+              <button type="button" class="pi eye-icon" [ngClass]="showFilePath ? 'pi-eye-slash' : 'pi-eye'" [attr.aria-label]="t('toggleFilePath')" [attr.aria-expanded]="showFilePath" (click)="showFilePath = !showFilePath"></button>
               @if (showFilePath) {
                 <code class="file-path-code">{{ book?.primaryFile?.filePath }}</code>
               }
@@ -719,7 +719,7 @@
                   }
                 }
                 @if (otherItems().length > 0) {
-                  <p-button icon="pi pi-ellipsis-v" severity="info" outlined (click)="entitymenu.toggle($event)"></p-button>
+                  <p-button icon="pi pi-ellipsis-v" severity="info" outlined (onClick)="entitymenu.toggle($event)"></p-button>
                   <p-tieredMenu #entitymenu [model]="otherItems()" [popup]="true" appendTo="body"></p-tieredMenu>
                 }
               </div>
@@ -749,13 +749,13 @@
 
     @if (isComicBook(book) && hasComicMetadata(book)) {
       <div class="comic-metadata-section">
-        <div class="section-header clickable" role="button" tabindex="0" (click)="isComicSectionExpanded = !isComicSectionExpanded" (keydown.enter)="isComicSectionExpanded = !isComicSectionExpanded">
-          <div class="section-header-left">
+        <button type="button" class="section-header clickable w-full" [attr.aria-expanded]="isComicSectionExpanded" (click)="isComicSectionExpanded = !isComicSectionExpanded">
+          <span class="section-header-left">
             <i class="pi pi-images"></i>
             <span>{{ t('comicDetailsTitle') }}</span>
-          </div>
+          </span>
           <i class="pi section-toggle-icon" [ngClass]="isComicSectionExpanded ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
-        </div>
+        </button>
 
         <div class="comic-metadata-content" [ngClass]="{'collapsed': !isComicSectionExpanded}">
           @let comic = book.metadata!.comicMetadata!;
@@ -826,7 +826,7 @@
                     <span class="comic-creator-role">{{ t('pencillers') }}</span>
                     <div class="comic-creator-names">
                       @for (name of comic.pencillers; track name) {
-                        <a class="comic-creator-link" role="button" tabindex="0" (click)="goToCreator(name, 'penciller')" (keydown.enter)="goToCreator(name, 'penciller')">{{ name }}</a>
+                        <button type="button" class="comic-creator-link" (click)="goToCreator(name, 'penciller')">{{ name }}</button>
                       }
                     </div>
                   </div>
@@ -836,7 +836,7 @@
                     <span class="comic-creator-role">{{ t('inkers') }}</span>
                     <div class="comic-creator-names">
                       @for (name of comic.inkers; track name) {
-                        <a class="comic-creator-link" role="button" tabindex="0" (click)="goToCreator(name, 'inker')" (keydown.enter)="goToCreator(name, 'inker')">{{ name }}</a>
+                        <button type="button" class="comic-creator-link" (click)="goToCreator(name, 'inker')">{{ name }}</button>
                       }
                     </div>
                   </div>
@@ -846,7 +846,7 @@
                     <span class="comic-creator-role">{{ t('colorists') }}</span>
                     <div class="comic-creator-names">
                       @for (name of comic.colorists; track name) {
-                        <a class="comic-creator-link" role="button" tabindex="0" (click)="goToCreator(name, 'colorist')" (keydown.enter)="goToCreator(name, 'colorist')">{{ name }}</a>
+                        <button type="button" class="comic-creator-link" (click)="goToCreator(name, 'colorist')">{{ name }}</button>
                       }
                     </div>
                   </div>
@@ -856,7 +856,7 @@
                     <span class="comic-creator-role">{{ t('letterers') }}</span>
                     <div class="comic-creator-names">
                       @for (name of comic.letterers; track name) {
-                        <a class="comic-creator-link" role="button" tabindex="0" (click)="goToCreator(name, 'letterer')" (keydown.enter)="goToCreator(name, 'letterer')">{{ name }}</a>
+                        <button type="button" class="comic-creator-link" (click)="goToCreator(name, 'letterer')">{{ name }}</button>
                       }
                     </div>
                   </div>
@@ -866,7 +866,7 @@
                     <span class="comic-creator-role">{{ t('coverArtists') }}</span>
                     <div class="comic-creator-names">
                       @for (name of comic.coverArtists; track name) {
-                        <a class="comic-creator-link" role="button" tabindex="0" (click)="goToCreator(name, 'coverArtist')" (keydown.enter)="goToCreator(name, 'coverArtist')">{{ name }}</a>
+                        <button type="button" class="comic-creator-link" (click)="goToCreator(name, 'coverArtist')">{{ name }}</button>
                       }
                     </div>
                   </div>
@@ -876,7 +876,7 @@
                     <span class="comic-creator-role">{{ t('editors') }}</span>
                     <div class="comic-creator-names">
                       @for (name of comic.editors; track name) {
-                        <a class="comic-creator-link" role="button" tabindex="0" (click)="goToCreator(name, 'editor')" (keydown.enter)="goToCreator(name, 'editor')">{{ name }}</a>
+                        <button type="button" class="comic-creator-link" (click)="goToCreator(name, 'editor')">{{ name }}</button>
                       }
                     </div>
                   </div>
@@ -897,9 +897,9 @@
                     <span class="comic-tag-label">{{ t('characters') }}</span>
                     <div class="comic-tag-list">
                       @for (character of comic.characters; track character) {
-                        <a class="comic-tag-clickable" role="button" tabindex="0" (click)="goToCharacter(character)" (keydown.enter)="goToCharacter(character)">
+                        <button type="button" class="comic-tag-clickable" (click)="goToCharacter(character)">
                           <app-tag color="cyan" size="xs">{{ character }}</app-tag>
-                        </a>
+                        </button>
                       }
                     </div>
                   </div>
@@ -909,9 +909,9 @@
                     <span class="comic-tag-label">{{ t('teams') }}</span>
                     <div class="comic-tag-list">
                       @for (team of comic.teams; track team) {
-                        <a class="comic-tag-clickable" role="button" tabindex="0" (click)="goToTeam(team)" (keydown.enter)="goToTeam(team)">
+                        <button type="button" class="comic-tag-clickable" (click)="goToTeam(team)">
                           <app-tag color="violet" size="xs">{{ team }}</app-tag>
-                        </a>
+                        </button>
                       }
                     </div>
                   </div>
@@ -921,9 +921,9 @@
                     <span class="comic-tag-label">{{ t('locations') }}</span>
                     <div class="comic-tag-list">
                       @for (location of comic.locations; track location) {
-                        <a class="comic-tag-clickable" role="button" tabindex="0" (click)="goToLocation(location)" (keydown.enter)="goToLocation(location)">
+                        <button type="button" class="comic-tag-clickable" (click)="goToLocation(location)">
                           <app-tag color="amber" size="xs">{{ location }}</app-tag>
-                        </a>
+                        </button>
                       }
                     </div>
                   </div>

@@ -49,12 +49,10 @@
                     @if (allAuthors(); as authors) {
                       <p class="series-authors">
                         @for (author of authors; track $index; let isLast = $last) {
-                          <a
+                          <button
+                            type="button"
                             class="author-link"
-                            role="button"
-                            tabindex="0"
-                            (click)="goToAuthorBooks(author)"
-                            (keydown.enter)="goToAuthorBooks(author)">{{ author }}</a>
+                            (click)="goToAuthorBooks(author)">{{ author }}</button>
                           @if (!isLast) {<span>, </span>}
                         }
                       </p>
@@ -65,14 +63,12 @@
                         <div class="categories-scroll">
                           <div class="categories-list">
                             @for (category of categories; track category) {
-                              <a
+                              <button
+                                type="button"
                                 class="category-link"
-                                role="button"
-                                tabindex="0"
-                                (click)="goToCategory(category)"
-                                (keydown.enter)="goToCategory(category)">
+                                (click)="goToCategory(category)">
                                 <app-tag color="red" size="xs">{{ category }}</app-tag>
-                              </a>
+                              </button>
                             }
                           </div>
                         </div>
@@ -82,17 +78,15 @@
                     <div class="metadata-cards">
                       @if (allPublishers(); as publishers) {
                         @if (publishers.length) {
-                          <span
+                          <button
+                            type="button"
                             class="meta-card meta-card-publisher"
-                            role="button"
-                            tabindex="0"
-                            (click)="goToPublisher(publishers[0])"
-                            (keydown.enter)="goToPublisher(publishers[0])">
+                            (click)="goToPublisher(publishers[0])">
                             <i class="pi pi-building"></i>
                             @for (pub of publishers; track pub; let isLast = $last) {
                               {{ pub }}{{ isLast ? '' : ', ' }}
                             }
-                          </span>
+                          </button>
                         }
                       }
                       <span class="meta-card meta-card-books">
@@ -182,12 +176,10 @@
                     <!-- Next Up + Progress (pushed to bottom, aligned with cover) -->
                     <div class="hero-status">
                       @if (nextUp(); as nextUp) {
-                        <div
-                          class="next-up-card"
-                          role="button"
-                          tabindex="0"
-                          (click)="readBook(nextUp.book.id)"
-                          (keydown.enter)="readBook(nextUp.book.id)">
+                        <button
+                          type="button"
+                          class="next-up-card text-start"
+                          (click)="readBook(nextUp.book.id)">
                           <app-cover
                             class="next-up-thumb"
                             aria-hidden="true"
@@ -196,24 +188,24 @@
                             [authors]="nextUp.book.metadata?.authors ?? []"
                             size="sm"
                             loading="lazy" />
-                          <div class="next-up-info">
+                          <span class="next-up-info">
                             <span class="next-up-label">
                               <i class="pi pi-bookmark-fill"></i>
                               {{ nextUp.isReading ? t('continueReading') : t('nextUp') }}
                             </span>
                             <span class="next-up-title">{{ nextUp.book.metadata?.title || '' }}</span>
                             @if (nextUp.isReading && nextUp.progressPercent !== null && nextUp.progressPercent !== undefined) {
-                              <div class="next-up-progress-row">
+                              <span class="next-up-progress-row">
                                 <p-progressBar
                                   [value]="nextUp.progressPercent"
                                   [showValue]="false"
                                   class="next-up-progress">
                                 </p-progressBar>
                                 <span class="next-up-percent">{{ nextUp.progressPercent }}%</span>
-                              </div>
+                              </span>
                             }
-                          </div>
-                        </div>
+                          </span>
+                        </button>
                       }
 
                       @if (readStatusBreakdown(); as segments) {
@@ -413,7 +405,7 @@
                 @if (hasMetadataMenuItems) {
                   <p-tieredMenu #metadataMenu [model]="metadataMenuItems()" [popup]="true" appendTo="body"/>
                   <p-button
-                    (click)="metadataMenu.toggle($event)"
+                    (onClick)="metadataMenu.toggle($event)"
                     [pTooltip]="t('tooltip.metadataActions')"
                     tooltipPosition="top"
                     outlined="true"
@@ -434,7 +426,7 @@
                     outlined="true"
                     icon="pi pi-lock"
                     severity="info"
-                  (click)="lockUnlockMetadata()"
+                  (onClick)="lockUnlockMetadata()"
                   [pTooltip]="t('tooltip.lockUnlockMetadata')"
                   tooltipPosition="top">
                   </p-button>
@@ -444,7 +436,7 @@
                     outlined="true"
                     icon="pi pi-arrows-h"
                     severity="info"
-                    (click)="moveFiles()"
+                    (onClick)="moveFiles()"
                     [pTooltip]="t('tooltip.organizeFiles')"
                     tooltipPosition="top">
                   </p-button>
@@ -452,7 +444,7 @@
                 @if (hasMoreActionsItems) {
                   <div class="more-actions-wrapper">
                     <p-button
-                      (click)="moreActionsMenu.toggle($event)"
+                      (onClick)="moreActionsMenu.toggle($event)"
                       [pTooltip]="t('tooltip.moreActions')"
                       tooltipPosition="top"
                       outlined="true"
@@ -469,7 +461,7 @@
                 outlined="true"
                 icon="pi pi-check-square"
                 severity="success"
-                (click)="selectAllBooks()"
+                (onClick)="selectAllBooks()"
                 [pTooltip]="t('tooltip.selectAll')"
                 tooltipPosition="top">
               </p-button>
@@ -477,7 +469,7 @@
                 outlined="true"
                 icon="pi pi-times"
                 severity="warn"
-                (click)="deselectAllBooks()"
+                (onClick)="deselectAllBooks()"
                 [pTooltip]="t('tooltip.deselectAll')"
                 tooltipPosition="top">
               </p-button>
@@ -488,7 +480,7 @@
                 outlined="true"
                 icon="pi pi-trash"
                 severity="danger"
-                (click)="confirmDeleteBooks()"
+                (onClick)="confirmDeleteBooks()"
                 [pTooltip]="t('tooltip.deleteSelected')"
                 tooltipPosition="top">
               </p-button>

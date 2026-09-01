@@ -274,6 +274,7 @@
         "errorDetailDefault": "Kunde inte spara magisk hylla."
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "Importera",
         "placeholder": "{\n  \"type\": \"group\",\n  \"join\": \"and\",\n  \"rules\": [\n    { \"field\": \"readStatus\", \"operator\": \"equals\", \"value\": \"READING\" }\n  ]\n}",
         "apply": "Tillämpa",

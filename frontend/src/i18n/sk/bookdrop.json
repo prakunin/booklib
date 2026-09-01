@@ -165,6 +165,7 @@
         "finalizeTooltip": ""
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "noCoverImage": "",
         "confirmResetHeader": "",
         "coverImageNotFound": "",

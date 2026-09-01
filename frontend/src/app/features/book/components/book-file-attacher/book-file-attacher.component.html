@@ -8,7 +8,7 @@
         <h2 class="panel-title">{{ isBulkMode ? t('titleBulk') : t('title') }}</h2>
         <p class="panel-description">{{ isBulkMode ? t('descriptionBulk') : t('description') }}</p>
       </div>
-      <p-button icon="pi pi-times" [rounded]="true" [text]="true" severity="secondary" (click)="closeDialog()"
+      <p-button icon="pi pi-times" [rounded]="true" [text]="true" severity="secondary" (onClick)="closeDialog()"
         class="close-button">
       </p-button>
     </div>
@@ -83,10 +83,10 @@
 
       <!-- Action Buttons -->
       <div class="action-buttons">
-        <p-button [label]="'common.cancel' | transloco" [outlined]="true" severity="secondary" (click)="closeDialog()"
+        <p-button [label]="'common.cancel' | transloco" [outlined]="true" severity="secondary" (onClick)="closeDialog()"
           [disabled]="isAttaching">
         </p-button>
-        <p-button [label]="isBulkMode ? t('attachFilesBulk') : t('attachFile')" icon="pi pi-link" (click)="attach()"
+        <p-button [label]="isBulkMode ? t('attachFilesBulk') : t('attachFile')" icon="pi pi-link" (onClick)="attach()"
           [disabled]="!canAttach()" [loading]="isAttaching">
         </p-button>
       </div>

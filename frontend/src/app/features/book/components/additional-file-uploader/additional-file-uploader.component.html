@@ -13,7 +13,7 @@
       [rounded]="true"
       [text]="true"
       severity="secondary"
-      (click)="closeDialog()"
+      (onClick)="closeDialog()"
       class="close-button">
     </p-button>
   </div>
@@ -81,7 +81,7 @@
                       @case ('Pending') {
                         <p-button
                           icon="pi pi-times"
-                          (click)="onRemoveTemplatingFile($event, uploadFile.file, removeFileCallback, i)"
+                          (onClick)="onRemoveTemplatingFile($event, uploadFile.file, removeFileCallback, i)"
                           severity="danger"
                           [text]="true"/>
                       }

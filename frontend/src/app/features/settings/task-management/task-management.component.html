@@ -196,6 +196,7 @@
                             [(ngModel)]="editingCronExpression"
                             (ngModelChange)="onCronExpressionChange()"
                             [placeholder]="t('cron.placeholder')"
+                            [attr.aria-label]="t('cron.placeholder')"
                             (keyup.enter)="saveCronExpression(taskInfo.taskType)"
                             (keyup.escape)="cancelEditingCron()">
                           <p-button

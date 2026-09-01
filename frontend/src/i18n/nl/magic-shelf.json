@@ -241,6 +241,7 @@
         "shelfName": ""
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "",
         "successDetail": "",
         "structureError": "",

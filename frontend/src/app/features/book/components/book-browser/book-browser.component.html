@@ -33,7 +33,7 @@
                   icon="pi pi-ellipsis-v"
                   [rounded]="true"
                   [text]="true"
-                  (click)="entitymenu.toggle($event)">
+                  (onClick)="entitymenu.toggle($event)">
                 </p-button>
                 <p-menu #entitymenu [model]="entityOptions()" [popup]="true" appendTo="body"></p-menu>
               </div>
@@ -44,24 +44,24 @@
       <div class="toolbar-actions">
         <div class="toolbar-icons">
           @if (isFilterActive()) {
-            <a class="toolbar-item" role="button" tabindex="0" (click)="clearFilter()" (keydown.enter)="clearFilter()">
+            <button type="button" class="toolbar-item" [attr.aria-label]="t('tooltip.clearFilters')" (click)="clearFilter()">
               <i
                 class="pi pi-filter-slash filter-clear-icon"
                 [pTooltip]="t('tooltip.clearFilters')"
                 tooltipPosition="top">
               </i>
-            </a>
+            </button>
           }
 
           @if (currentViewMode() === 'table') {
             <div>
-              <a class="toolbar-item" role="button" tabindex="0" (click)="columnPopover.toggle($event)" (keydown.enter)="columnPopover.toggle($event)">
+              <button type="button" class="toolbar-item" [attr.aria-label]="t('tooltip.visibleColumns')" (click)="columnPopover.toggle($event)">
                 <i
                   class="pi pi-eye"
                   [pTooltip]="t('tooltip.visibleColumns')"
                   tooltipPosition="top">
                 </i>
-              </a>
+              </button>
               <p-popover #columnPopover [dismissable]="true" appendTo="body">
                 <div class="column-popover-content">
                   <p-multiSelect
@@ -82,29 +82,28 @@
                     [label]="t('labels.save')"
                     outlined
                     size="small"
-                    (click)="columnPreferenceService.saveVisibleColumns(visibleColumns())"></p-button>
+                    (onClick)="columnPreferenceService.saveVisibleColumns(visibleColumns())"></p-button>
                 </div>
               </p-popover>
             </div>
           }
-          <a class="toolbar-item" role="button" tabindex="0" (click)="toggleTableGrid()" (keydown.enter)="toggleTableGrid()">
+          <button type="button" class="toolbar-item" [attr.aria-label]="t('tooltip.toggleView')" (click)="toggleTableGrid()">
             <i
               [class]="viewIcon()"
               [pTooltip]="t('tooltip.toggleView')"
               tooltipPosition="top">
             </i>
-          </a>
+          </button>
           <div>
-            <a
+            <button
+              type="button"
               class="toolbar-item"
-              role="button"
-              tabindex="0"
+              [attr.aria-label]="'common.displaySettings' | transloco"
               (click)="seriesCollapseOverlay.toggle($event)"
-              (keydown.enter)="seriesCollapseOverlay.toggle($event)"
               [pTooltip]="'common.displaySettings' | transloco"
               tooltipPosition="top">
               <i class="pi pi-cog"></i>
-            </a>
+            </button>
             <p-popover
               #seriesCollapseOverlay
               [dismissable]="true"
@@ -133,7 +132,7 @@
           </div>
 
           <div class="sort-button-wrapper">
-            <a class="toolbar-item" role="button" tabindex="0" (click)="sortPopover.toggle($event)" (keydown.enter)="sortPopover.toggle($event)">
+            <button type="button" class="toolbar-item" [attr.aria-label]="t('tooltip.selectSorting')" (click)="sortPopover.toggle($event)">
               <i
                 class="pi pi-sort"
                 [pTooltip]="t('tooltip.selectSorting')"
@@ -142,7 +141,7 @@
               @if (sortCriteriaCount() > 1) {
                 <p-badge [value]="sortCriteriaCount().toString()" class="sort-badge"/>
               }
-            </a>
+            </button>
             <p-popover #sortPopover [dismissable]="true" appendTo="body">
               <app-multi-sort-popover
                 [sortCriteria]="this.bookSorter.selectedSortCriteria"
@@ -185,7 +184,7 @@
                 size="small"
                 [rounded]="true"
                 class="search-clear-btn"
-                (click)="clearSearch(); searchDropdown.hide()"
+                (onClick)="clearSearch(); searchDropdown.hide()"
               ></p-button>
             </div>
           </p-popover>
@@ -209,18 +208,18 @@
               size="small"
               [rounded]="true"
               class="search-clear-btn"
-              (click)="clearSearch()"
+              (onClick)="clearSearch()"
             ></p-button>
           }
         </div>
 
-        <a class="toolbar-item" role="button" tabindex="0" (click)="toggleSidebar()" (keydown.enter)="toggleSidebar()">
+        <button type="button" class="toolbar-item" [attr.aria-label]="t('tooltip.toggleSidebar')" (click)="toggleSidebar()">
           <i
             [ngClass]="showFilter() ? 'pi pi-filter-fill' : 'pi pi-filter'"
             [pTooltip]="t('tooltip.toggleSidebar')"
             tooltipPosition="top">
           </i>
-        </a>
+        </button>
       </div>
     </div>
 
@@ -319,7 +318,7 @@
                         @if (hasMetadataMenuItems()) {
                           <p-tieredMenu #menu [model]="metadataMenuItems" [popup]="true" appendTo="body" styleClass="footer-menu"/>
                           <p-button
-                            (click)="menu.toggle($event)"
+                            (onClick)="menu.toggle($event)"
                             [pTooltip]="t('tooltip.metadataActions')"
                             tooltipPosition="top"
                             outlined="true"
@@ -340,7 +339,7 @@
                             icon="pi pi-bookmark"
                             outlined="true"
                             severity="info"
-                            (click)="unshelfBooks()"
+                            (onClick)="unshelfBooks()"
                             [pTooltip]="t('tooltip.removeFromShelf')"
                             tooltipPosition="top">
                           </p-button>
@@ -350,7 +349,7 @@
                             outlined="true"
                             icon="pi pi-lock"
                             severity="info"
-                            (click)="lockUnlockMetadata()"
+                            (onClick)="lockUnlockMetadata()"
                             [pTooltip]="t('tooltip.lockUnlockMetadata')"
                             tooltipPosition="top">
                           </p-button>
@@ -360,7 +359,7 @@
                             outlined="true"
                             icon="pi pi-arrows-h"
                             severity="info"
-                            (click)="moveFiles()"
+                            (onClick)="moveFiles()"
                             [pTooltip]="t('tooltip.organizeFiles')"
                             tooltipPosition="top">
                           </p-button>
@@ -370,7 +369,7 @@
                             outlined="true"
                             icon="pi pi-link"
                             severity="info"
-                            (click)="attachFilesToBook()"
+                            (onClick)="attachFilesToBook()"
                             [disabled]="!canAttachFiles()"
                             [pTooltip]="t('tooltip.attachToBook')"
                             tooltipPosition="top">
@@ -379,7 +378,7 @@
                         @if (hasMoreActionsItems()) {
                           <div class="more-actions-wrapper">
                             <p-button
-                              (click)="menu.toggle($event)"
+                              (onClick)="menu.toggle($event)"
                               [pTooltip]="t('tooltip.moreActions')"
                               tooltipPosition="top"
                               outlined="true"
@@ -397,7 +396,7 @@
                         outlined="true"
                         icon="pi pi-check-square"
                         severity="success"
-                        (click)="selectAllBooks()"
+                        (onClick)="selectAllBooks()"
                         [pTooltip]="t('tooltip.selectAll')"
                         tooltipPosition="top">
                       </p-button>
@@ -405,7 +404,7 @@
                         outlined="true"
                         icon="pi pi-times"
                         severity="warn"
-                        (click)="deselectAllBooks()"
+                        (onClick)="deselectAllBooks()"
                         [pTooltip]="t('tooltip.deselectAll')"
                         tooltipPosition="top">
                       </p-button>
@@ -416,7 +415,7 @@
                         outlined="true"
                         icon="pi pi-trash"
                         severity="danger"
-                        (click)="confirmDeleteBooks()"
+                        (onClick)="confirmDeleteBooks()"
                         [pTooltip]="t('tooltip.deleteSelected')"
                         tooltipPosition="top">
                       </p-button>
@@ -430,13 +429,12 @@
       </div>
 
       @if (showFilter()) {
-        <div
-          class="mobile-filter-mask"
-          role="button"
-          tabindex="0"
-          (click)="toggleSidebar()"
-          (keydown.enter)="toggleSidebar()">
-        </div>
+        <button
+          type="button"
+          class="mobile-filter-mask block"
+          [attr.aria-label]="t('tooltip.toggleSidebar')"
+          (click)="toggleSidebar()">
+        </button>
       }
       <app-book-filter
         [showFilter]="showFilter()"

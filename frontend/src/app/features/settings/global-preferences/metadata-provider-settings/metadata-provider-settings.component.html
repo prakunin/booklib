@@ -42,6 +42,7 @@
                       type="text"
                       pInputText
                       [placeholder]="t('cookiePlaceholder')"
+                      [attr.aria-label]="t('cookieLabel')"
                       [(ngModel)]="amazonCookie"
                       class="config-input"/>
                   </div>
@@ -77,6 +78,7 @@
                     type="text"
                     pInputText
                     [placeholder]="t('googleApiPlaceholder')"
+                    [attr.aria-label]="t('googleApiLabel')"
                     [(ngModel)]="googleApiKey"
                     class="config-input"/>
                 </div>
@@ -101,6 +103,7 @@
                     type="text"
                     pInputText
                     [placeholder]="t('hardcoverPlaceholder')"
+                    [attr.aria-label]="t('apiToken')"
                     [(ngModel)]="hardcoverToken"
                     (ngModelChange)="onTokenChange($event)"
                     class="config-input"/>
@@ -121,6 +124,7 @@
                       type="text"
                       pInputText
                       [placeholder]="t('comicvinePlaceholder')"
+                      [attr.aria-label]="t('apiToken')"
                       [(ngModel)]="comicvineToken"
                       (ngModelChange)="onComicTokenChange($event)"
                       class="config-input"/>
@@ -197,7 +201,7 @@
         </div>
 
         <div class="setting-actions">
-          <p-button [label]="t('saveConfigurations')" icon="pi pi-save" severity="success" [outlined]="true" (click)="saveSettings()"></p-button>
+          <p-button [label]="t('saveConfigurations')" icon="pi pi-save" severity="success" [outlined]="true" (onClick)="saveSettings()"></p-button>
         </div>
       </div>
     </div>

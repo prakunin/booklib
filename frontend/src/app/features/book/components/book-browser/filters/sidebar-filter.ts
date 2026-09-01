@@ -1,5 +1,5 @@
 import {ageRatingRanges, fileSizeRanges, matchScoreRanges, pageCountRanges, ratingRanges} from '../book-filter/book-filter.config';
-import {Book, ReadStatus} from '../../../model/book.model';
+import {Book, ComicMetadata, ReadStatus} from '../../../model/book.model';
 import {BookFilterMode} from '../../../../settings/user-management/user.service';
 
 export function isRatingInRange(rating: number | undefined | null, rangeId: string | number): boolean {
@@ -54,6 +54,45 @@ export function doesBookMatchReadStatus(book: Book, selected: unknown[]): boolea
   return selected.includes(status);
 }
 
+function matchByMode(filterValues: unknown[], effectiveMode: BookFilterMode, predicate: (val: unknown) => unknown): boolean {
+  return effectiveMode === 'or' ? filterValues.some(predicate) : filterValues.every(predicate);
+}
+
+function matchesListField(filterValues: unknown[], effectiveMode: BookFilterMode, list: readonly string[] | null | undefined): boolean {
+  return matchByMode(filterValues, effectiveMode, val => list?.includes(val as string));
+}
+
+function matchesValueField(filterValues: unknown[], effectiveMode: BookFilterMode, value: unknown): boolean {
+  return effectiveMode === 'or' ? filterValues.includes(value) : filterValues.every(val => value === val);
+}
+
+function matchesPublishedYear(book: Book, filterValues: unknown[]): boolean {
+  const bookYear = book.metadata?.publishedDate
+    ? new Date(book.metadata.publishedDate).getFullYear()
+    : null;
+  return bookYear ? filterValues.some(val => val == bookYear || val == bookYear.toString()) : false;
+}
+
+function collectComicCreators(comic: ComicMetadata): string[] {
+  const allCreators: string[] = [];
+  const roles: [string[] | undefined, string][] = [
+    [comic.pencillers, 'penciller'],
+    [comic.inkers, 'inker'],
+    [comic.colorists, 'colorist'],
+    [comic.letterers, 'letterer'],
+    [comic.coverArtists, 'coverArtist'],
+    [comic.editors, 'editor']
+  ];
+  for (const [names, role] of roles) {
+    if (names) {
+      for (const name of names) {
+        allCreators.push(`${name}:${role}`);
+      }
+    }
+  }
+  return allCreators;
+}
+
 export function doesBookMatchFilter(
   book: Book,
   filterType: string,
@@ -68,17 +107,11 @@ export function doesBookMatchFilter(
 
   switch (filterType) {
     case 'author':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.metadata?.authors?.includes(val as string))
-        : filterValues.every(val => book.metadata?.authors?.includes(val as string));
+      return matchesListField(filterValues, effectiveMode, book.metadata?.authors);
     case 'category':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.metadata?.categories?.includes(val as string))
-        : filterValues.every(val => book.metadata?.categories?.includes(val as string));
+      return matchesListField(filterValues, effectiveMode, book.metadata?.categories);
     case 'series':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.metadata?.seriesName?.trim() === val)
-        : filterValues.every(val => book.metadata?.seriesName?.trim() === val);
+      return matchesValueField(filterValues, effectiveMode, book.metadata?.seriesName?.trim());
     case 'bookType':
       return book.isPhysical ? filterValues.includes('PHYSICAL') : filterValues.includes(book.primaryFile?.bookType);
     case 'readStatus':
@@ -86,33 +119,21 @@ export function doesBookMatchFilter(
     case 'personalRating':
       return filterValues.some(range => isRatingInRange10(book.personalRating, range as string | number));
     case 'publisher':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.metadata?.publisher === val)
-        : filterValues.every(val => book.metadata?.publisher === val);
+      return matchesValueField(filterValues, effectiveMode, book.metadata?.publisher);
     case 'matchScore':
       return filterValues.some(range => isMatchScoreInRange(book.metadataMatchScore, range as string | number));
     case 'library':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => val == book.libraryId)
-        : filterValues.every(val => val == book.libraryId);
+      return matchByMode(filterValues, effectiveMode, val => val == book.libraryId);
     case 'shelf':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.shelves?.some(s => s.id == val))
-        : filterValues.every(val => book.shelves?.some(s => s.id == val));
+      return matchByMode(filterValues, effectiveMode, val => book.shelves?.some(s => s.id == val));
     case 'shelfStatus': {
       const shelved = book.shelves && book.shelves.length > 0 ? 'shelved' : 'unshelved';
       return filterValues.includes(shelved);
     }
     case 'tag':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.metadata?.tags?.includes(val as string))
-        : filterValues.every(val => book.metadata?.tags?.includes(val as string));
-    case 'publishedDate': {
-      const bookYear = book.metadata?.publishedDate
-        ? new Date(book.metadata.publishedDate).getFullYear()
-        : null;
-      return bookYear ? filterValues.some(val => val == bookYear || val == bookYear.toString()) : false;
-    }
+      return matchesListField(filterValues, effectiveMode, book.metadata?.tags);
+    case 'publishedDate':
+      return matchesPublishedYear(book, filterValues);
     case 'fileSize':
       return filterValues.some(range => isFileSizeInRange(book.fileSizeKb, range as string | number));
     case 'amazonRating':
@@ -132,9 +153,7 @@ export function doesBookMatchFilter(
     case 'pageCount':
       return filterValues.some(range => isPageCountInRange(book.metadata?.pageCount ?? undefined, range as string | number));
     case 'mood':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.metadata?.moods?.includes(val as string))
-        : filterValues.every(val => book.metadata?.moods?.includes(val as string));
+      return matchesListField(filterValues, effectiveMode, book.metadata?.moods);
     case 'ageRating':
       return filterValues.some(range => isAgeRatingInRange(book.metadata?.ageRating, range as string | number));
     case 'contentRating':
@@ -142,39 +161,15 @@ export function doesBookMatchFilter(
     case 'narrator':
       return filterValues.includes(book.metadata?.narrator);
     case 'comicCharacter':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.metadata?.comicMetadata?.characters?.includes(val as string))
-        : filterValues.every(val => book.metadata?.comicMetadata?.characters?.includes(val as string));
+      return matchesListField(filterValues, effectiveMode, book.metadata?.comicMetadata?.characters);
     case 'comicTeam':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.metadata?.comicMetadata?.teams?.includes(val as string))
-        : filterValues.every(val => book.metadata?.comicMetadata?.teams?.includes(val as string));
+      return matchesListField(filterValues, effectiveMode, book.metadata?.comicMetadata?.teams);
     case 'comicLocation':
-      return effectiveMode === 'or'
-        ? filterValues.some(val => book.metadata?.comicMetadata?.locations?.includes(val as string))
-        : filterValues.every(val => book.metadata?.comicMetadata?.locations?.includes(val as string));
+      return matchesListField(filterValues, effectiveMode, book.metadata?.comicMetadata?.locations);
     case 'comicCreator': {
       const comic = book.metadata?.comicMetadata;
       if (!comic) return false;
-      const allCreators: string[] = [];
-      const roles: [string[] | undefined, string][] = [
-        [comic.pencillers, 'penciller'],
-        [comic.inkers, 'inker'],
-        [comic.colorists, 'colorist'],
-        [comic.letterers, 'letterer'],
-        [comic.coverArtists, 'coverArtist'],
-        [comic.editors, 'editor']
-      ];
-      for (const [names, role] of roles) {
-        if (names) {
-          for (const name of names) {
-            allCreators.push(`${name}:${role}`);
-          }
-        }
-      }
-      return effectiveMode === 'or'
-        ? filterValues.some(val => allCreators.includes(val as string))
-        : filterValues.every(val => allCreators.includes(val as string));
+      return matchesListField(filterValues, effectiveMode, collectComicCreators(comic));
     }
     default:
       return false;

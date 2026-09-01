@@ -274,6 +274,7 @@
         "errorDetailDefault": "Не вдалося зберегти магічну полицю."
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "Імпорт",
         "placeholder": "{\n  \"type\": \"group\",\n  \"join\": \"and\",\n  \"rules\": [\n    { \"field\": \"readStatus\", \"operator\": \"equals\", \"value\": \"READING\" }\n  ]\n}",
         "apply": "Застосувати",

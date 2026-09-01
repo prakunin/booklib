@@ -104,9 +104,7 @@ export class ReaderSidebarService {
   }
 
   private subscribeToAnnotationChanges(): void {
-    if (!this.selectionService) {
-      this.selectionService = this.injector.get(ReaderSelectionService);
-    }
+    this.selectionService ??= this.injector.get(ReaderSelectionService);
 
     this.selectionService.annotationsChanged$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -120,9 +118,7 @@ export class ReaderSidebarService {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(annotations => {
         this._annotations.set(annotations);
-        if (!this.selectionService) {
-          this.selectionService = this.injector.get(ReaderSelectionService);
-        }
+        this.selectionService ??= this.injector.get(ReaderSelectionService);
         this.selectionService.setAnnotations(annotations);
         if (annotations.length > 0) {
           const viewAnnotations = this.annotationService.toViewAnnotations(annotations);

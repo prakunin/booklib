@@ -28,8 +28,8 @@ interface LibraryFormModel {
   watch: boolean;
 }
 
-const TAKEN_NAMES = ['fiction', 'comics'];
-const RESERVED_NAMES = ['all books', 'unshelved'];
+const TAKEN_NAMES = new Set(['fiction', 'comics']);
+const RESERVED_NAMES = new Set(['all books', 'unshelved']);
 const PATH_SEPARATOR = /[\\/]/;
 
 function createInitialModel(): LibraryFormModel {
@@ -84,7 +84,7 @@ export class LibraryFormExampleComponent {
       validate(path.name, ({ value }) => {
         const name = value().trim();
         if (PATH_SEPARATOR.test(name)) return { kind: 'nameFormat', message: 'Name cannot contain / or \\' };
-        if (RESERVED_NAMES.includes(name.toLowerCase())) return { kind: 'nameReserved', message: `"${name}" is a reserved name` };
+        if (RESERVED_NAMES.has(name.toLowerCase())) return { kind: 'nameReserved', message: `"${name}" is a reserved name` };
         return null;
       });
       minLength(path.folders, 1, { message: 'Add at least one folder' });
@@ -102,7 +102,7 @@ export class LibraryFormExampleComponent {
           this.submitAttempted.set(true);
           await delay(900);
           const name = this.model().name.trim();
-          if (TAKEN_NAMES.includes(name.toLowerCase())) {
+          if (TAKEN_NAMES.has(name.toLowerCase())) {
             return [{ fieldTree: field.name, kind: 'server', message: `A library named "${name}" already exists` }];
           }
           this.submitState.set('saved');

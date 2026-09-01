@@ -264,31 +264,7 @@ export class ReadingSessionHeatmapComponent implements OnInit, OnDestroy {
     const sortedDates = sortStrings(Array.from(new Set(data.map(d => d.date))));
     const dateSet = new Set(sortedDates);
 
-    // Calculate all streaks
-    const streakLengths: number[] = [];
-    let streakStart: string | null = null;
-    let prevDate: string | null = null;
-    let lastStreakEnd: string | null = null;
-    let lastStreakLength = 0;
-
-    for (const dateStr of sortedDates) {
-      if (!prevDate || !this.isConsecutiveDay(prevDate, dateStr)) {
-        if (prevDate && streakStart) {
-          const len = this.daysBetween(streakStart, prevDate) + 1;
-          streakLengths.push(len);
-          lastStreakEnd = prevDate;
-          lastStreakLength = len;
-        }
-        streakStart = dateStr;
-      }
-      prevDate = dateStr;
-    }
-    if (prevDate && streakStart) {
-      const len = this.daysBetween(streakStart, prevDate) + 1;
-      streakLengths.push(len);
-      lastStreakEnd = prevDate;
-      lastStreakLength = len;
-    }
+    const {streakLengths, lastStreakEnd, lastStreakLength} = this.computeStreaks(sortedDates);
 
     this.longestStreak = streakLengths.length > 0 ? Math.max(...streakLengths) : 0;
 
@@ -318,6 +294,36 @@ export class ReadingSessionHeatmapComponent implements OnInit, OnDestroy {
       {label: this.translocoService.translate('statsUser.sessionHeatmap.milestone365ReadingDays'), icon: '\uD83C\uDFC6', requirement: 365, type: 'total', unlocked: this.totalReadingDays >= 365},
       {label: this.translocoService.translate('statsUser.sessionHeatmap.milestoneYearOfReading'), icon: '\uD83D\uDC51', requirement: 365, type: 'streak', unlocked: this.longestStreak >= 365},
     ];
+  }
+
+  // Calculate all streaks
+  private computeStreaks(sortedDates: string[]): {streakLengths: number[]; lastStreakEnd: string | null; lastStreakLength: number} {
+    const streakLengths: number[] = [];
+    let streakStart: string | null = null;
+    let prevDate: string | null = null;
+    let lastStreakEnd: string | null = null;
+    let lastStreakLength = 0;
+
+    for (const dateStr of sortedDates) {
+      if (!prevDate || !this.isConsecutiveDay(prevDate, dateStr)) {
+        if (prevDate && streakStart) {
+          const len = this.daysBetween(streakStart, prevDate) + 1;
+          streakLengths.push(len);
+          lastStreakEnd = prevDate;
+          lastStreakLength = len;
+        }
+        streakStart = dateStr;
+      }
+      prevDate = dateStr;
+    }
+    if (prevDate && streakStart) {
+      const len = this.daysBetween(streakStart, prevDate) + 1;
+      streakLengths.push(len);
+      lastStreakEnd = prevDate;
+      lastStreakLength = len;
+    }
+
+    return {streakLengths, lastStreakEnd, lastStreakLength};
   }
 
   private toDateStr(d: Date): string {

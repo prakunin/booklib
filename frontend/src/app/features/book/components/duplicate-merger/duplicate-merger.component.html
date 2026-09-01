@@ -13,7 +13,7 @@
       [rounded]="true"
       [text]="true"
       severity="secondary"
-      (click)="closeDialog()"
+      (onClick)="closeDialog()"
       class="close-button">
     </p-button>
   </div>
@@ -70,7 +70,7 @@
         <p-button
           [label]="t('scan')"
           icon="pi pi-search"
-          (click)="scan()"
+          (onClick)="scan()"
           [disabled]="!canScan"
           [loading]="isScanning()">
         </p-button>
@@ -90,7 +90,7 @@
             [label]="t('mergeAll', { count: activeGroups.length })"
             icon="pi pi-check-circle"
             severity="success"
-            (click)="mergeAll()"
+            (onClick)="mergeAll()"
             [disabled]="isMerging()"
             [loading]="isMerging()">
           </p-button>
@@ -149,7 +149,7 @@
                     icon="pi pi-check"
                     size="small"
                     severity="success"
-                    (click)="mergeGroup(group)"
+                    (onClick)="mergeGroup(group)"
                     [disabled]="isMerging()">
                   </p-button>
                   @if (getDeleteSelectedCount(group) > 0) {
@@ -159,7 +159,7 @@
                       size="small"
                       severity="danger"
                       [outlined]="true"
-                      (click)="deleteGroup(group)"
+                      (onClick)="deleteGroup(group)"
                       [disabled]="isMerging()">
                     </p-button>
                   }
@@ -169,7 +169,7 @@
                     size="small"
                     severity="secondary"
                     [outlined]="true"
-                    (click)="dismissGroup(group)"
+                    (onClick)="dismissGroup(group)"
                     [disabled]="isMerging()">
                   </p-button>
                 </div>

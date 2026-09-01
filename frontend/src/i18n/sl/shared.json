@@ -69,6 +69,7 @@
         "description": "Izberi eno ali več map iz svojega datotečnega sistema",
         "currentPath": "Trenutna pot:",
         "searchPlaceholder": "Išči mape...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "Pojdi en nivo višje",
         "selectAllBtn": "Izberi vse",
         "selectAllTooltip": "Izberi vse vidne mape",

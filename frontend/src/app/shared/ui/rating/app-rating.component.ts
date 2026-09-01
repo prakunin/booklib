@@ -273,7 +273,12 @@ export class AppRatingComponent implements FormValueControl<number> {
 
     return Array.from({ length: count }, (_, i): Star => {
       const pos = i + 1;
-      const fill = this.readonly() ? clampFill(preview - i) : preview >= pos ? 100 : 0;
+      let fill: number;
+      if (this.readonly()) {
+        fill = clampFill(preview - i);
+      } else {
+        fill = preview >= pos ? 100 : 0;
+      }
       return { value: pos, fill, hidden: false };
     });
   });

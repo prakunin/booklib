@@ -838,28 +838,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   private preloadAdjacentPages(): void {
     if (!this.pages().length || this.scrollMode() === CbxScrollMode.INFINITE || this.scrollMode() === CbxScrollMode.LONG_STRIP) return;
 
-    const pagesToPreload: number[] = [];
-
-    const step = this.isTwoPageView() ? 2 : 1;
-    for (let i = 1; i <= 2; i++) {
-      const nextPage = this.currentPage() + (step * i);
-      if (nextPage < this.pages().length) {
-        pagesToPreload.push(nextPage);
-        if (this.isTwoPageView() && nextPage + 1 < this.pages().length) {
-          pagesToPreload.push(nextPage + 1);
-        }
-      }
-    }
-
-    for (let i = 1; i <= 2; i++) {
-      const prevPage = this.currentPage() - (step * i);
-      if (prevPage >= 0) {
-        pagesToPreload.push(prevPage);
-        if (this.isTwoPageView() && prevPage + 1 < this.pages().length) {
-          pagesToPreload.push(prevPage + 1);
-        }
-      }
-    }
+    const pagesToPreload = [...this.collectPreloadPages(1), ...this.collectPreloadPages(-1)];
 
     pagesToPreload.forEach(pageIndex => {
       const url = this.getPageImageUrl(pageIndex);
@@ -871,6 +850,25 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     });
 
     this.cleanupPreloadedImages(pagesToPreload);
+  }
+
+  /** Pages (up to two steps away in the given direction) that should be kept warm in the image cache. */
+  private collectPreloadPages(direction: 1 | -1): number[] {
+    const pages: number[] = [];
+    const totalPages = this.pages().length;
+    const twoPageView = this.isTwoPageView();
+    const step = twoPageView ? 2 : 1;
+    for (let i = 1; i <= 2; i++) {
+      const page = this.currentPage() + direction * step * i;
+      if (page < 0 || page >= totalPages) {
+        continue;
+      }
+      pages.push(page);
+      if (twoPageView && page + 1 < totalPages) {
+        pages.push(page + 1);
+      }
+    }
+    return pages;
   }
 
   private cleanupPreloadedImages(keepPages: number[]): void {
@@ -971,82 +969,17 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
   private advancePage(direction: 1 | -1): void {
     const previousPage = this.currentPage();
-    if (this.scrollMode() === CbxScrollMode.LONG_STRIP) {
-      const newPage = this.currentPage() + direction;
-      if (newPage >= 0 && newPage < this.pages().length) {
-        this.currentPage.set(newPage);
-        this.longStripScrollToPage(newPage);
-        this.updateProgress();
-        this.updateSessionProgress();
-        this.updateFooterPage();
-      }
+    const scrollMode = this.scrollMode();
+    if (scrollMode === CbxScrollMode.LONG_STRIP || scrollMode === CbxScrollMode.INFINITE) {
+      this.advancePageInScrollingMode(direction, scrollMode);
       return;
     }
 
-    if (this.scrollMode() === CbxScrollMode.INFINITE) {
-      const newPage = this.currentPage() + direction;
-      if (newPage >= 0 && newPage < this.pages().length) {
-        this.currentPage.set(newPage);
-        this.scrollToPage(this.currentPage());
-        this.updateProgress();
-        this.updateSessionProgress();
-        this.updateFooterPage();
-      }
+    const consumedBySplitPage = direction > 0
+      ? this.advancePaginatedForward()
+      : this.advancePaginatedBackward();
+    if (consumedBySplitPage) {
       return;
-    }
-
-    if (direction > 0) {
-      // Forward navigation
-      if (this.isTwoPageView()) {
-        const spreads = this.getCbxSpreads();
-        const spreadIndex = spreads.findIndex(spread => spread.includes(this.currentPage()));
-        const nextSpread = spreadIndex >= 0 ? spreads[spreadIndex + 1] : undefined;
-        if (nextSpread) {
-          this.currentPage.set(nextSpread[0]);
-        }
-      } else if (this.currentPage() < this.pages().length - 1) {
-        // Single-page mode: handle canvas split state for wide pages
-        if (this.pageSplitOption() !== CbxPageSplitOption.NO_SPLIT && this.isSpreadPage(this.currentPage())) {
-          if (this.canvasSplitState() === 'NO_SPLIT' || this.canvasSplitState() === 'LEFT_PART') {
-            // Show first half, then second half before advancing
-            this.canvasSplitState.set(this.canvasSplitState() === 'NO_SPLIT' ? 'LEFT_PART' : 'RIGHT_PART');
-            this.resetPaginatedScroll();
-            this.updateCurrentImageUrls();
-            return;
-          }
-          // Already showed RIGHT_PART — advance to next page
-          this.canvasSplitState.set('NO_SPLIT');
-        }
-        this.currentPage.set(this.currentPage() + 1);
-      }
-    } else {
-      // Backward navigation
-      if (this.isTwoPageView()) {
-        const spreads = this.getCbxSpreads();
-        const spreadIndex = spreads.findIndex(spread => spread.includes(this.currentPage()));
-        const previousSpread = spreadIndex > 0 ? spreads[spreadIndex - 1] : undefined;
-        if (previousSpread) {
-          this.currentPage.set(previousSpread[0]);
-        }
-      } else {
-        // Single-page backward: handle canvas split for wide pages
-        if (this.pageSplitOption() !== CbxPageSplitOption.NO_SPLIT && this.isSpreadPage(this.currentPage())) {
-          if (this.canvasSplitState() === 'RIGHT_PART') {
-            this.canvasSplitState.set('LEFT_PART');
-            this.resetPaginatedScroll();
-            this.updateCurrentImageUrls();
-            return;
-          }
-          this.canvasSplitState.set('NO_SPLIT');
-        }
-        if (this.currentPage() > 0) {
-          this.currentPage.set(this.currentPage() - 1);
-          // If landing on a wide page, start at right half
-          if (this.pageSplitOption() !== CbxPageSplitOption.NO_SPLIT && this.isSpreadPage(this.currentPage())) {
-            this.canvasSplitState.set('RIGHT_PART');
-          }
-        }
-      }
     }
 
     if (this.currentPage() !== previousPage) {
@@ -1060,6 +993,93 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     if (this.isSlideshowActive() && this.currentPage() >= this.pages().length - 1) {
       this.stopSlideshow();
     }
+  }
+
+  private advancePageInScrollingMode(direction: 1 | -1, scrollMode: CbxScrollMode): void {
+    const newPage = this.currentPage() + direction;
+    if (newPage < 0 || newPage >= this.pages().length) {
+      return;
+    }
+    this.currentPage.set(newPage);
+    if (scrollMode === CbxScrollMode.LONG_STRIP) {
+      this.longStripScrollToPage(newPage);
+    } else {
+      this.scrollToPage(this.currentPage());
+    }
+    this.updateProgress();
+    this.updateSessionProgress();
+    this.updateFooterPage();
+  }
+
+  /**
+   * Forward navigation in paginated mode.
+   * Returns true when the step was consumed by revealing the next half of a split wide page.
+   */
+  private advancePaginatedForward(): boolean {
+    if (this.isTwoPageView()) {
+      const spreads = this.getCbxSpreads();
+      const spreadIndex = spreads.findIndex(spread => spread.includes(this.currentPage()));
+      const nextSpread = spreadIndex >= 0 ? spreads[spreadIndex + 1] : undefined;
+      if (nextSpread) {
+        this.currentPage.set(nextSpread[0]);
+      }
+      return false;
+    }
+    if (this.currentPage() >= this.pages().length - 1) {
+      return false;
+    }
+    // Single-page mode: handle canvas split state for wide pages
+    if (this.isSplitWidePage(this.currentPage())) {
+      if (this.canvasSplitState() === 'NO_SPLIT' || this.canvasSplitState() === 'LEFT_PART') {
+        // Show first half, then second half before advancing
+        this.canvasSplitState.set(this.canvasSplitState() === 'NO_SPLIT' ? 'LEFT_PART' : 'RIGHT_PART');
+        this.resetPaginatedScroll();
+        this.updateCurrentImageUrls();
+        return true;
+      }
+      // Already showed RIGHT_PART — advance to next page
+      this.canvasSplitState.set('NO_SPLIT');
+    }
+    this.currentPage.set(this.currentPage() + 1);
+    return false;
+  }
+
+  /**
+   * Backward navigation in paginated mode.
+   * Returns true when the step was consumed by revealing the previous half of a split wide page.
+   */
+  private advancePaginatedBackward(): boolean {
+    if (this.isTwoPageView()) {
+      const spreads = this.getCbxSpreads();
+      const spreadIndex = spreads.findIndex(spread => spread.includes(this.currentPage()));
+      const previousSpread = spreadIndex > 0 ? spreads[spreadIndex - 1] : undefined;
+      if (previousSpread) {
+        this.currentPage.set(previousSpread[0]);
+      }
+      return false;
+    }
+    // Single-page backward: handle canvas split for wide pages
+    if (this.isSplitWidePage(this.currentPage())) {
+      if (this.canvasSplitState() === 'RIGHT_PART') {
+        this.canvasSplitState.set('LEFT_PART');
+        this.resetPaginatedScroll();
+        this.updateCurrentImageUrls();
+        return true;
+      }
+      this.canvasSplitState.set('NO_SPLIT');
+    }
+    if (this.currentPage() > 0) {
+      this.currentPage.set(this.currentPage() - 1);
+      // If landing on a wide page, start at right half
+      if (this.isSplitWidePage(this.currentPage())) {
+        this.canvasSplitState.set('RIGHT_PART');
+      }
+    }
+    return false;
+  }
+
+  private isSplitWidePage(pageIndex: number): boolean {
+    return this.pageSplitOption() !== CbxPageSplitOption.NO_SPLIT && this.isSpreadPage(pageIndex);
   }
 
   private alignCurrentPageToParity() {
@@ -1280,7 +1300,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
     if (!best) return;
 
-    const attr = best.getAttribute('data-page');
+    const attr = best.dataset['page'];
     const newPage = attr != null ? Number.parseInt(attr, 10) : Number.NaN;
     if (Number.isNaN(newPage) || newPage === this.currentPage()) return;
 
@@ -1475,7 +1495,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
     for (const entry of entries) {
       if (entry.isIntersecting) {
-        const pageAttr = entry.target.getAttribute('data-page');
+        const pageAttr = (entry.target as HTMLElement).dataset['page'];
         if (pageAttr != null) {
           const page = Number.parseInt(pageAttr, 10);
           // Prefetch more images when a page enters the viewport
@@ -1562,7 +1582,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     const closest = this.longStripFindClosestImage(images, container);
 
     if (closest) {
-      const page = Number.parseInt(closest.getAttribute('data-page') ?? '0', 10);
+      const page = Number.parseInt(closest.dataset['page'] ?? '0', 10);
       if (page !== this.currentPage()) {
         this.currentPage.set(page);
         this.progressSaveSubject$.next();
@@ -1795,56 +1815,69 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
       case 'm':
       case 'M':
         event.preventDefault();
-        this.isMagnifierActive.set(!this.isMagnifierActive());
-        if (!this.isMagnifierActive()) {
-          this.hideMagnifier();
-        }
-        this.headerService.updateState({ isMagnifierActive: this.isMagnifierActive() });
+        this.toggleMagnifierFromKeyboard();
         break;
       case '+':
       case '=':
-        if (this.isMagnifierActive()) {
-          event.preventDefault();
-          this.cycleMagnifierZoom(1);
-        }
-        break;
       case '-':
-        if (this.isMagnifierActive()) {
-          event.preventDefault();
-          this.cycleMagnifierZoom(-1);
-        }
-        break;
       case ']':
-        if (this.isMagnifierActive()) {
-          event.preventDefault();
-          this.cycleMagnifierLensSize(1);
-        }
-        break;
       case '[':
-        if (this.isMagnifierActive()) {
-          event.preventDefault();
-          this.cycleMagnifierLensSize(-1);
-        }
+        this.handleMagnifierAdjustKey(event);
         break;
       case '?':
         event.preventDefault();
         this.showShortcutsHelp.set(true);
         break;
       case 'Escape':
-        if (this.isMagnifierActive()) {
-          this.isMagnifierActive.set(false);
-          this.hideMagnifier();
-          this.headerService.updateState({ isMagnifierActive: false });
-        } else if (this.showShortcutsHelp()) {
-          this.showShortcutsHelp.set(false);
-        } else if (this.showNoteDialog()) {
-          this.showNoteDialog.set(false);
-        } else if (this.showQuickSettings()) {
-          this.quickSettingsService.close();
-        } else if (this.isFullscreen()) {
-          this.exitFullscreen();
-        }
+        this.handleEscapeKey();
         break;
+    }
+  }
+
+  private toggleMagnifierFromKeyboard(): void {
+    this.isMagnifierActive.set(!this.isMagnifierActive());
+    if (!this.isMagnifierActive()) {
+      this.hideMagnifier();
+    }
+    this.headerService.updateState({ isMagnifierActive: this.isMagnifierActive() });
+  }
+
+  /** `+`/`=`/`-` change the magnifier zoom, `]`/`[` its lens size — only while the magnifier is active. */
+  private handleMagnifierAdjustKey(event: KeyboardEvent): void {
+    if (!this.isMagnifierActive()) {
+      return;
+    }
+    event.preventDefault();
+    switch (event.key) {
+      case '+':
+      case '=':
+        this.cycleMagnifierZoom(1);
+        break;
+      case '-':
+        this.cycleMagnifierZoom(-1);
+        break;
+      case ']':
+        this.cycleMagnifierLensSize(1);
+        break;
+      case '[':
+        this.cycleMagnifierLensSize(-1);
+        break;
+    }
+  }
+
+  private handleEscapeKey(): void {
+    if (this.isMagnifierActive()) {
+      this.isMagnifierActive.set(false);
+      this.hideMagnifier();
+      this.headerService.updateState({ isMagnifierActive: false });
+    } else if (this.showShortcutsHelp()) {
+      this.showShortcutsHelp.set(false);
+    } else if (this.showNoteDialog()) {
+      this.showNoteDialog.set(false);
+    } else if (this.showQuickSettings()) {
+      this.quickSettingsService.close();
+    } else if (this.isFullscreen()) {
+      this.exitFullscreen();
     }
   }
 

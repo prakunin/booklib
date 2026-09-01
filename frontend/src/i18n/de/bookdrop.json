@@ -20,6 +20,7 @@
         "tags": "Schlagwörter"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "Dateidaten",
         "fetchedData": "Abgerufene Daten",
         "copyMissingTooltip": "Fehlende Felder aus abgerufenen Metadaten kopieren",

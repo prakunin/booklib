@@ -192,11 +192,7 @@ export class PublicationTrendChartComponent {
     };
   }
 
-  private calculateInsights(yearCounts: Map<number, number>, totalBooks: number): TrendInsights {
-    const currentYear = new Date().getFullYear();
-    const years = Array.from(yearCounts.keys()).sort((a, b) => a - b);
-
-    // Peak year
+  private findPeakYear(yearCounts: Map<number, number>): {peakYear: number; peakYearCount: number} {
     let peakYear = 0;
     let peakYearCount = 0;
     for (const [year, count] of yearCounts) {
@@ -205,8 +201,10 @@ export class PublicationTrendChartComponent {
         peakYearCount = count;
       }
     }
+    return {peakYear, peakYearCount};
+  }
 
-    // Books in last 10 years
+  private countBooksByEra(yearCounts: Map<number, number>, currentYear: number): {booksLast10Years: number; classicBooks: number; century21Books: number} {
     let booksLast10Years = 0;
     let classicBooks = 0; // Pre-1970
     let century21Books = 0; // 2000+
@@ -222,6 +220,15 @@ export class PublicationTrendChartComponent {
         century21Books += count;
       }
     }
+    return {booksLast10Years, classicBooks, century21Books};
+  }
+
+  private calculateInsights(yearCounts: Map<number, number>, totalBooks: number): TrendInsights {
+    const currentYear = new Date().getFullYear();
+    const years = Array.from(yearCounts.keys()).sort((a, b) => a - b);
+
+    const {peakYear, peakYearCount} = this.findPeakYear(yearCounts);
+    const {booksLast10Years, classicBooks, century21Books} = this.countBooksByEra(yearCounts, currentYear);
 
     const booksLast10YearsPercent = totalBooks > 0 ? Math.round((booksLast10Years / totalBooks) * 100) : 0;
     const classicBooksPercent = totalBooks > 0 ? Math.round((classicBooks / totalBooks) * 100) : 0;

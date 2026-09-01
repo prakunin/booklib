@@ -19,6 +19,8 @@ import {MultiSortPopoverComponent} from '../../../book/components/book-browser/s
 import {Popover} from '@openng/optimus-ui/popover';
 import {CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, moveItemInArray} from '@angular/cdk/drag-drop';
 
+type OverrideEntityType = 'LIBRARY' | 'SHELF' | 'MAGIC_SHELF';
+
 @Component({
   selector: 'app-view-preferences',
   standalone: true,
@@ -114,7 +116,7 @@ export class ViewPreferencesComponent implements OnInit {
   private readonly sortFieldList = viewChild<ElementRef<HTMLElement>>('sortFieldList');
 
   overrides: {
-    entityType: 'LIBRARY' | 'SHELF' | 'MAGIC_SHELF';
+    entityType: OverrideEntityType;
     library: number;
     sort: string;
     sortDir: 'ASC' | 'DESC';
@@ -216,8 +218,8 @@ export class ViewPreferencesComponent implements OnInit {
     ];
   }
 
-  getAvailableEntities(index: number, type: 'LIBRARY' | 'SHELF' | 'MAGIC_SHELF') {
-    const selected = this.overrides.map((o, i) => i !== index ? o.library : null);
+  getAvailableEntities(index: number, type: OverrideEntityType) {
+    const selected = new Set(this.overrides.map((o, i) => i !== index ? o.library : null));
     let source: { label: string; value: number }[];
     switch (type) {
       case 'LIBRARY':
@@ -232,13 +234,13 @@ export class ViewPreferencesComponent implements OnInit {
       default:
         source = [];
     }
-    return source.filter(opt => !selected.includes(opt.value) || this.overrides[index]?.library === opt.value);
+    return source.filter(opt => !selected.has(opt.value) || this.overrides[index]?.library === opt.value);
   }
 
   get availableLibraries() {
     const used = new Set(this.overrides.map(o => `${o.entityType}_${o.library}`));
 
-    const withEntityType = (options: { label: string; value: number }[], entityType: 'LIBRARY' | 'SHELF' | 'MAGIC_SHELF') =>
+    const withEntityType = (options: { label: string; value: number }[], entityType: OverrideEntityType) =>
       options.map(opt => ({...opt, entityType}));
 
     return [...withEntityType(this.libraryOptions, 'LIBRARY'),

@@ -20,6 +20,7 @@
         "tags": "Tagi"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "Dane pliku",
         "fetchedData": "Pobrane dane",
         "copyMissingTooltip": "Skopiuj brakujące pola z pobranych metadanych",

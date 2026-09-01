@@ -22,7 +22,11 @@ export class CbxReaderService {
 
   private appendToken(url: string): string {
     const token = this.getToken();
-    return token ? `${url}${url.includes('?') ? '&' : '?'}token=${token}` : url;
+    if (!token) {
+      return url;
+    }
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}token=${token}`;
   }
 
   getAvailablePages(bookId: number, bookType?: string) {

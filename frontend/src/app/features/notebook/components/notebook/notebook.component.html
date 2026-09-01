@@ -22,6 +22,7 @@
               [(ngModel)]="searchQuery"
               (ngModelChange)="onSearchChange()"
               [placeholder]="t('notebook.searchPlaceholder')"
+              [attr.aria-label]="t('notebook.searchPlaceholder')"
               class="search-input"
             />
           </span>
@@ -137,21 +138,21 @@
         @for (group of filteredGroups; track group.bookId) {
           <div class="settings-card book-group-card">
             <!-- Book Header -->
-            <div class="book-group-header" role="button" tabindex="0" (click)="toggleGroup(group.bookId)" (keydown.enter)="toggleGroup(group.bookId)">
+            <button type="button" class="book-group-header w-full text-start" [attr.aria-expanded]="!isGroupCollapsed(group.bookId)" (click)="toggleGroup(group.bookId)">
               <app-cover
                 class="book-thumbnail"
                 aria-hidden="true"
                 [src]="group.thumbnailUrl"
                 [title]="group.bookTitle"
                 size="sm" />
-              <div class="book-info">
+              <span class="book-info">
                 <span class="book-title">{{ group.bookTitle }}</span>
                 <span class="book-entry-count">
                   {{ group.entries.length }} {{ group.entries.length === 1 ? t('notebook.annotation') : t('notebook.annotations') }}
                 </span>
-              </div>
+              </span>
               <i class="pi toggle-icon" [class.pi-chevron-down]="!isGroupCollapsed(group.bookId)" [class.pi-chevron-right]="isGroupCollapsed(group.bookId)"></i>
-            </div>
+            </button>
 
             <!-- Entries -->
             @if (!isGroupCollapsed(group.bookId)) {

@@ -141,21 +141,7 @@ export class BulkIsbnImportDialogComponent {
   async startImport(): Promise<void> {
     if (!this.canStartImport()) return;
 
-    const existingIsbns = await firstValueFrom(this.appBooksApi.findExistingIsbns(
-      this.selectedLibraryId!,
-      this.entries.map(entry => entry.isbn),
-    ));
-    if (existingIsbns.size > 0) {
-      const pending: IsbnEntry[] = [];
-      for (const entry of this.entries) {
-        if (existingIsbns.has(entry.isbn)) {
-          this.skipped.push({value: entry.isbn, reason: 'alreadyExists'});
-        } else {
-          pending.push(entry);
-        }
-      }
-      this.entries = pending;
-    }
+    await this.skipExistingIsbns();
 
     this.phase = 'processing';
     this.processedCount = 0;
@@ -173,30 +159,8 @@ export class BulkIsbnImportDialogComponent {
         const metadata = await this.lookupIsbn(entry.isbn);
         if (this.cancelled) break;
 
-        const request: CreatePhysicalBookRequest = {
-          libraryId: this.selectedLibraryId!,
-          isbn: entry.isbn,
-          title: metadata?.title || undefined,
-          authors: metadata?.authors?.length ? [...metadata.authors] : undefined,
-          description: metadata?.description || undefined,
-          publisher: metadata?.publisher || undefined,
-          publishedDate: metadata?.publishedDate || undefined,
-          language: metadata?.language || undefined,
-          pageCount: metadata?.pageCount ?? undefined,
-          categories: metadata?.categories?.length ? [...metadata.categories] : undefined,
-          thumbnailUrl: metadata?.thumbnailUrl || undefined,
-        };
-
-        await this.createBook(request);
-
-        if (metadata?.title) {
-          entry.status = 'created';
-          entry.title = metadata.title;
-          this.createdCount++;
-        } else {
-          entry.status = 'created-no-metadata';
-          this.noMetadataCount++;
-        }
+        await this.createBook(this.buildCreateRequest(entry, metadata));
+        this.markCreated(entry, metadata);
       } catch (err: unknown) {
         entry.status = 'failed';
         entry.error = err instanceof Error ? err.message : 'Unknown error';
@@ -211,6 +175,51 @@ export class BulkIsbnImportDialogComponent {
     }
 
     this.phase = 'summary';
+  }
+
+  private async skipExistingIsbns(): Promise<void> {
+    const existingIsbns = await firstValueFrom(this.appBooksApi.findExistingIsbns(
+      this.selectedLibraryId!,
+      this.entries.map(entry => entry.isbn),
+    ));
+    if (existingIsbns.size === 0) return;
+
+    const pending: IsbnEntry[] = [];
+    for (const entry of this.entries) {
+      if (existingIsbns.has(entry.isbn)) {
+        this.skipped.push({value: entry.isbn, reason: 'alreadyExists'});
+      } else {
+        pending.push(entry);
+      }
+    }
+    this.entries = pending;
+  }
+
+  private buildCreateRequest(entry: IsbnEntry, metadata: BookMetadata | null): CreatePhysicalBookRequest {
+    return {
+      libraryId: this.selectedLibraryId!,
+      isbn: entry.isbn,
+      title: metadata?.title || undefined,
+      authors: metadata?.authors?.length ? [...metadata.authors] : undefined,
+      description: metadata?.description || undefined,
+      publisher: metadata?.publisher || undefined,
+      publishedDate: metadata?.publishedDate || undefined,
+      language: metadata?.language || undefined,
+      pageCount: metadata?.pageCount ?? undefined,
+      categories: metadata?.categories?.length ? [...metadata.categories] : undefined,
+      thumbnailUrl: metadata?.thumbnailUrl || undefined,
+    };
+  }
+
+  private markCreated(entry: IsbnEntry, metadata: BookMetadata | null): void {
+    if (metadata?.title) {
+      entry.status = 'created';
+      entry.title = metadata.title;
+      this.createdCount++;
+    } else {
+      entry.status = 'created-no-metadata';
+      this.noMetadataCount++;
+    }
   }
 
   cancelImport(): void {
@@ -245,7 +254,7 @@ export class BulkIsbnImportDialogComponent {
       isbns = this.parseCsvLines(lines, extension === 'tsv' ? '\t' : undefined);
     } else if (source === 'paste') {
       // Pasted text: split by newlines, commas, semicolons, or spaces
-      const tokens = cleaned.split(/[\n\r,;\s]+/);
+      const tokens = cleaned.split(/[,;\s]+/);
       isbns = tokens.map(t => t.trim()).filter(t => t.length > 0);
     } else {
       // Plain text: one per line
@@ -289,10 +298,7 @@ export class BulkIsbnImportDialogComponent {
 
     // Auto-detect delimiter if not provided
     if (!delimiter) {
-      const firstLine = lines[0];
-      if (firstLine.includes('\t')) delimiter = '\t';
-      else if (firstLine.includes(';')) delimiter = ';';
-      else delimiter = ',';
+      delimiter = this.detectDelimiter(lines[0]);
     }
 
     const headerFields = lines[0].split(delimiter).map(f => f.trim().replaceAll(/^["']|["']$/g, '').toLowerCase());
@@ -320,6 +326,12 @@ export class BulkIsbnImportDialogComponent {
     return result;
   }
 
+  private detectDelimiter(firstLine: string): string {
+    if (firstLine.includes('\t')) return '\t';
+    if (firstLine.includes(';')) return ';';
+    return ',';
+  }
+
   private normalizeIsbn(raw: string): string {
     // Strip hyphens, spaces, surrounding whitespace; preserve trailing X
     return raw.trim().replaceAll(/[-\s]/g, '').toUpperCase();
@@ -338,17 +350,19 @@ export class BulkIsbnImportDialogComponent {
         error: err => {
           // Retry once on potential rate limiting
           if (err?.status === 429) {
-            setTimeout(() => {
-              this.bookMetadataService.lookupByIsbn(isbn).subscribe({
-                next: metadata => resolve(metadata),
-                error: () => resolve(null), // Still create with ISBN only
-              });
-            }, RETRY_DELAY_MS);
+            setTimeout(() => this.retryLookupIsbn(isbn, resolve), RETRY_DELAY_MS);
           } else {
             resolve(null); // No metadata found, still create with ISBN
           }
         },
       });
+    });
+  }
+
+  private retryLookupIsbn(isbn: string, resolve: (metadata: BookMetadata | null) => void): void {
+    this.bookMetadataService.lookupByIsbn(isbn).subscribe({
+      next: metadata => resolve(metadata),
+      error: () => resolve(null), // Still create with ISBN only
     });
   }
 

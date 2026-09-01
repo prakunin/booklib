@@ -274,6 +274,7 @@
         "errorDetailDefault": "Не удалось сохранить умную полку."
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "",
         "successDetail": "",
         "structureError": "",

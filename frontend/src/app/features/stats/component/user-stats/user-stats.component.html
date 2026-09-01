@@ -43,19 +43,19 @@
     </div>
 
     <ng-template pTemplate="footer">
-      <p-button class="reset-btn" (click)="resetLayout()" severity="danger">
+      <p-button class="reset-btn" (onClick)="resetLayout()" severity="danger">
         <i class="pi pi-refresh"></i>
         <span>{{ t('main.resetLayout') }}</span>
       </p-button>
-      <p-button class="hide-all-btn" (click)="hideAllCharts()" severity="secondary">
+      <p-button class="hide-all-btn" (onClick)="hideAllCharts()" severity="secondary">
         <i class="pi pi-eye-slash"></i>
         <span>{{ t('main.hideAll') }}</span>
       </p-button>
-      <p-button class="show-all-btn" (click)="showAllCharts()" severity="secondary">
+      <p-button class="show-all-btn" (onClick)="showAllCharts()" severity="secondary">
         <i class="pi pi-eye"></i>
         <span>{{ t('main.showAll') }}</span>
       </p-button>
-      <p-button class="close-btn" (click)="toggleConfigPanel()" severity="secondary">
+      <p-button class="close-btn" (onClick)="toggleConfigPanel()" severity="secondary">
         <span>{{ t('main.close') }}</span>
       </p-button>
     </ng-template>

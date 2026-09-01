@@ -266,6 +266,7 @@
     "comicEditors": ""
   },
   "importJson": {
+    "textareaLabel": "JSON configuration",
     "buttonLabel": "",
     "placeholder": "",
     "apply": "",

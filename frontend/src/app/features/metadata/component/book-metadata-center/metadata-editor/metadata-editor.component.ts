@@ -9,8 +9,7 @@ import {Book, BookMetadata, ComicMetadata, MetadataClearFlags, MetadataUpdateWra
 import {UrlHelperService} from "../../../../../shared/service/url-helper.service";
 import {CoverComponent} from "../../../../../shared/components/cover/cover.component";
 import {MetadataSourceBadgeComponent} from "../../../../../shared/components/metadata-source-badge/metadata-source-badge.component";
-import {MetadataFieldSources} from '../../../../../shared/metadata';
-import {ALL_COMIC_METADATA_FIELDS, AUDIOBOOK_METADATA_FIELDS, COMIC_FORM_TO_MODEL_LOCK, COMIC_TEXT_METADATA_FIELDS, COMIC_ARRAY_METADATA_FIELDS, COMIC_TEXTAREA_METADATA_FIELDS, isFieldEmbeddable, hasMetadataWriter} from '../../../../../shared/metadata';
+import {MetadataFieldSources, ALL_COMIC_METADATA_FIELDS, AUDIOBOOK_METADATA_FIELDS, COMIC_FORM_TO_MODEL_LOCK, COMIC_TEXT_METADATA_FIELDS, COMIC_ARRAY_METADATA_FIELDS, COMIC_TEXTAREA_METADATA_FIELDS, isFieldEmbeddable, hasMetadataWriter} from '../../../../../shared/metadata';
 import {FileUpload, FileUploadErrorEvent, FileUploadEvent,} from "@openng/optimus-ui/fileupload";
 import {HttpResponse} from "@angular/common/http";
 import {BookService} from "../../../../book/service/book.service";
@@ -384,7 +383,12 @@ export class MetadataEditorComponent implements OnInit {
 
     // Add comic metadata form controls
     for (const field of ALL_COMIC_METADATA_FIELDS) {
-      const defaultValue = field.type === 'array' ? [] : (field.type === 'number' || field.type === 'boolean') ? null : '';
+      let defaultValue: string[] | null | string = '';
+      if (field.type === 'array') {
+        defaultValue = [];
+      } else if (field.type === 'number' || field.type === 'boolean') {
+        defaultValue = null;
+      }
       this.metadataForm.addControl(field.controlName, new FormControl(defaultValue));
       this.metadataForm.addControl(field.lockedKey, new FormControl(false));
     }
@@ -488,7 +492,12 @@ export class MetadataEditorComponent implements OnInit {
       contentRatingLocked: metadata.contentRatingLocked ?? false,
     });
 
-    // Patch audiobook metadata
+    this.patchAudiobookFields(metadata);
+    this.patchComicFields(metadata);
+    this.applyLockStates(metadata);
+  }
+
+  private patchAudiobookFields(metadata: BookMetadata): void {
     const audiobookPatch: Record<string, unknown> = {};
     for (const field of AUDIOBOOK_METADATA_FIELDS) {
       const key = field.controlName as keyof BookMetadata;
@@ -497,8 +506,9 @@ export class MetadataEditorComponent implements OnInit {
       audiobookPatch[field.lockedKey] = metadata[lockedKey] ?? false;
     }
     this.metadataForm.patchValue(audiobookPatch);
+  }
 
-    // Patch comic metadata
+  private patchComicFields(metadata: BookMetadata): void {
     const comicMeta = metadata.comicMetadata;
     const comicPatch: Record<string, unknown> = {};
     for (const field of ALL_COMIC_METADATA_FIELDS) {
@@ -514,7 +524,9 @@ export class MetadataEditorComponent implements OnInit {
       comicPatch[field.lockedKey] = comicMeta?.[modelLockKey as keyof ComicMetadata] ?? false;
     }
     this.metadataForm.patchValue(comicPatch);
+  }
 
+  private applyLockStates(metadata: BookMetadata): void {
     const lockableFields: { key: keyof BookMetadata; control: string }[] = [
       {key: "titleLocked", control: "title"},
       {key: "subtitleLocked", control: "subtitle"},
@@ -560,41 +572,29 @@ export class MetadataEditorComponent implements OnInit {
     ];
 
     for (const {key, control} of lockableFields) {
-      const isLocked = metadata[key] === true;
-      const formControl = this.metadataForm.get(control);
-      if (formControl) {
-        if (isLocked) {
-          formControl.disable();
-        } else {
-          formControl.enable();
-        }
-      }
+      this.setControlLock(control, metadata[key] === true);
     }
 
     // Apply audiobook lock states
     for (const field of AUDIOBOOK_METADATA_FIELDS) {
-      const isLocked = this.metadataForm.get(field.lockedKey)?.value === true;
-      const formControl = this.metadataForm.get(field.controlName);
-      if (formControl) {
-        if (isLocked) {
-          formControl.disable();
-        } else {
-          formControl.enable();
-        }
-      }
+      this.setControlLock(field.controlName, this.metadataForm.get(field.lockedKey)?.value === true);
     }
 
     // Apply comic lock states
     for (const field of ALL_COMIC_METADATA_FIELDS) {
-      const isLocked = this.metadataForm.get(field.lockedKey)?.value === true;
-      const formControl = this.metadataForm.get(field.controlName);
-      if (formControl) {
-        if (isLocked) {
-          formControl.disable();
-        } else {
-          formControl.enable();
-        }
-      }
+      this.setControlLock(field.controlName, this.metadataForm.get(field.lockedKey)?.value === true);
+    }
+  }
+
+  private setControlLock(controlName: string, isLocked: boolean): void {
+    const formControl = this.metadataForm.get(controlName);
+    if (!formControl) {
+      return;
+    }
+    if (isLocked) {
+      formControl.disable();
+    } else {
+      formControl.enable();
     }
   }
 
@@ -629,7 +629,7 @@ export class MetadataEditorComponent implements OnInit {
     return this.bookMetadataManageService
       .updateBookMetadata(
         this.currentBookId,
-        this.buildMetadataWrapper(undefined),
+        this.buildMetadataWrapper(),
         false
       )
       .pipe(
@@ -799,46 +799,10 @@ export class MetadataEditorComponent implements OnInit {
       }),
     };
 
-    // Build comic metadata from form controls
-    const comicMetadata: Record<string, unknown> = {};
-    for (const field of ALL_COMIC_METADATA_FIELDS) {
-      const value = form.get(field.controlName)?.value;
-      if (field.type === 'array') {
-        comicMetadata[field.fetchedKey] = Array.isArray(value) ? value : [];
-      } else if (field.type === 'number') {
-        comicMetadata[field.fetchedKey] = value !== '' && value !== null ? Number(value) : null;
-      } else if (field.type === 'boolean') {
-        comicMetadata[field.fetchedKey] = value ?? null;
-      } else {
-        comicMetadata[field.fetchedKey] = value ?? '';
-      }
-    }
-    // Consolidate comic lock states to model lock keys
-    const lockGroups: Record<string, boolean> = {};
-    for (const [formKey, modelKey] of Object.entries(COMIC_FORM_TO_MODEL_LOCK)) {
-      const value = form.get(formKey)?.value ?? false;
-      if (value) {
-        lockGroups[modelKey] = true;
-      } else if (!(modelKey in lockGroups)) {
-        lockGroups[modelKey] = false;
-      }
-    }
-    for (const [modelKey, value] of Object.entries(lockGroups)) {
-      comicMetadata[modelKey] = value;
-    }
-    metadata.comicMetadata = comicMetadata as ComicMetadata;
+    metadata.comicMetadata = this.buildComicMetadataFromForm();
 
     const original = this.originalMetadata;
-
-    const wasCleared = (key: keyof BookMetadata): boolean => {
-      const current = (metadata[key]) ?? null;
-      const prev = (original[key]) ?? null;
-
-      const isEmpty = (val: unknown): boolean =>
-        val === null || val === "" || (Array.isArray(val) && val.length === 0);
-
-      return isEmpty(current) && !isEmpty(prev);
-    };
+    const wasCleared = (key: keyof BookMetadata): boolean => this.wasCleared(metadata, original, key);
 
     const clearFlags: MetadataClearFlags = {
       title: wasCleared("title"),
@@ -885,6 +849,52 @@ export class MetadataEditorComponent implements OnInit {
     };
 
     return {metadata, clearFlags};
+  }
+
+  private buildComicMetadataFromForm(): ComicMetadata {
+    const form = this.metadataForm;
+    // Build comic metadata from form controls
+    const comicMetadata: Record<string, unknown> = {};
+    for (const field of ALL_COMIC_METADATA_FIELDS) {
+      comicMetadata[field.fetchedKey] = this.comicFieldValue(field.type, form.get(field.controlName)?.value);
+    }
+    // Consolidate comic lock states to model lock keys
+    const lockGroups: Record<string, boolean> = {};
+    for (const [formKey, modelKey] of Object.entries(COMIC_FORM_TO_MODEL_LOCK)) {
+      const value = form.get(formKey)?.value ?? false;
+      if (value) {
+        lockGroups[modelKey] = true;
+      } else if (!(modelKey in lockGroups)) {
+        lockGroups[modelKey] = false;
+      }
+    }
+    for (const [modelKey, value] of Object.entries(lockGroups)) {
+      comicMetadata[modelKey] = value;
+    }
+    return comicMetadata as ComicMetadata;
+  }
+
+  private comicFieldValue(type: string, value: unknown): unknown {
+    if (type === 'array') {
+      return Array.isArray(value) ? value : [];
+    }
+    if (type === 'number') {
+      return value !== '' && value !== null ? Number(value) : null;
+    }
+    if (type === 'boolean') {
+      return value ?? null;
+    }
+    return value ?? '';
+  }
+
+  private wasCleared(metadata: BookMetadata, original: BookMetadata, key: keyof BookMetadata): boolean {
+    const current = (metadata[key]) ?? null;
+    const prev = (original[key]) ?? null;
+    return this.isEmptyValue(current) && !this.isEmptyValue(prev);
+  }
+
+  private isEmptyValue(val: unknown): boolean {
+    return val === null || val === "" || (Array.isArray(val) && val.length === 0);
   }
 
   private updateMetadata(shouldLockAllFields: boolean | undefined): void {

@@ -21,6 +21,7 @@
     "audio": ""
   },
   "editor": {
+    "removeAuthor": "Remove author",
     "ebookCover": "",
     "audiobookCover": "",
     "regenerateCoverTooltip": "",
@@ -135,6 +136,7 @@
     }
   },
   "picker": {
+    "removeAuthor": "Remove author",
     "loadingMetadata": "",
     "columnCurrent": "",
     "columnFetched": "",
@@ -234,6 +236,9 @@
     "fileName": ""
   },
   "viewer": {
+    "toggleFilePath": "Show or hide file path",
+    "editDateFinished": "Edit date finished",
+    "editReadStatus": "Edit read status",
     "metadataLocked": "",
     "metadataUnlocked": "",
     "genresLabel": "",

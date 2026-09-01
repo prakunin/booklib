@@ -20,6 +20,7 @@
         "tags": "标签"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "文件数据",
         "fetchedData": "获取的数据",
         "copyMissingTooltip": "从获取的元数据中复制缺失字段",

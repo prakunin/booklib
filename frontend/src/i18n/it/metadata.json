@@ -21,6 +21,7 @@
         "audio": "Audio"
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "ebookCover": "Copertina eBook",
         "audiobookCover": "Copertina audiolibro",
         "regenerateCoverTooltip": "Rigenera copertina (dal file)",
@@ -135,6 +136,7 @@
         "writtenToFileTooltip": ""
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "loadingMetadata": "Caricamento metadati completi...",
         "columnCurrent": "Corrente",
         "columnFetched": "Recuperato",
@@ -234,6 +236,9 @@
         "startTime": ""
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "metadataLocked": "I metadati di questo libro sono bloccati.",
         "metadataUnlocked": "I metadati di questo libro sono sbloccati.",
         "genresLabel": "Generi:",

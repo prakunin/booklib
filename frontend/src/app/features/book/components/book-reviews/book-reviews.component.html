@@ -15,7 +15,7 @@
               rounded
               icon="pi pi-download"
               severity="primary"
-              (click)="fetchNewReviews()"
+              (onClick)="fetchNewReviews()"
               [pTooltip]="t('tooltip.fetchReviews')"
               tooltipPosition="top"
               class="action-btn floating-btn">
@@ -157,7 +157,7 @@
           size="small"
           [severity]="reviewsLocked ? 'danger' : 'success'"
           [disabled]="!reviewDownloadEnabled || loading()"
-          (click)="toggleReviewsLock()"
+          (onClick)="toggleReviewsLock()"
           [pTooltip]="loading() ? t('tooltip.pleaseWait') : (!reviewDownloadEnabled ? t('tooltip.enableDownloads') : (reviewsLocked ? t('tooltip.unlockReviews') : t('tooltip.lockReviews')))"
           tooltipPosition="left"
           class="action-btn"/>
@@ -169,7 +169,7 @@
           severity="primary"
           [loading]="loading()"
           [disabled]="reviewsLocked || !reviewDownloadEnabled || loading()"
-          (click)="fetchNewReviews()"
+          (onClick)="fetchNewReviews()"
           [pTooltip]="loading() ? t('tooltip.pleaseWait') : (!reviewDownloadEnabled ? t('tooltip.enableDownloads') : (reviewsLocked ? t('tooltip.reviewsLocked') : t('tooltip.fetchNewReviews')))"
           tooltipPosition="left"
           class="action-btn"/>
@@ -182,7 +182,7 @@
           size="small"
           severity="danger"
           [disabled]="reviewsLocked || loading()"
-          (click)="deleteAllReviews()"
+          (onClick)="deleteAllReviews()"
           [pTooltip]="loading() ? t('tooltip.pleaseWait') : (reviewsLocked ? t('tooltip.reviewsLocked') : t('tooltip.deleteAllReviews'))"
           tooltipPosition="left"
           class="action-btn"/>
@@ -195,7 +195,7 @@
           size="small"
           [severity]="allSpoilersRevealed ? 'warn' : 'info'"
           [disabled]="loading()"
-          (click)="toggleSpoilerVisibility()"
+          (onClick)="toggleSpoilerVisibility()"
           [pTooltip]="loading() ? t('tooltip.pleaseWait') : (allSpoilersRevealed ? t('tooltip.hideAllSpoilers') : t('tooltip.revealAllSpoilers'))"
           tooltipPosition="left"
           class="action-btn"/>
@@ -206,7 +206,7 @@
           size="small"
           severity="contrast"
           [disabled]="loading()"
-          (click)="toggleSortOrder()"
+          (onClick)="toggleSortOrder()"
           [pTooltip]="loading() ? t('tooltip.pleaseWait') : (sortAscending ? t('tooltip.sortNewest') : t('tooltip.sortOldest'))"
           tooltipPosition="left"
           class="action-btn"/>

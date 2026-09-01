@@ -21,7 +21,7 @@
         icon="pi pi-refresh"
         severity="primary"
         outlined
-        (click)="rescanBookdrop()"
+        (onClick)="rescanBookdrop()"
         [pTooltip]="t('rescanTooltip')"
         tooltipPosition="top">
       </p-button>
@@ -62,7 +62,7 @@
                 [label]="t('importMetadata')"
                 icon="pi pi-copy"
                 [disabled]="!hasSelectedFiles"
-                (click)="copyMetadata()"
+                (onClick)="copyMetadata()"
                 [pTooltip]="t('importMetadataTooltip')"
                 tooltipPosition="top">
               </p-button>
@@ -73,7 +73,7 @@
                   [binary]="true"
                   [(ngModel)]="includeCoversOnCopy">
                 </p-checkbox>
-                <label for="includecovers"><i class="pi pi-image icon-padding-left"></i></label>
+                <label for="includecovers" [attr.aria-label]="t('includeCoversTooltip')"><i class="pi pi-image icon-padding-left" aria-hidden="true"></i></label>
               </p-inputgroup-addon>
             </p-inputgroup>
 
@@ -85,7 +85,7 @@
               [label]="t('bulkEdit')"
               icon="pi pi-pencil"
               [disabled]="!hasSelectedFiles"
-              (click)="openBulkEditDialog()"
+              (onClick)="openBulkEditDialog()"
               [pTooltip]="t('bulkEditTooltip')"
               tooltipPosition="top">
             </p-button>
@@ -98,7 +98,7 @@
               [label]="t('extractPattern')"
               icon="pi pi-sliders-h"
               [disabled]="!hasSelectedFiles"
-              (click)="openPatternExtractDialog()"
+              (onClick)="openPatternExtractDialog()"
               [pTooltip]="t('extractPatternTooltip')"
               tooltipPosition="top">
             </p-button>
@@ -134,7 +134,7 @@
               icon="pi pi-check"
               severity="info"
               [disabled]="!canApplyDefaults"
-              (click)="applyLibraryDefaults()"
+              (onClick)="applyLibraryDefaults()"
               [pTooltip]="t('applyLibraryTooltip')"
               tooltipPosition="top">
             </p-button>
@@ -242,7 +242,7 @@
                   size="small"
                   [variant]="file.file.fetchedMetadata?.title ? undefined : 'outlined'"
                   [icon]="file.showDetails ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
-                  (click)="file.showDetails = !file.showDetails"
+                  (onClick)="file.showDetails = !file.showDetails"
                   [pTooltip]="file.showDetails
                     ? t('hideMetadataTooltip')
                     : file.file.fetchedMetadata?.title
@@ -287,7 +287,7 @@
               [label]="t('selectAll')"
               icon="pi pi-check-square"
               severity="info"
-              (click)="selectAll(true)"
+              (onClick)="selectAll(true)"
               outlined
               [pTooltip]="t('selectAllTooltip')"
               tooltipPosition="top">
@@ -299,7 +299,7 @@
             icon="pi pi-times-circle"
             severity="warn"
             [disabled]="!hasSelectedFiles"
-            (click)="selectAll(false)"
+            (onClick)="selectAll(false)"
             outlined
             [pTooltip]="t('clearTooltip')"
             tooltipPosition="top">
@@ -331,7 +331,7 @@
           severity="warn"
           [disabled]="!hasSelectedFiles"
           outlined
-          (click)="confirmReset()"
+          (onClick)="confirmReset()"
           [pTooltip]="t('resetTooltip')"
           tooltipPosition="top">
         </p-button>
@@ -341,7 +341,7 @@
           severity="danger"
           [disabled]="!hasSelectedFiles"
           outlined
-          (click)="confirmDelete()"
+          (onClick)="confirmDelete()"
           [pTooltip]="t('deleteTooltip')"
           tooltipPosition="top">
         </p-button>
@@ -351,7 +351,7 @@
           severity="success"
           outlined
           [disabled]="!canFinalize || saving"
-          (click)="confirmFinalize()"
+          (onClick)="confirmFinalize()"
           [pTooltip]="t('finalizeTooltip')"
           tooltipPosition="top">
         </p-button>

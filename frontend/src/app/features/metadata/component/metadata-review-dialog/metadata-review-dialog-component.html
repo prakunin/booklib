@@ -12,7 +12,7 @@
       [rounded]="true"
       [text]="true"
       severity="secondary"
-      (click)="close()"
+      (onClick)="close()"
       class="close-button">
     </p-button>
   </div>
@@ -49,7 +49,7 @@
           icon="pi pi-times-circle"
           severity="secondary"
           [outlined]="true"
-          (click)="close()">
+          (onClick)="close()">
         </p-button>
 
         <p-divider layout="vertical"/>
@@ -59,7 +59,7 @@
           icon="pi pi-lock"
           severity="warn"
           [outlined]="true"
-          (click)="lockAllMetadata()">
+          (onClick)="lockAllMetadata()">
         </p-button>
 
         <p-button
@@ -67,7 +67,7 @@
           icon="pi pi-lock-open"
           severity="success"
           [outlined]="true"
-          (click)="unlockAllMetadata()">
+          (onClick)="unlockAllMetadata()">
         </p-button>
 
         <p-divider layout="vertical"/>
@@ -79,7 +79,7 @@
           severity="success"
           [outlined]="true"
           [disabled]="saving()"
-          (click)="onSave()">
+          (onClick)="onSave()">
         </p-button>
 
         <p-divider layout="vertical"/>
@@ -90,7 +90,7 @@
           iconPos="right"
           severity="info"
           [outlined]="true"
-          (click)="onNext()">
+          (onClick)="onNext()">
         </p-button>
       </div>
     </div>

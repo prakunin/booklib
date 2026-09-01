@@ -266,6 +266,7 @@
     "comicEditors": "Editors"
   },
   "importJson": {
+    "textareaLabel": "JSON configuration",
     "buttonLabel": "Import",
     "placeholder": "{\n  \"type\": \"group\",\n  \"join\": \"and\",\n  \"rules\": [\n    { \"field\": \"readStatus\", \"operator\": \"equals\", \"value\": \"READING\" }\n  ]\n}",
     "apply": "Apply",

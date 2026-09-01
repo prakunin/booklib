@@ -20,6 +20,7 @@
         "tags": "Oznake"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "Podaci datoteke",
         "fetchedData": "Dohvaćeni podaci",
         "copyMissingTooltip": "Kopiraj polja koja nedostaju iz dohvaćenih metapodataka",

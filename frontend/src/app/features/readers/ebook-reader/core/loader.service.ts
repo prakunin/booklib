@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {defer, from, Observable, of} from 'rxjs';
+import {defer, from, Observable, of, Subscriber} from 'rxjs';
 import {switchMap} from 'rxjs/operators';
 
 @Injectable({
@@ -13,20 +13,22 @@ export class ReaderLoaderService {
       return of(undefined);
     }
 
-    return defer(() => new Observable<void>(observer => {
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.src = '/assets/foliate/view.js';
-      script.onload = () => {
-        this.scriptLoaded = true;
-        setTimeout(() => {
-          observer.next();
-          observer.complete();
-        }, 100);
-      };
-      script.onerror = () => observer.error(new Error('Failed to load foliate.js'));
-      document.head.appendChild(script);
-    }));
+    return defer(() => new Observable<void>(observer => this.appendFoliateScript(observer)));
+  }
+
+  private appendFoliateScript(observer: Subscriber<void>): void {
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = '/assets/foliate/view.js';
+    script.onload = () => {
+      this.scriptLoaded = true;
+      setTimeout(() => {
+        observer.next();
+        observer.complete();
+      }, 100);
+    };
+    script.onerror = () => observer.error(new Error('Failed to load foliate.js'));
+    document.head.appendChild(script);
   }
 
   waitForCustomElement(): Observable<void> {

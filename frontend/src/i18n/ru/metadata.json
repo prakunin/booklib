@@ -24,6 +24,7 @@
         "tooltip": "Заполнено из источника {{ provider }}"
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "ebookCover": "Обложка электронной книги",
         "audiobookCover": "Обложка аудиокниги",
         "regenerateCoverTooltip": "Создать обложку из файла",
@@ -139,6 +140,7 @@
         "writtenToFileTooltip": ""
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "loadingMetadata": "Загрузка полных метаданных...",
         "columnCurrent": "Текущие",
         "columnFetched": "Полученные",
@@ -240,6 +242,9 @@
         "localCatalog": "Каталог"
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "metadataLocked": "Метаданные этой книги заблокированы.",
         "metadataUnlocked": "Метаданные этой книги разблокированы.",
         "genresLabel": "Жанры:",

@@ -106,14 +106,14 @@
       [label]="'common.cancel' | transloco"
       icon="pi pi-times"
       severity="secondary"
-      (click)="cancel()">
+      (onClick)="cancel()">
     </p-button>
     <p-button
       [label]="t('applyToSelected')"
       icon="pi pi-check"
       severity="success"
       [disabled]="!hasEnabledFields"
-      (click)="apply()">
+      (onClick)="apply()">
     </p-button>
   </div>
 </div>

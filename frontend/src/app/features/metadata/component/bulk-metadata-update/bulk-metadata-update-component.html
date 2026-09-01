@@ -12,7 +12,7 @@
       [rounded]="true"
       [text]="true"
       severity="secondary"
-      (click)="ref.close()"
+      (onClick)="ref.close()"
       class="close-button">
     </p-button>
   </div>
@@ -361,8 +361,10 @@
               #coverFileInput
               accept="image/jpeg,image/png,image/webp"
               (change)="onCoverFileSelect($event)"
+              aria-labelledby="bulk-cover-file-button"
               class="file-input-hidden">
             <p-button
+              id="bulk-cover-file-button"
               icon="pi pi-upload"
               label="Select Image"
               [outlined]="true"

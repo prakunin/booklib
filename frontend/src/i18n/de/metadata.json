@@ -21,6 +21,7 @@
         "audio": "Audio"
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "ebookCover": "E-Book-Cover",
         "audiobookCover": "Hörbuch-Cover",
         "regenerateCoverTooltip": "Cover neu generieren (aus Datei)",
@@ -135,6 +136,7 @@
         "writtenToFileTooltip": "Dieses Feld wird in die physische Datei geschrieben"
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "loadingMetadata": "Vollständige Metadaten werden geladen...",
         "columnCurrent": "Aktuell",
         "columnFetched": "Abgerufen",
@@ -234,6 +236,9 @@
         "detachTooltip": ""
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "metadataLocked": "Die Metadaten dieses Buches sind gesperrt.",
         "metadataUnlocked": "Die Metadaten dieses Buches sind entsperrt.",
         "genresLabel": "Genres:",

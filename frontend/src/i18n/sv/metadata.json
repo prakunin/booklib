@@ -21,6 +21,7 @@
         "audio": "Ljud"
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "ebookCover": "E-boksomslag",
         "audiobookCover": "Ljudboksomslag",
         "regenerateCoverTooltip": "Återskapa omslag (från fil)",
@@ -135,6 +136,7 @@
         "writtenToFileTooltip": "Det här fältet skrivs till den fysiska filen"
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "loadingMetadata": "Laddar komplett metadata...",
         "columnCurrent": "Nuvarande",
         "columnFetched": "Hämtad",
@@ -234,6 +236,9 @@
         "fileName": "Fil"
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "metadataLocked": "Denna boks metadata är låst.",
         "metadataUnlocked": "Denna boks metadata är upplåst.",
         "genresLabel": "Genrer:",

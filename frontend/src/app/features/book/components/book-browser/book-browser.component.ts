@@ -642,7 +642,7 @@ export class BookBrowserComponent implements AfterViewInit {
       ? Object.fromEntries(
           Object.entries(filters).map(([key, value]) => [
             key,
-            (Array.isArray(value) ? value : [value]).map(filterValue => String(filterValue))
+            (Array.isArray(value) ? value : [value]).map(String)
           ])
         )
       : null;
@@ -668,9 +668,8 @@ export class BookBrowserComponent implements AfterViewInit {
 
   onVisibleColumnsChange(selected: { field: string; header: string }[]): void {
     const allFields = this.columnPreferenceService.allColumns.map(column => column.field);
-    this.visibleColumns.set(selected.sort(
-      (a, b) => allFields.indexOf(a.field) - allFields.indexOf(b.field)
-    ));
+    selected.sort((a, b) => allFields.indexOf(a.field) - allFields.indexOf(b.field));
+    this.visibleColumns.set(selected);
   }
 
   onCheckboxClicked(event: CheckboxClickEvent): void {

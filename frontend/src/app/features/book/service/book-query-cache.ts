@@ -158,23 +158,28 @@ function appBooksViewDependsOn(queryKey: readonly unknown[], changedFields: Set<
   const filters = queryKey[1] as AppBookFilters | undefined;
   const sort = queryKey[2] as AppBookSort | undefined;
 
-  if (filters) {
-    // A magic shelf's rule is evaluated server-side and can match on any field, so membership after
-    // a change is not decidable here. A plain shelfId holds explicit book ids and is unaffected.
-    if (filters.magicShelfId != null) return true;
-    if (changedFields.has('readStatus') && filters.status?.length) return true;
-    if (changedFields.has('personalRating') &&
-      (filters.personalRating?.length || filters.minRating != null || filters.maxRating != null)) return true;
-    if (changedFields.has('metadataMatchScore') && filters.matchScore?.length) return true;
-  }
+  if (filters && appBooksFiltersDependOn(filters, changedFields)) return true;
+  if (sort?.field && appBooksSortDependsOn(sort.field, changedFields)) return true;
+  return false;
+}
 
-  if (sort?.field) {
-    // AppBookSort.field may be a comma-joined multi-sort with a leading '-' for descending.
-    const sortTokens = sort.field.split(',').map(token => token.replace(/^-/, ''));
-    for (const field of changedFields) {
-      const token = SORT_FIELD_BY_BOOK_FIELD[field];
-      if (token && sortTokens.includes(token)) return true;
-    }
+function appBooksFiltersDependOn(filters: AppBookFilters, changedFields: Set<string>): boolean {
+  // A magic shelf's rule is evaluated server-side and can match on any field, so membership after
+  // a change is not decidable here. A plain shelfId holds explicit book ids and is unaffected.
+  if (filters.magicShelfId != null) return true;
+  if (changedFields.has('readStatus') && filters.status?.length) return true;
+  if (changedFields.has('personalRating') &&
+    (filters.personalRating?.length || filters.minRating != null || filters.maxRating != null)) return true;
+  if (changedFields.has('metadataMatchScore') && filters.matchScore?.length) return true;
+  return false;
+}
+
+function appBooksSortDependsOn(sortField: string, changedFields: Set<string>): boolean {
+  // AppBookSort.field may be a comma-joined multi-sort with a leading '-' for descending.
+  const sortTokens = new Set(sortField.split(',').map(token => token.replace(/^-/, '')));
+  for (const field of changedFields) {
+    const token = SORT_FIELD_BY_BOOK_FIELD[field];
+    if (token && sortTokens.has(token)) return true;
   }
   return false;
 }

@@ -13,7 +13,7 @@
       [rounded]="true"
       [text]="true"
       severity="secondary"
-      (click)="dynamicDialogRef.close()"
+      (onClick)="dynamicDialogRef.close()"
       class="close-button">
     </p-button>
   </div>
@@ -70,7 +70,7 @@
               [text]="true"
               [rounded]="true"
               severity="secondary"
-              (click)="onClear()"
+              (onClick)="onClear()"
               [pTooltip]="t('resetSearchTooltip')"
               tooltipPosition="top">
             </p-button>
@@ -135,7 +135,7 @@
                 }
                 <div class="cover-overlay">
                   <p-button
-                    (click)="selectAndSave(cover)"
+                    (onClick)="selectAndSave(cover)"
                     [label]="t('selectCover')"
                     icon="pi pi-check"
                     size="small">

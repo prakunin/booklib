@@ -7,7 +7,7 @@ export class GlobalErrorHandler implements ErrorHandler {
         const message = typeof error === 'string' ? error : err?.message ?? '';
         const name = err?.name ?? '';
 
-        const chunkFailedMessage = /Loading chunk [\d]+ failed/i;
+        const chunkFailedMessage = /Loading chunk \d+ failed/i;
         const moduleFailedMessage = /Loading failed for the module/i;
         const dynamicImportFailedMessage = /Failed to fetch dynamically imported module|Importing a module script failed/i;
 

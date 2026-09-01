@@ -11,8 +11,7 @@ import {BookService} from '../../../book/service/book.service';
 import {BookMetadataManageService} from '../../../book/service/book-metadata-manage.service';
 import {Book, BulkMetadataUpdateRequest} from '../../../book/model/book.model';
 import {Checkbox} from '@openng/optimus-ui/checkbox';
-import {AutoComplete} from '@openng/optimus-ui/autocomplete';
-import {AutoCompleteSelectEvent} from '@openng/optimus-ui/autocomplete';
+import {AutoComplete, AutoCompleteSelectEvent} from '@openng/optimus-ui/autocomplete';
 import {ProgressSpinner} from '@openng/optimus-ui/progressspinner';
 import {AppBooksApiService} from '../../../book/service/app-books-api.service';
 
@@ -185,6 +184,27 @@ export class BulkMetadataUpdateComponent implements OnInit {
     }
   }
 
+  private arrayFieldValue(clear: boolean, value: string[] | undefined): string[] | undefined {
+    if (clear) {
+      return [];
+    }
+    return value?.length ? value : undefined;
+  }
+
+  private textFieldValue(clear: boolean, value: string | undefined): string | undefined {
+    if (clear) {
+      return '';
+    }
+    return value?.trim() || undefined;
+  }
+
+  private publishedDateValue(clear: boolean, value: string | Date | null | undefined): string | null | undefined {
+    if (clear) {
+      return null;
+    }
+    return value ? new Date(value).toISOString().split('T')[0] : undefined;
+  }
+
   onSubmit(): void {
     if (!this.metadataForm.valid) return;
 
@@ -193,33 +213,31 @@ export class BulkMetadataUpdateComponent implements OnInit {
     const payload: BulkMetadataUpdateRequest = {
       bookIds: this.bookIds,
 
-      authors: this.clearFields.authors ? [] : (formValue.authors?.length ? formValue.authors : undefined),
+      authors: this.arrayFieldValue(this.clearFields.authors, formValue.authors),
       clearAuthors: this.clearFields.authors,
 
-      publisher: this.clearFields.publisher ? '' : (formValue.publisher?.trim() || undefined),
+      publisher: this.textFieldValue(this.clearFields.publisher, formValue.publisher),
       clearPublisher: this.clearFields.publisher,
 
-      language: this.clearFields.language ? '' : (formValue.language?.trim() || undefined),
+      language: this.textFieldValue(this.clearFields.language, formValue.language),
       clearLanguage: this.clearFields.language,
 
-      seriesName: this.clearFields.seriesName ? '' : (formValue.seriesName?.trim() || undefined),
+      seriesName: this.textFieldValue(this.clearFields.seriesName, formValue.seriesName),
       clearSeriesName: this.clearFields.seriesName,
 
       seriesTotal: this.clearFields.seriesTotal ? null : (formValue.seriesTotal || undefined),
       clearSeriesTotal: this.clearFields.seriesTotal,
 
-      publishedDate: this.clearFields.publishedDate
-        ? null
-        : (formValue.publishedDate ? new Date(formValue.publishedDate).toISOString().split('T')[0] : undefined),
+      publishedDate: this.publishedDateValue(this.clearFields.publishedDate, formValue.publishedDate),
       clearPublishedDate: this.clearFields.publishedDate,
 
-      genres: this.clearFields.genres ? [] : (formValue.genres?.length ? formValue.genres : undefined),
+      genres: this.arrayFieldValue(this.clearFields.genres, formValue.genres),
       clearGenres: this.clearFields.genres,
 
-      moods: this.clearFields.moods ? [] : (formValue.moods?.length ? formValue.moods : undefined),
+      moods: this.arrayFieldValue(this.clearFields.moods, formValue.moods),
       clearMoods: this.clearFields.moods,
 
-      tags: this.clearFields.tags ? [] : (formValue.tags?.length ? formValue.tags : undefined),
+      tags: this.arrayFieldValue(this.clearFields.tags, formValue.tags),
       clearTags: this.clearFields.tags,
 
       mergeCategories: this.mergeCategories,

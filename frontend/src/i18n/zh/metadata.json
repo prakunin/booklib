@@ -21,6 +21,7 @@
         "audio": "音频"
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "ebookCover": "电子书封面",
         "audiobookCover": "有声书封面",
         "regenerateCoverTooltip": "重新生成封面（从文件）",
@@ -135,6 +136,7 @@
         "writtenToFileTooltip": ""
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "loadingMetadata": "正在加载完整元数据...",
         "columnCurrent": "当前",
         "columnFetched": "获取的",
@@ -234,6 +236,9 @@
         "startTime": ""
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "metadataLocked": "此图书元数据已锁定。",
         "metadataUnlocked": "此图书元数据已解锁。",
         "genresLabel": "类型：",

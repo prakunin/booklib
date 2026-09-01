@@ -321,70 +321,15 @@ export class BookCardComponent {
 
   private getPermissionBasedMenuItems(b: Book): MenuItem[] {
     const items: MenuItem[] = [];
+    const hasAdditional = (b.alternativeFormats && b.alternativeFormats.length > 0) ||
+      (b.supplementaryFiles && b.supplementaryFiles.length > 0);
 
     if (this.currentUser()?.permissions.canDownload) {
-      const hasAdditional = (b.alternativeFormats && b.alternativeFormats.length > 0) ||
-        (b.supplementaryFiles && b.supplementaryFiles.length > 0);
-
-      if (hasAdditional) {
-        items.push({
-          label: this.t.translate('book.card.menu.download'),
-          icon: 'pi pi-download',
-          items: this.getDownloadMenuItems(b)
-        });
-      } else if (this.additionalFilesLoaded()) {
-        items.push({
-          label: this.t.translate('book.card.menu.download'),
-          icon: 'pi pi-download',
-          command: () => this.bookFileService.downloadFile(this.book())
-        });
-      } else {
-        items.push({
-          label: this.t.translate('book.card.menu.download'),
-          icon: this.isSubMenuLoading() ? 'pi pi-spin pi-spinner' : 'pi pi-download',
-          items: [{label: this.t.translate('book.card.menu.loading'), disabled: true}]
-        });
-      }
+      items.push(this.getDownloadMenuItem(b, hasAdditional));
     }
 
     if (this.currentUser()?.permissions.canDeleteBook) {
-      const hasAdditional = (b.alternativeFormats && b.alternativeFormats.length > 0) ||
-        (b.supplementaryFiles && b.supplementaryFiles.length > 0);
-
-      if (hasAdditional) {
-        items.push({
-          label: this.t.translate('book.card.menu.delete'),
-          icon: 'pi pi-trash',
-          items: this.getDeleteMenuItems(b)
-        });
-      } else if (this.additionalFilesLoaded()) {
-        items.push({
-          label: this.t.translate('book.card.menu.delete'),
-          icon: 'pi pi-trash',
-          command: () => {
-            this.confirmationService.confirm({
-              message: this.t.translate('book.card.confirm.deleteBookMessage', {title: this.book().metadata?.title}),
-              header: this.t.translate('book.card.confirm.deleteBookHeader'),
-              icon: 'pi pi-exclamation-triangle',
-              acceptIcon: 'pi pi-trash',
-              rejectIcon: 'pi pi-times',
-              acceptLabel: this.t.translate('common.delete'),
-              rejectLabel: this.t.translate('common.cancel'),
-              acceptButtonStyleClass: 'p-button-danger',
-              rejectButtonStyleClass: 'p-button-outlined',
-              accept: () => {
-                this.bookService.deleteBooks(new Set([this.book().id])).subscribe();
-              }
-            });
-          }
-        });
-      } else {
-        items.push({
-          label: this.t.translate('book.card.menu.delete'),
-          icon: this.isSubMenuLoading() ? 'pi pi-spin pi-spinner' : 'pi pi-trash',
-          items: [{label: this.t.translate('book.card.menu.loading'), disabled: true}]
-        });
-      }
+      items.push(this.getDeleteMenuItem(b, hasAdditional));
     }
 
     if (this.currentUser()?.permissions.canEmailBook) {
@@ -394,43 +339,7 @@ export class BookCardComponent {
         items: [{
           label: this.t.translate('book.card.menu.quickSend'),
           icon: 'pi pi-envelope',
-          command: () => {
-            const doSend = () => {
-              this.emailService.emailBookQuick(this.book().id).subscribe({
-                next: () => {
-                  this.messageService.add({
-                    severity: 'info',
-                    summary: this.t.translate('common.success'),
-                    detail: this.t.translate('book.card.toast.quickSendSuccessDetail'),
-                  });
-                },
-                error: (err: {error?: {message?: string}}) => {
-                  const errorMessage = err?.error?.message || this.t.translate('book.card.toast.quickSendErrorDetail');
-                  this.messageService.add({
-                    severity: 'error',
-                    summary: this.t.translate('common.error'),
-                    detail: errorMessage,
-                  });
-                },
-              });
-            };
-
-            const currentBook = this.book();
-            if (currentBook.primaryFile?.fileSizeKb && currentBook.primaryFile.fileSizeKb > 25 * 1024) {
-              this.confirmationService.confirm({
-                message: this.t.translate('book.card.confirm.largeFileMessage'),
-                header: this.t.translate('book.card.confirm.largeFileHeader'),
-                icon: 'pi pi-exclamation-triangle',
-                acceptLabel: this.t.translate('book.card.confirm.sendAnyway'),
-                rejectLabel: this.t.translate('common.cancel'),
-                acceptButtonProps: {severity: 'warn'},
-                rejectButtonProps: {severity: 'secondary'},
-                accept: doSend,
-              });
-            } else {
-              doSend();
-            }
-          }
+          command: () => this.quickSendCurrentBook()
         },
           {
             label: this.t.translate('book.card.menu.customSend'),
@@ -516,6 +425,103 @@ export class BookCardComponent {
     }
 
     return items;
+  }
+
+  private getDownloadMenuItem(b: Book, hasAdditional: boolean | undefined): MenuItem {
+    if (hasAdditional) {
+      return {
+        label: this.t.translate('book.card.menu.download'),
+        icon: 'pi pi-download',
+        items: this.getDownloadMenuItems(b)
+      };
+    }
+    if (this.additionalFilesLoaded()) {
+      return {
+        label: this.t.translate('book.card.menu.download'),
+        icon: 'pi pi-download',
+        command: () => this.bookFileService.downloadFile(this.book())
+      };
+    }
+    return {
+      label: this.t.translate('book.card.menu.download'),
+      icon: this.isSubMenuLoading() ? 'pi pi-spin pi-spinner' : 'pi pi-download',
+      items: [{label: this.t.translate('book.card.menu.loading'), disabled: true}]
+    };
+  }
+
+  private getDeleteMenuItem(b: Book, hasAdditional: boolean | undefined): MenuItem {
+    if (hasAdditional) {
+      return {
+        label: this.t.translate('book.card.menu.delete'),
+        icon: 'pi pi-trash',
+        items: this.getDeleteMenuItems(b)
+      };
+    }
+    if (this.additionalFilesLoaded()) {
+      return {
+        label: this.t.translate('book.card.menu.delete'),
+        icon: 'pi pi-trash',
+        command: () => {
+          this.confirmationService.confirm({
+            message: this.t.translate('book.card.confirm.deleteBookMessage', {title: this.book().metadata?.title}),
+            header: this.t.translate('book.card.confirm.deleteBookHeader'),
+            icon: 'pi pi-exclamation-triangle',
+            acceptIcon: 'pi pi-trash',
+            rejectIcon: 'pi pi-times',
+            acceptLabel: this.t.translate('common.delete'),
+            rejectLabel: this.t.translate('common.cancel'),
+            acceptButtonStyleClass: 'p-button-danger',
+            rejectButtonStyleClass: 'p-button-outlined',
+            accept: () => {
+              this.bookService.deleteBooks(new Set([this.book().id])).subscribe();
+            }
+          });
+        }
+      };
+    }
+    return {
+      label: this.t.translate('book.card.menu.delete'),
+      icon: this.isSubMenuLoading() ? 'pi pi-spin pi-spinner' : 'pi pi-trash',
+      items: [{label: this.t.translate('book.card.menu.loading'), disabled: true}]
+    };
+  }
+
+  private quickSendCurrentBook(): void {
+    const doSend = () => {
+      this.emailService.emailBookQuick(this.book().id).subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'info',
+            summary: this.t.translate('common.success'),
+            detail: this.t.translate('book.card.toast.quickSendSuccessDetail'),
+          });
+        },
+        error: (err: {error?: {message?: string}}) => {
+          const errorMessage = err?.error?.message || this.t.translate('book.card.toast.quickSendErrorDetail');
+          this.messageService.add({
+            severity: 'error',
+            summary: this.t.translate('common.error'),
+            detail: errorMessage,
+          });
+        },
+      });
+    };
+
+    const currentBook = this.book();
+    if (currentBook.primaryFile?.fileSizeKb && currentBook.primaryFile.fileSizeKb > 25 * 1024) {
+      this.confirmationService.confirm({
+        message: this.t.translate('book.card.confirm.largeFileMessage'),
+        header: this.t.translate('book.card.confirm.largeFileHeader'),
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: this.t.translate('book.card.confirm.sendAnyway'),
+        rejectLabel: this.t.translate('common.cancel'),
+        acceptButtonProps: {severity: 'warn'},
+        rejectButtonProps: {severity: 'secondary'},
+        accept: doSend,
+      });
+    } else {
+      doSend();
+    }
   }
 
   private moreMenuItems(): MenuItem[] {

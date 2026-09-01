@@ -21,6 +21,7 @@
         "audio": "Audio"
     },
     "editor": {
+        "removeAuthor": "Remove author",
         "ebookCover": "Naslovnica e-knjige",
         "audiobookCover": "Naslovnica audioknjige",
         "regenerateCoverTooltip": "Regeneriraj naslovnicu (iz datoteke)",
@@ -135,6 +136,7 @@
         "writtenToFileTooltip": "Ovo polje se zapisuje u fizičku datoteku"
     },
     "picker": {
+        "removeAuthor": "Remove author",
         "loadingMetadata": "Učitavanje potpunih metapodataka...",
         "columnCurrent": "Trenutno",
         "columnFetched": "Dohvaćeno",
@@ -234,6 +236,9 @@
         "detachTooltip": "Odvoji"
     },
     "viewer": {
+        "toggleFilePath": "Show or hide file path",
+        "editDateFinished": "Edit date finished",
+        "editReadStatus": "Edit read status",
         "metadataLocked": "Metapodaci ove knjige su zaključani.",
         "metadataUnlocked": "Metapodaci ove knjige su otključani.",
         "genresLabel": "Žanrovi:",

@@ -328,7 +328,7 @@ export class BookTableRowComponent {
   }
 
   private isKeyOf<T extends object>(value: T, field: PropertyKey): field is keyof T {
-    return Object.prototype.hasOwnProperty.call(value, field);
+    return Object.hasOwn(value, field);
   }
 
   private isAudiobook(): boolean {

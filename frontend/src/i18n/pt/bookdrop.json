@@ -20,6 +20,7 @@
         "tags": "Tags"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "Dados do Arquivo",
         "fetchedData": "Dados Obtidos",
         "copyMissingTooltip": "Copiar campos ausentes dos metadados obtidos",

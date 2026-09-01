@@ -48,12 +48,10 @@ export class BookSocketService {
       () => this.flushAppBooksInvalidation(),
       this.appBooksInvalidationDebounceMs
     );
-    if (this.appBooksInvalidationMaxWaitTimer === null) {
-      this.appBooksInvalidationMaxWaitTimer = setTimeout(
-        () => this.flushAppBooksInvalidation(),
-        this.appBooksInvalidationMaxWaitMs
-      );
-    }
+    this.appBooksInvalidationMaxWaitTimer ??= setTimeout(
+      () => this.flushAppBooksInvalidation(),
+      this.appBooksInvalidationMaxWaitMs
+    );
   }
 
   private flushAppBooksInvalidation(): void {

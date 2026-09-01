@@ -95,6 +95,7 @@
     "description": "Choose one or more directories from your file system",
     "currentPath": "Current Path:",
     "searchPlaceholder": "Search folders...",
+    "clearSearch": "Clear search",
     "goUpTooltip": "Go up one level",
     "selectAllBtn": "Select All",
     "selectAllTooltip": "Select all visible folders",

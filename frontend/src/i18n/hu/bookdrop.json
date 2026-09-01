@@ -20,6 +20,7 @@
         "tags": "Címkék"
     },
     "metadataPicker": {
+        "removeAuthor": "Remove author",
         "fileData": "Fájl Adatok",
         "fetchedData": "Begyűjtött Adatok",
         "copyMissingTooltip": "Másold a hiányzó mezőket a begyűjtött metaadatokból",

@@ -258,6 +258,7 @@
         "firstInSeries": ""
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "",
         "successDetail": "",
         "structureError": "",

@@ -36,7 +36,8 @@
                   type="text"
                   #tableFilter
                   (input)="filterGlobal($event, dataTable)"
-                  [placeholder]="t(tab.placeholderKey)"/>
+                  [placeholder]="t(tab.placeholderKey)"
+                  [attr.aria-label]="t(tab.placeholderKey)"/>
               </p-iconfield>
               <div class="actions">
                 <p-button
@@ -118,14 +119,12 @@
                         (ngModelChange)="onRowSelect(tab.type)"></p-checkbox>
                     </td>
                     <td>
-                      <span
-                        class="clickable-cell"
-                        role="button"
-                        tabindex="0"
-                        (click)="onMetadataClick(tab.type, item.value)"
-                        (keydown.enter)="onMetadataClick(tab.type, item.value)">
+                      <button
+                        type="button"
+                        class="clickable-cell text-start"
+                        (click)="onMetadataClick(tab.type, item.value)">
                         {{ item.value }}
-                      </span>
+                      </button>
                     </td>
                     <td>{{ item.count }}</td>
                     <td class="actions-cell">

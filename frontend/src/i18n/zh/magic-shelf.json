@@ -274,6 +274,7 @@
         "errorDetailDefault": "保存智能书架失败。"
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "",
         "successDetail": "",
         "structureError": "",

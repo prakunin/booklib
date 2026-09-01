@@ -105,7 +105,7 @@ interface FullFieldConfig {
   max?: number;
 }
 
-type FieldType = 'number' | 'decimal' | 'date' | 'boolean' | undefined;
+type FieldType = 'number' | 'decimal' | 'date' | 'boolean';
 
 export interface Rule {
   field: RuleField;
@@ -116,7 +116,7 @@ export interface Rule {
 }
 
 export interface FieldConfig {
-  type: FieldType;
+  type: FieldType | undefined;
   max?: number;
 }
 
@@ -727,16 +727,12 @@ export class MagicShelfComponent implements OnInit {
       valueCtrl?.setValue(null);
       valueStartCtrl?.setValue(null);
       valueEndCtrl?.setValue('days');
-    } else if (operator === 'this_period') {
+    } else if (operator === 'this_period' || EMPTY_CHECK_OPERATORS.includes(operator)) {
       valueCtrl?.setValue(null);
       valueStartCtrl?.setValue(null);
       valueEndCtrl?.setValue(null);
     } else if (MULTI_VALUE_OPERATORS.includes(operator)) {
       valueCtrl?.setValue([]);
-      valueStartCtrl?.setValue(null);
-      valueEndCtrl?.setValue(null);
-    } else if (EMPTY_CHECK_OPERATORS.includes(operator)) {
-      valueCtrl?.setValue(null);
       valueStartCtrl?.setValue(null);
       valueEndCtrl?.setValue(null);
     } else {
@@ -788,8 +784,7 @@ export class MagicShelfComponent implements OnInit {
     const inputValue = target?.value?.trim();
     if (inputValue) {
       const currentValue = formControl.value || [];
-      const values = Array.isArray(currentValue) ? currentValue :
-        typeof currentValue === 'string' && currentValue ? currentValue.split(',').map((v: string) => v.trim()) : [];
+      const values = this.toValueList(currentValue);
 
       if (!values.includes(inputValue)) {
         values.push(inputValue);
@@ -799,6 +794,16 @@ export class MagicShelfComponent implements OnInit {
         target.value = '';
       }
     }
+  }
+
+  private toValueList(currentValue: unknown): string[] {
+    if (Array.isArray(currentValue)) {
+      return currentValue;
+    }
+    if (typeof currentValue === 'string' && currentValue) {
+      return currentValue.split(',').map((v: string) => v.trim());
+    }
+    return [];
   }
 
   onIsPublicChange(event: CheckboxChangeEvent): void {

@@ -48,7 +48,7 @@
                       (onClick)="setDefaultProvider(provider)">
                     </p-radioButton>
                     @if (provider.isEditing) {
-                      <input type="text" pInputText [(ngModel)]="provider.name" [placeholder]="t('providerNamePlaceholder')" class="name-input"/>
+                      <input type="text" pInputText [(ngModel)]="provider.name" [placeholder]="t('providerNamePlaceholder')" [attr.aria-label]="t('providerNamePlaceholder')" class="name-input"/>
                     } @else {
                       <span class="provider-name">{{ provider.name }}</span>
                       @if (provider.shared) {
@@ -117,7 +117,7 @@
                       {{ t('host') }}
                     </span>
                     @if (provider.isEditing) {
-                      <input type="text" pInputText [(ngModel)]="provider.host" [placeholder]="t('hostPlaceholder')"/>
+                      <input type="text" pInputText [(ngModel)]="provider.host" [placeholder]="t('hostPlaceholder')" [attr.aria-label]="t('host')"/>
                     } @else {
                       <span class="detail-value">{{ provider.host }}</span>
                     }
@@ -129,7 +129,7 @@
                       {{ t('port') }}
                     </span>
                     @if (provider.isEditing) {
-                      <input type="number" pInputText [(ngModel)]="provider.port" [placeholder]="t('portPlaceholder')"/>
+                      <input type="number" pInputText [(ngModel)]="provider.port" [placeholder]="t('portPlaceholder')" [attr.aria-label]="t('port')"/>
                     } @else {
                       <span class="detail-value">{{ provider.port }}</span>
                     }
@@ -141,7 +141,7 @@
                       {{ t('username') }}
                     </span>
                     @if (provider.isEditing) {
-                      <input type="text" pInputText [(ngModel)]="provider.username" [placeholder]="t('usernamePlaceholder')"/>
+                      <input type="text" pInputText [(ngModel)]="provider.username" [placeholder]="t('usernamePlaceholder')" [attr.aria-label]="t('username')"/>
                     } @else {
                       <span class="detail-value">{{ provider.username }}</span>
                     }
@@ -153,7 +153,7 @@
                       {{ t('password') }}
                     </span>
                     @if (provider.isEditing) {
-                      <input type="password" pInputText [(ngModel)]="provider.password" [placeholder]="t('passwordPlaceholder')"/>
+                      <input type="password" pInputText [(ngModel)]="provider.password" [placeholder]="t('passwordPlaceholder')" [attr.aria-label]="t('password')"/>
                     } @else {
                       <span class="detail-value password-hidden">********</span>
                     }
@@ -165,7 +165,7 @@
                       {{ t('fromAddress') }}
                     </span>
                     @if (provider.isEditing) {
-                      <input type="email" pInputText [(ngModel)]="provider.fromAddress" [placeholder]="t('fromAddressPlaceholder')"/>
+                      <input type="email" pInputText [(ngModel)]="provider.fromAddress" [placeholder]="t('fromAddressPlaceholder')" [attr.aria-label]="t('fromAddress')"/>
                     } @else {
                       <span class="detail-value">{{ provider.fromAddress }}</span>
                     }

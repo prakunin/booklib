@@ -98,7 +98,11 @@
               </td>
               <td class="description-cell"
                   [class.expanded]="expandedRows.has(log.id)"
-                  (click)="toggleDescription(log.id)">
+                  tabindex="0"
+                  [attr.aria-expanded]="expandedRows.has(log.id)"
+                  (click)="toggleDescription(log.id)"
+                  (keydown.enter)="toggleDescription(log.id)"
+                  (keydown.space)="toggleDescription(log.id); $event.preventDefault()">
                 {{ log.description }}
               </td>
               <td class="ip-cell">

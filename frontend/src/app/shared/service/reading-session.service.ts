@@ -273,14 +273,7 @@ export class ReadingSessionService {
   }
 
   private stopIdleDetection(): void {
-    if (this.idleTimer) {
-      clearTimeout(this.idleTimer);
-      this.idleTimer = null;
-    }
-    if (this.activitySubscription) {
-      this.activitySubscription.unsubscribe();
-      this.activitySubscription = null;
-    }
+    this.pauseIdleDetection();
   }
 
   private cleanup(): void {

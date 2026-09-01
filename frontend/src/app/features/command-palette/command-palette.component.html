@@ -2,7 +2,7 @@
   <ng-container *transloco="let t; prefix: 'layout.commandPalette'">
     <div class="command-palette-shell" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" [attr.aria-label]="t('ariaLabel')">
       <div class="command-palette" [style.max-height.px]="availableHeightPx()">
-        <!-- iOS needs both type="search" and a form with an action attribute. -->
+        <!-- iOS shows the search keyboard only for a search-typed input inside a form that carries an action attribute. -->
         <form ngNoForm action="." class="command-palette-form" (submit)="$event.preventDefault()">
           <div class="command-palette-input-row">
             <svg lucideSearch class="command-palette-search-icon" aria-hidden="true"></svg>

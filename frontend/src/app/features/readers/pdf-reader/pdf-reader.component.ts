@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, Injector, NgZone, OnDestroy, OnInit, afterNextRender, viewChild, DestroyRef, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { ActivatedRoute, Router, type Navigation } from '@angular/router';
 import { PageTitleService } from "../../../shared/service/page-title.service";
 import { BookService } from '../../book/service/book.service';
@@ -27,9 +27,10 @@ import { CacheStorageService } from '../../../shared/service/cache-storage.servi
 import { LocalSettingsService } from '../../../shared/service/local-settings.service';
 import { ReadingSessionService } from '../../../shared/service/reading-session.service';
 import { WakeLockService } from '../../../shared/service/wake-lock.service';
-import { Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {ReaderFullscreenService} from '../shared/reader-fullscreen.service';
+
+type PdfSpreadMode = 'none' | 'odd' | 'even';
 
 export function hasInAppReaderPredecessor(
   navigation: Pick<Navigation, 'extras' | 'previousNavigation'> | null,
@@ -69,7 +70,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   readonly isToolbarOverflowOpen = signal(false);
   readonly isZoomMenuOpen = signal(false);
   readonly activeAnnotationTool = signal<string | null>(null);
-  readonly spreadMode = signal<'none' | 'odd' | 'even'>('none');
+  readonly spreadMode = signal<PdfSpreadMode>('none');
   readonly scrollLayout = signal<PdfScrollLayout>('vertical');
   readonly goToPageInput = signal<number | null>(null);
   readonly outline = signal<PdfOutlineItem[]>([]);
@@ -719,7 +720,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
       this.annotationListItems.set(items.map(item => {
         const ann = item.annotation as unknown as Record<string, unknown>;
         return {
-          id: String(ann['id'] || ''),
+          id: String((ann['id'] as string | number | undefined) || ''),
           pageIndex: (ann['pageIndex'] as number) ?? 0,
           type: this.getAnnotationTypeName(ann['type'] as number),
           color: (ann['strokeColor'] ?? ann['color']) as string | undefined,
@@ -848,7 +849,7 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
   // --- Spread ---
 
   cycleSpreadMode(): void {
-    const modes: ('none' | 'odd' | 'even')[] = ['none', 'odd', 'even'];
+    const modes: PdfSpreadMode[] = ['none', 'odd', 'even'];
     const idx = modes.indexOf(this.spreadMode());
     const next = modes[(idx + 1) % modes.length];
     this.spreadMode.set(next);
@@ -1396,14 +1397,12 @@ export class PdfReaderComponent implements OnInit, OnDestroy {
         } else if (!this.isPhone() && tapX > screenWidth * (1 - this.TAP_ZONE_RATIO)) {
           // Right zone: next page
           this.goToNextPage();
-        } else {
+        } else if (this.headerVisible() || this.footerVisible()) {
           // Center zone (or any zone on phone): toggle chrome
-          if (this.headerVisible() || this.footerVisible()) {
-            this.hideChrome();
-          } else {
-            this.showChrome();
-            this.startChromeAutoHide();
-          }
+          this.hideChrome();
+        } else {
+          this.showChrome();
+          this.startChromeAutoHide();
         }
       });
     }

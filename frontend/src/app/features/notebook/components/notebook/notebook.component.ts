@@ -243,11 +243,6 @@ export class NotebookComponent implements OnInit {
         break;
       case 'EPUB':
       case 'HTML':
-        if (entry.cfi) {
-          queryParams['cfi'] = entry.cfi;
-        }
-        void this.router.navigate([`/ebook-reader/book/${entry.bookId}`], {queryParams});
-        break;
       case 'FB2':
       case 'MOBI':
       case 'AZW3':
@@ -293,31 +288,9 @@ export class NotebookComponent implements OnInit {
   }
 
   private generateMarkdownDownload(entries: NotebookEntry[]): void {
-    const groupMap = new Map<number, { bookTitle: string; entries: NotebookEntry[] }>();
-    for (const entry of entries) {
-      if (!groupMap.has(entry.bookId)) {
-        groupMap.set(entry.bookId, {bookTitle: entry.bookTitle, entries: []});
-      }
-      groupMap.get(entry.bookId)!.entries.push(entry);
-    }
-
     let md = '# Notebook Export\n\n';
-    for (const group of groupMap.values()) {
-      md += `## ${group.bookTitle}\n\n`;
-      let currentChapter = '';
-      for (const entry of group.entries) {
-        if (entry.chapterTitle && entry.chapterTitle !== currentChapter) {
-          currentChapter = entry.chapterTitle;
-          md += `### ${currentChapter}\n\n`;
-        }
-        if (entry.text) {
-          md += `> ${entry.text}\n\n`;
-        }
-        if (entry.note) {
-          md += `**Note:** ${entry.note}\n\n`;
-        }
-        md += '---\n\n';
-      }
+    for (const group of this.groupEntriesByBook(entries)) {
+      md += this.formatGroupMarkdown(group);
     }
 
     const blob = new Blob([md], {type: 'text/markdown'});
@@ -327,6 +300,36 @@ export class NotebookComponent implements OnInit {
     a.download = 'notebook-export.md';
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  private groupEntriesByBook(entries: NotebookEntry[]): { bookTitle: string; entries: NotebookEntry[] }[] {
+    const groupMap = new Map<number, { bookTitle: string; entries: NotebookEntry[] }>();
+    for (const entry of entries) {
+      if (!groupMap.has(entry.bookId)) {
+        groupMap.set(entry.bookId, {bookTitle: entry.bookTitle, entries: []});
+      }
+      groupMap.get(entry.bookId)!.entries.push(entry);
+    }
+    return [...groupMap.values()];
+  }
+
+  private formatGroupMarkdown(group: { bookTitle: string; entries: NotebookEntry[] }): string {
+    let md = `## ${group.bookTitle}\n\n`;
+    let currentChapter = '';
+    for (const entry of group.entries) {
+      if (entry.chapterTitle && entry.chapterTitle !== currentChapter) {
+        currentChapter = entry.chapterTitle;
+        md += `### ${currentChapter}\n\n`;
+      }
+      if (entry.text) {
+        md += `> ${entry.text}\n\n`;
+      }
+      if (entry.note) {
+        md += `**Note:** ${entry.note}\n\n`;
+      }
+      md += '---\n\n';
+    }
+    return md;
   }
 
   private parsePositiveInt(value: string | undefined): number | null {

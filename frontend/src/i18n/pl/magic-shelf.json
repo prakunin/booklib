@@ -274,6 +274,7 @@
         "errorDetailDefault": "Nie udało się zapisać inteligentnej półki."
     },
     "importJson": {
+        "textareaLabel": "JSON configuration",
         "buttonLabel": "",
         "successDetail": "",
         "structureError": "",

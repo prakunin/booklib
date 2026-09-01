@@ -315,7 +315,7 @@ export class AppBooksApiService {
       toArray(),
       map(responses => {
         const booksById = new Map(
-          responses.flatMap(response => response).map(summary => [summary.id, summaryToBook(summary)]),
+          responses.flat().map(summary => [summary.id, summaryToBook(summary)]),
         );
         return bookIds.flatMap(bookId => {
           const book = booksById.get(bookId);

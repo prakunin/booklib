@@ -1,5 +1,5 @@
 import {Component, inject} from '@angular/core';
-import {TranslocoDirective} from '@jsverse/transloco';
+import {TranslocoDirective, TranslocoPipe} from '@jsverse/transloco';
 import {ReaderHeaderService} from './header.service';
 import {ReaderIconComponent} from '../../shared/icon.component';
 import {Router} from '@angular/router';
@@ -7,7 +7,7 @@ import {Router} from '@angular/router';
 @Component({
   selector: 'app-reader-header',
   standalone: true,
-  imports: [TranslocoDirective, ReaderIconComponent],
+  imports: [TranslocoDirective, TranslocoPipe, ReaderIconComponent],
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.scss']
 })

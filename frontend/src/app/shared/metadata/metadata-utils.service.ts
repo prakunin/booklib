@@ -76,22 +76,20 @@ export class MetadataUtilsService {
   }
 
   normalizeForComparison(field1: unknown, field2: unknown): [string | undefined, string | undefined] {
-    let val1: string | undefined = undefined;
-    let val2: string | undefined = undefined;
+    return [this.normalizeField(field1), this.normalizeField(field2)];
+  }
 
-    if (Array.isArray(field1)) {
-      val1 = field1.length > 0 ? JSON.stringify(sortStrings(field1.map(String))) : undefined;
-    } else if (field1 != null && field1 !== '') {
-      val1 = String(field1);
+  private normalizeField(field: unknown): string | undefined {
+    if (Array.isArray(field)) {
+      return field.length > 0 ? JSON.stringify(sortStrings(field.map(String))) : undefined;
     }
-
-    if (Array.isArray(field2)) {
-      val2 = field2.length > 0 ? JSON.stringify(sortStrings(field2.map(String))) : undefined;
-    } else if (field2 != null && field2 !== '') {
-      val2 = String(field2);
+    if (field == null || field === '') {
+      return undefined;
     }
-
-    return [val1, val2];
+    if (field instanceof Date) {
+      return field.toString();
+    }
+    return typeof field === 'object' ? JSON.stringify(field) : String(field);
   }
 
   isValueChanged(field: string, metadataForm: FormGroup, originalMetadata?: BookMetadata): boolean {

@@ -69,6 +69,7 @@
         "description": "Choisissez un ou plusieurs répertoires de votre système de fichiers",
         "currentPath": "Chemin actuel :",
         "searchPlaceholder": "Rechercher des dossiers...",
+        "clearSearch": "Clear search",
         "goUpTooltip": "Remonter d'un niveau",
         "selectAllBtn": "Tout sélectionner",
         "selectAllTooltip": "Sélectionner tous les dossiers visibles",

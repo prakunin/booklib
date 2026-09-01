@@ -204,7 +204,7 @@ export class AuditLogsComponent implements OnInit {
   countryCodeToFlag(code: string): string {
     if (code?.length !== 2) return '';
     return [...code.toUpperCase()]
-      .map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65))
+      .map(c => String.fromCodePoint(0x1F1E6 + (c.codePointAt(0) ?? 0) - 65))
       .join('');
   }
 

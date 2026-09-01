@@ -28,24 +28,25 @@ export class SortService {
 
       if (aChunk === '' && bChunk === '') continue;
 
-      const aIsNumeric = /^\d+$/.test(aChunk);
-      const bIsNumeric = /^\d+$/.test(bChunk);
-
-      if (aIsNumeric && bIsNumeric) {
-        const aNum = Number.parseInt(aChunk, 10);
-        const bNum = Number.parseInt(bChunk, 10);
-        if (aNum !== bNum) {
-          return aNum - bNum;
-        }
-      } else {
-        const comparison = aChunk.localeCompare(bChunk);
-        if (comparison !== 0) {
-          return comparison;
-        }
+      const comparison = this.compareChunks(aChunk, bChunk);
+      if (comparison !== 0) {
+        return comparison;
       }
     }
 
     return aChunks.length - bChunks.length;
+  }
+
+  private compareChunks(aChunk: string, bChunk: string): number {
+    const aIsNumeric = /^\d+$/.test(aChunk);
+    const bIsNumeric = /^\d+$/.test(bChunk);
+
+    if (aIsNumeric && bIsNumeric) {
+      const aNum = Number.parseInt(aChunk, 10);
+      const bNum = Number.parseInt(bChunk, 10);
+      return aNum !== bNum ? aNum - bNum : 0;
+    }
+    return aChunk.localeCompare(bChunk);
   }
 
   private static readonly READ_STATUS_RANK: Record<string, number> = {
@@ -158,20 +159,21 @@ export class SortService {
 
   private compareArrays(aValue: unknown[], bValue: unknown[]): number {
     for (let i = 0; i < aValue.length; i++) {
-      const valA = aValue[i];
-      const valB = bValue[i];
-
-      if (typeof valA === 'string' && typeof valB === 'string') {
-        const result = this.naturalCompare(valA, valB);
-        if (result !== 0) return result;
-      } else if (typeof valA === 'number' && typeof valB === 'number') {
-        const result = valA - valB;
-        if (result !== 0) return result;
-      } else {
-        if (valA == null && valB != null) return 1;
-        if (valA != null && valB == null) return -1;
-      }
+      const result = this.compareArrayElements(aValue[i], bValue[i]);
+      if (result !== 0) return result;
     }
+    return 0;
+  }
+
+  private compareArrayElements(valA: unknown, valB: unknown): number {
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      return this.naturalCompare(valA, valB);
+    }
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return valA - valB;
+    }
+    if (valA == null && valB != null) return 1;
+    if (valA != null && valB == null) return -1;
     return 0;
   }
 }

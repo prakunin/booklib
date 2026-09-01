@@ -75,6 +75,35 @@ export type ViewEvent =
   | { type: 'toggle-immersive' }
   | { type: 'change-font-size'; delta: number };
 
+type KeyboardShortcutEventType =
+  | 'go-first-section'
+  | 'go-last-section'
+  | 'toggle-fullscreen'
+  | 'toggle-toc'
+  | 'toggle-search'
+  | 'toggle-notes'
+  | 'toggle-immersive'
+  | 'toggle-shortcuts-help'
+  | 'escape-pressed';
+
+/** Single-key reader shortcuts that only emit an event (navigation keys are handled separately). */
+const KEYBOARD_SHORTCUT_EVENTS: ReadonlyMap<string, KeyboardShortcutEventType> = new Map<string, KeyboardShortcutEventType>([
+  ['Home', 'go-first-section'],
+  ['End', 'go-last-section'],
+  ['f', 'toggle-fullscreen'],
+  ['F', 'toggle-fullscreen'],
+  ['t', 'toggle-toc'],
+  ['T', 'toggle-toc'],
+  ['s', 'toggle-search'],
+  ['S', 'toggle-search'],
+  ['n', 'toggle-notes'],
+  ['N', 'toggle-notes'],
+  ['i', 'toggle-immersive'],
+  ['I', 'toggle-immersive'],
+  ['?', 'toggle-shortcuts-help'],
+  ['Escape', 'escape-pressed'],
+]);
+
 interface ViewCallbacks {
   prev: (distance?: number) => void;
   next: (distance?: number) => void;
@@ -233,63 +262,49 @@ export class ReaderEventService {
       if (this.isEditableTarget(event.target)) {
         return;
       }
-
-      if ((event.ctrlKey || event.metaKey) && !event.altKey) {
-        if (event.key === '+' || event.key === '=') {
-          this.eventSubject.next({type: 'change-font-size', delta: 1});
-          event.preventDefault();
-          return;
-        }
-        if (event.key === '-' || event.key === '_') {
-          this.eventSubject.next({type: 'change-font-size', delta: -1});
-          event.preventDefault();
-          return;
-        }
+      if (this.handleFontSizeShortcut(event)) {
+        return;
       }
-
-      const k = event.key;
-      if (k === 'ArrowLeft' || k === 'PageUp') {
-        this.viewCallbacks?.prev();
-        event.preventDefault();
-      } else if (k === 'ArrowRight' || k === 'PageDown') {
-        this.viewCallbacks?.next();
-        event.preventDefault();
-      } else if (k === ' ' && event.shiftKey) {
-        this.viewCallbacks?.prev();
-        event.preventDefault();
-      } else if (k === ' ') {
-        this.viewCallbacks?.next();
-        event.preventDefault();
-      } else if (k === 'Home') {
-        this.eventSubject.next({type: 'go-first-section'});
-        event.preventDefault();
-      } else if (k === 'End') {
-        this.eventSubject.next({type: 'go-last-section'});
-        event.preventDefault();
-      } else if (k === 'f' || k === 'F') {
-        this.eventSubject.next({type: 'toggle-fullscreen'});
-        event.preventDefault();
-      } else if (k === 't' || k === 'T') {
-        this.eventSubject.next({type: 'toggle-toc'});
-        event.preventDefault();
-      } else if (k === 's' || k === 'S') {
-        this.eventSubject.next({type: 'toggle-search'});
-        event.preventDefault();
-      } else if (k === 'n' || k === 'N') {
-        this.eventSubject.next({type: 'toggle-notes'});
-        event.preventDefault();
-      } else if (k === 'i' || k === 'I') {
-        this.eventSubject.next({type: 'toggle-immersive'});
-        event.preventDefault();
-      } else if (k === '?') {
-        this.eventSubject.next({type: 'toggle-shortcuts-help'});
-        event.preventDefault();
-      } else if (k === 'Escape') {
-        this.eventSubject.next({type: 'escape-pressed'});
-        event.preventDefault();
-      }
+      this.handleReaderShortcut(event);
     };
     document.addEventListener('keydown', this.keydownHandler);
+  }
+
+  /** Ctrl/Cmd + `+`/`-` change the font size; returns true when the key was consumed. */
+  private handleFontSizeShortcut(event: KeyboardEvent): boolean {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) {
+      return false;
+    }
+    if (event.key === '+' || event.key === '=') {
+      this.eventSubject.next({type: 'change-font-size', delta: 1});
+      event.preventDefault();
+      return true;
+    }
+    if (event.key === '-' || event.key === '_') {
+      this.eventSubject.next({type: 'change-font-size', delta: -1});
+      event.preventDefault();
+      return true;
+    }
+    return false;
+  }
+
+  private handleReaderShortcut(event: KeyboardEvent): void {
+    const k = event.key;
+    if (k === 'ArrowLeft' || k === 'PageUp' || (k === ' ' && event.shiftKey)) {
+      this.viewCallbacks?.prev();
+      event.preventDefault();
+      return;
+    }
+    if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') {
+      this.viewCallbacks?.next();
+      event.preventDefault();
+      return;
+    }
+    const shortcutEvent = KEYBOARD_SHORTCUT_EVENTS.get(k);
+    if (shortcutEvent) {
+      this.eventSubject.next({type: shortcutEvent});
+      event.preventDefault();
+    }
   }
 
   private attachZoomWheelHandler(): void {
@@ -516,54 +531,66 @@ export class ReaderEventService {
     }
 
     if (!this.isTextSelectionInProgress && event.changedTouches.length === 1) {
-      const touch = event.changedTouches[0];
-      const deltaX = touch.clientX - this.touchStartX;
-      const signedDeltaY = touch.clientY - this.touchStartY;
-      const deltaY = Math.abs(signedDeltaY);
-
-      if (deltaY >= this.SWIPE_THRESHOLD_PX && deltaY > Math.abs(deltaX)
-        && this.tryNavigateAcrossScrolledBoundary(-signedDeltaY)) {
-        event.preventDefault();
-        return;
-      }
-
-      if (Math.abs(deltaX) >= this.SWIPE_THRESHOLD_PX && Math.abs(deltaX) > deltaY) {
-        if (this.isNavigating) return;
-
-        this.isNavigating = true;
-        if (deltaX < 0) {
-          this.viewCallbacks?.next();
-        } else {
-          this.viewCallbacks?.prev();
-        }
-        setTimeout(() => this.isNavigating = false, 300);
-        return;
-      }
-
-      if (touchDuration < this.LONG_HOLD_THRESHOLD_MS && Math.abs(deltaX) < 10 && deltaY < 10) {
-        if (this.isInteractiveTarget(event.target)) {
-          return;
-        }
-
-        const iframe = doc.defaultView?.frameElement as HTMLIFrameElement | null;
-        if (!iframe) return;
-
-        const iframeRect = iframe.getBoundingClientRect();
-        const viewportX = iframeRect.left + touch.clientX;
-
-        window.postMessage({
-          type: 'iframe-click',
-          clientX: viewportX,
-          clientY: iframeRect.top + touch.clientY,
-          iframeLeft: iframeRect.left,
-          iframeWidth: iframeRect.width,
-          eventClientX: touch.clientX,
-          target: (event.target as HTMLElement)?.tagName
-        }, globalThis.location.origin);
-      }
+      this.handleSingleTouchEnd(event, doc, event.changedTouches[0], touchDuration);
     }
 
     this.isTextSelectionInProgress = false;
+  }
+
+  /** Classifies a finished single-finger gesture as vertical boundary swipe, horizontal swipe, or short tap. */
+  private handleSingleTouchEnd(event: TouchEvent, doc: Document, touch: Touch, touchDuration: number): void {
+    const deltaX = touch.clientX - this.touchStartX;
+    const signedDeltaY = touch.clientY - this.touchStartY;
+    const deltaY = Math.abs(signedDeltaY);
+
+    if (deltaY >= this.SWIPE_THRESHOLD_PX && deltaY > Math.abs(deltaX)
+      && this.tryNavigateAcrossScrolledBoundary(-signedDeltaY)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (Math.abs(deltaX) >= this.SWIPE_THRESHOLD_PX && Math.abs(deltaX) > deltaY) {
+      this.navigateBySwipe(deltaX);
+      return;
+    }
+
+    if (touchDuration < this.LONG_HOLD_THRESHOLD_MS && Math.abs(deltaX) < 10 && deltaY < 10) {
+      this.forwardShortTapToParent(event, doc, touch);
+    }
+  }
+
+  private navigateBySwipe(deltaX: number): void {
+    if (this.isNavigating) return;
+
+    this.isNavigating = true;
+    if (deltaX < 0) {
+      this.viewCallbacks?.next();
+    } else {
+      this.viewCallbacks?.prev();
+    }
+    setTimeout(() => this.isNavigating = false, 300);
+  }
+
+  private forwardShortTapToParent(event: TouchEvent, doc: Document, touch: Touch): void {
+    if (this.isInteractiveTarget(event.target)) {
+      return;
+    }
+
+    const iframe = doc.defaultView?.frameElement as HTMLIFrameElement | null;
+    if (!iframe) return;
+
+    const iframeRect = iframe.getBoundingClientRect();
+    const viewportX = iframeRect.left + touch.clientX;
+
+    window.postMessage({
+      type: 'iframe-click',
+      clientX: viewportX,
+      clientY: iframeRect.top + touch.clientY,
+      iframeLeft: iframeRect.left,
+      iframeWidth: iframeRect.width,
+      eventClientX: touch.clientX,
+      target: (event.target as HTMLElement)?.tagName
+    }, globalThis.location.origin);
   }
 
   private startLongHoldTimer(): void {

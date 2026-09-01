@@ -7,15 +7,13 @@ import {InputText} from '@openng/optimus-ui/inputtext';
 import {BookMetadata} from '../../../book/model/book.model';
 import {UrlHelperService} from '../../../../shared/service/url-helper.service';
 import {Textarea} from '@openng/optimus-ui/textarea';
-import {AutoComplete} from '@openng/optimus-ui/autocomplete';
+import {AutoComplete, AutoCompleteSelectEvent} from '@openng/optimus-ui/autocomplete';
 import {Image} from '@openng/optimus-ui/image';
 import {LazyLoadImageModule} from 'ng-lazyload-image';
 import {ConfirmationService} from '@openng/optimus-ui/api';
 import {CdkDragDrop, CdkDropList, CdkDrag, moveItemInArray} from '@angular/cdk/drag-drop';
-import {AutoCompleteSelectEvent} from '@openng/optimus-ui/autocomplete';
 import {DatePicker} from '@openng/optimus-ui/datepicker';
-import {ALL_METADATA_FIELDS, getArrayFields, getBottomFields, getTextareaFields, MetadataFieldConfig} from '../../../../shared/metadata';
-import {MetadataUtilsService} from '../../../../shared/metadata';
+import {ALL_METADATA_FIELDS, getArrayFields, getBottomFields, getTextareaFields, MetadataFieldConfig, MetadataUtilsService} from '../../../../shared/metadata';
 import {MetadataProviderSpecificFields} from '../../../../shared/model/app-settings.model';
 import {AppSettingsService} from '../../../../shared/service/app-settings.service';
 import {TranslocoDirective, TranslocoService} from '@jsverse/transloco';
@@ -176,8 +174,7 @@ export class BookdropFileMetadataPickerComponent {
     const inputValue = target?.value?.trim();
     if (inputValue) {
       const currentValue = this.metadataForm.get(fieldName)?.value || [];
-      const values = Array.isArray(currentValue) ? currentValue :
-        typeof currentValue === 'string' && currentValue ? currentValue.split(',').map((v: string) => v.trim()) : [];
+      const values = this.toValueList(currentValue);
       if (!values.includes(inputValue)) {
         values.push(inputValue);
         this.metadataForm.get(fieldName)?.setValue(values);
@@ -186,6 +183,16 @@ export class BookdropFileMetadataPickerComponent {
         target.value = '';
       }
     }
+  }
+
+  private toValueList(currentValue: unknown): string[] {
+    if (Array.isArray(currentValue)) {
+      return currentValue;
+    }
+    if (typeof currentValue === 'string' && currentValue) {
+      return currentValue.split(',').map((v: string) => v.trim());
+    }
+    return [];
   }
 
   confirmReset(): void {

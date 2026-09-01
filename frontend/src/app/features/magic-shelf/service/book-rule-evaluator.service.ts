@@ -3,6 +3,9 @@ import {Book} from '../../book/model/book.model';
 import {GroupRule, Rule, RuleField} from '../component/magic-shelf-component';
 import {parseValue} from './magic-shelf-utils';
 
+/** A magic-shelf rule value as entered in the UI: a primitive, a date, or nothing. */
+type RuleScalar = string | number | boolean | Date | null | undefined;
+
 @Injectable({providedIn: 'root'})
 export class BookRuleEvaluatorService {
 
@@ -29,245 +32,226 @@ export class BookRuleEvaluatorService {
     const rawValue = this.extractBookValue(book, rule.field);
     const isDateField = rule.field === 'publishedDate' || rule.field === 'dateFinished' ||
       rule.field === 'lastReadTime' || rule.field === 'addedOn';
-    const withoutTime = (date: Date): Date =>
-      new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-    const normalize = (val: unknown): unknown => {
-      if (val === null || val === undefined) return val;
-      if (val instanceof Date) return isDateField ? withoutTime(val) : val;
-      if (typeof val === 'boolean') return String(val);
-      if (typeof val === 'string') {
-        const date = parseValue(val, 'date');
-        if (date instanceof Date) return isDateField ? withoutTime(date) : date;
-        return val.toLowerCase();
-      }
-      return val;
-    };
-
-    const value = normalize(rawValue);
-    const ruleVal = normalize(rule.value);
-    const ruleStart = normalize(rule.valueStart);
-    const ruleEnd = normalize(rule.valueEnd);
-
-    const mapFileTypeValue = (uiValue: string): string => {
-      const lowerValue = uiValue.toLowerCase();
-      switch (lowerValue) {
-        case 'cbr':
-        case 'cbz':
-        case 'cb7':
-          return 'cbx';
-        case 'azw':
-          return 'azw3';
-        default:
-          return lowerValue;
-      }
-    };
-
-    const getArrayField = (field: RuleField): string[] => {
-      switch (field) {
-        case 'authors':
-          return (book.metadata?.authors ?? []).map(a => a.toLowerCase());
-        case 'categories':
-          return (book.metadata?.categories ?? []).map(c => c.toLowerCase());
-        case 'moods':
-          return (book.metadata?.moods ?? []).map(m => m.toLowerCase());
-        case 'tags':
-          return (book.metadata?.tags ?? []).map(t => t.toLowerCase());
-        case 'readStatus':
-          return [String(book.readStatus ?? 'UNSET').toLowerCase()];
-        case 'fileType':
-          return [String(book.primaryFile?.bookType ?? '').toLowerCase()];
-        case 'library':
-          return [String(book.libraryId)];
-        case 'shelf':
-          return (book.shelves ?? []).map(s => String(s.id));
-        case 'language':
-          return [String(book.metadata?.language ?? '').toLowerCase()];
-        case 'title':
-          return [String(book.metadata?.title ?? '').toLowerCase()];
-        case 'subtitle':
-          return [String(book.metadata?.subtitle ?? '').toLowerCase()];
-        case 'publisher':
-          return [String(book.metadata?.publisher ?? '').toLowerCase()];
-        case 'seriesName':
-          return [String(book.metadata?.seriesName ?? '').toLowerCase()];
-        case 'isbn13':
-          return [String(book.metadata?.isbn13 ?? '').toLowerCase()];
-        case 'isbn10':
-          return [String(book.metadata?.isbn10 ?? '').toLowerCase()];
-        case 'narrator':
-          return [String(book.metadata?.narrator ?? '').toLowerCase()];
-        case 'description':
-          return [String(book.metadata?.description ?? '').toLowerCase()];
-        case 'contentRating':
-          return [String(book.metadata?.contentRating ?? '').toLowerCase()];
-        default:
-          return [];
-      }
-    };
+    const value = this.normalizeValue(rawValue, isDateField);
+    const ruleVal = this.normalizeValue(rule.value, isDateField);
+    const ruleStart = this.normalizeValue(rule.valueStart, isDateField);
+    const ruleEnd = this.normalizeValue(rule.valueEnd, isDateField);
 
     const isNumericIdField = rule.field === 'library' || rule.field === 'shelf';
     const isFileTypeField = rule.field === 'fileType';
 
-    const ruleList = Array.isArray(rule.value)
-      ? rule.value.map(v => {
-        if (isNumericIdField) return String(v);
-        const lowerValue = String(v).toLowerCase();
-        return isFileTypeField ? mapFileTypeValue(lowerValue) : lowerValue;
-      })
-      : (rule.value ? [
-        isNumericIdField
-          ? String(rule.value)
-          : isFileTypeField
-            ? mapFileTypeValue(String(rule.value).toLowerCase())
-            : String(rule.value).toLowerCase()
-      ] : []);
+    const ruleList = this.buildRuleList(rule.value, isNumericIdField, isFileTypeField);
 
     switch (rule.operator) {
       case 'equals':
-        if (Array.isArray(value)) {
-          return value.some(v => ruleList.includes(isNumericIdField ? String(v) : String(v).toLowerCase()));
-        }
-        if (value instanceof Date && ruleVal instanceof Date) {
-          return value.getTime() === ruleVal.getTime();
-        }
-        if (isFileTypeField && typeof ruleVal === 'string') {
-          const mappedRuleVal = mapFileTypeValue(ruleVal.toLowerCase());
-          return value === mappedRuleVal;
-        }
-        return value === ruleVal;
+        return this.matchesEquals(value, ruleVal, ruleList, isNumericIdField, isFileTypeField);
 
       case 'not_equals':
-        if (Array.isArray(value)) {
-          return value.every(v => !ruleList.includes(isNumericIdField ? String(v) : String(v).toLowerCase()));
-        }
-        if (value instanceof Date && ruleVal instanceof Date) {
-          return value.getTime() !== ruleVal.getTime();
-        }
-        if (isFileTypeField && typeof ruleVal === 'string') {
-          const mappedRuleVal = mapFileTypeValue(ruleVal.toLowerCase());
-          return value !== mappedRuleVal;
-        }
-        return value !== ruleVal;
+        return !this.matchesEquals(value, ruleVal, ruleList, isNumericIdField, isFileTypeField);
 
       case 'contains':
-        if (Array.isArray(value)) {
-          if (typeof ruleVal !== 'string') return false;
-          return value.some(v => String(v).includes(ruleVal));
-        }
-        if (typeof value !== 'string') return false;
-        if (typeof ruleVal !== 'string') return false;
-        return value.includes(ruleVal);
+        return this.matchesText(value, ruleVal, (text, needle) => text.includes(needle));
 
       case 'does_not_contain':
-        if (Array.isArray(value)) {
-          if (typeof ruleVal !== 'string') return true;
-          return value.every(v => !String(v).includes(ruleVal));
-        }
-        if (typeof value !== 'string') return true;
-        if (typeof ruleVal !== 'string') return true;
-        return !value.includes(ruleVal);
+        return !this.matchesText(value, ruleVal, (text, needle) => text.includes(needle));
 
       case 'starts_with':
-        if (Array.isArray(value)) {
-          if (typeof ruleVal !== 'string') return false;
-          return value.some(v => String(v).startsWith(ruleVal));
-        }
-        if (typeof value !== 'string') return false;
-        if (typeof ruleVal !== 'string') return false;
-        return value.startsWith(ruleVal);
+        return this.matchesText(value, ruleVal, (text, needle) => text.startsWith(needle));
 
       case 'ends_with':
-        if (Array.isArray(value)) {
-          if (typeof ruleVal !== 'string') return false;
-          return value.some(v => String(v).endsWith(ruleVal));
-        }
-        if (typeof value !== 'string') return false;
-        if (typeof ruleVal !== 'string') return false;
-        return value.endsWith(ruleVal);
+        return this.matchesText(value, ruleVal, (text, needle) => text.endsWith(needle));
 
       case 'greater_than':
-        if (value instanceof Date && ruleVal instanceof Date) {
-          return value > ruleVal;
-        }
-        return Number(value) > Number(ruleVal);
+        return this.compareOrdered(value, ruleVal, (a, b) => a > b);
 
       case 'greater_than_equal_to':
-        if (value instanceof Date && ruleVal instanceof Date) {
-          return value >= ruleVal;
-        }
-        return Number(value) >= Number(ruleVal);
+        return this.compareOrdered(value, ruleVal, (a, b) => a >= b);
 
       case 'less_than':
-        if (value instanceof Date && ruleVal instanceof Date) {
-          return value < ruleVal;
-        }
-        return Number(value) < Number(ruleVal);
+        return this.compareOrdered(value, ruleVal, (a, b) => a < b);
 
       case 'less_than_equal_to':
-        if (value instanceof Date && ruleVal instanceof Date) {
-          return value <= ruleVal;
-        }
-        return Number(value) <= Number(ruleVal);
+        return this.compareOrdered(value, ruleVal, (a, b) => a <= b);
 
       case 'in_between':
-        if (value == null || ruleStart == null || ruleEnd == null) return false;
-        if (value instanceof Date && ruleStart instanceof Date && ruleEnd instanceof Date) {
-          return value >= ruleStart && value <= ruleEnd;
-        }
-        return Number(value) >= Number(ruleStart) && Number(value) <= Number(ruleEnd);
+        return this.isBetween(value, ruleStart, ruleEnd);
 
-      case 'is_empty': {
-        const emptyVal = rule.field === 'readStatus' ? book.readStatus : value;
-        if (emptyVal == null) return true;
-        if (typeof emptyVal === 'string') return emptyVal.trim() === '';
-        if (Array.isArray(emptyVal)) return emptyVal.length === 0;
-        return false;
-      }
+      case 'is_empty':
+        return this.isEmptyValue(rule.field === 'readStatus' ? book.readStatus : value);
 
-      case 'is_not_empty': {
-        const notEmptyVal = rule.field === 'readStatus' ? book.readStatus : value;
-        if (notEmptyVal == null) return false;
-        if (typeof notEmptyVal === 'string') return notEmptyVal.trim() !== '';
-        if (Array.isArray(notEmptyVal)) return notEmptyVal.length > 0;
-        return true;
-      }
+      case 'is_not_empty':
+        return !this.isEmptyValue(rule.field === 'readStatus' ? book.readStatus : value);
 
       case 'includes_all': {
-        const bookList = getArrayField(rule.field);
+        const bookList = this.getArrayField(book, rule.field);
         return ruleList.every(v => bookList.includes(v));
       }
 
       case 'excludes_all': {
-        const bookList = getArrayField(rule.field);
+        const bookList = this.getArrayField(book, rule.field);
         return ruleList.every(v => !bookList.includes(v));
       }
 
       case 'includes_any': {
-        const bookList = getArrayField(rule.field);
+        const bookList = this.getArrayField(book, rule.field);
         return ruleList.some(v => bookList.includes(v));
       }
 
-      case 'within_last': {
-        if (!(value instanceof Date)) return false;
-        const threshold = this.computeDateThreshold(Number(rule.value), String(rule.valueEnd ?? 'days'));
-        return value >= threshold;
-      }
-
-      case 'older_than': {
-        if (!(value instanceof Date)) return false;
-        const threshold = this.computeDateThreshold(Number(rule.value), String(rule.valueEnd ?? 'days'));
-        return value < threshold;
-      }
-
-      case 'this_period': {
-        if (!(value instanceof Date)) return false;
-        const start = this.getStartOfPeriod(String(rule.value ?? 'year'));
-        return value >= start;
-      }
+      case 'within_last':
+      case 'older_than':
+      case 'this_period':
+        return this.matchesDatePeriod(value, rule);
 
       default:
         return false;
+    }
+  }
+
+  private withoutTime(date: Date): Date {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  private normalizeValue(val: unknown, isDateField: boolean): unknown {
+    if (val === null || val === undefined) return val;
+    if (val instanceof Date) return isDateField ? this.withoutTime(val) : val;
+    if (typeof val === 'boolean') return String(val);
+    if (typeof val === 'string') {
+      const date = parseValue(val, 'date');
+      if (date instanceof Date) return isDateField ? this.withoutTime(date) : date;
+      return val.toLowerCase();
+    }
+    return val;
+  }
+
+  /** Rule values are user-entered scalars (or lists of them), never plain objects. */
+  private scalarText(value: unknown): string {
+    return String(value as RuleScalar);
+  }
+
+  private mapFileTypeValue(uiValue: string): string {
+    const lowerValue = uiValue.toLowerCase();
+    switch (lowerValue) {
+      case 'cbr':
+      case 'cbz':
+      case 'cb7':
+        return 'cbx';
+      case 'azw':
+        return 'azw3';
+      default:
+        return lowerValue;
+    }
+  }
+
+  private buildRuleList(ruleValue: unknown, isNumericIdField: boolean, isFileTypeField: boolean): string[] {
+    if (Array.isArray(ruleValue)) {
+      return ruleValue.map(v => this.normalizeRuleListEntry(v, isNumericIdField, isFileTypeField));
+    }
+    return ruleValue ? [this.normalizeRuleListEntry(ruleValue, isNumericIdField, isFileTypeField)] : [];
+  }
+
+  private normalizeRuleListEntry(v: unknown, isNumericIdField: boolean, isFileTypeField: boolean): string {
+    const text = this.scalarText(v);
+    if (isNumericIdField) return text;
+    const lowerValue = text.toLowerCase();
+    return isFileTypeField ? this.mapFileTypeValue(lowerValue) : lowerValue;
+  }
+
+  private matchesEquals(value: unknown, ruleVal: unknown, ruleList: string[], isNumericIdField: boolean, isFileTypeField: boolean): boolean {
+    if (Array.isArray(value)) {
+      return value.some(v => ruleList.includes(isNumericIdField ? String(v) : String(v).toLowerCase()));
+    }
+    if (value instanceof Date && ruleVal instanceof Date) {
+      return value.getTime() === ruleVal.getTime();
+    }
+    if (isFileTypeField && typeof ruleVal === 'string') {
+      const mappedRuleVal = this.mapFileTypeValue(ruleVal.toLowerCase());
+      return value === mappedRuleVal;
+    }
+    return value === ruleVal;
+  }
+
+  private matchesText(value: unknown, ruleVal: unknown, predicate: (text: string, needle: string) => boolean): boolean {
+    if (typeof ruleVal !== 'string') return false;
+    if (Array.isArray(value)) {
+      return value.some(v => predicate(String(v), ruleVal));
+    }
+    if (typeof value !== 'string') return false;
+    return predicate(value, ruleVal);
+  }
+
+  private compareOrdered(value: unknown, ruleVal: unknown, compare: (a: number, b: number) => boolean): boolean {
+    if (value instanceof Date && ruleVal instanceof Date) {
+      return compare(value.getTime(), ruleVal.getTime());
+    }
+    return compare(Number(value), Number(ruleVal));
+  }
+
+  private isBetween(value: unknown, ruleStart: unknown, ruleEnd: unknown): boolean {
+    if (value == null || ruleStart == null || ruleEnd == null) return false;
+    if (value instanceof Date && ruleStart instanceof Date && ruleEnd instanceof Date) {
+      return value >= ruleStart && value <= ruleEnd;
+    }
+    return Number(value) >= Number(ruleStart) && Number(value) <= Number(ruleEnd);
+  }
+
+  private isEmptyValue(val: unknown): boolean {
+    if (val == null) return true;
+    if (typeof val === 'string') return val.trim() === '';
+    if (Array.isArray(val)) return val.length === 0;
+    return false;
+  }
+
+  private matchesDatePeriod(value: unknown, rule: Rule): boolean {
+    if (!(value instanceof Date)) return false;
+    if (rule.operator === 'this_period') {
+      const start = this.getStartOfPeriod(this.scalarText(rule.value ?? 'year'));
+      return value >= start;
+    }
+    const threshold = this.computeDateThreshold(Number(rule.value), this.scalarText(rule.valueEnd ?? 'days'));
+    return rule.operator === 'within_last' ? value >= threshold : value < threshold;
+  }
+
+  private getArrayField(book: Book, field: RuleField): string[] {
+    switch (field) {
+      case 'authors':
+        return (book.metadata?.authors ?? []).map(a => a.toLowerCase());
+      case 'categories':
+        return (book.metadata?.categories ?? []).map(c => c.toLowerCase());
+      case 'moods':
+        return (book.metadata?.moods ?? []).map(m => m.toLowerCase());
+      case 'tags':
+        return (book.metadata?.tags ?? []).map(t => t.toLowerCase());
+      case 'readStatus':
+        return [String(book.readStatus ?? 'UNSET').toLowerCase()];
+      case 'fileType':
+        return [String(book.primaryFile?.bookType ?? '').toLowerCase()];
+      case 'library':
+        return [String(book.libraryId)];
+      case 'shelf':
+        return (book.shelves ?? []).map(s => String(s.id));
+      case 'language':
+        return [String(book.metadata?.language ?? '').toLowerCase()];
+      case 'title':
+        return [String(book.metadata?.title ?? '').toLowerCase()];
+      case 'subtitle':
+        return [String(book.metadata?.subtitle ?? '').toLowerCase()];
+      case 'publisher':
+        return [String(book.metadata?.publisher ?? '').toLowerCase()];
+      case 'seriesName':
+        return [String(book.metadata?.seriesName ?? '').toLowerCase()];
+      case 'isbn13':
+        return [String(book.metadata?.isbn13 ?? '').toLowerCase()];
+      case 'isbn10':
+        return [String(book.metadata?.isbn10 ?? '').toLowerCase()];
+      case 'narrator':
+        return [String(book.metadata?.narrator ?? '').toLowerCase()];
+      case 'description':
+        return [String(book.metadata?.description ?? '').toLowerCase()];
+      case 'contentRating':
+        return [String(book.metadata?.contentRating ?? '').toLowerCase()];
+      default:
+        return [];
     }
   }
 

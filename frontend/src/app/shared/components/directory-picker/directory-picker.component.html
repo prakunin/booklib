@@ -31,19 +31,19 @@
           [(ngModel)]="searchQuery"
           (input)="onSearch()"
           [placeholder]="t('searchPlaceholder')"
+          [attr.aria-label]="t('searchPlaceholder')"
         />
         @if (searchQuery) {
-          <i
+          <button
+            type="button"
             class="pi pi-times clear-icon"
-            role="button"
-            tabindex="0"
-            (click)="searchQuery = ''; onSearch()"
-            (keydown.enter)="searchQuery = ''; onSearch()"></i>
+            [attr.aria-label]="t('clearSearch')"
+            (click)="searchQuery = ''; onSearch()"></button>
         }
       </p-iconfield>
       <p-button
         icon="pi pi-arrow-up"
-        (click)="goUp()"
+        (onClick)="goUp()"
         [disabled]="selectedProductName === '/' || selectedProductName === ''"
         [pTooltip]="t('goUpTooltip')"
         tooltipPosition="bottom"
@@ -57,7 +57,7 @@
         severity="secondary"
         [outlined]="true"
         size="small"
-        (click)="selectAll()"
+        (onClick)="selectAll()"
         [disabled]="filteredPaths.length === 0"
         [pTooltip]="t('selectAllTooltip')"
         tooltipPosition="bottom"
@@ -68,7 +68,7 @@
         severity="secondary"
         [outlined]="true"
         size="small"
-        (click)="deselectAll()"
+        (onClick)="deselectAll()"
         [disabled]="selectedFolders.length === 0"
         [pTooltip]="t('deselectAllTooltip')"
         tooltipPosition="bottom"
@@ -79,7 +79,7 @@
         severity="info"
         [outlined]="true"
         size="small"
-        (click)="selectCurrent()"
+        (onClick)="selectCurrent()"
         [disabled]="!selectedProductName || selectedProductName === '/'"
         [pTooltip]="t('selectCurrentTooltip')"
         tooltipPosition="bottom"
@@ -195,13 +195,13 @@
         [label]="'common.cancel' | transloco"
         severity="secondary"
         [outlined]="true"
-        (click)="onCancel()"
+        (onClick)="onCancel()"
       />
       <p-button
         [label]="t('selectDirectoriesBtn')"
         icon="pi pi-check"
         severity="success"
-        (click)="onSelect()"
+        (onClick)="onSelect()"
         [disabled]="selectedFolders.length === 0"
       />
     </div>
