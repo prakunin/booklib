@@ -589,7 +589,13 @@ public class OpdsFeedService {
 
         Instant coverUpdatedOn = getCoverUpdatedOn(book);
         if (coverUpdatedOn != null) {
+            // The token goes on cover links for the same reason as on acquisition links: readers
+            // fetch images without the Authorization header, and every anonymous 401 counted
+            // against the OPDS auth rate limit.
             String coverUrl = "/api/v1/opds/" + book.getId() + "/cover?" + coverUpdatedOn;
+            if (downloadToken != null && !downloadToken.isEmpty()) {
+                coverUrl += "&token=" + downloadToken;
+            }
             feed.append("    <link rel=\"http://opds-spec.org/image\" href=\"")
                     .append(escapeXml(coverUrl)).append("\" type=\"image/jpeg\"/>\n");
             feed.append("    <link rel=\"http://opds-spec.org/image/thumbnail\" href=\"")

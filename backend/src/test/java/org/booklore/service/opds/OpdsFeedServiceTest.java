@@ -203,6 +203,38 @@ class OpdsFeedServiceTest {
     }
 
     @Test
+    void generateCatalogFeed_shouldEmbedDownloadTokenInCoverLink() {
+        mockAuthenticatedUser();
+        when(authenticationService.generateDownloadToken(TEST_USER_ID)).thenReturn("test.jwt.token");
+
+        when(request.getParameter(anyString())).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/opds/catalog");
+        when(request.getQueryString()).thenReturn(null);
+
+        Book book = Book.builder()
+                .id(10L)
+                .primaryFile(BookFile.builder().id(7L).bookType(BookFileType.EPUB).build())
+                .addedOn(FIXED_INSTANT)
+                .metadata(BookMetadata.builder()
+                        .title("Cover Book")
+                        .coverUpdatedOn(FIXED_INSTANT)
+                        .build())
+                .build();
+
+        Page<Book> page = new PageImpl<>(List.of(book), PageRequest.of(0, 50), 1);
+        when(opdsBookService.getBooksPage(eq(TEST_USER_ID), any(), any(), any(), eq(0), eq(50))).thenReturn(page);
+        when(opdsBookService.applySortOrder(any(), any())).thenReturn(page);
+
+        String xml = opdsFeedService.generateCatalogFeed(request);
+
+        // Cover links must carry the token too: readers fetch them without the Authorization
+        // header, and every anonymous 401 used to count against the OPDS auth rate limit.
+        assertThat(xml)
+                .contains("/api/v1/opds/10/cover?" + FIXED_INSTANT + "&amp;token=test.jwt.token")
+                .doesNotContain("cover?" + FIXED_INSTANT + "\"");
+    }
+
+    @Test
     void generateCatalogFeed_shouldOmitTokenWhenNoneAvailable() {
         mockAuthenticatedUser();
         when(authenticationService.generateDownloadToken(TEST_USER_ID)).thenReturn(null);

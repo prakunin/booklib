@@ -28,6 +28,8 @@ public class OpdsBasicAuthRateLimitFilter extends OncePerRequestFilter {
 
     private static final String AUTH_PATH = "opds";
     private static final String BASIC_PREFIX = "Basic ";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String TOKEN_PARAM = "token";
 
     private final AuthRateLimitService authRateLimitService;
 
@@ -38,7 +40,7 @@ public class OpdsBasicAuthRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        BasicCredentials credentials = parseBasicCredentials(request.getHeader("Authorization"));
+        BasicCredentials credentials = parseBasicCredentials(request.getHeader(AUTHORIZATION_HEADER));
         String ip = request.getRemoteAddr();
 
         if (isRateLimited(response, ip, credentials.username())) {
@@ -52,12 +54,28 @@ public class OpdsBasicAuthRateLimitFilter extends OncePerRequestFilter {
             if (credentials.username() != null) {
                 authRateLimitService.resetAlternateAuthAttemptsByCredential(AUTH_PATH, credentials.username());
             }
-        } else if (response.getStatus() == HttpServletResponse.SC_UNAUTHORIZED) {
+        } else if (response.getStatus() == HttpServletResponse.SC_UNAUTHORIZED && isAuthenticationAttempt(request)) {
             authRateLimitService.recordFailedAlternateAuthAttempt(AUTH_PATH, ip);
             if (credentials.username() != null) {
                 authRateLimitService.recordFailedAlternateAuthAttemptByCredential(AUTH_PATH, credentials.username());
             }
         }
+    }
+
+    /**
+     * A 401 only counts against the rate limit when the request actually presented credentials.
+     * OPDS clients routinely fetch a URL anonymously first and answer the Basic challenge only
+     * afterwards — most notably for cover images — so counting those challenges exhausted the
+     * five-attempt budget within a single feed and locked the reader out for 15 minutes even
+     * though its password was correct.
+     */
+    private boolean isAuthenticationAttempt(HttpServletRequest request) {
+        String authorization = request.getHeader(AUTHORIZATION_HEADER);
+        if (authorization != null && !authorization.isBlank()) {
+            return true;
+        }
+        String token = request.getParameter(TOKEN_PARAM);
+        return token != null && !token.isBlank();
     }
 
     private boolean isRateLimited(HttpServletResponse response, String ip, String username) throws IOException {

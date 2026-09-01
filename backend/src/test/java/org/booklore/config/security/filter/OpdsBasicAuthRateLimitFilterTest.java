@@ -22,7 +22,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,6 +64,36 @@ class OpdsBasicAuthRateLimitFilterTest {
 
         verify(authRateLimitService).resetAlternateAuthAttempts("opds", "192.0.2.30");
         verify(authRateLimitService).resetAlternateAuthAttemptsByCredential("opds", "reader");
+    }
+
+    @Test
+    void anonymousChallengeResponse_doesNotCountAsFailedAttempt() throws Exception {
+        // OPDS clients legitimately probe without credentials and only then answer the Basic
+        // challenge; counting those 401s locked real readers out after a handful of requests.
+        OpdsBasicAuthRateLimitFilter filter = new OpdsBasicAuthRateLimitFilter(authRateLimitService);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/opds/10/cover");
+        request.setRemoteAddr("192.0.2.30");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = (req, res) -> response.setStatus(401);
+
+        filter.doFilter(request, response, chain);
+
+        verify(authRateLimitService, never()).recordFailedAlternateAuthAttempt(anyString(), anyString());
+        verify(authRateLimitService, never()).recordFailedAlternateAuthAttemptByCredential(anyString(), anyString());
+    }
+
+    @Test
+    void unauthorizedTokenRequest_recordsFailedIpAttempt() throws Exception {
+        OpdsBasicAuthRateLimitFilter filter = new OpdsBasicAuthRateLimitFilter(authRateLimitService);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/opds/10/download");
+        request.setRemoteAddr("192.0.2.30");
+        request.setParameter("token", "bad.jwt.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = (req, res) -> response.setStatus(401);
+
+        filter.doFilter(request, response, chain);
+
+        verify(authRateLimitService).recordFailedAlternateAuthAttempt("opds", "192.0.2.30");
     }
 
     @Test
