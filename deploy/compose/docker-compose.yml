@@ -9,11 +9,11 @@ services:
   # Read docs/UPGRADING-MARIADB-12.md before upgrading.
   booklib:
     # Stable release example:
-    image: prakunin/booklib:v0.38.2
+    image: prakunin/booklib:v3.2.17
     # Convenience tag:
     # image: prakunin/booklib:latest
     # Or the GHCR image:
-    # image: ghcr.io/prakunin/booklib:v0.38.2
+    # image: ghcr.io/prakunin/booklib:v3.2.17
     # The image already embeds its own release version metadata.
     container_name: booklib
     # The JVM uses -XX:MaxRAMPercentage=60.0, so this container limit yields

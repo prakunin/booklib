@@ -73,7 +73,7 @@ body:
         # User Acknowledgements
         > [!TIP]
         > Use these links to review the existing Grimmory [Discussions](https://github.com/orgs/grimmory-tools/discussions) and
-        > [Issues](https://github.com/grimmory-tools/grimmory/issues?q=sort%3Areactions-desc).
+        > [Issues](https://github.com/prakunin/booklib/issues?q=sort%3Areactions-desc).
 
   - type: checkboxes
     id: prerequisites

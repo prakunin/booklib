@@ -166,7 +166,7 @@ jobs:
                             type: 2,
                             style: 5,
                             label: "Report Issue",
-                            url: "https://github.com/grimmory-tools/grimmory/issues/new?template=bug-report.yml"
+                            url: "https://github.com/prakunin/booklib/issues/new?template=bug-report.yml"
                           }
                         ]
                       }
@@ -182,7 +182,7 @@ jobs:
                             type: 2,
                             style: 5,
                             label: "Report Issue",
-                            url: "https://github.com/grimmory-tools/grimmory/issues/new?template=bug-report.yml"
+                            url: "https://github.com/prakunin/booklib/issues/new?template=bug-report.yml"
                           }
                         ]
                       }

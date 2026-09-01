@@ -106,11 +106,11 @@ jobs:
         run: |
           set -eu
           VERSION="${RELEASE_TAG#v}"
-          helm dependency update deploy/helm/grimmory
-          helm package deploy/helm/grimmory \
+          helm dependency update deploy/helm/booklib
+          helm package deploy/helm/booklib \
             --version "${VERSION}" \
             --app-version "${RELEASE_TAG}"
-          helm push "grimmory-${VERSION}.tgz" "oci://ghcr.io/${{ github.repository_owner }}/helm-charts"
+          helm push "booklib-${VERSION}.tgz" "oci://ghcr.io/${{ github.repository_owner }}/helm-charts"
 
   prepare-release-notification:
     name: Prepare Stable Release Notification

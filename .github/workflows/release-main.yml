@@ -96,11 +96,11 @@ jobs:
       - name: Set Up pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
-          version: 11
+          version: 11.19.0
           cache: true
-          run_install: |
-            - cwd: frontend/
-          package_json_file: frontend/package.json
+
+      - name: Install Frontend Dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build frontend
         working-directory: frontend/
@@ -113,7 +113,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: frontend
-          path: frontend/dist/grimmory/browser/
+          path: frontend/dist/booklib/browser/
           retention-days: 30
 
   build-backend:
@@ -224,8 +224,8 @@ jobs:
         run: |
           mkdir -p release-assets/
 
-          cp artifacts/backend*.jar release-assets/grimmory.jar
-          cp artifacts/grimmory-openapi.json release-assets/openapi.json
+          cp artifacts/backend*.jar release-assets/booklib.jar
+          cp artifacts/booklib-openapi.json release-assets/openapi.json
           cp artifacts/frontend.zip release-assets/frontend.zip
 
       - name: Create Draft Release

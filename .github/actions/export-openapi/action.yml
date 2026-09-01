@@ -1,5 +1,5 @@
 name: Export OpenAPI
-description: Check out a ref, set up the backend toolchain, and export grimmory-openapi.json.
+description: Check out a ref, set up the backend toolchain, and export booklib-openapi.json.
 
 inputs:
   app_version:

@@ -99,7 +99,7 @@ jobs:
           echo "Applying migrations from base ref (${BASE_REF})..."
           docker run --network host \
             -v ${GITHUB_WORKSPACE}:/flyway/sql \
-            flyway/flyway:12.1.0 \
+            flyway/flyway:13.3.0 \
             -url=jdbc:mariadb://127.0.0.1:3306/booklore_test \
             -user=root -password=root \
             -locations=filesystem:/flyway/sql/backend/src/main/resources/db/migration \
@@ -119,7 +119,7 @@ jobs:
           echo "Applying new migrations from head ref (${HEAD_REF})..."
           docker run --network host \
             -v ${GITHUB_WORKSPACE}:/flyway/sql \
-            flyway/flyway:12.1.0 \
+            flyway/flyway:13.3.0 \
             -url=jdbc:mariadb://127.0.0.1:3306/booklore_test \
             -user=root -password=root \
             -locations=filesystem:/flyway/sql/backend/src/main/resources/db/migration \

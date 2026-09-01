@@ -4,9 +4,9 @@ description: A Helm chart for [BookLib](https://github.com/prakunin/booklib)
 type: application
 version: 0.1.0
 
-# The app version is set to v0.0.0 in the Github repository and is bumped
-# dynamically by the CI on release
-appVersion: "v0.0.0"
+# The app version tracks the latest stable release and is overridden
+# dynamically by the CI on release (helm package --app-version)
+appVersion: "v3.2.17"
 dependencies:
   - name: mariadb
     version: 0.16.6

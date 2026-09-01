@@ -5,7 +5,7 @@ After=booklib-db.container
 
 [Container]
 ContainerName=booklib
-Image=ghcr.io/prakunin/booklib:v0.38.2
+Image=ghcr.io/prakunin/booklib:v3.2.17
 Pod=booklib.pod
 AutoUpdate=registry
 Pull=always
