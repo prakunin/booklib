@@ -28,6 +28,7 @@ public class AppMigrationStartup {
     private final PromoteDjvuFilesFromOtherMigration promoteDjvuFilesFromOtherMigration;
     private final ResetUnreadableWordDocumentsMigration resetUnreadableWordDocumentsMigration;
     private final RepairFb2TitlePageArtifactsMigration repairFb2TitlePageArtifactsMigration;
+    private final FoldSearchTextPunctuationMigration foldSearchTextPunctuationMigration;
 
     @EventListener(ApplicationReadyEvent.class)
     public void runMigrationsOnce() {
@@ -48,5 +49,6 @@ public class AppMigrationStartup {
         appMigrationService.executeMigration(promoteDjvuFilesFromOtherMigration);
         appMigrationService.executeMigration(resetUnreadableWordDocumentsMigration);
         appMigrationService.executeMigration(repairFb2TitlePageArtifactsMigration);
+        appMigrationService.executeMigration(foldSearchTextPunctuationMigration);
     }
 }

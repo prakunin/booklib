@@ -176,6 +176,27 @@ class BookUtilsTest {
     }
 
     @Test
+    void testNormalizeForSearch_stripsTypographicQuotes() {
+        // A title stored as Generation «П» has to match a reader typing Generation П: the
+        // guillemets sit between the two words the substring search joins.
+        assertEquals("generation p", BookUtils.normalizeForSearch("Generation \u00ABP\u00BB"));
+        assertEquals("generation p", BookUtils.normalizeForSearch("Generation \u201EP\u201C"));
+        assertEquals("generation p", BookUtils.normalizeForSearch("Generation \u201CP\u201D"));
+        // The ASCII apostrophe is deliberately kept (see testBuildSearchText); the typographic one
+        // folds onto it so both spellings normalize alike.
+        assertEquals("don't look now", BookUtils.normalizeForSearch("Don\u2019t Look Now"));
+        assertEquals("don't look now", BookUtils.normalizeForSearch("Don't Look Now"));
+    }
+
+    @Test
+    void testNormalizeForSearch_foldsDashesToHyphen() {
+        // En/em dashes fold onto the plain hyphen rather than vanishing, so digits and words on
+        // either side stay separated: 1941–1945 must not collapse into 19411945.
+        assertEquals("1941-1945", BookUtils.normalizeForSearch("1941\u20131945"));
+        assertEquals("west-east", BookUtils.normalizeForSearch("West\u2014East"));
+    }
+
+    @Test
     void testNormalizeForSearch_variousDiacritics() {
         // French
         assertEquals("francois", BookUtils.normalizeForSearch("François"));

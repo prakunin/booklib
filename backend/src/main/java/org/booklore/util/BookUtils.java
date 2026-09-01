@@ -26,6 +26,16 @@ public class BookUtils {
 
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
     private static final Pattern SPECIAL_CHARACTERS_PATTERN = Pattern.compile("[!@$%^&*_=|~`<>?/\"]");
+    // Quotation marks are dropped rather than replaced by a space: they sit against a word
+    // boundary, and a title stored as Generation «P» has to match a reader typing Generation P,
+    // whose words the substring search joins with a single space.
+    private static final Pattern QUOTE_CHARACTERS_PATTERN = Pattern.compile("[\u00AB\u00BB\u201C\u201D\u201E\u201F\u2039\u203A]");
+    // Typographic apostrophes fold onto the ASCII one, which this normalization deliberately keeps
+    // (see testBuildSearchText), so Don\u2019t and Don't normalize to the same text.
+    private static final Pattern APOSTROPHE_CHARACTERS_PATTERN = Pattern.compile("[\u2018\u2019\u201A\u201B]");
+    // Dashes fold onto the plain hyphen instead of disappearing, so 1941–1945 stays 1941-1945
+    // rather than collapsing into one number.
+    private static final Pattern DASH_CHARACTERS_PATTERN = Pattern.compile("[\u2010-\u2015\u2212]");
     private static final Pattern DIACRITICAL_MARKS_PATTERN = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
     private static final Pattern PARENTHESIS_PATTERN = Pattern.compile("\\s?\\([^()]*\\)");
     private static final String DOCUMENT_BODY_SEARCH_BOUNDARY = "\u001F\n";
@@ -205,9 +215,24 @@ public class BookUtils {
             return "";
         }
         String s = term;
-        s = SPECIAL_CHARACTERS_PATTERN.matcher(s).replaceAll("").trim();
-        s = WHITESPACE_PATTERN.matcher(s).replaceAll(" ");
+        s = SPECIAL_CHARACTERS_PATTERN.matcher(s).replaceAll("");
+        s = foldSearchPunctuation(s);
+        s = WHITESPACE_PATTERN.matcher(s).replaceAll(" ").trim();
         return s;
+    }
+
+    /**
+     * Folds typographic punctuation onto the plain forms the substring search compares against.
+     * Exposed separately so a backfill can bring already-stored {@code search_text} in line without
+     * rebuilding it from metadata, which would need every author of every book loaded.
+     */
+    public static String foldSearchPunctuation(String text) {
+        if (text == null) {
+            return null;
+        }
+        String s = QUOTE_CHARACTERS_PATTERN.matcher(text).replaceAll("");
+        s = APOSTROPHE_CHARACTERS_PATTERN.matcher(s).replaceAll("'");
+        return DASH_CHARACTERS_PATTERN.matcher(s).replaceAll("-");
     }
 
     public static String cleanAndTruncateSearchTerm(String term) {

@@ -31,6 +31,43 @@ public interface BookMetadataRepository extends JpaRepository<BookMetadataEntity
      * earlier, looser title-page heuristic. Keyset paging rather than an offset: the pass rewrites
      * rows as it goes, and an offset would step over the ones it just changed.
      */
+    /**
+     * Rows whose stored {@code search_text} still carries typographic punctuation, in book-id order
+     * for keyset paging. Only the two columns the backfill touches are read: rebuilding the text
+     * from metadata instead would have to load every author of every book.
+     */
+    @Query("""
+            SELECT m.bookId AS bookId, m.searchText AS searchText FROM BookMetadataEntity m
+            WHERE m.bookId > :afterBookId
+            AND (m.searchText LIKE '%\u00AB%' OR m.searchText LIKE '%\u00BB%'
+              OR m.searchText LIKE '%\u201C%' OR m.searchText LIKE '%\u201D%'
+              OR m.searchText LIKE '%\u201E%' OR m.searchText LIKE '%\u201F%'
+              OR m.searchText LIKE '%\u2039%' OR m.searchText LIKE '%\u203A%'
+              OR m.searchText LIKE '%\u2018%' OR m.searchText LIKE '%\u2019%'
+              OR m.searchText LIKE '%\u201A%' OR m.searchText LIKE '%\u201B%'
+              OR m.searchText LIKE '%\u2010%' OR m.searchText LIKE '%\u2011%'
+              OR m.searchText LIKE '%\u2012%' OR m.searchText LIKE '%\u2013%'
+              OR m.searchText LIKE '%\u2014%' OR m.searchText LIKE '%\u2015%'
+              OR m.searchText LIKE '%\u2212%')
+            ORDER BY m.bookId
+            """)
+    List<SearchTextView> findSearchTextsWithTypographicPunctuation(@Param("afterBookId") long afterBookId,
+                                                                   Pageable pageable);
+
+    /**
+     * Writes the folded text directly, bypassing the {@code @PreUpdate} hook that would otherwise
+     * rebuild {@code search_text} from the metadata fields and their lazily loaded authors.
+     */
+    @Modifying
+    @Query("UPDATE BookMetadataEntity m SET m.searchText = :searchText WHERE m.bookId = :bookId")
+    void updateSearchText(@Param("bookId") Long bookId, @Param("searchText") String searchText);
+
+    interface SearchTextView {
+        Long getBookId();
+
+        String getSearchText();
+    }
+
     @Query("""
             SELECT m FROM BookMetadataEntity m
             WHERE m.bookId > :afterBookId
