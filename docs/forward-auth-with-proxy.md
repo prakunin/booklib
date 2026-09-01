@@ -36,8 +36,8 @@ REMOTE_AUTH_GROUPS_DELIMITER=\\s+          # Regex pattern for splitting groups.
 
 ```yaml
 services:
-  grimmory:
-    image: ghcr.io/grimmory-tools/grimmory:latest
+  booklib:
+    image: ghcr.io/prakunin/booklib:latest
     environment:
       # Forward Auth Configuration
       - REMOTE_AUTH_ENABLED=true
@@ -69,6 +69,6 @@ books.example.com {
     copy_headers Remote-User Remote-Name Remote-Email Remote-Groups
   }
 
-  reverse_proxy grimmory:6060
+  reverse_proxy booklib:6060
 }
 ```

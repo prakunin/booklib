@@ -23,15 +23,14 @@ Your passwords and database name are unaffected: the official image accepts the 
 ## Before you start
 
 **Know your database name.** The commands below use `$MYSQL_DATABASE`, read from inside the
-container so it always matches your deployment. This repository's samples do not agree on the value
-— `deploy/compose/docker-compose.yml` uses `grimmory`, the README `.env` sample uses `booklib` — so
-never hardcode it. To see yours:
+container so it always matches your deployment. This repository's samples now all use `booklib`, but
+older Booklore and Grimmory deployments used other names — so never hardcode it. To see yours:
 
 ```bash
 docker compose exec mariadb sh -c 'echo "$MYSQL_DATABASE"'
 ```
 
-**Know where your old data actually lives.** The samples disagree here too. Find your current
+**Know where your old data actually lives.** The old samples disagree here. Find your current
 linuxserver mapping (the host side of `:/config`) before going further:
 
 | If your compose says | your data is at            |

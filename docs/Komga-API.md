@@ -59,7 +59,7 @@ Authentication uses HTTP Basic Auth, the same as OPDS.
 1. Install the Tachiyomi app
 2. Add a source → Browse → Sources → Komga
 3. Configure the source:
-   - Server URL: `http://your-grimmory-server/`
+   - Server URL: `http://your-booklib-server/`
    - Username: Your OPDS username
    - Password: Your OPDS password
 
@@ -67,7 +67,7 @@ Authentication uses HTTP Basic Auth, the same as OPDS.
 
 1. Install Komelia
 2. Add a server:
-   - URL: `http://your-grimmory-server/`
+   - URL: `http://your-booklib-server/`
    - Username: Your OPDS username
    - Password: Your OPDS password
 
@@ -76,7 +76,7 @@ Authentication uses HTTP Basic Auth, the same as OPDS.
 1. Install Tachidesk
 2. Add Komga extension
 3. Configure:
-   - Server URL: `http://your-grimmory-server/`
+   - Server URL: `http://your-booklib-server/`
    - Username: Your OPDS username
    - Password: Your OPDS password
 

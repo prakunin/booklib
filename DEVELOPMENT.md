@@ -1,6 +1,6 @@
-# Developing Grimmory
+# Developing BookLib
 
-This document covers the technical side of working in the Grimmory codebase: environment setup, build
+This document covers the technical side of working in the BookLib codebase: environment setup, build
 commands, testing, and conventions. If you haven't already, read [CONTRIBUTING.md](CONTRIBUTING.md)
 first — it covers the process side: how issues become PRs, what gets a PR closed, and how to submit
 work.
@@ -8,7 +8,7 @@ work.
 ## Project Structure
 
 ```
-grimmory/
+booklib/
 ├── frontend/                # Angular frontend (TypeScript, Optimus UI)
 ├── backend/                 # Spring Boot backend (Java 25, Gradle)
 ├── deploy/                  # Compose, Helm, and Podman deployment examples
@@ -36,7 +36,7 @@ just image-build           # Build the production image locally
 > **Tip:** Agents and automation should prefer `just` recipes where a suitable recipe exists, so local
 > workflows and documented commands stay aligned.
 
-> **Tip:** Set `GRIMMORY_COMPOSE_FILE=/path/to/compose.yml` if you need the root `just` recipes to
+> **Tip:** Set `BOOKLIB_COMPOSE_FILE=/path/to/compose.yml` if you need the root `just` recipes to
 > target a different development compose file.
 
 ## Component Guides
@@ -141,7 +141,7 @@ just ui coverage    # With coverage report (output: coverage/)
 
 ```bash
 just api test                                                              # Run all tests
-just api test-class test_class=org.booklore.service.BookServiceTest        # Specific class
+just api test-class org.booklore.service.BookServiceTest                   # Specific class
 just api coverage                                                          # Coverage report
 ```
 
@@ -172,7 +172,7 @@ just dev-down   # Or stop the full stack if started with `just dev-up`
 ### Cross-platform builds
 
 ```bash
-just image-build linux/arm64 grimmory:local-arm64
+just image-build linux/arm64 booklib:local-arm64
 ```
 
 ### Tips
@@ -181,7 +181,7 @@ just image-build linux/arm64 grimmory:local-arm64
   environments.
 - **Volumes:** Mount book directories to `/books`, data/config to `/app/data`, and an optional bookdrop
   folder to `/bookdrop`.
-- **Logs:** Use `docker logs -f grimmory-local` to follow application logs.
+- **Logs:** Use `docker logs -f booklib-local` to follow application logs.
 
 ---
 

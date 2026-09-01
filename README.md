@@ -84,7 +84,7 @@ The image is built locally from the repository via `build: .` — no external re
 > Migrating from an existing Booklore or Grimmory container? Keep your current `container_name`, database name and user, and ports the same. Replace only the `image:` line with `build: .` and run `docker compose up -d --build`.
 
 > [!IMPORTANT]
-> The mariadb volume is the one thing you must **not** keep as-is. Grimmory now runs the official
+> The mariadb volume is the one thing you must **not** keep as-is. BookLib now runs the official
 > MariaDB image, whose data directory is `/var/lib/mysql` rather than the linuxserver `/config`.
 > Reusing your old mapping starts an **empty** database and leaves your library invisible.
 > Read [docs/UPGRADING-MARIADB-12.md](docs/UPGRADING-MARIADB-12.md) first.
@@ -141,7 +141,7 @@ services:
       start_period: 30s
 ```
 
-> **Upgrading from an older release?** Grimmory now uses the official MariaDB image instead of the
+> **Upgrading from an older release?** BookLib now uses the official MariaDB image instead of the
 > linuxserver one, which stores data in a different directory. See
 > [docs/UPGRADING-MARIADB-12.md](docs/UPGRADING-MARIADB-12.md) before pulling.
 
@@ -155,11 +155,11 @@ Open http://localhost:6060, create your admin account, and start building your l
 
 #### Optional: Capture Heap Dumps for OOM Debugging
 
-Heap dumps are disabled by default. To enable them temporarily, add the following environment variable to the `grimmory` service:
+Heap dumps are disabled by default. To enable them temporarily, add the following environment variable to the `booklib` service:
 
 ```yaml
 services:
-  grimmory:
+  booklib:
     environment:
       - JDK_JAVA_OPTIONS=-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/data
 ```
@@ -169,7 +169,7 @@ The JVM creates a PID-specific `.hprof` file in the mounted `/app/data` director
 Additional deployment examples:
 
 - Docker Compose: [`deploy/compose/docker-compose.yml`](deploy/compose/docker-compose.yml)
-- Helm: [`deploy/helm/grimmory/Chart.yaml`](deploy/helm/grimmory/Chart.yaml)
+- Helm: [`deploy/helm/booklib/Chart.yaml`](deploy/helm/booklib/Chart.yaml)
 - Podman Quadlet: [`deploy/podman/quadlet/README.md`](deploy/podman/quadlet/README.md)
 
 ---

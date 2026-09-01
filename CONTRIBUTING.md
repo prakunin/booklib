@@ -1,4 +1,4 @@
-# Contributing to Grimmory
+# Contributing to BookLib
 
 This document is for anyone considering opening a **discussion**, **issue**, or **pull request**,
 whether you're a first-time user reporting something broken or an experienced developer submitting
@@ -14,7 +14,7 @@ code.
   - [Something isn't working](#something-isnt-working)
   - [I have an idea or feature request](#i-have-an-idea-or-feature-request)
   - [I've implemented something and want to submit it](#ive-implemented-something-and-want-to-submit-it)
-  - [I need help getting set up or using Grimmory](#i-need-help-getting-set-up-or-using-grimmory)
+  - [I need help getting set up or using BookLib](#i-need-help-getting-set-up-or-using-booklib)
 - [Policies and Conventions](#policies-and-conventions)
   - [Issues Are Actionable](#issues-are-actionable)
   - [Pull Requests Implement an Issue](#pull-requests-implement-an-issue)
@@ -23,7 +23,7 @@ code.
 
 ## How We Work
 
-Grimmory uses a two-stage workflow designed to keep everyone's time well spent.
+BookLib uses a two-stage workflow designed to keep everyone's time well spent.
 
 **Discussions first.** Ideas and support questions all start in
 [GitHub Discussions](https://github.com/orgs/grimmory-tools/discussions). This is where problems get
@@ -46,7 +46,7 @@ We'll work through it together.
 
 ## First-Time Contributors
 
-Projects like Grimmory run entirely on the energy of people willing to show up and help, and we're
+Projects like BookLib run entirely on the energy of people willing to show up and help, and we're
 genuinely glad you're here. Every bug report, reproduced issue, tested fix, or submitted feature
 makes a real difference to the people who use this every day.
 
@@ -66,11 +66,11 @@ build something that fits the shape of what's been agreed. We'll meet you there.
 
 ### I'd like to contribute code
 
-All issues in the Grimmory issue tracker are [actionable](#issues-are-actionable). Pick one and
+All issues in the BookLib issue tracker are [actionable](#issues-are-actionable). Pick one and
 start working on it. If you need help or guidance, comment on the issue. Issues that are especially
 friendly to newcomers are tagged [`good first issue`][good-first-issue].
 
-[good-first-issue]: https://github.com/grimmory-tools/grimmory/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good+first+issue%22
+[good-first-issue]: https://github.com/prakunin/booklib/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good+first+issue%22
 
 ### I'd like to contribute translations
 
@@ -113,8 +113,8 @@ fields slows things down for everyone.
 > over again, or ask you to repost entirely.
 
 [discussions]: https://github.com/orgs/grimmory-tools/discussions
-[closed-issues]: https://github.com/grimmory-tools/grimmory/issues?q=is%3Aissue%20state%3Aclosed
-[bug]: https://github.com/grimmory-tools/grimmory/issues/new?template=bug-report.yml
+[closed-issues]: https://github.com/prakunin/booklib/issues?q=is%3Aissue%20state%3Aclosed
+[bug]: https://github.com/prakunin/booklib/issues/new?template=bug-report.yml
 [request]: https://github.com/orgs/grimmory-tools/discussions/new?category=feature-requests-ideas
 [qa]: https://github.com/orgs/grimmory-tools/discussions/new?category=q-a
 
@@ -128,7 +128,7 @@ Search first, as someone may have already suggested it. If not, open a discussio
 1. If there is an accepted issue for it, open a pull request.
 2. If there is no issue yet, open a discussion and link to your branch.
 
-### I need help getting set up or using Grimmory
+### I need help getting set up or using BookLib
 
 Open a discussion in [**Q&A**][qa] discussion, or join the [Discord server][discord] and ask there.
 
@@ -140,7 +140,7 @@ Open a discussion in [**Q&A**][qa] discussion, or join the [Discord server][disc
 
 ### Issues Are Actionable
 
-The Grimmory [issue tracker](https://github.com/grimmory-tools/grimmory/issues) is for actionable
+The BookLib [issue tracker](https://github.com/prakunin/booklib/issues) is for actionable
 work items only. No discussion, no feature requests, no speculative ideas. Everything in the tracker
 has already been through Discussions and been agreed by a maintainer.
 
@@ -160,7 +160,7 @@ as described and your pull request will be accepted with a high degree of certai
 > **Pull requests are not the place to discuss feature design.** If you want to share a
 > work-in-progress, open a discussion and link to your branch.
 
-[feature-issues]: https://github.com/grimmory-tools/grimmory/issues?q=is%3Aissue%20is%3Aopen%20label%3Afeature
+[feature-issues]: https://github.com/prakunin/booklib/issues?q=is%3Aissue%20is%3Aopen%20label%3Afeature
 
 ### Working in the Codebase
 
@@ -168,7 +168,7 @@ The technical side of development (environment setup, build commands, testing, b
 commit conventions) lives in [DEVELOPMENT.md](DEVELOPMENT.md). That's the right starting point once
 you have an issue to work on.
 
-Grimmory has two distinct codebases, each with their own conventions:
+BookLib has two distinct codebases, each with their own conventions:
 
 - **Backend** (Java / Spring Boot): [backend/DEVELOPMENT.md](backend/DEVELOPMENT.md)
 - **Frontend** (TypeScript / Angular): [frontend/DEVELOPMENT.md](frontend/DEVELOPMENT.md)
@@ -180,5 +180,5 @@ If your change touches both, read both.
 You must understand what you're contributing. Whether that's a bug report, an idea, or a pull
 request, it should reflect your own thinking and not unreviewed output from a tool.
 
-The Grimmory project has clear rules for AI usage. Please read the [AI Usage Policy](AI_POLICY.md)
-before contributing. **This matters.**
+The upstream Grimmory project publishes an [AI Usage Policy](https://github.com/grimmory-tools/grimmory/blob/develop/AI_POLICY.md);
+it applies here as well. Please read it before contributing. **This matters.**

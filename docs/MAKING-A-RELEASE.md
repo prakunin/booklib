@@ -86,10 +86,8 @@ When `semantic-release` creates a release, [`.github/workflows/release-main.yml`
 That workflow will:
 
 - build the multi-architecture container image,
-- publish `grimmory/grimmory:vX.Y.Z`,
-- publish `grimmory/grimmory:latest`,
-- publish `ghcr.io/grimmory-tools/grimmory:vX.Y.Z`,
-- publish `ghcr.io/grimmory-tools/grimmory:latest`,
+- publish `prakunin/booklib:vX.Y.Z` and `prakunin/booklib:vX.Y` on Docker Hub (the registry comes from the `DOCKERHUB_REGISTRY` repository variable),
+- publish `ghcr.io/prakunin/booklib:vX.Y.Z` and `ghcr.io/prakunin/booklib:vX.Y`,
 - and flip the GitHub release from draft to published.
 
 ## Nightly Builds
@@ -100,7 +98,7 @@ They come from `develop` through [`.github/workflows/publish-nightly.yml`](../.g
 
 - `nightly`
 - `nightly-YYYYMMDD-<sha>`
-- `grimmory-openapi.json`
+- `booklib-openapi.json`
 
 ## Preview Builds
 
