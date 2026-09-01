@@ -1,9 +1,7 @@
-import {describe, expect, it} from 'vitest';
+import {describe, it} from 'vitest';
 
 // TODO(seam): The metadata editor requires a high-fidelity form harness for Optimus UI
 // upload, autocomplete, drag-drop author ordering, router navigation, and autosave flows.
-describe.skip('MetadataEditorComponent', () => {
-  it('needs an integration harness for form population, upload, save, and navigation branches', () => {
-    expect.hasAssertions();
-  });
+describe('MetadataEditorComponent', () => {
+  it.todo('needs an integration harness for form population, upload, save, and navigation branches');
 });

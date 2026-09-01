@@ -76,11 +76,6 @@ describe('UserManagementComponent', () => {
     fixture.destroy();
   });
 
-  it.skip('needs service seams to verify user loading, edit toggling, and save payload shaping', () => {
-    // TODO(seam): Cover loadUsers, toggleEdit, and saveUser once the table-editing state and async user-service flows are isolated.
-  });
-
-  it.skip('needs dialog seams to verify create-user refresh, delete confirmation, and password-change validation', () => {
-    // TODO(seam): Cover openCreateUserDialog, deleteUser, and submitPasswordChange after extracting confirm and modal runtime concerns.
-  });
+  it.todo('needs service seams to verify user loading, edit toggling, and save payload shaping');
+  it.todo('needs dialog seams to verify create-user refresh, delete confirmation, and password-change validation');
 });

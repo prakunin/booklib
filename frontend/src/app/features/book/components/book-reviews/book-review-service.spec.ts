@@ -53,20 +53,26 @@ describe('BookReviewService', () => {
   });
 
   it('deletes a single review by id', () => {
-    service.delete(11).subscribe();
+    let completed = false;
+    service.delete(11).subscribe({complete: () => (completed = true)});
 
     const request = httpTestingController.expectOne(req =>
       req.method === 'DELETE' && req.url.endsWith('/api/v1/reviews/11')
     );
     request.flush(null);
+
+    expect(completed).toBe(true);
   });
 
   it('deletes all reviews for a book', () => {
-    service.deleteAllByBookId(12).subscribe();
+    let completed = false;
+    service.deleteAllByBookId(12).subscribe({complete: () => (completed = true)});
 
     const request = httpTestingController.expectOne(req =>
       req.method === 'DELETE' && req.url.endsWith('/api/v1/reviews/book/12')
     );
     request.flush(null);
+
+    expect(completed).toBe(true);
   });
 });

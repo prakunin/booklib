@@ -85,20 +85,25 @@ describe('UserStatsService', () => {
     service.getReadingDates().subscribe();
     service.getSessionScatter(2026).subscribe();
 
-    httpTestingController.expectOne(req => req.url.endsWith('/api/v1/user-stats/reading/genres')).flush([]);
-    httpTestingController.expectOne(req =>
-      req.url.endsWith('/api/v1/user-stats/reading/completion-timeline')
-      && req.params.get('year') === '2026'
-    ).flush([]);
-    httpTestingController.expectOne(req => req.url.endsWith('/api/v1/user-stats/reading/page-turner-scores')).flush([]);
-    httpTestingController.expectOne(req =>
-      req.url.endsWith('/api/v1/user-stats/reading/completion-race')
-      && req.params.get('year') === '2026'
-    ).flush([]);
-    httpTestingController.expectOne(req => req.url.endsWith('/api/v1/user-stats/reading/dates')).flush([]);
-    httpTestingController.expectOne(req =>
-      req.url.endsWith('/api/v1/user-stats/reading/session-scatter')
-      && req.params.get('year') === '2026'
-    ).flush([]);
+    const requests = [
+      httpTestingController.expectOne(req => req.url.endsWith('/api/v1/user-stats/reading/genres')),
+      httpTestingController.expectOne(req =>
+        req.url.endsWith('/api/v1/user-stats/reading/completion-timeline')
+        && req.params.get('year') === '2026'
+      ),
+      httpTestingController.expectOne(req => req.url.endsWith('/api/v1/user-stats/reading/page-turner-scores')),
+      httpTestingController.expectOne(req =>
+        req.url.endsWith('/api/v1/user-stats/reading/completion-race')
+        && req.params.get('year') === '2026'
+      ),
+      httpTestingController.expectOne(req => req.url.endsWith('/api/v1/user-stats/reading/dates')),
+      httpTestingController.expectOne(req =>
+        req.url.endsWith('/api/v1/user-stats/reading/session-scatter')
+        && req.params.get('year') === '2026'
+      ),
+    ];
+
+    expect(requests.map(request => request.request.method)).toEqual(Array(6).fill('GET'));
+    requests.forEach(request => request.flush([]));
   });
 });

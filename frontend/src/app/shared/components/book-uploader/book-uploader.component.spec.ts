@@ -4,14 +4,7 @@ import {describe, it} from 'vitest';
 // controllable library/settings signals, and a stable upload-progress harness for `HttpRequest`
 // event streams and dialog close behavior. The current surface mixes view-child state, effects,
 // progress events, and UI messaging too tightly for a reliable low-noise unit spec tonight.
-describe.skip('BookUploaderComponent', () => {
-  it('needs a file-upload seam to verify destination validation, duplicate filtering, and size failures', () => {
-    // TODO(seam): Cover file selection and validation after the Optimus UI file chooser state is
-    // wrapped behind a testable adapter instead of relying on the live FileUpload view child.
-  });
-
-  it('needs an upload-progress seam to verify request batching, status transitions, and bookdrop close behavior', () => {
-    // TODO(seam): Cover progress updates and terminal states once upload event streams can be
-    // driven without coupling the spec to the full Optimus UI/http runtime.
-  });
+describe('BookUploaderComponent', () => {
+  it.todo('needs a file-upload seam to verify destination validation, duplicate filtering, and size failures');
+  it.todo('needs an upload-progress seam to verify request batching, status transitions, and bookdrop close behavior');
 });
