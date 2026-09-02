@@ -1,6 +1,7 @@
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
+import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
 import org.gradle.testing.jacoco.tasks.JacocoReport
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import org.springframework.boot.gradle.tasks.run.BootRun
@@ -387,6 +388,37 @@ tasks.named<JacocoReport>("jacocoTestReport") {
         xml.required.set(true)
         html.required.set(true)
     }
+}
+
+// Coverage ratchet: fails `check` when bundle line coverage drops below the floor. The floor sits
+// below today's figure (~70% on 2026-09-01) so it catches regressions without blocking the build.
+// Deliberately hooked into `check`, not `test`, so a plain test run never fails on coverage.
+// The two classes excluded here need native libraries (pdfium/epub4j) that a CI runner may lack,
+// so their tests are conditionally skipped; the Sonar scan excludes the same two.
+val jacocoCoverageExcludes = listOf(
+    "org/booklore/service/metadata/writer/CbxMetadataWriter*",
+    "org/booklore/service/kobo/CbxConversionService*",
+)
+
+tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn(tasks.named("test"))
+    classDirectories.setFrom(
+        classDirectories.files.map { dir -> fileTree(dir) { exclude(jacocoCoverageExcludes) } }
+    )
+    violationRules {
+        rule {
+            element = "BUNDLE"
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.65".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(tasks.named("jacocoTestCoverageVerification"))
 }
 
 tasks.named<Copy>("processResources") {
