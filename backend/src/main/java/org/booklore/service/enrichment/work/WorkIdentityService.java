@@ -11,6 +11,7 @@ import org.booklore.repository.BookWorkLinkRepository;
 import org.booklore.repository.WorkIdentityRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.Map;
@@ -37,6 +38,7 @@ public class WorkIdentityService {
 
     private final WorkIdentityRepository workIdentityRepository;
     private final BookWorkLinkRepository bookWorkLinkRepository;
+    private final TransactionTemplate transactionTemplate;
 
     private final Map<String, ReentrantLock> inFlight = new ConcurrentHashMap<>();
 
@@ -69,15 +71,16 @@ public class WorkIdentityService {
             if (resolvedMeanwhile.isPresent()) {
                 return resolvedMeanwhile;
             }
-            return resolver.get().map(identity -> store(workKey, identity));
+            // Through the template rather than a @Transactional self-call: this method is not
+            // transactional, so a call via `this` would bypass the proxy and run outside any transaction.
+            return resolver.get().map(identity -> transactionTemplate.execute(status -> store(workKey, identity)));
         } finally {
             lock.unlock();
             inFlight.remove(workKey, lock);
         }
     }
 
-    @Transactional
-    public WorkIdentityEntity store(String workKey, ResolvedWorkIdentity identity) {
+    private WorkIdentityEntity store(String workKey, ResolvedWorkIdentity identity) {
         WorkIdentityEntity entity = workIdentityRepository.findByWorkKey(workKey)
                 .orElseGet(() -> WorkIdentityEntity.builder().workKey(workKey).build());
         entity.setOriginalTitle(identity.originalTitle());

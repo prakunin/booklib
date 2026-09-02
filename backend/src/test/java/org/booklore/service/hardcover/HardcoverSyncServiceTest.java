@@ -63,7 +63,7 @@ class HardcoverSyncServiceTest {
     private static final Long TEST_USER_ID = 1L;
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         // Create service with mocked dependencies
         service = new HardcoverSyncService(hardcoverSyncSettingsService, bookRepository, restClient);
 

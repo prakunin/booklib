@@ -27,11 +27,6 @@ public interface BookMetadataRepository extends JpaRepository<BookMetadataEntity
     void updateAudiobookCoverTimestamp(@Param("bookId") Long bookId, @Param("timestamp") Instant timestamp);
 
     /**
-     * Unlocked, non-empty subtitles in book-id order, for the repair pass over values written by the
-     * earlier, looser title-page heuristic. Keyset paging rather than an offset: the pass rewrites
-     * rows as it goes, and an offset would step over the ones it just changed.
-     */
-    /**
      * Rows whose stored {@code search_text} still carries typographic punctuation, in book-id order
      * for keyset paging. Only the two columns the backfill touches are read: rebuilding the text
      * from metadata instead would have to load every author of every book.
@@ -68,6 +63,11 @@ public interface BookMetadataRepository extends JpaRepository<BookMetadataEntity
         String getSearchText();
     }
 
+    /**
+     * Unlocked, non-empty subtitles in book-id order, for the repair pass over values written by the
+     * earlier, looser title-page heuristic. Keyset paging rather than an offset: the pass rewrites
+     * rows as it goes, and an offset would step over the ones it just changed.
+     */
     @Query("""
             SELECT m FROM BookMetadataEntity m
             WHERE m.bookId > :afterBookId

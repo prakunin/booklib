@@ -239,56 +239,79 @@ public class Fb2MetadataExtractor implements FileMetadataExtractor {
      */
     public BookMetadata extractMetadata(InputStream inputStream, String sourceName) {
         try {
-            BookMetadata.BookMetadataBuilder metadataBuilder = BookMetadata.builder();
-            List<String> authors = new ArrayList<>();
-            Set<String> categories = new HashSet<>();
-            List<String> bodyParagraphs = new ArrayList<>();
-            boolean inBody = false;
-            boolean afterDescription = false;
-
+            DocumentScan scan = new DocumentScan();
             XMLStreamReader reader = createXmlStreamReader(inputStream);
             try {
-                while (reader.hasNext()) {
-                    int event = reader.next();
-                    if (event == XMLStreamConstants.START_ELEMENT && "description".equals(reader.getLocalName())) {
-                        extractDescription(reader, metadataBuilder, authors, categories);
-                        afterDescription = true;
-                    } else if (event == XMLStreamConstants.START_ELEMENT && "body".equals(reader.getLocalName())) {
-                        inBody = true;
-                    } else if (event == XMLStreamConstants.START_ELEMENT && afterDescription && !inBody) {
-                        // Do not scan arbitrary trailing payloads (especially large or
-                        // truncated <binary> elements). Only a document body is useful
-                        // for the fallback title-page recovery.
-                        break;
-                    } else if (event == XMLStreamConstants.END_ELEMENT && inBody
-                            && BODY_ELEMENT.equals(reader.getLocalName())) {
-                        // The title page lives in the first body; everything past it - further
-                        // bodies, and above all the base64 <binary> cover payloads that make up
-                        // the bulk of an FB2 - would only be decompressed and scanned for nothing.
-                        break;
-                    } else if (event == XMLStreamConstants.START_ELEMENT && inBody
-                            && "p".equals(reader.getLocalName())) {
-                        String paragraph = readElementText(reader);
-                        if (StringUtils.isNotBlank(paragraph)) {
-                            bodyParagraphs.add(paragraph.trim());
-                        }
-                        if (bodyParagraphs.size() >= MAX_BODY_PARAGRAPHS) {
-                            break;
-                        }
-                    }
+                boolean reading = true;
+                while (reading && reader.hasNext()) {
+                    reading = scan.consume(reader);
                 }
             } finally {
                 reader.close();
             }
+            return scan.toMetadata();
+        } catch (Exception e) {
+            log.warn("Failed to extract metadata from FB2: {}", sourceName, e);
+            return null;
+        }
+    }
 
+    /**
+     * One pass over an FB2 document: the structured {@code <description>} plus the opening body
+     * paragraphs the title-page fallback needs, and nothing past them.
+     */
+    private final class DocumentScan {
+        private final BookMetadata.BookMetadataBuilder metadataBuilder = BookMetadata.builder();
+        private final List<String> authors = new ArrayList<>();
+        private final Set<String> categories = new HashSet<>();
+        private final List<String> bodyParagraphs = new ArrayList<>();
+        private boolean inBody;
+        private boolean afterDescription;
+
+        /** Consumes the next event. Returns {@code false} once nothing useful can follow. */
+        boolean consume(XMLStreamReader reader) throws XMLStreamException {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) {
+                return consumeStartElement(reader);
+            }
+            // The title page lives in the first body; everything past it - further bodies, and above
+            // all the base64 <binary> cover payloads that make up the bulk of an FB2 - would only be
+            // decompressed and scanned for nothing.
+            return !(event == XMLStreamConstants.END_ELEMENT && inBody && BODY_ELEMENT.equals(reader.getLocalName()));
+        }
+
+        private boolean consumeStartElement(XMLStreamReader reader) throws XMLStreamException {
+            String name = reader.getLocalName();
+            if ("description".equals(name)) {
+                extractDescription(reader, metadataBuilder, authors, categories);
+                afterDescription = true;
+                return true;
+            }
+            if (BODY_ELEMENT.equals(name)) {
+                inBody = true;
+                return true;
+            }
+            if (!inBody) {
+                // Do not scan arbitrary trailing payloads (especially large or truncated <binary>
+                // elements). Only a document body is useful for the fallback title-page recovery.
+                return !afterDescription;
+            }
+            if ("p".equals(name)) {
+                String paragraph = readElementText(reader);
+                if (StringUtils.isNotBlank(paragraph)) {
+                    bodyParagraphs.add(paragraph.trim());
+                }
+                return bodyParagraphs.size() < MAX_BODY_PARAGRAPHS;
+            }
+            return true;
+        }
+
+        BookMetadata toMetadata() {
             metadataBuilder.authors(authors);
             metadataBuilder.categories(categories);
             BookMetadata metadata = metadataBuilder.build();
             applyBodyMetadataFallback(metadata, bodyParagraphs);
             return metadata;
-        } catch (Exception e) {
-            log.warn("Failed to extract metadata from FB2: {}", sourceName, e);
-            return null;
         }
     }
 

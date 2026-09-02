@@ -6,7 +6,6 @@ import org.booklore.mapper.OpdsUserV2Mapper;
 import org.booklore.mapper.custom.BookLoreUserTransformer;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.OpdsUserV2;
-import org.booklore.model.entity.BookLoreUserEntity;
 import org.booklore.model.entity.OpdsUserV2Entity;
 import org.booklore.repository.OpdsUserV2Repository;
 import org.springframework.security.core.userdetails.UserDetailsService;

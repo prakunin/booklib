@@ -51,7 +51,7 @@ public final class CfiParser {
     // Detect range form: contentPath , startPath , endPath
     String[] rangeParts = splitRange(afterBang);
 
-    if (rangeParts != null) {
+    if (rangeParts.length > 0) {
       // Range form: shared , start , end
       SegmentParseResult shared = parseSegment(rangeParts[0]);
       SegmentParseResult endSeg = parseSegment(rangeParts[2]);
@@ -127,21 +127,21 @@ public final class CfiParser {
     String numPart = bracket >= 0 ? spineToken.substring(0, bracket) : spineToken;
     try {
       return Integer.parseInt(numPart);
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       throw new IllegalArgumentException("Non-numeric spine position: " + spineToken);
     }
   }
 
   /**
-   * Split a content string into range parts if it contains the {@code P,S,E} form. Returns {@code
-   * null} for non-range (point) CFIs.
+   * Split a content string into range parts if it contains the {@code P,S,E} form. Returns an
+   * empty array for non-range (point) CFIs.
    */
   private static String[] splitRange(String content) {
     // A range has exactly two commas at the top level
     int first = content.indexOf(',');
-    if (first < 0) return null;
+    if (first < 0) return new String[0];
     int second = content.indexOf(',', first + 1);
-    if (second < 0) return null;
+    if (second < 0) return new String[0];
 
     return new String[] {
       content.substring(0, first),
@@ -165,7 +165,7 @@ public final class CfiParser {
       try {
         offset = Integer.parseInt(numStr);
         pathPart = segment.substring(0, lastColon);
-      } catch (NumberFormatException ignored) {
+      } catch (NumberFormatException _) {
         // Not a valid offset; treat the whole thing as a path
       }
     }
@@ -202,7 +202,7 @@ public final class CfiParser {
       try {
         int pos = Integer.parseInt(numStr);
         steps.add(new CfiExpression.PathStep(pos, id));
-      } catch (NumberFormatException e) {
+      } catch (NumberFormatException _) {
         throw new IllegalArgumentException("Invalid step token: " + token);
       }
     }

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.entity.LocalCatalogIndexEntity;
 import org.booklore.model.enums.LocalCatalogSourceType;
+import org.booklore.model.entity.LibraryEntity;
 import org.booklore.repository.LibraryRepository;
 import org.booklore.repository.LocalCatalogIndexRepository;
 import org.booklore.service.ArchiveService;
@@ -24,8 +25,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Walks a local catalog once and records where each key lives.
@@ -149,7 +148,7 @@ public class LocalCatalogIndexBuilder {
 
     private Optional<Path> catalogRoot(long libraryId) {
         return libraryRepository.findById(libraryId)
-                .map(library -> library.getMetadataSidecarPath())
+                .map(LibraryEntity::getMetadataSidecarPath)
                 .filter(path -> path != null && !path.isBlank())
                 .map(Path::of)
                 .filter(layout::matches);
@@ -263,18 +262,41 @@ public class LocalCatalogIndexBuilder {
         indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.COMPILATION);
         indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.COMPILATION_PART);
 
-        List<LocalCatalogIndexEntity> batch = new ArrayList<>(BATCH_SIZE);
-        Map<String, List<CompilationMembership>> membershipsByPartKey = new LinkedHashMap<>();
-        Set<String> compilationKeys = new HashSet<>();
-        AtomicLong duplicates = new AtomicLong();
-        AtomicReference<RuntimeException> saveFailure = new AtomicReference<>();
-        compilationParser.parse(new ByteArrayInputStream(json), (key, parts) -> {
+        CompilationIndexing indexing = new CompilationIndexing(libraryId);
+        compilationParser.parse(new ByteArrayInputStream(json), indexing::index);
+        indexing.rethrowSaveFailure();
+        flush(indexing.batch);
+
+        indexing.writeMembershipRows();
+        flush(indexing.batch);
+
+        if (indexing.duplicates > 0) {
+            log.warn("compilations.json for library {} lists {} compilation(s) more than once; kept the "
+                    + "first sighting of each", libraryId, indexing.duplicates);
+        }
+        return new CompilationCounts(indexing.compilationKeys.size(), indexing.membershipsByPartKey.size());
+    }
+
+    /** The accumulators of one pass over {@code compilations.json}; see {@link #indexCompilations}. */
+    private final class CompilationIndexing {
+        private final long libraryId;
+        private final List<LocalCatalogIndexEntity> batch = new ArrayList<>(BATCH_SIZE);
+        private final Map<String, List<CompilationMembership>> membershipsByPartKey = new LinkedHashMap<>();
+        private final Set<String> compilationKeys = new HashSet<>();
+        private long duplicates;
+        private RuntimeException saveFailure;
+
+        private CompilationIndexing(long libraryId) {
+            this.libraryId = libraryId;
+        }
+
+        void index(FlibustaCompilationParser.CompilationKey key, List<CompilationPart> parts) {
             String entryKey = layout.bookKey(key.archiveName(), key.entryName());
             if (entryKey == null) {
                 return;
             }
             if (!compilationKeys.add(entryKey)) {
-                duplicates.incrementAndGet();
+                duplicates++;
                 return;
             }
             batch.add(LocalCatalogIndexEntity.builder()
@@ -285,46 +307,42 @@ public class LocalCatalogIndexBuilder {
                     .build());
             for (CompilationPart part : parts) {
                 String partKey = layout.bookKey(part.archiveName(), part.entryName());
-                if (partKey == null) {
-                    continue;
+                if (partKey != null) {
+                    membershipsByPartKey.computeIfAbsent(partKey, unused -> new ArrayList<>())
+                            .add(new CompilationMembership(key.archiveName(), key.entryName(), part.part()));
                 }
-                membershipsByPartKey.computeIfAbsent(partKey, unused -> new ArrayList<>())
-                        .add(new CompilationMembership(key.archiveName(), key.entryName(), part.part()));
             }
             if (batch.size() >= BATCH_SIZE) {
                 try {
                     flush(batch);
                 } catch (RuntimeException e) {
-                    saveFailure.set(e);
+                    saveFailure = e;
                     throw e;
                 }
             }
-        });
-        RuntimeException failure = saveFailure.get();
-        if (failure != null) {
-            throw new IllegalStateException(
-                    "Could not save local catalog compilation rows: " + failure.getMessage(), failure);
         }
-        flush(batch);
 
-        for (Map.Entry<String, List<CompilationMembership>> entry : membershipsByPartKey.entrySet()) {
-            batch.add(LocalCatalogIndexEntity.builder()
-                    .libraryId(libraryId)
-                    .sourceType(LocalCatalogSourceType.COMPILATION_PART)
-                    .entryKey(entry.getKey())
-                    .payload(writeMemberships(entry.getValue()))
-                    .build());
-            if (batch.size() >= BATCH_SIZE) {
-                flush(batch);
+        /** The parser swallows consumer failures into a row-read warning; a database error must not hide there. */
+        void rethrowSaveFailure() {
+            if (saveFailure != null) {
+                throw new IllegalStateException(
+                        "Could not save local catalog compilation rows: " + saveFailure.getMessage(), saveFailure);
             }
         }
-        flush(batch);
 
-        if (duplicates.get() > 0) {
-            log.warn("compilations.json for library {} lists {} compilation(s) more than once; kept the "
-                    + "first sighting of each", libraryId, duplicates.get());
+        void writeMembershipRows() {
+            for (Map.Entry<String, List<CompilationMembership>> entry : membershipsByPartKey.entrySet()) {
+                batch.add(LocalCatalogIndexEntity.builder()
+                        .libraryId(libraryId)
+                        .sourceType(LocalCatalogSourceType.COMPILATION_PART)
+                        .entryKey(entry.getKey())
+                        .payload(writeMemberships(entry.getValue()))
+                        .build());
+                if (batch.size() >= BATCH_SIZE) {
+                    flush(batch);
+                }
+            }
         }
-        return new CompilationCounts(compilationKeys.size(), membershipsByPartKey.size());
     }
 
     /**
@@ -354,10 +372,6 @@ public class LocalCatalogIndexBuilder {
         }
         indexRepository.deleteByLibraryIdAndSourceType(libraryId, LocalCatalogSourceType.LANGUAGE);
 
-        List<LocalCatalogIndexEntity> batch = new ArrayList<>(BATCH_SIZE);
-        Map<String, Integer> metadataHashByKey = new HashMap<>();
-        AtomicLong conflicts = new AtomicLong();
-        long rows = 0;
         List<String> contentsEntries;
         try {
             contentsEntries = archiveService.getEntryNames(container);
@@ -365,6 +379,7 @@ public class LocalCatalogIndexBuilder {
             log.warn("Could not list required local catalog archive {}: {}", container, e.getMessage());
             return LanguageIndexResult.incomplete();
         }
+        LanguageIndexing indexing = new LanguageIndexing(libraryId);
         int listings = 0;
         for (String entryName : contentsEntries) {
             String language = languageCode(entryName);
@@ -372,68 +387,90 @@ public class LocalCatalogIndexBuilder {
                 continue;
             }
             listings++;
-            byte[] listing;
-            try {
-                listing = archiveService.getEntryBytes(container, entryName);
-            } catch (IOException e) {
-                log.warn("Could not read required local catalog entry '{}' from {}: {}",
-                        entryName, container, e.getMessage());
+            if (!indexing.indexListing(container, entryName, language)) {
                 return LanguageIndexResult.incomplete();
-            }
-            if (listing.length == 0) {
-                log.warn("Local catalog contents listing is empty: {}", entryName);
-                return LanguageIndexResult.incomplete();
-            }
-            AtomicReference<RuntimeException> saveFailure = new AtomicReference<>();
-            rows += contentsParser.parse(new ByteArrayInputStream(listing), row -> {
-                try {
-                    String entryKey = layout.bookKey(row.archiveName(), row.entryName());
-                    if (entryKey == null) {
-                        return;
-                    }
-                    CatalogBookMetadata catalogMetadata = new CatalogBookMetadata(
-                            row.title(), row.authors(), language);
-                    Integer alreadyIndexed = metadataHashByKey.putIfAbsent(entryKey, catalogMetadata.hashCode());
-                    if (alreadyIndexed != null) {
-                        if (alreadyIndexed != catalogMetadata.hashCode()) {
-                            conflicts.incrementAndGet();
-                        }
-                        return;
-                    }
-                    batch.add(LocalCatalogIndexEntity.builder()
-                            .libraryId(libraryId)
-                            .sourceType(LocalCatalogSourceType.LANGUAGE)
-                            .entryKey(entryKey)
-                            .payload(writeCatalogMetadata(catalogMetadata))
-                            .build());
-                    if (batch.size() >= BATCH_SIZE) {
-                        flush(batch);
-                    }
-                } catch (RuntimeException e) {
-                    saveFailure.set(e);
-                    throw e;
-                }
-            });
-            RuntimeException failure = saveFailure.get();
-            if (failure != null) {
-                throw new IllegalStateException(
-                        "Could not save local catalog language rows from '" + entryName
-                                + "': " + failure.getMessage(), failure);
             }
         }
         if (listings == 0) {
             log.warn("Local catalog contents archive has no language listings: {}", container);
             return LanguageIndexResult.incomplete();
         }
-        flush(batch);
+        flush(indexing.batch);
 
-        if (conflicts.get() > 0) {
+        if (indexing.conflicts > 0) {
             log.warn("{} book(s) in library {} have conflicting contents listings; kept the listing "
-                    + "each was seen in first", conflicts.get(), libraryId);
+                    + "each was seen in first", indexing.conflicts, libraryId);
         }
         log.info("Indexed {} for library {}: {} keys from {} rows",
-                LocalCatalogSourceType.LANGUAGE, libraryId, metadataHashByKey.size(), rows);
-        return new LanguageIndexResult(metadataHashByKey.size(), true);
+                LocalCatalogSourceType.LANGUAGE, libraryId, indexing.metadataHashByKey.size(), indexing.rows);
+        return new LanguageIndexResult(indexing.metadataHashByKey.size(), true);
+    }
+
+    /** The accumulators of one pass over the contents listings; see {@link #indexLanguages}. */
+    private final class LanguageIndexing {
+        private final long libraryId;
+        private final List<LocalCatalogIndexEntity> batch = new ArrayList<>(BATCH_SIZE);
+        private final Map<String, Integer> metadataHashByKey = new HashMap<>();
+        private long conflicts;
+        private long rows;
+        private RuntimeException saveFailure;
+
+        private LanguageIndexing(long libraryId) {
+            this.libraryId = libraryId;
+        }
+
+        /** @return {@code false} when the listing cannot be read, which leaves the index incomplete */
+        boolean indexListing(Path container, String entryName, String language) {
+            byte[] listing;
+            try {
+                listing = archiveService.getEntryBytes(container, entryName);
+            } catch (IOException e) {
+                log.warn("Could not read required local catalog entry '{}' from {}: {}",
+                        entryName, container, e.getMessage());
+                return false;
+            }
+            if (listing.length == 0) {
+                log.warn("Local catalog contents listing is empty: {}", entryName);
+                return false;
+            }
+            rows += contentsParser.parse(new ByteArrayInputStream(listing), row -> indexRow(row, language));
+            if (saveFailure != null) {
+                throw new IllegalStateException(
+                        "Could not save local catalog language rows from '" + entryName
+                                + "': " + saveFailure.getMessage(), saveFailure);
+            }
+            return true;
+        }
+
+        private void indexRow(FlibustaContentsParser.CatalogRow row, String language) {
+            try {
+                String entryKey = layout.bookKey(row.archiveName(), row.entryName());
+                if (entryKey == null) {
+                    return;
+                }
+                CatalogBookMetadata catalogMetadata = new CatalogBookMetadata(
+                        row.title(), row.authors(), language);
+                Integer alreadyIndexed = metadataHashByKey.putIfAbsent(entryKey, catalogMetadata.hashCode());
+                if (alreadyIndexed != null) {
+                    if (alreadyIndexed != catalogMetadata.hashCode()) {
+                        conflicts++;
+                    }
+                    return;
+                }
+                batch.add(LocalCatalogIndexEntity.builder()
+                        .libraryId(libraryId)
+                        .sourceType(LocalCatalogSourceType.LANGUAGE)
+                        .entryKey(entryKey)
+                        .payload(writeCatalogMetadata(catalogMetadata))
+                        .build());
+                if (batch.size() >= BATCH_SIZE) {
+                    flush(batch);
+                }
+            } catch (RuntimeException e) {
+                saveFailure = e;
+                throw e;
+            }
+        }
     }
 
     private String languageCode(String entryName) {

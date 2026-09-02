@@ -22,8 +22,10 @@ class FlibustaContentsParserTest {
 
     @Test
     void readsArchiveAndEntryFromTheLastTwoColumns() {
-        int count = parse("Жун,Цзян,:\tWolf Totem (chinese)\t\tfb2-091841-104214.zip\t95887.fb2\n"
-                + "Толстой,Лев,:\tВойна и мир\t\tf.fb2-173909-177717.zip\t174393.fb2\n");
+        int count = parse("""
+                Жун,Цзян,:\tWolf Totem (chinese)\t\tfb2-091841-104214.zip\t95887.fb2
+                Толстой,Лев,:\tВойна и мир\t\tf.fb2-173909-177717.zip\t174393.fb2
+                """);
 
         assertThat(count).isEqualTo(2);
         assertThat(collected).containsExactly(
@@ -45,8 +47,10 @@ class FlibustaContentsParserTest {
 
     @Test
     void skipsRowsWhoseArchiveOrEntryIsBlank() {
-        int count = parse("a\tb\t\t\t95887.fb2\n"
-                + "a\tb\t\tarchive.zip\t\n");
+        int count = parse("""
+                a\tb\t\t\t95887.fb2
+                a\tb\t\tarchive.zip\t
+                """);
 
         assertThat(count).isZero();
         assertThat(collected).isEmpty();

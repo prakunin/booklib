@@ -85,8 +85,8 @@ class AuthorDescriptionCapacityTest {
     void countsCyrillicBiographiesInBytesRatherThanCharacters() {
         String biography = "б".repeat(40_000);
 
-        assertThat(biography.getBytes(StandardCharsets.UTF_8).length)
-                .isGreaterThan((int) TEXT_CAPACITY_BYTES);
+        assertThat(biography.getBytes(StandardCharsets.UTF_8))
+                .hasSizeGreaterThan((int) TEXT_CAPACITY_BYTES);
         assertThat(capacityOf(declaredColumnDefinition()))
                 .isGreaterThan((long) biography.getBytes(StandardCharsets.UTF_8).length);
     }

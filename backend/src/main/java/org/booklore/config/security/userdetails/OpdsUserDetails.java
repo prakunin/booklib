@@ -13,7 +13,7 @@ import java.util.List;
 @Getter
 @RequiredArgsConstructor
 public class OpdsUserDetails implements UserDetails {
-    private final BookLoreUser user;
+    private final transient BookLoreUser user;
 
     private final transient OpdsUserV2 opdsUserV2;
 

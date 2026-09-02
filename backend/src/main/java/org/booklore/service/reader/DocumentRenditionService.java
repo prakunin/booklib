@@ -351,7 +351,8 @@ public class DocumentRenditionService {
     private String escape(String text) {
         StringBuilder xmlText = new StringBuilder(text.length());
         boolean needsSeparator = false;
-        for (int index = 0; index < text.length();) {
+        int index = 0;
+        while (index < text.length()) {
             int codePoint = text.codePointAt(index);
             index += Character.charCount(codePoint);
             if (!isValidXmlCodePoint(codePoint)) {

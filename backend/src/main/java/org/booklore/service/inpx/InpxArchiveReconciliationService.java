@@ -140,65 +140,12 @@ public class InpxArchiveReconciliationService {
     public ReconciliationResult reconcileNestedPublications(long libraryId, String archiveName) {
         List<BookFileEntity> files = bookFileRepository.findBookFilesByArchives(libraryId, List.of(archiveName));
         List<BookFileEntity> filesToUpdate = new ArrayList<>();
-        int promotedHtml = 0;
         Set<List<String>> htmlParents = new HashSet<>();
         Set<List<String>> comicContainers = new HashSet<>();
 
-        for (BookFileEntity file : files) {
-            if (Boolean.TRUE.equals(file.getBook().getDeleted())) {
-                continue;
-            }
-            List<String> chain = decode(file);
-            if (isHtml(file.getFileName()) && chain.size() >= 2) {
-                htmlParents.add(List.copyOf(chain.subList(0, chain.size() - 1)));
-                if (file.getBookType() == BookFileType.OTHER) {
-                    file.setBookType(BookFileType.HTML);
-                    filesToUpdate.add(file);
-                    promotedHtml++;
-                }
-            }
-            if (file.getBookType() == BookFileType.CBX
-                    && entryMetadataRecognizer.isGenericArchive(chain.getLast())) {
-                comicContainers.add(chain);
-            }
-        }
-
-        for (BookFileEntity container : files) {
-            if (Boolean.TRUE.equals(container.getBook().getDeleted())
-                    || container.getBookType() != BookFileType.OTHER
-                    || !entryMetadataRecognizer.isGenericArchive(container.getFileName())) {
-                continue;
-            }
-            List<String> containerChain = decode(container);
-            List<BookFileEntity> descendants = files.stream()
-                    .filter(file -> !Boolean.TRUE.equals(file.getBook().getDeleted()))
-                    .filter(file -> startsWith(decode(file), containerChain))
-                    .toList();
-            boolean hasImage = descendants.stream().anyMatch(file -> isImage(file.getFileName()));
-            boolean onlyComicResources = descendants.stream().allMatch(file -> isSupport(file.getFileName()));
-            if (hasImage && onlyComicResources) {
-                container.setBookType(BookFileType.CBX);
-                filesToUpdate.add(container);
-                comicContainers.add(containerChain);
-            }
-        }
-
-        Map<Long, BookEntity> booksToRetire = new LinkedHashMap<>();
-        for (BookFileEntity file : files) {
-            if (Boolean.TRUE.equals(file.getBook().getDeleted()) || !isSupport(file.getFileName())) {
-                continue;
-            }
-            List<String> chain = decode(file);
-            if (chain.size() < 2) {
-                continue;
-            }
-            List<String> parent = List.copyOf(chain.subList(0, chain.size() - 1));
-            boolean htmlAsset = htmlParents.contains(parent);
-            boolean comicAsset = comicContainers.stream().anyMatch(container -> startsWith(chain, container));
-            if ((htmlAsset || comicAsset) && isOnlyBookFile(file)) {
-                booksToRetire.put(file.getBook().getId(), file.getBook());
-            }
-        }
+        int promotedHtml = promoteHtmlPublications(files, filesToUpdate, htmlParents, comicContainers);
+        promoteImageOnlyContainers(files, filesToUpdate, comicContainers);
+        Map<Long, BookEntity> booksToRetire = publicationAssetBooks(files, htmlParents, comicContainers);
 
         Instant deletedAt = Instant.now();
         booksToRetire.values().forEach(book -> {
@@ -212,6 +159,90 @@ public class InpxArchiveReconciliationService {
             bookRepository.saveAll(new ArrayList<>(booksToRetire.values()));
         }
         return new ReconciliationResult(promotedHtml, booksToRetire.size());
+    }
+
+    /**
+     * First pass: nested HTML leaves become HTML books. Their parent chains, and the containers of
+     * books already typed as comics, are remembered for the asset pass.
+     *
+     * @return how many rows were promoted from OTHER to HTML
+     */
+    private int promoteHtmlPublications(List<BookFileEntity> files, List<BookFileEntity> filesToUpdate,
+                                        Set<List<String>> htmlParents, Set<List<String>> comicContainers) {
+        int promotedHtml = 0;
+        for (BookFileEntity file : files) {
+            if (isDeletedBook(file)) {
+                continue;
+            }
+            List<String> chain = decode(file);
+            if (isHtml(file.getFileName()) && chain.size() >= 2) {
+                htmlParents.add(parentOf(chain));
+                if (file.getBookType() == BookFileType.OTHER) {
+                    file.setBookType(BookFileType.HTML);
+                    filesToUpdate.add(file);
+                    promotedHtml++;
+                }
+            }
+            if (file.getBookType() == BookFileType.CBX
+                    && entryMetadataRecognizer.isGenericArchive(chain.getLast())) {
+                comicContainers.add(chain);
+            }
+        }
+        return promotedHtml;
+    }
+
+    /** Second pass: a generic archive whose descendants are images and comic resources only is a comic. */
+    private void promoteImageOnlyContainers(List<BookFileEntity> files, List<BookFileEntity> filesToUpdate,
+                                            Set<List<String>> comicContainers) {
+        for (BookFileEntity container : files) {
+            if (isDeletedBook(container)
+                    || container.getBookType() != BookFileType.OTHER
+                    || !entryMetadataRecognizer.isGenericArchive(container.getFileName())) {
+                continue;
+            }
+            List<String> containerChain = decode(container);
+            List<BookFileEntity> descendants = files.stream()
+                    .filter(file -> !isDeletedBook(file))
+                    .filter(file -> startsWith(decode(file), containerChain))
+                    .toList();
+            boolean hasImage = descendants.stream().anyMatch(file -> isImage(file.getFileName()));
+            boolean onlyComicResources = descendants.stream().allMatch(file -> isSupport(file.getFileName()));
+            if (hasImage && onlyComicResources) {
+                container.setBookType(BookFileType.CBX);
+                filesToUpdate.add(container);
+                comicContainers.add(containerChain);
+            }
+        }
+    }
+
+    /** Third pass: a support asset that belongs to an HTML publication or a comic is not a book of its own. */
+    private Map<Long, BookEntity> publicationAssetBooks(List<BookFileEntity> files, Set<List<String>> htmlParents,
+                                                        Set<List<String>> comicContainers) {
+        Map<Long, BookEntity> booksToRetire = new LinkedHashMap<>();
+        for (BookFileEntity file : files) {
+            if (isDeletedBook(file) || !isSupport(file.getFileName())) {
+                continue;
+            }
+            List<String> chain = decode(file);
+            if (chain.size() >= 2 && isPublicationAsset(chain, htmlParents, comicContainers) && isOnlyBookFile(file)) {
+                booksToRetire.put(file.getBook().getId(), file.getBook());
+            }
+        }
+        return booksToRetire;
+    }
+
+    private boolean isPublicationAsset(List<String> chain, Set<List<String>> htmlParents,
+                                       Set<List<String>> comicContainers) {
+        return htmlParents.contains(parentOf(chain))
+                || comicContainers.stream().anyMatch(container -> startsWith(chain, container));
+    }
+
+    private static List<String> parentOf(List<String> chain) {
+        return List.copyOf(chain.subList(0, chain.size() - 1));
+    }
+
+    private static boolean isDeletedBook(BookFileEntity file) {
+        return Boolean.TRUE.equals(file.getBook().getDeleted());
     }
 
     private List<String> decode(BookFileEntity file) {

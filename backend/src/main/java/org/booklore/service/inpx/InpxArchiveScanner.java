@@ -390,15 +390,13 @@ public class InpxArchiveScanner {
                 return;
             }
             String entryName = entry.name();
-            if (!isCandidateEntry(entryName, entryName.endsWith("/"))) {
+            if (!isCandidateEntry(entryName, entryName.endsWith("/")) || isPublicationAsset(entryName, htmlEntrypoints)) {
                 continue;
             }
             if (isGenericArchive(entryName)) {
                 context.state().hasNestedContainers = true;
                 descend(chain, depth, context, entryName, entry.size(),
                         output -> archiveService.transferEntryTo(archivePath, entryName, output));
-            } else if (isSupportAsset(entryName) || (isHtml(entryName) && !htmlEntrypoints.contains(entryName))) {
-                continue;
             } else if (context.extractMetadata() && isFb2(entryName)) {
                 addNativeFb2Leaf(archivePath, chain, entry, context);
             } else {
@@ -512,6 +510,11 @@ public class InpxArchiveScanner {
         return SUPPORT_EXTENSIONS.contains(extension(entryName).toLowerCase(Locale.ROOT));
     }
 
+    /** A resource of a publication rather than a book of its own: a support asset, or an HTML page that is not an entrypoint. */
+    private boolean isPublicationAsset(String entryName, Set<String> htmlEntrypoints) {
+        return isSupportAsset(entryName) || (isHtml(entryName) && !htmlEntrypoints.contains(entryName));
+    }
+
     private Set<String> htmlEntrypoints(List<String> entryNames) {
         List<String> html = entryNames.stream().filter(this::isHtml).toList();
         if (html.size() <= 1) {
@@ -530,31 +533,39 @@ public class InpxArchiveScanner {
 
     private boolean isImageOnlyContainer(Path archivePath, String entryName) throws IOException {
         if (isZip(entryName)) {
-            try (ZipFile archive = LibraryArchives.open(archivePath)) {
-                boolean hasImage = false;
-                int visited = 0;
-                var entries = archive.getEntries();
-                while (entries.hasMoreElements()) {
-                    ZipArchiveEntry entry = entries.nextElement();
-                    if (entry.isDirectory()) {
-                        continue;
-                    }
-                    if (++visited > MAX_VISITED_ENTRIES) {
-                        return false;
-                    }
-                    ImageEntryKind kind = classifyImageContainerEntry(ZipEntryNameResolver.resolve(entry));
-                    if (kind == ImageEntryKind.UNSUPPORTED) {
-                        return false;
-                    }
-                    hasImage |= kind == ImageEntryKind.IMAGE;
-                }
-                return hasImage;
-            }
+            return isImageOnlyZip(archivePath);
         }
         List<ArchiveService.Entry> entries = archiveService.getEntries(archivePath);
         if (entries.size() > MAX_VISITED_ENTRIES) {
             return false;
         }
+        return isImageOnly(entries);
+    }
+
+    private boolean isImageOnlyZip(Path archivePath) throws IOException {
+        try (ZipFile archive = LibraryArchives.open(archivePath)) {
+            boolean hasImage = false;
+            int visited = 0;
+            var entries = archive.getEntries();
+            while (entries.hasMoreElements()) {
+                ZipArchiveEntry entry = entries.nextElement();
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                if (++visited > MAX_VISITED_ENTRIES) {
+                    return false;
+                }
+                ImageEntryKind kind = classifyImageContainerEntry(ZipEntryNameResolver.resolve(entry));
+                if (kind == ImageEntryKind.UNSUPPORTED) {
+                    return false;
+                }
+                hasImage |= kind == ImageEntryKind.IMAGE;
+            }
+            return hasImage;
+        }
+    }
+
+    private boolean isImageOnly(List<ArchiveService.Entry> entries) {
         boolean hasImage = false;
         for (ArchiveService.Entry entry : entries) {
             if (entry.name().endsWith("/")) {

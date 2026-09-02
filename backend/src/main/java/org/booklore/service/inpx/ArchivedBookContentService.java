@@ -39,6 +39,9 @@ public class ArchivedBookContentService {
     private static final long MAX_EXTRACTED_SIZE = 1024L * 1024 * 1024;
     private static final long MAX_TOTAL_EXPANDED_SIZE = 4L * MAX_EXTRACTED_SIZE;
     private static final int MAX_PUBLICATION_ENTRIES = 100_000;
+    private static final String UNABLE_TO_READ = "Unable to read archived book: ";
+    private static final String SCRATCH_DIRECTORY = "scratch";
+    private static final String TOO_MANY_ENTRIES = "Publication archive has too many entries";
     private final AppProperties appProperties;
     private final ArchiveService archiveService;
     private final ConcurrentMap<Long, CompletableFuture<Path>> extractionFlights = new ConcurrentHashMap<>();
@@ -93,9 +96,9 @@ public class ArchivedBookContentService {
 
         Path scratch;
         try {
-            scratch = Files.createTempFile("booklib-inpx-readonce-", suffix(bookFile.getFileName()));
+            scratch = createScratchFile("booklib-inpx-readonce-", suffix(bookFile.getFileName()));
         } catch (IOException e) {
-            throw ApiError.FILE_READ_ERROR.createException("Unable to read archived book: " + e.getMessage());
+            throw ApiError.FILE_READ_ERROR.createException(UNABLE_TO_READ + e.getMessage());
         }
         try {
             extract(source.archivePath(), source.entryChain(), scratch);
@@ -103,7 +106,7 @@ public class ArchivedBookContentService {
         } catch (MissingEntryException _) {
             throw new ArchiveEntryMissingException(safeEntryLeaf(bookFile.getFileName()));
         } catch (IOException e) {
-            throw ApiError.FILE_READ_ERROR.createException("Unable to read archived book: " + e.getMessage());
+            throw ApiError.FILE_READ_ERROR.createException(UNABLE_TO_READ + e.getMessage());
         } finally {
             deleteQuietly(scratch);
         }
@@ -162,30 +165,9 @@ public class ArchivedBookContentService {
         try {
             return withContainingArchive(bookFile, archivePath -> {
                 try {
-                    if (archivePath.outer() || isZip(archivePath.path())) {
-                        try (ZipFile archive = LibraryArchives.open(archivePath.path())) {
-                            List<ArchivedEntry> entries = new ArrayList<>();
-                            var archiveEntries = archive.getEntries();
-                            while (archiveEntries.hasMoreElements()) {
-                                ZipArchiveEntry entry = archiveEntries.nextElement();
-                                if (!entry.isDirectory()) {
-                                    if (entries.size() >= MAX_PUBLICATION_ENTRIES) {
-                                        throw new IOException("Publication archive has too many entries");
-                                    }
-                                    entries.add(new ArchivedEntry(ZipEntryNameResolver.resolve(entry), entry.getSize()));
-                                }
-                            }
-                            return List.copyOf(entries);
-                        }
-                    }
-                    List<ArchiveService.Entry> archiveEntries = archiveService.getEntries(archivePath.path());
-                    if (archiveEntries.size() > MAX_PUBLICATION_ENTRIES) {
-                        throw new IOException("Publication archive has too many entries");
-                    }
-                    return archiveEntries.stream()
-                            .filter(entry -> !entry.name().endsWith("/"))
-                            .map(entry -> new ArchivedEntry(entry.name(), entry.size()))
-                            .toList();
+                    return archivePath.outer() || isZip(archivePath.path())
+                            ? zipEntries(archivePath.path())
+                            : nativeEntries(archivePath.path());
                 } catch (IOException e) {
                     throw new ArchiveAccessException(e);
                 }
@@ -194,6 +176,34 @@ public class ArchivedBookContentService {
             throw ApiError.FILE_READ_ERROR.createException("Unable to list publication resources: "
                     + e.getCause().getMessage());
         }
+    }
+
+    private List<ArchivedEntry> zipEntries(Path archivePath) throws IOException {
+        try (ZipFile archive = LibraryArchives.open(archivePath)) {
+            List<ArchivedEntry> entries = new ArrayList<>();
+            var archiveEntries = archive.getEntries();
+            while (archiveEntries.hasMoreElements()) {
+                ZipArchiveEntry entry = archiveEntries.nextElement();
+                if (!entry.isDirectory()) {
+                    if (entries.size() >= MAX_PUBLICATION_ENTRIES) {
+                        throw new IOException(TOO_MANY_ENTRIES);
+                    }
+                    entries.add(new ArchivedEntry(ZipEntryNameResolver.resolve(entry), entry.getSize()));
+                }
+            }
+            return List.copyOf(entries);
+        }
+    }
+
+    private List<ArchivedEntry> nativeEntries(Path archivePath) throws IOException {
+        List<ArchiveService.Entry> archiveEntries = archiveService.getEntries(archivePath);
+        if (archiveEntries.size() > MAX_PUBLICATION_ENTRIES) {
+            throw new IOException(TOO_MANY_ENTRIES);
+        }
+        return archiveEntries.stream()
+                .filter(entry -> !entry.name().endsWith("/"))
+                .map(entry -> new ArchivedEntry(entry.name(), entry.size()))
+                .toList();
     }
 
     /** Streams one exact sibling selected from {@link #listPublicationEntries(BookFileEntity)}. */
@@ -287,7 +297,7 @@ public class ArchivedBookContentService {
         } catch (MissingEntryException _) {
             throw new ArchiveEntryMissingException(entryName);
         } catch (IOException e) {
-            throw ApiError.FILE_READ_ERROR.createException("Unable to read archived book: " + e.getMessage());
+            throw ApiError.FILE_READ_ERROR.createException(UNABLE_TO_READ + e.getMessage());
         }
     }
 
@@ -301,7 +311,7 @@ public class ArchivedBookContentService {
             List<String> chain = source.entryChain();
             for (int index = 0; index < chain.size() - 1; index++) {
                 String entryName = chain.get(index);
-                Path nested = Files.createTempFile("booklib-inpx-publication-", suffix(entryName));
+                Path nested = createScratchFile("booklib-inpx-publication-", suffix(entryName));
                 temporaryPaths.add(nested);
                 extractEntry(currentArchive, entryName, nested, outer, totalExpanded);
                 currentArchive = nested;
@@ -361,6 +371,17 @@ public class ArchivedBookContentService {
 
     private Path cacheRoot() {
         return Path.of(appProperties.getPathConfig(), "cache", "inpx");
+    }
+
+    /**
+     * Scratch files live under the cache root rather than {@code java.io.tmpdir}: the cache is the
+     * application's own directory, while the system temp directory is shared with every other
+     * process on the host and may be world-writable.
+     */
+    private Path createScratchFile(String prefix, String suffix) throws IOException {
+        Path scratch = cacheRoot().resolve(SCRATCH_DIRECTORY);
+        Files.createDirectories(scratch);
+        return Files.createTempFile(scratch, prefix, suffix);
     }
 
     private Path cachePath(BookFileEntity bookFile) {
@@ -454,8 +475,6 @@ public class ArchivedBookContentService {
         }
     }
 
-    // createTempFile uses an atomic, unpredictable name and owner-only permissions on supported filesystems.
-    @SuppressWarnings("java:S5443")
     private void extract(Path archivePath, List<String> entryChain, Path target) throws IOException {
         List<Path> temporaryPaths = new ArrayList<>();
         long[] totalExpanded = {0};
@@ -466,7 +485,7 @@ public class ArchivedBookContentService {
                 boolean finalEntry = index == entryChain.size() - 1;
                 Path output = finalEntry
                         ? Files.createTempFile(target.getParent(), ".inpx-", ".tmp")
-                        : Files.createTempFile("booklib-inpx-nested-", suffix(entryName));
+                        : createScratchFile("booklib-inpx-nested-", suffix(entryName));
                 temporaryPaths.add(output);
                 extractEntry(currentArchive, entryName, output, index == 0, totalExpanded);
                 if (!finalEntry) {

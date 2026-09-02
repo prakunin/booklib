@@ -81,18 +81,7 @@ public class PendingDeletionPool {
         Map<Long, BookSnapshot> affectedBooks = new ConcurrentHashMap<>();
 
         for (BookEntity book : booksWithFiles) {
-            List<FileSnapshot> fileSnapshots = new ArrayList<>();
-            for (BookFileEntity bf : book.getBookFiles()) {
-                if (!bf.isBookFormat()) continue;
-                FileSnapshot fs = new FileSnapshot(
-                        bf.getId(), bf.getFileName(), bf.getFileSubPath(),
-                        bf.getCurrentHash(), bf.isFolderBased(), bf.getBookType());
-                fileSnapshots.add(fs);
-                if (bf.getCurrentHash() != null) {
-                    hashMap.put(bf.getCurrentHash(), bf.getId());
-                    hashIndex.put(bf.getCurrentHash(), folderPath);
-                }
-            }
+            List<FileSnapshot> fileSnapshots = snapshotBookFiles(book, folderPath, hashMap);
             if (!fileSnapshots.isEmpty()) {
                 BookSnapshot bs = new BookSnapshot(
                         book.getId(),
@@ -108,6 +97,22 @@ public class PendingDeletionPool {
         pendingByPath.put(folderPath, pending);
 
         log.debug("[POOL] Added folder deletion: path='{}', books={}, hashes={}", folderPath, affectedBooks.size(), hashMap.size());
+    }
+
+    /** Snapshots the book's format files and indexes their hashes against the folder being deleted. */
+    private List<FileSnapshot> snapshotBookFiles(BookEntity book, Path folderPath, Map<String, Long> hashMap) {
+        List<FileSnapshot> fileSnapshots = new ArrayList<>();
+        for (BookFileEntity bf : book.getBookFiles()) {
+            if (!bf.isBookFormat()) continue;
+            fileSnapshots.add(new FileSnapshot(
+                    bf.getId(), bf.getFileName(), bf.getFileSubPath(),
+                    bf.getCurrentHash(), bf.isFolderBased(), bf.getBookType()));
+            if (bf.getCurrentHash() != null) {
+                hashMap.put(bf.getCurrentHash(), bf.getId());
+                hashIndex.put(bf.getCurrentHash(), folderPath);
+            }
+        }
+        return fileSnapshots;
     }
 
     public Optional<MatchResult> matchByHash(String hash) {

@@ -68,14 +68,18 @@ class LocalCatalogBackfillTaskTest {
 
     @Test
     void refusesToRunWithoutALibraryId() {
-        assertThatThrownBy(() -> task.execute(request(LocalCatalogBackfillOptions.builder().build())))
+        TaskCreateRequest request = request(LocalCatalogBackfillOptions.builder().build());
+
+        assertThatThrownBy(() -> task.execute(request))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("libraryId");
     }
 
     @Test
     void refusesToRunWithoutAnyOptions() {
-        assertThatThrownBy(() -> task.execute(request(null)))
+        TaskCreateRequest request = request(null);
+
+        assertThatThrownBy(() -> task.execute(request))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("libraryId");
     }
@@ -96,9 +100,9 @@ class LocalCatalogBackfillTaskTest {
     void tellsTheUiTheRunIsOverWhenTheBackfillRefusesToStart() {
         when(backfillService.run(anyLong(), any(), any(), any()))
                 .thenThrow(new IllegalStateException("the index is being rebuilt"));
+        TaskCreateRequest request = request(LocalCatalogBackfillOptions.builder().libraryId(19L).build());
 
-        assertThatThrownBy(() -> task.execute(
-                request(LocalCatalogBackfillOptions.builder().libraryId(19L).build())))
+        assertThatThrownBy(() -> task.execute(request))
                 .isInstanceOf(IllegalStateException.class);
 
         ArgumentCaptor<TaskProgressPayload> payloads = ArgumentCaptor.captor();

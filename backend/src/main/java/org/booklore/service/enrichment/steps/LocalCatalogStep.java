@@ -66,10 +66,16 @@ public class LocalCatalogStep implements EnrichmentStepHandler {
                         .description(description.orElse(null))
                         .build(),
                 EnrichmentConfidence.HIGH);
-        context.note(hasIdentity
-                ? "Local catalog supplied exact book identity"
-                : hasContentsMetadata
-                        ? "Local catalog supplied exact book contents metadata"
-                        : "Local catalog supplied a description");
+        context.note(noteFor(hasIdentity, hasContentsMetadata));
+    }
+
+    private static String noteFor(boolean hasIdentity, boolean hasContentsMetadata) {
+        if (hasIdentity) {
+            return "Local catalog supplied exact book identity";
+        }
+        if (hasContentsMetadata) {
+            return "Local catalog supplied exact book contents metadata";
+        }
+        return "Local catalog supplied a description";
     }
 }

@@ -40,8 +40,8 @@ class LocalCatalogStepTest {
         assertThat(contribution.getAuthors()).containsExactly("Correct Author");
         assertThat(contribution.getLanguage()).isEqualTo("ru");
         assertThat(contribution.getDescription()).isEqualTo("Catalog description");
-        assertThat(context.getConfidences().get(MetadataProvider.FlibustaLocal))
-                .isEqualTo(EnrichmentConfidence.HIGH);
+        assertThat(context.getConfidences())
+                .containsEntry(MetadataProvider.FlibustaLocal, EnrichmentConfidence.HIGH);
     }
 
     @Test

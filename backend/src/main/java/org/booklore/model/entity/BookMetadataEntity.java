@@ -410,7 +410,10 @@ public class BookMetadataEntity {
     private String clampDescription(String value) {
         String clamped = BookUtils.clampToUtf8Bytes(value, BookUtils.TEXT_MAX_UTF8_BYTES);
         if (value != null && clamped.length() < value.length()) {
-            Long id = this.bookId != null ? this.bookId : (this.book == null ? null : this.book.getId());
+            Long id = this.bookId;
+            if (id == null && this.book != null) {
+                id = this.book.getId();
+            }
             log.warn("Description of book {} did not fit its TEXT column and was truncated: {} characters "
                             + "({} bytes of UTF-8) cut to {} characters, against a column limit of {} bytes",
                     id, value.length(), value.getBytes(StandardCharsets.UTF_8).length,

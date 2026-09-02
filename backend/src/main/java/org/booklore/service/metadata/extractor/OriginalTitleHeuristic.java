@@ -32,9 +32,11 @@ public final class OriginalTitleHeuristic {
      * Markers of the things an FB2 title page carries that are not titles. {@code [<>{}=]} covers
      * leftover markup and script in one stroke, which is what the worst offenders turned out to be.
      */
-    private static final Pattern BOILERPLATE_PATTERN = Pattern.compile(
-            "(?iu)\\bisbn\\b|\\bissn\\b|copyright|©|\\(c\\)|https?://|www\\.|@|mailto|e-?mail"
-                    + "|[<>{}=]|\\.(?:qxp|indd|docx?|fb2|epub|txt|pdf|rtf)\\b");
+    private static final Pattern BOILERPLATE_WORDS = Pattern.compile(
+            "(?iu)\\bisbn\\b|\\bissn\\b|copyright|©|\\(c\\)|https?://|www\\.|@|mailto|e-?mail");
+
+    private static final Pattern BOILERPLATE_MARKUP = Pattern.compile(
+            "(?iu)[<>{}=]|\\.(?:qxp|indd|docx?|fb2|epub|txt|pdf|rtf)\\b");
 
     private OriginalTitleHeuristic() {
     }
@@ -43,7 +45,8 @@ public final class OriginalTitleHeuristic {
         if (StringUtils.isBlank(value)
                 || value.length() > MAX_LENGTH
                 || MojibakeText.isMojibake(value)
-                || BOILERPLATE_PATTERN.matcher(value).find()) {
+                || BOILERPLATE_WORDS.matcher(value).find()
+                || BOILERPLATE_MARKUP.matcher(value).find()) {
             return false;
         }
         long latinLetters = value.chars()

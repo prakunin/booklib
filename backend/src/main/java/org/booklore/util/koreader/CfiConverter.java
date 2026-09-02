@@ -44,6 +44,9 @@ public class CfiConverter {
 
   private static final String XPOINTER_BODY_SUFFIX = "]/body";
 
+  /** Suffix KOReader appends to address a character offset inside an element, e.g. {@code /text().12}. */
+  private static final String TEXT_NODE_MARKER = "/text().";
+
   private final DocumentNavigator nav;
   private final int spineIdx;
 
@@ -93,7 +96,7 @@ public class CfiConverter {
     if (xpointer == null) return null;
 
     // Remove "/text().N" suffix
-    int textIdx = xpointer.indexOf("/text().");
+    int textIdx = xpointer.indexOf(TEXT_NODE_MARKER);
     if (textIdx >= 0) {
       xpointer = xpointer.substring(0, textIdx);
     }
@@ -168,7 +171,7 @@ public class CfiConverter {
     try {
       cfiToXPointer(cfi);
       return true;
-    } catch (RuntimeException e) {
+    } catch (RuntimeException _) {
       return false;
     }
   }
@@ -178,7 +181,7 @@ public class CfiConverter {
     try {
       xPointerToCfi(xpointer, null);
       return true;
-    } catch (RuntimeException e) {
+    } catch (RuntimeException _) {
       return false;
     }
   }
@@ -227,9 +230,9 @@ public class CfiConverter {
     Integer textOffset = null;
     String pathStr = xpointer;
 
-    int textMarker = xpointer.indexOf("/text().");
+    int textMarker = xpointer.indexOf(TEXT_NODE_MARKER);
     if (textMarker >= 0) {
-      String digits = xpointer.substring(textMarker + "/text().".length());
+      String digits = xpointer.substring(textMarker + TEXT_NODE_MARKER.length());
       textOffset = Integer.parseInt(digits);
       pathStr = xpointer.substring(0, textMarker);
     }
@@ -370,18 +373,7 @@ public class CfiConverter {
       Object parent = nav.getParent(cur);
       if (parent == null) break;
 
-      String tag = nav.getTagName(cur).toLowerCase();
-      int sameTagBefore = 0;
-      int sameTagTotal = 0;
-
-      for (Object sibling : nav.getChildElements(parent)) {
-        if (nav.getTagName(sibling).equalsIgnoreCase(tag)) {
-          if (sibling == cur) sameTagBefore = sameTagTotal;
-          sameTagTotal++;
-        }
-      }
-
-      segments.addFirst(sameTagTotal == 1 ? tag : tag + "[" + (sameTagBefore + 1) + "]");
+      segments.addFirst(xpointerSegment(parent, cur));
       cur = parent;
     }
 
@@ -394,6 +386,25 @@ public class CfiConverter {
       sb.append('/').append(String.join("/", segments));
     }
     return sb.toString();
+  }
+
+  /**
+   * One path segment for {@code cur}: the bare tag when it is the only child of its tag, otherwise
+   * the tag with its 1-based position among same-tag siblings, e.g. {@code p[3]}.
+   */
+  private String xpointerSegment(Object parent, Object cur) {
+    String tag = nav.getTagName(cur).toLowerCase();
+    int sameTagBefore = 0;
+    int sameTagTotal = 0;
+
+    for (Object sibling : nav.getChildElements(parent)) {
+      if (nav.getTagName(sibling).equalsIgnoreCase(tag)) {
+        if (sibling == cur) sameTagBefore = sameTagTotal;
+        sameTagTotal++;
+      }
+    }
+
+    return sameTagTotal == 1 ? tag : tag + "[" + (sameTagBefore + 1) + "]";
   }
 
   // -- Text-offset mapping ----------------------------------------------------
@@ -430,7 +441,7 @@ public class CfiConverter {
       block = parent;
     }
 
-    return elementToXPointer(block != null ? block : element) + "/text()." + localOffset;
+    return elementToXPointer(block != null ? block : element) + TEXT_NODE_MARKER + localOffset;
   }
 
   // -- Spine helpers ----------------------------------------------------------

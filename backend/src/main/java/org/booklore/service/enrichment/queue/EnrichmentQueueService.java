@@ -133,21 +133,25 @@ public class EnrichmentQueueService {
         return steps.stream().map(Enum::name).sorted().collect(Collectors.joining(","));
     }
 
+    /**
+     * The inverse of {@link #encodeSteps}. Empty when the row names no step, which
+     * {@link org.booklore.model.dto.request.EnrichmentRequest} reads the same way as {@code null}: every step.
+     */
     static Set<EnrichmentStepType> decodeSteps(String encoded) {
-        if (encoded == null || encoded.isBlank()) {
-            return null;
-        }
         Set<EnrichmentStepType> steps = EnumSet.noneOf(EnrichmentStepType.class);
+        if (encoded == null || encoded.isBlank()) {
+            return steps;
+        }
         for (String name : encoded.split(",")) {
             try {
                 steps.add(EnrichmentStepType.valueOf(name.strip()));
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException _) {
                 // A step removed in a later version: the queued row outlives the enum value, and
                 // dropping the unknown name is better than failing work that is still mostly valid.
                 log.warn("Ignoring unknown enrichment step '{}' on a queued row", name);
             }
         }
-        return steps.isEmpty() ? null : steps;
+        return steps;
     }
 
     public record JobProgress(String jobId, long total, long done, long skipped, long failed,

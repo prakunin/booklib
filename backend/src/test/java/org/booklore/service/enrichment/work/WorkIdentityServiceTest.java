@@ -5,6 +5,8 @@ import org.booklore.model.entity.WorkIdentityEntity;
 import org.booklore.repository.BookWorkLinkRepository;
 import org.booklore.repository.WorkIdentityRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -22,8 +24,15 @@ class WorkIdentityServiceTest {
 
     private final WorkIdentityRepository workIdentityRepository = mock(WorkIdentityRepository.class);
     private final BookWorkLinkRepository bookWorkLinkRepository = mock(BookWorkLinkRepository.class);
+    private final TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
     private final WorkIdentityService service =
-            new WorkIdentityService(workIdentityRepository, bookWorkLinkRepository);
+            new WorkIdentityService(workIdentityRepository, bookWorkLinkRepository, transactionTemplate);
+
+    WorkIdentityServiceTest() {
+        // The template only delimits the store; run the callback inline.
+        when(transactionTemplate.execute(any())).thenAnswer(invocation ->
+                invocation.<TransactionCallback<?>>getArgument(0).doInTransaction(null));
+    }
 
     private ResolvedWorkIdentity identity() {
         return new ResolvedWorkIdentity("The Master and Margarita", "Mikhail Bulgakov", "ru",
@@ -76,7 +85,7 @@ class WorkIdentityServiceTest {
                         resolverCalls.incrementAndGet();
                         return Optional.of(identity());
                     });
-                } catch (InterruptedException e) {
+                } catch (InterruptedException _) {
                     Thread.currentThread().interrupt();
                 } finally {
                     done.countDown();

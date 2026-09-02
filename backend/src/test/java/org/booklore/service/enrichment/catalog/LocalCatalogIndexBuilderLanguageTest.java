@@ -116,9 +116,10 @@ class LocalCatalogIndexBuilderLanguageTest {
     void aBookListedTwiceInOneListingProducesOneRow() throws Exception {
         when(archiveService.getEntryNames(catalogRoot.resolve("contents.7z"))).thenReturn(List.of("ru.txt"));
         when(archiveService.getEntryBytes(catalogRoot.resolve("contents.7z"), "ru.txt"))
-                .thenReturn(("Толстой\tВойна и мир\t\tf.fb2-173909-177717.zip\t174393.fb2\n"
-                        + "Толстой\tВойна и мир\t\tf.fb2-173909-177717.zip\t174393.fb2\n")
-                        .getBytes(StandardCharsets.UTF_8));
+                .thenReturn("""
+                        Толстой\tВойна и мир\t\tf.fb2-173909-177717.zip\t174393.fb2
+                        Толстой\tВойна и мир\t\tf.fb2-173909-177717.zip\t174393.fb2
+                        """.getBytes(StandardCharsets.UTF_8));
 
         LocalCatalogIndexBuilder.IndexResult result = builder.rebuild(7L);
 

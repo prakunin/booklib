@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.booklore.model.entity.LocalCatalogIndexEntity;
 import org.booklore.model.enums.LocalCatalogSourceType;
+import org.booklore.model.entity.LibraryEntity;
 import org.booklore.repository.LibraryRepository;
 import org.booklore.repository.LocalCatalogIndexRepository;
 import org.booklore.service.ArchiveService;
@@ -220,7 +221,7 @@ public class FlibustaCatalogSource implements LocalCatalogSource {
      */
     private Optional<Path> catalogRoot(long libraryId) {
         return catalogRoots.get(libraryId, id -> libraryRepository.findById(id)
-                .map(library -> library.getMetadataSidecarPath())
+                .map(LibraryEntity::getMetadataSidecarPath)
                 .filter(path -> path != null && !path.isBlank())
                 .map(Path::of)
                 .filter(layout::matches));

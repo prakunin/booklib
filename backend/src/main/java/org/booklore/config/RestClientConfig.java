@@ -51,7 +51,6 @@ public class RestClientConfig {
     }
 
     @Bean
-    @Qualifier("unsafe")
     public ClientHttpRequestFactory unsafeClientHttpRequestFactory() {
         var outbound = appProperties.getOutbound();
         int connectTimeout = outbound.getConnectTimeout();
@@ -81,15 +80,12 @@ public class RestClientConfig {
     }
 
     @Bean
-    @Qualifier("oidc")
     public RestTemplate oidcRestTemplate(
             ClientHttpRequestFactory clientHttpRequestFactory,
-            @Qualifier("unsafe")
+            @Qualifier("unsafeClientHttpRequestFactory")
             ClientHttpRequestFactory unsafeClientHttpRequestFactory
     ) {
-        var isAllowingUnsafeHosts = appProperties.getOidc().getAllowUnsafeHosts();
-
-        if (isAllowingUnsafeHosts) {
+        if (Boolean.TRUE.equals(appProperties.getOidc().getAllowUnsafeHosts())) {
             return new RestTemplate(unsafeClientHttpRequestFactory);
         }
 

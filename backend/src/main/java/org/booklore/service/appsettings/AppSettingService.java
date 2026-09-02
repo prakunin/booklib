@@ -323,8 +323,8 @@ public class AppSettingService {
             details.setClientSecret(null);
         }
 
-        boolean oidcEnabled = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_ENABLED, "false"));
-        boolean oidcForceOnlyMode = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_FORCE_ONLY_MODE, "false"));
+        boolean oidcEnabled = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_ENABLED, DEFAULT_DISABLED));
+        boolean oidcForceOnlyMode = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_FORCE_ONLY_MODE, DEFAULT_DISABLED));
 
         if (isOIDCForceDisabled()) {
             oidcEnabled = false;
@@ -410,8 +410,8 @@ public class AppSettingService {
             }
         }
 
-        boolean oidcEnabled = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_ENABLED, "false"));
-        boolean oidcForceOnlyMode = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_FORCE_ONLY_MODE, "false"));
+        boolean oidcEnabled = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_ENABLED, DEFAULT_DISABLED));
+        boolean oidcForceOnlyMode = Boolean.parseBoolean(settingPersistenceHelper.getOrCreateSetting(AppSettingKey.OIDC_FORCE_ONLY_MODE, DEFAULT_DISABLED));
 
         if (isOIDCForceDisabled()) {
             oidcEnabled = false;

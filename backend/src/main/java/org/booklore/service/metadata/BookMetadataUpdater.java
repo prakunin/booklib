@@ -162,7 +162,7 @@ public class BookMetadataUpdater {
             this.providers = providers != null ? providers : Map.of();
         }
 
-        private void record(MetadataField field, FieldWriteOutcome outcome) {
+        private void recordOutcome(MetadataField field, FieldWriteOutcome outcome) {
             if (field == null || outcome == FieldWriteOutcome.NOT_WRITTEN || outcome == FieldWriteOutcome.UNCHANGED) {
                 // Nothing was stored, so whatever the field's row says is still whatever it said.
                 // UNCHANGED counts as nothing stored in both directions - it neither deletes a row nor
@@ -364,7 +364,7 @@ public class BookMetadataUpdater {
         }
 
         private <T> void apply(MetadataField field, Boolean locked, boolean shouldClear, T newValue, Consumer<T> setter, Supplier<T> getter) {
-            sources.record(field, handleFieldUpdate(locked, shouldClear, newValue, setter, getter, replaceMode));
+            sources.recordOutcome(field, handleFieldUpdate(locked, shouldClear, newValue, setter, getter, replaceMode));
         }
     }
 

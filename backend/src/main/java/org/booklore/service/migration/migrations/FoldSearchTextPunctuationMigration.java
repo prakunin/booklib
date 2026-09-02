@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Brings stored {@code search_text} in line with the punctuation folding the search now applies to
@@ -60,9 +61,10 @@ public class FoldSearchTextPunctuationMigration implements Migration {
         long scanned = 0;
         long rewritten = 0;
 
-        while (true) {
+        List<BookMetadataRepository.SearchTextView> batch;
+        do {
             long batchStart = lastBookId;
-            List<BookMetadataRepository.SearchTextView> batch = transactionTemplate.execute(status ->
+            batch = transactionTemplate.execute(status ->
                     bookMetadataRepository.findSearchTextsWithTypographicPunctuation(batchStart, PageRequest.of(0, BATCH_SIZE)));
 
             if (batch == null || batch.isEmpty()) {
@@ -72,11 +74,7 @@ public class FoldSearchTextPunctuationMigration implements Migration {
             rewritten += foldBatch(batch);
             scanned += batch.size();
             lastBookId = batch.getLast().getBookId();
-
-            if (batch.size() < BATCH_SIZE) {
-                break;
-            }
-        }
+        } while (batch.size() >= BATCH_SIZE);
 
         log.info("Completed migration '{}'. Scanned {} rows, rewrote {}.", getKey(), scanned, rewritten);
     }
@@ -93,6 +91,7 @@ public class FoldSearchTextPunctuationMigration implements Migration {
             }
             return updated;
         });
-        return count == null ? 0 : count;
+        // The callback always returns a boxed long; the fallback only honours the template's @Nullable contract.
+        return Objects.requireNonNullElse(count, 0L);
     }
 }

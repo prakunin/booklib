@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -20,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 
 @ExtendWith(MockitoExtension.class)
-public class CoverDetectorServiceTest {
+class CoverDetectorServiceTest {
     @Spy
     ArchiveService archiveService = new ArchiveService();
 
@@ -140,7 +139,7 @@ public class CoverDetectorServiceTest {
     }
 
     @Test
-    void returnsNullForEpubWithNoCover() throws IOException {
+    void returnsNoImageForEpubWithNoCover() throws IOException {
         Path epub = tempDir.resolve("nocover.epub");
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(epub.toFile()))) {
             zos.putNextEntry(new ZipEntry("mimetype"));
@@ -174,7 +173,7 @@ public class CoverDetectorServiceTest {
         }
 
         byte[] result = coverDetectorService.detectCoverImage(epub);
-        assertThat(result).isNull();
+        assertThat(result).isEmpty();
     }
 
     @Test
@@ -307,18 +306,18 @@ public class CoverDetectorServiceTest {
     }
 
     @Test
-    void nonExistentFileReturnsNull() {
+    void nonExistentFileReturnsNoImage() {
         Path nonExistent = tempDir.resolve("nonexistent.epub");
-        assertThat(coverDetectorService.detectCoverImage(nonExistent)).isNull();
+        assertThat(coverDetectorService.detectCoverImage(nonExistent)).isEmpty();
     }
 
     @Test
-    void corruptZipReturnsNull() throws IOException {
+    void corruptZipReturnsNoImage() throws IOException {
         Path corrupt = tempDir.resolve("corrupt.epub");
         try (FileOutputStream fos = new FileOutputStream(corrupt.toFile())) {
             fos.write(new byte[]{0x00, 0x01, 0x02, 0x03});
         }
-        assertThat(coverDetectorService.detectCoverImage(corrupt)).isNull();
+        assertThat(coverDetectorService.detectCoverImage(corrupt)).isEmpty();
     }
 
 }

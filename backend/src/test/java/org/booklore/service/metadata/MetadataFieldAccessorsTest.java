@@ -7,6 +7,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.time.LocalDate;
+import java.time.Month;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,14 +30,14 @@ class MetadataFieldAccessorsTest {
         BookMetadata metadata = BookMetadata.builder()
                 .title("A Title")
                 .pageCount(321)
-                .publishedDate(LocalDate.of(2026, 8, 4))
+                .publishedDate(LocalDate.of(2026, Month.AUGUST, 4))
                 .goodreadsRating(4.5)
                 .build();
 
         assertThat(MetadataFieldAccessors.valueOf(MetadataField.TITLE, metadata)).isEqualTo("A Title");
         assertThat(MetadataFieldAccessors.valueOf(MetadataField.PAGE_COUNT, metadata)).isEqualTo(321);
         assertThat(MetadataFieldAccessors.valueOf(MetadataField.PUBLISHED_DATE, metadata))
-                .isEqualTo(LocalDate.of(2026, 8, 4));
+                .isEqualTo(LocalDate.of(2026, Month.AUGUST, 4));
         assertThat(MetadataFieldAccessors.valueOf(MetadataField.GOODREADS_RATING, metadata)).isEqualTo(4.5);
         assertThat(MetadataFieldAccessors.valueOf(MetadataField.SUBTITLE, metadata)).isNull();
     }

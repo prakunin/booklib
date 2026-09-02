@@ -180,7 +180,7 @@ public class KoreaderService {
                 case AUDIOBOOK -> {
                     // KOReader syncs ebook readers only; audiobooks have no per-format position fields here.
                 }
-                case DOC, DJVU, OTHER -> {
+                case HTML, DOC, DJVU, OTHER -> {
                     // These formats had no legacy KOReader mapping before the switch became exhaustive.
                 }
             }

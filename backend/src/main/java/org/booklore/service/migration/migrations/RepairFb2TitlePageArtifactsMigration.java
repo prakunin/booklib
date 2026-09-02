@@ -18,6 +18,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -84,7 +85,7 @@ public class RepairFb2TitlePageArtifactsMigration implements Migration {
         long cleared = 0;
         while (true) {
             BatchResult batch = clearRejectedSubtitleBatch(lastBookId);
-            if (batch == null) {
+            if (!batch.hasRows()) {
                 return cleared;
             }
             lastBookId = batch.lastBookId();
@@ -93,11 +94,11 @@ public class RepairFb2TitlePageArtifactsMigration implements Migration {
     }
 
     private BatchResult clearRejectedSubtitleBatch(long afterBookId) {
-        return transactionTemplate.execute(status -> {
+        BatchResult result = transactionTemplate.execute(status -> {
             List<BookMetadataEntity> page = bookMetadataRepository.findUnlockedSubtitlesAfterBookId(
                     afterBookId, PageRequest.of(0, BATCH_SIZE));
             if (page.isEmpty()) {
-                return null;
+                return BatchResult.EMPTY;
             }
             long cleared = 0;
             for (BookMetadataEntity metadata : page) {
@@ -107,11 +108,13 @@ public class RepairFb2TitlePageArtifactsMigration implements Migration {
                     cleared++;
                 }
             }
-            return new BatchResult(page.getLast().getBookId(), cleared);
+            return new BatchResult(true, page.getLast().getBookId(), cleared);
         });
+        return Objects.requireNonNullElse(result, BatchResult.EMPTY);
     }
 
-    private record BatchResult(long lastBookId, long cleared) {
+    private record BatchResult(boolean hasRows, long lastBookId, long cleared) {
+        private static final BatchResult EMPTY = new BatchResult(false, 0, 0);
     }
 
     /**

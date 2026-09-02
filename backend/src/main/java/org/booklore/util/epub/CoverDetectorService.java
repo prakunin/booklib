@@ -31,6 +31,8 @@ public class CoverDetectorService {
     /** Minimum image size in bytes to consider as a potential cover (10KB). */
     private static final int MIN_COVER_SIZE = 10 * 1024;
 
+    private static final String COVER = "cover";
+
     private static final Pattern IMG_SRC_PATTERN =
             Pattern.compile("<img[^>]+src\\s*=\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE);
     private static final Pattern SVG_IMAGE_PATTERN =
@@ -44,7 +46,7 @@ public class CoverDetectorService {
         try {
             for (var entryName : archiveService.getEntryNames(path)) {
                 String lower = entryName.toLowerCase();
-                if (lower.contains("cover") && (lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+                if (lower.contains(COVER) && (lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
                         lower.endsWith(".png") || lower.endsWith(".webp"))) {
                     return new Resource(
                             archiveService.getEntryBytes(path, entryName),
@@ -123,6 +125,7 @@ public class CoverDetectorService {
         return null;
     }
 
+    /** @return the cover image bytes, or an empty array when the EPUB has none or cannot be read */
     public byte[] detectCoverImage(Path path) {
         try {
             Book book = new EpubReader().readEpubLazy(path, "UTF-8");
@@ -133,12 +136,12 @@ public class CoverDetectorService {
                 resource = detectCoverImageFallback(path);
             }
 
-            return resource == null ? null : resource.getData();
+            return resource == null ? new byte[0] : resource.getData();
         } catch (IOException e) {
             log.debug("Failed to read epub for cover detection: {}", e.getMessage());
         }
 
-        return null;
+        return new byte[0];
     }
 
     /**
@@ -149,7 +152,7 @@ public class CoverDetectorService {
         for (Resource resource : resources) {
             if (!isImageResource(resource)) continue;
             String id = resource.getId();
-            if (id != null && id.toLowerCase().contains("cover")) {
+            if (id != null && id.toLowerCase().contains(COVER)) {
                 return resource;
             }
         }
@@ -174,33 +177,29 @@ public class CoverDetectorService {
      * matches like "cover.jpg" over partial matches like "discover.png".
      */
     private Resource findCoverByName(Collection<Resource> resources) {
-        Resource exactMatch = null;
         Resource partialMatch = null;
 
         for (Resource resource : resources) {
-            if (!isImageResource(resource)) continue;
+            if (!isImageResource(resource) || resource.getHref() == null) continue;
 
-            String href = resource.getHref();
-            if (href == null) continue;
-
-            String filename = href;
-            int lastSlash = filename.lastIndexOf('/');
-            if (lastSlash >= 0) filename = filename.substring(lastSlash + 1);
-            String filenameLower = filename.toLowerCase();
-
+            String filenameLower = fileNameOf(resource.getHref()).toLowerCase();
             int dotPos = filenameLower.lastIndexOf('.');
             String nameWithoutExt = dotPos > 0 ? filenameLower.substring(0, dotPos) : filenameLower;
-            if ("cover".equals(nameWithoutExt)) {
-                exactMatch = resource;
-                break; // Can't do better than an exact match
+            if (COVER.equals(nameWithoutExt)) {
+                return resource; // Can't do better than an exact match
             }
 
-            if (partialMatch == null && filenameLower.contains("cover")) {
+            if (partialMatch == null && filenameLower.contains(COVER)) {
                 partialMatch = resource;
             }
         }
 
-        return exactMatch != null ? exactMatch : partialMatch;
+        return partialMatch;
+    }
+
+    private static String fileNameOf(String href) {
+        int lastSlash = href.lastIndexOf('/');
+        return lastSlash >= 0 ? href.substring(lastSlash + 1) : href;
     }
 
     /**

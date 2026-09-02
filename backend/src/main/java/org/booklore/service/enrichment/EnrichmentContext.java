@@ -10,12 +10,14 @@ import org.booklore.model.enums.MetadataProvider;
 import org.booklore.service.enrichment.catalog.CatalogReview;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * What one book's enrichment run accumulates as it moves through the steps.
@@ -87,29 +89,35 @@ public class EnrichmentContext {
      * listed; a field absent here is a field no step produces, and adding one means adding it here.
      */
     private BookMetadata merged(BookMetadata existing, BookMetadata incoming) {
-        if (incoming.getTitle() != null) existing.setTitle(incoming.getTitle());
-        if (incoming.getSubtitle() != null) existing.setSubtitle(incoming.getSubtitle());
-        if (incoming.getDescription() != null) existing.setDescription(incoming.getDescription());
-        if (incoming.getLanguage() != null) existing.setLanguage(incoming.getLanguage());
-        if (incoming.getPublisher() != null) existing.setPublisher(incoming.getPublisher());
-        if (incoming.getPublishedDate() != null) existing.setPublishedDate(incoming.getPublishedDate());
-        if (incoming.getSeriesName() != null) existing.setSeriesName(incoming.getSeriesName());
-        if (incoming.getSeriesNumber() != null) existing.setSeriesNumber(incoming.getSeriesNumber());
-        if (incoming.getSeriesTotal() != null) existing.setSeriesTotal(incoming.getSeriesTotal());
-        if (incoming.getIsbn10() != null) existing.setIsbn10(incoming.getIsbn10());
-        if (incoming.getIsbn13() != null) existing.setIsbn13(incoming.getIsbn13());
-        if (incoming.getAsin() != null) existing.setAsin(incoming.getAsin());
-        if (incoming.getRating() != null) existing.setRating(incoming.getRating());
-        if (incoming.getAuthors() != null && !incoming.getAuthors().isEmpty()) {
-            existing.setAuthors(incoming.getAuthors());
-        }
-        if (incoming.getCategories() != null && !incoming.getCategories().isEmpty()) {
-            existing.setCategories(incoming.getCategories());
-        }
-        if (incoming.getBookReviews() != null && !incoming.getBookReviews().isEmpty()) {
-            existing.setBookReviews(incoming.getBookReviews());
-        }
+        replaceIfSet(incoming.getTitle(), existing::setTitle);
+        replaceIfSet(incoming.getSubtitle(), existing::setSubtitle);
+        replaceIfSet(incoming.getDescription(), existing::setDescription);
+        replaceIfSet(incoming.getLanguage(), existing::setLanguage);
+        replaceIfSet(incoming.getPublisher(), existing::setPublisher);
+        replaceIfSet(incoming.getPublishedDate(), existing::setPublishedDate);
+        replaceIfSet(incoming.getSeriesName(), existing::setSeriesName);
+        replaceIfSet(incoming.getSeriesNumber(), existing::setSeriesNumber);
+        replaceIfSet(incoming.getSeriesTotal(), existing::setSeriesTotal);
+        replaceIfSet(incoming.getIsbn10(), existing::setIsbn10);
+        replaceIfSet(incoming.getIsbn13(), existing::setIsbn13);
+        replaceIfSet(incoming.getAsin(), existing::setAsin);
+        replaceIfSet(incoming.getRating(), existing::setRating);
+        replaceIfNotEmpty(incoming.getAuthors(), existing::setAuthors);
+        replaceIfNotEmpty(incoming.getCategories(), existing::setCategories);
+        replaceIfNotEmpty(incoming.getBookReviews(), existing::setBookReviews);
         return existing;
+    }
+
+    private static <T> void replaceIfSet(T value, Consumer<T> setter) {
+        if (value != null) {
+            setter.accept(value);
+        }
+    }
+
+    private static <T extends Collection<?>> void replaceIfNotEmpty(T value, Consumer<T> setter) {
+        if (value != null && !value.isEmpty()) {
+            setter.accept(value);
+        }
     }
 
     public void addCatalogReviews(List<CatalogReview> reviews) {

@@ -22,11 +22,11 @@ public class OidcDiscoveryService {
 
     private final ConcurrentMap<String, CachedDiscovery> cache = new ConcurrentHashMap<>();
 
-    @Qualifier("oidc")
+    @Qualifier("oidcRestTemplate")
     private final RestTemplate oidcRestTemplate;
 
     public OidcDiscoveryService(
-            @Qualifier("oidc")
+            @Qualifier("oidcRestTemplate")
             RestTemplate oidcRestTemplate
     ) {
         this.oidcRestTemplate = oidcRestTemplate;

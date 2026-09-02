@@ -1,6 +1,8 @@
 package org.booklore.service.reader;
 
 import org.booklore.model.dto.response.EpubBookInfo;
+import org.booklore.model.dto.response.EpubManifestItem;
+import org.booklore.model.dto.response.EpubSpineItem;
 import org.booklore.model.entity.BookFileEntity;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.service.inpx.ArchivedBookContentService;
@@ -67,15 +69,15 @@ class HtmlRenditionServiceTest {
         service.streamResource(bookFile, "content.xhtml", content);
         String xhtml = content.toString(java.nio.charset.StandardCharsets.UTF_8);
 
-        assertThat(info.getSpine()).singleElement().extracting(item -> item.getHref()).isEqualTo("content.xhtml");
-        assertThat(info.getManifest()).extracting(item -> item.getHref())
+        assertThat(info.getSpine()).singleElement().extracting(EpubSpineItem::getHref).isEqualTo("content.xhtml");
+        assertThat(info.getManifest()).extracting(EpubManifestItem::getHref)
                 .containsExactly("content.xhtml", "resources/0001.gif", "resources/0002.jpg");
         assertThat(xhtml).contains("Письмо", "src=\"resources/0001.gif\"", "src=\"resources/0002.jpg\"")
                 .doesNotContain("script", "onload", "onerror", "iframe", "svg", "xlink", "https://", "../secret.jpg");
 
         ByteArrayOutputStream image = new ByteArrayOutputStream();
         service.streamResource(bookFile, "resources/0001.gif", image);
-        assertThat(image.toString()).isEqualTo("gif");
+        assertThat(image).hasToString("gif");
         assertThatThrownBy(() -> service.streamResource(bookFile, "resources/../../secret.jpg",
                 new ByteArrayOutputStream())).isInstanceOf(java.io.FileNotFoundException.class);
     }

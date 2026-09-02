@@ -71,9 +71,10 @@ class FlibustaCatalogRealDataTest {
     void authorKeysMatchTheShippedBucketNames() throws Exception {
         List<String> keys = archiveService.getEntryNames(layout.authorBucket(CATALOG_ROOT, "10.7z"));
 
-        assertThat(keys).isNotEmpty();
-        assertThat(keys).contains(FlibustaAuthorKey.of("Хэндлер Дэниел"));
-        assertThat(keys).allSatisfy(key -> assertThat(key).hasSize(32).matches("[0-9a-f]+"));
+        assertThat(keys)
+                .isNotEmpty()
+                .contains(FlibustaAuthorKey.of("Хэндлер Дэниел"))
+                .allSatisfy(key -> assertThat(key).hasSize(32).matches("[0-9a-f]+"));
     }
 
     /**
@@ -88,9 +89,10 @@ class FlibustaCatalogRealDataTest {
         List<String> keys = archiveService.getEntryNames(layout.authorBucket(CATALOG_ROOT, "5.7z"));
         List<String> candidates = FlibustaAuthorKey.candidates("Кевин Митник");
 
-        assertThat(keys).isNotEmpty();
-        assertThat(keys).doesNotContain(candidates.getFirst());
-        assertThat(keys).contains(candidates.get(1));
+        assertThat(keys)
+                .isNotEmpty()
+                .doesNotContain(candidates.getFirst())
+                .contains(candidates.get(1));
     }
 
     /**
@@ -113,8 +115,9 @@ class FlibustaCatalogRealDataTest {
         List<CatalogReview> latest = reviewsIn("202601.7z", key, parser);
 
         assertThat(earliest).isNotEmpty();
-        assertThat(latest).isNotEmpty();
-        assertThat(latest).doesNotContainAnyElementsOf(earliest);
+        assertThat(latest)
+                .isNotEmpty()
+                .doesNotContainAnyElementsOf(earliest);
     }
 
     private List<CatalogReview> reviewsIn(String container, String key, FlibustaReviewParser parser) {

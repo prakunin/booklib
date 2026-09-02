@@ -25,7 +25,7 @@ public class OidcTokenClient {
 
     public OidcTokenClient(
             OidcDiscoveryService discoveryService,
-            @Qualifier("oidc")
+            @Qualifier("oidcRestTemplate")
             RestTemplate oidcRestTemplate
     ) {
         this.discoveryService = discoveryService;

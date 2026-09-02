@@ -35,35 +35,44 @@ final class LegacyWordTextNormalizer {
         }
 
         String[] filtered = new String[textPieces.length];
-        Deque<Boolean> fieldResults = new ArrayDeque<>();
-        int instructionDepth = 0;
+        FieldNesting nesting = new FieldNesting();
         for (int textPieceIndex = 0; textPieceIndex < textPieces.length; textPieceIndex++) {
             String textPiece = textPieces[textPieceIndex];
-            if (textPiece == null) {
-                filtered[textPieceIndex] = null;
-                continue;
-            }
+            filtered[textPieceIndex] = textPiece == null ? null : nesting.visibleText(textPiece);
+        }
+        return filtered;
+    }
 
+    private static boolean hasBalancedFields(String[] textPieces) {
+        FieldNesting nesting = new FieldNesting();
+        for (String textPiece : textPieces) {
+            if (textPiece != null && !nesting.consumesBalanced(textPiece)) {
+                return false;
+            }
+        }
+        return nesting.isClosed();
+    }
+
+    /**
+     * Tracks Word field codes across text pieces. A field is {@code FIELD_START instruction
+     * FIELD_SEPARATOR result FIELD_END}; only the result part is visible text, and fields nest.
+     */
+    private static final class FieldNesting {
+
+        private enum Part { INSTRUCTION, RESULT }
+
+        private final Deque<Part> openFields = new ArrayDeque<>();
+        private int instructionDepth;
+
+        /** The text piece with every field instruction removed, leaving field results and plain text. */
+        String visibleText(String textPiece) {
             StringBuilder visible = new StringBuilder(textPiece.length());
             for (int charIndex = 0; charIndex < textPiece.length(); charIndex++) {
                 char value = textPiece.charAt(charIndex);
                 switch (value) {
-                    case FIELD_START -> {
-                        fieldResults.push(false);
-                        instructionDepth++;
-                    }
-                    case FIELD_SEPARATOR -> {
-                        if (!fieldResults.isEmpty() && !fieldResults.peek()) {
-                            fieldResults.pop();
-                            fieldResults.push(true);
-                            instructionDepth--;
-                        }
-                    }
-                    case FIELD_END -> {
-                        if (!fieldResults.isEmpty() && !fieldResults.pop()) {
-                            instructionDepth--;
-                        }
-                    }
+                    case FIELD_START -> openField();
+                    case FIELD_SEPARATOR -> enterResult();
+                    case FIELD_END -> closeField();
                     default -> {
                         if (instructionDepth == 0) {
                             visible.append(value);
@@ -71,35 +80,54 @@ final class LegacyWordTextNormalizer {
                     }
                 }
             }
-            filtered[textPieceIndex] = visible.toString();
+            return visible.toString();
         }
-        return filtered;
-    }
 
-    private static boolean hasBalancedFields(String[] textPieces) {
-        Deque<Boolean> fieldResults = new ArrayDeque<>();
-        for (String textPiece : textPieces) {
-            if (textPiece == null) {
-                continue;
-            }
+        /** Consumes the piece; {@code false} as soon as a separator or end has no field to belong to. */
+        boolean consumesBalanced(String textPiece) {
             for (int index = 0; index < textPiece.length(); index++) {
                 char value = textPiece.charAt(index);
                 if (value == FIELD_START) {
-                    fieldResults.push(false);
-                } else if (value == FIELD_SEPARATOR) {
-                    if (fieldResults.isEmpty() || fieldResults.peek()) {
-                        return false;
-                    }
-                    fieldResults.pop();
-                    fieldResults.push(true);
-                } else if (value == FIELD_END) {
-                    if (fieldResults.isEmpty()) {
-                        return false;
-                    }
-                    fieldResults.pop();
+                    openField();
+                } else if (value == FIELD_SEPARATOR && !enterResult()) {
+                    return false;
+                } else if (value == FIELD_END && !closeField()) {
+                    return false;
                 }
             }
+            return true;
         }
-        return fieldResults.isEmpty();
+
+        boolean isClosed() {
+            return openFields.isEmpty();
+        }
+
+        private void openField() {
+            openFields.push(Part.INSTRUCTION);
+            instructionDepth++;
+        }
+
+        /** @return {@code false} when there is no instruction part to leave */
+        private boolean enterResult() {
+            if (openFields.peek() != Part.INSTRUCTION) {
+                return false;
+            }
+            openFields.pop();
+            openFields.push(Part.RESULT);
+            instructionDepth--;
+            return true;
+        }
+
+        /** @return {@code false} when there is no open field to close */
+        private boolean closeField() {
+            Part closed = openFields.poll();
+            if (closed == null) {
+                return false;
+            }
+            if (closed == Part.INSTRUCTION) {
+                instructionDepth--;
+            }
+            return true;
+        }
     }
 }

@@ -169,8 +169,8 @@ class EnrichmentQueueServiceTest {
         @Test
         void treatsAnEmptySelectionAsEveryStep() {
             assertThat(EnrichmentQueueService.encodeSteps(Set.of())).isNull();
-            assertThat(EnrichmentQueueService.decodeSteps(null)).isNull();
-            assertThat(EnrichmentQueueService.decodeSteps("  ")).isNull();
+            assertThat(EnrichmentQueueService.decodeSteps(null)).isEmpty();
+            assertThat(EnrichmentQueueService.decodeSteps("  ")).isEmpty();
         }
 
         /**
@@ -181,7 +181,7 @@ class EnrichmentQueueServiceTest {
         void ignoresStepNamesItNoLongerKnows() {
             assertThat(EnrichmentQueueService.decodeSteps("LOCAL_CATALOG,SOMETHING_REMOVED"))
                     .containsExactly(EnrichmentStepType.LOCAL_CATALOG);
-            assertThat(EnrichmentQueueService.decodeSteps("ALL_REMOVED")).isNull();
+            assertThat(EnrichmentQueueService.decodeSteps("ALL_REMOVED")).isEmpty();
         }
     }
 }

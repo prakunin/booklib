@@ -13,6 +13,7 @@ import org.booklore.service.inpx.ArchivedBookContentService;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Attribute;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.DocumentType;
 import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
@@ -30,10 +31,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -58,7 +61,7 @@ public class HtmlRenditionService {
             .maximumWeight(MAX_CACHE_WEIGHT)
             .weigher((Long bookId, CachedRendition rendition) -> Math.toIntExact(Math.min(
                     Integer.MAX_VALUE,
-                    (long) rendition.xhtml().length + (long) rendition.resources().size() * RESOURCE_WEIGHT_BYTES)))
+                    rendition.xhtml().length + (long) rendition.resources().size() * RESOURCE_WEIGHT_BYTES)))
             .expireAfterAccess(Duration.ofMinutes(30))
             .build();
 
@@ -67,6 +70,28 @@ public class HtmlRenditionService {
 
     private record CachedRendition(long lastModified, byte[] xhtml, Map<String, Resource> resources,
                                    EpubBookInfo bookInfo, String title) {
+
+        @Override
+        public boolean equals(Object other) {
+            return this == other
+                    || other instanceof CachedRendition that
+                    && lastModified == that.lastModified
+                    && Arrays.equals(xhtml, that.xhtml)
+                    && Objects.equals(resources, that.resources)
+                    && Objects.equals(bookInfo, that.bookInfo)
+                    && Objects.equals(title, that.title);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(lastModified, Arrays.hashCode(xhtml), resources, bookInfo, title);
+        }
+
+        @Override
+        public String toString() {
+            return "CachedRendition[lastModified=" + lastModified + ", xhtml=" + xhtml.length + " bytes, resources="
+                    + resources.size() + ", title=" + title + "]";
+        }
     }
 
     public boolean supports(BookFileEntity bookFile) {
@@ -137,10 +162,14 @@ public class HtmlRenditionService {
                 .prettyPrint(false);
         document.select("meta[charset]").remove();
         document.head().prependElement("meta").attr("charset", "utf-8");
-        if (document.documentType() != null) {
-            document.documentType().remove();
+        DocumentType documentType = document.documentType();
+        if (documentType != null) {
+            documentType.remove();
         }
-        document.selectFirst("html").attr("xmlns", "http://www.w3.org/1999/xhtml");
+        Element html = document.selectFirst("html");
+        if (html != null) {
+            html.attr("xmlns", "http://www.w3.org/1999/xhtml");
+        }
         byte[] xhtml = document.outerHtml().getBytes(StandardCharsets.UTF_8);
         if (xhtml.length > MAX_HTML_BYTES) {
             throw new IOException("Sanitized HTML publication exceeds the rendition size limit");
@@ -377,8 +406,12 @@ public class HtmlRenditionService {
         return dot > 0 ? fileName.substring(0, dot) : fileName;
     }
 
+    /** Never null: a missing href falls through to the "not part of the rendition" branch. */
     private String cleanHref(String href) {
-        return href != null && href.startsWith("/") ? href.substring(1) : href;
+        if (href == null) {
+            return "";
+        }
+        return href.startsWith("/") ? href.substring(1) : href;
     }
 
     private String escape(String value) {

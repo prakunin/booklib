@@ -72,7 +72,7 @@ public class FlibustaReviewParser {
         }
         try {
             return LocalDateTime.parse(value.strip(), TIME_FORMAT).toInstant(ZoneOffset.UTC);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             log.debug("Unparseable review timestamp '{}'", value);
             return null;
         }

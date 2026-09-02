@@ -279,7 +279,7 @@ public class KomgaController {
     @Operation(summary = "Catch-all for Komga API", description = "Catch-all endpoint for unhandled Komga API requests.")
     @ApiResponse(responseCode = "404", description = "Not Found")
     @RequestMapping(value = "/**", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.PATCH})
-    public ResponseEntity<?> catchAll() {
+    public ResponseEntity<ErrorResponse> catchAll() {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(

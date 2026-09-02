@@ -44,52 +44,80 @@ public class FlibustaAnnotationParser {
             return Map.of();
         }
         Map<String, String> annotations = new HashMap<>();
-        XMLStreamReader reader = null;
-        try {
-            reader = inputFactory.createXMLStreamReader(new ByteArrayInputStream(xml), StandardCharsets.UTF_8.name());
-            readDocument(reader, annotations);
+        try (ClosingReader reader = open(xml)) {
+            readDocument(reader.stream(), annotations);
         } catch (XMLStreamException e) {
             log.warn("Could not parse annotations document ({} bytes): {}", xml.length, e.getMessage());
-        } finally {
-            closeQuietly(reader);
         }
         return annotations;
     }
 
-    private void readDocument(XMLStreamReader reader, Map<String, String> annotations) throws XMLStreamException {
-        String currentEntry = null;
-        StringBuilder currentText = new StringBuilder();
-        StringBuilder paragraph = new StringBuilder();
-        boolean insideParagraph = false;
+    private ClosingReader open(byte[] xml) throws XMLStreamException {
+        return new ClosingReader(inputFactory.createXMLStreamReader(
+                new ByteArrayInputStream(xml), StandardCharsets.UTF_8.name()));
+    }
 
+    private void readDocument(XMLStreamReader reader, Map<String, String> annotations) throws XMLStreamException {
+        AnnotationCursor cursor = new AnnotationCursor(annotations);
         while (reader.hasNext()) {
             switch (reader.next()) {
-                case XMLStreamConstants.START_ELEMENT -> {
-                    if ("file".equals(reader.getLocalName())) {
-                        currentEntry = reader.getAttributeValue(null, "name");
-                        currentText.setLength(0);
-                    } else if ("p".equals(reader.getLocalName())) {
-                        insideParagraph = true;
-                        paragraph.setLength(0);
-                    }
-                }
-                case XMLStreamConstants.CHARACTERS, XMLStreamConstants.CDATA -> {
-                    if (insideParagraph) {
-                        paragraph.append(reader.getText());
-                    }
-                }
-                case XMLStreamConstants.END_ELEMENT -> {
-                    if ("p".equals(reader.getLocalName())) {
-                        insideParagraph = false;
-                        appendParagraph(currentText, paragraph.toString());
-                    } else if ("file".equals(reader.getLocalName())) {
-                        storeAnnotation(annotations, currentEntry, currentText.toString());
-                        currentEntry = null;
-                    }
-                }
+                case XMLStreamConstants.START_ELEMENT -> cursor.startElement(reader);
+                case XMLStreamConstants.CHARACTERS, XMLStreamConstants.CDATA -> cursor.characters(reader);
+                case XMLStreamConstants.END_ELEMENT -> cursor.endElement(reader);
                 default -> {
                     // comments, processing instructions and whitespace carry nothing we need
                 }
+            }
+        }
+    }
+
+    /** Where the stream stands: the {@code <file>} being read and the paragraphs collected for it so far. */
+    private final class AnnotationCursor {
+        private final Map<String, String> annotations;
+        private final StringBuilder currentText = new StringBuilder();
+        private final StringBuilder paragraph = new StringBuilder();
+        private String currentEntry;
+        private boolean insideParagraph;
+
+        private AnnotationCursor(Map<String, String> annotations) {
+            this.annotations = annotations;
+        }
+
+        void startElement(XMLStreamReader reader) {
+            if ("file".equals(reader.getLocalName())) {
+                currentEntry = reader.getAttributeValue(null, "name");
+                currentText.setLength(0);
+            } else if ("p".equals(reader.getLocalName())) {
+                insideParagraph = true;
+                paragraph.setLength(0);
+            }
+        }
+
+        void characters(XMLStreamReader reader) {
+            if (insideParagraph) {
+                paragraph.append(reader.getText());
+            }
+        }
+
+        void endElement(XMLStreamReader reader) {
+            if ("p".equals(reader.getLocalName())) {
+                insideParagraph = false;
+                appendParagraph(currentText, paragraph.toString());
+            } else if ("file".equals(reader.getLocalName())) {
+                storeAnnotation(annotations, currentEntry, currentText.toString());
+                currentEntry = null;
+            }
+        }
+    }
+
+    /** {@link XMLStreamReader} predates {@link AutoCloseable}; this adapter lets it ride try-with-resources. */
+    private record ClosingReader(XMLStreamReader stream) implements AutoCloseable {
+        @Override
+        public void close() {
+            try {
+                stream.close();
+            } catch (XMLStreamException e) {
+                log.debug("Could not close annotations reader: {}", e.getMessage());
             }
         }
     }
@@ -120,16 +148,5 @@ public class FlibustaAnnotationParser {
         factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
         factory.setProperty(XMLInputFactory.IS_COALESCING, true);
         return factory;
-    }
-
-    private void closeQuietly(XMLStreamReader reader) {
-        if (reader == null) {
-            return;
-        }
-        try {
-            reader.close();
-        } catch (XMLStreamException e) {
-            log.debug("Could not close annotations reader: {}", e.getMessage());
-        }
     }
 }
