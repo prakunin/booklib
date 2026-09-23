@@ -25,7 +25,14 @@ public interface BookAdditionalFileRepository extends JpaRepository<BookFileEnti
                                                                            @Param("fileSubPath") String fileSubPath,
                                                                            @Param("fileName") String fileName);
 
-    @Query("SELECT bf FROM BookFileEntity bf WHERE bf.book.library.id = :libraryId")
+    // Library scans read these files outside a transaction and key them by the book's library path,
+    // so both associations are fetched here rather than left lazy.
+    @Query("""
+            SELECT bf FROM BookFileEntity bf
+            JOIN FETCH bf.book b
+            LEFT JOIN FETCH b.libraryPath
+            WHERE b.library.id = :libraryId
+            """)
     List<BookFileEntity> findByLibraryId(@Param("libraryId") Long libraryId);
 
     @Query("""

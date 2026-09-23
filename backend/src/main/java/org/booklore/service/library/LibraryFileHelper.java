@@ -61,6 +61,8 @@ public class LibraryFileHelper {
 
         return allAdditionalFiles.stream()
                 .filter(BookFileEntity::isBookFormat)
+                // Without a library path the file cannot be located on disk, so it cannot be judged gone.
+                .filter(additionalFile -> additionalFile.getBook().getLibraryPath() != null)
                 .filter(additionalFile -> !currentFileKeys.contains(generateUniqueKey(additionalFile)))
                 .map(BookFileEntity::getId)
                 .toList();
@@ -89,11 +91,13 @@ public class LibraryFileHelper {
             // Fileless book - use a unique key that won't match any file
             return "fileless:" + book.getId();
         }
-        return generateKey(book.getLibraryPath().getId(), primaryFile.getFileSubPath(), primaryFile.getFileName());
+        LibraryPathEntity libraryPath = book.getLibraryPath();
+        return generateKey(libraryPath != null ? libraryPath.getId() : null, primaryFile.getFileSubPath(), primaryFile.getFileName());
     }
 
     private String generateUniqueKey(BookFileEntity file) {
-        return generateKey(file.getBook().getLibraryPath().getId(), file.getFileSubPath(), file.getFileName());
+        LibraryPathEntity libraryPath = file.getBook().getLibraryPath();
+        return generateKey(libraryPath != null ? libraryPath.getId() : null, file.getFileSubPath(), file.getFileName());
     }
 
     private String generateUniqueKey(LibraryFile file) {
