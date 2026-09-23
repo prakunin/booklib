@@ -2,7 +2,6 @@ package org.booklore.app.service;
 
 import org.booklore.app.dto.AppLibrarySummary;
 import org.booklore.app.mapper.AppBookMapper;
-import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.Library;
 import org.booklore.model.entity.LibraryEntity;
@@ -29,7 +28,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AppLibraryServiceTest {
 
-    @Mock private AuthenticationService authenticationService;
     @Mock private LibraryRepository libraryRepository;
     @Mock private BookRepository bookRepository;
     @Mock private AppBookMapper mobileBookMapper;
@@ -38,7 +36,7 @@ class AppLibraryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AppLibraryService(authenticationService, libraryRepository, bookRepository, mobileBookMapper);
+        service = new AppLibraryService(libraryRepository, bookRepository, mobileBookMapper);
     }
 
     @Nested
@@ -46,12 +44,11 @@ class AppLibraryServiceTest {
 
         @Test
         void adminSeesAllLibrariesWithCountsFromOneGroupedQuery() {
-            when(authenticationService.getAuthenticatedUser()).thenReturn(user(true, null));
             when(libraryRepository.findAll()).thenReturn(List.of(library(1L, "Fiction"), library(2L, "Empty")));
             when(bookRepository.countByLibraryIds(List.of(1L, 2L))).thenReturn(List.of(count(1L, 42L)));
             when(mobileBookMapper.toLibrarySummary(any(), anyLong())).thenCallRealMethod();
 
-            List<AppLibrarySummary> result = service.getLibraries();
+            List<AppLibrarySummary> result = service.getLibraries(user(true, null));
 
             assertThat(result)
                     .extracting(AppLibrarySummary::getName, AppLibrarySummary::getBookCount)
@@ -64,12 +61,11 @@ class AppLibraryServiceTest {
         @Test
         void regularUserSeesOnlyAssignedLibraries() {
             Library assigned = Library.builder().id(7L).build();
-            when(authenticationService.getAuthenticatedUser()).thenReturn(user(false, List.of(assigned)));
             when(libraryRepository.findByIdIn(List.of(7L))).thenReturn(List.of(library(7L, "Mine")));
             when(bookRepository.countByLibraryIds(List.of(7L))).thenReturn(List.of(count(7L, 3L)));
             when(mobileBookMapper.toLibrarySummary(any(), anyLong())).thenCallRealMethod();
 
-            List<AppLibrarySummary> result = service.getLibraries();
+            List<AppLibrarySummary> result = service.getLibraries(user(false, List.of(assigned)));
 
             assertThat(result).singleElement()
                     .satisfies(summary -> {
@@ -81,10 +77,9 @@ class AppLibraryServiceTest {
 
         @Test
         void userWithoutLibrariesSkipsTheCountQuery() {
-            when(authenticationService.getAuthenticatedUser()).thenReturn(user(false, null));
             when(libraryRepository.findByIdIn(List.of())).thenReturn(List.of());
 
-            assertThat(service.getLibraries()).isEmpty();
+            assertThat(service.getLibraries(user(false, null))).isEmpty();
             verify(bookRepository, never()).countByLibraryIds(any());
         }
     }

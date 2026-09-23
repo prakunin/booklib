@@ -3,7 +3,6 @@ package org.booklore.app.service;
 import lombok.RequiredArgsConstructor;
 import org.booklore.app.dto.AppLibrarySummary;
 import org.booklore.app.mapper.AppBookMapper;
-import org.booklore.config.security.service.AuthenticationService;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.model.dto.Library;
 import org.booklore.model.entity.LibraryEntity;
@@ -21,14 +20,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AppLibraryService {
 
-    private final AuthenticationService authenticationService;
     private final LibraryRepository libraryRepository;
     private final BookRepository bookRepository;
     private final AppBookMapper mobileBookMapper;
 
+    // The caller resolves the user outside this transaction: resolving it can write the user's
+    // default settings, which a read-only transaction would silently drop.
     @Transactional(readOnly = true)
-    public List<AppLibrarySummary> getLibraries() {
-        List<LibraryEntity> libraries = findVisibleLibraries(authenticationService.getAuthenticatedUser());
+    public List<AppLibrarySummary> getLibraries(BookLoreUser user) {
+        List<LibraryEntity> libraries = findVisibleLibraries(user);
         if (libraries.isEmpty()) {
             return List.of();
         }

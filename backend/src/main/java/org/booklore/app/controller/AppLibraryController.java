@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.booklore.app.dto.AppLibrarySummary;
 import org.booklore.app.service.AppLibraryService;
+import org.booklore.config.security.service.AuthenticationService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,7 @@ import java.util.List;
 @Tag(name = "App Libraries", description = "Endpoints for retrieving libraries in the app experience")
 public class AppLibraryController {
 
+    private final AuthenticationService authenticationService;
     private final AppLibraryService appLibraryService;
 
     @Operation(
@@ -27,6 +29,6 @@ public class AppLibraryController {
     )
     @GetMapping
     public ResponseEntity<List<AppLibrarySummary>> getLibraries() {
-        return ResponseEntity.ok(appLibraryService.getLibraries());
+        return ResponseEntity.ok(appLibraryService.getLibraries(authenticationService.getAuthenticatedUser()));
     }
 }
