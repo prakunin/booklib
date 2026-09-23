@@ -4,6 +4,7 @@ import org.booklore.model.dto.Shelf;
 import org.booklore.model.entity.AuthorEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collections;
 import java.util.Iterator;
@@ -14,6 +15,7 @@ import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 
+@Slf4j
 @UtilityClass
 public class BookUtils {
 
@@ -57,8 +59,9 @@ public class BookUtils {
                     }
                 }
             }
-        } catch (Exception _) {
+        } catch (Exception ex) {
             // LazyInitializationException or similar - authors won't be included in search text
+            log.debug("Could not read authors for the search text of book {}: {}", e.getBookId(), ex.getMessage());
         }
         
         return normalizeForSearch(sb.toString().trim());

@@ -7,11 +7,13 @@ import org.booklore.app.dto.AppUserInfo;
 import org.booklore.model.dto.BookLoreUser;
 import org.booklore.service.appsettings.AppSettingService;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @AllArgsConstructor
 @RestController
 @RequestMapping("/api/v1/app/users")
@@ -37,8 +39,8 @@ public class AppUserController {
             if (configured != null) {
                 maxUploadSizeMb = configured;
             }
-        } catch (Exception _) {
-            // fall back to default
+        } catch (Exception e) {
+            log.debug("Could not read the max upload size for user {}, using the default: {}", user.getId(), e.getMessage());
         }
 
         AppUserInfo info = AppUserInfo.builder()

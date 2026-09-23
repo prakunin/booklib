@@ -33,8 +33,9 @@ public class BookloreSyncTokenGenerator {
                         .rawKoboSyncToken(base64Token)
                         .build();
             }
-        } catch (Exception _) {
+        } catch (Exception e) {
             // Malformed token, fall through to an empty sync token
+            log.debug("Could not decode Kobo sync token, starting from an empty one: {}", e.getMessage());
         }
         return new BookloreSyncToken();
     }
