@@ -43,42 +43,54 @@ class CoverImageGeneratorTest {
         void twoArgOverload_delegatesWithNullSubtitle() throws IOException {
             byte[] jpeg = generator.generateCover("Dune", "Frank Herbert");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
         void withSubtitle_rendersWithoutError() throws IOException {
             byte[] jpeg = generator.generateCover("Dune", "Frank Herbert", "A science fiction epic of politics and prophecy");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
         void blankSubtitle_isTreatedAsAbsent() throws IOException {
             byte[] jpeg = generator.generateCover("Dune", "Frank Herbert", "   ");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
         void nullTitleAndAuthor_fallBackToDefaults() throws IOException {
             byte[] jpeg = generator.generateCover(null, null);
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
         void blankTitleAndAuthor_fallBackToDefaults() throws IOException {
             byte[] jpeg = generator.generateCover("   ", "   ");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
         void veryShortTitleAndAuthor_useLargestFontBucket() throws IOException {
             byte[] jpeg = generator.generateCover("It", "Or");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
@@ -86,21 +98,27 @@ class CoverImageGeneratorTest {
             String longTitle = "A ".repeat(150) + "Extremely Long Title That Exceeds The Maximum Allowed Length By A Wide Margin";
             byte[] jpeg = generator.generateCover(longTitle, "Some Author");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
         void multipleCommaSeparatedAuthors_suppressesByPrefix() throws IOException {
             byte[] jpeg = generator.generateCover("Good Omens", "Terry Pratchett, Neil Gaiman");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
         void singleShortAuthor_showsByPrefix() throws IOException {
             byte[] jpeg = generator.generateCover("Neuromancer", "Gibson");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
@@ -108,14 +126,18 @@ class CoverImageGeneratorTest {
             byte[] jpeg = generator.generateCover(
                     "An Anthology", "Author Number One, Author Number Two, Author Number Three, Author Number Four");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
 
         @Test
         void unicodeTitleAndAuthor_renderWithoutError() throws IOException {
             byte[] jpeg = generator.generateCover("百年の孤独", "ガブリエル・ガルシア=マルケス");
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1600);
         }
     }
 
@@ -137,7 +159,9 @@ class CoverImageGeneratorTest {
         void nullTitleAndAuthor_fallBackToDefaults() throws IOException {
             byte[] jpeg = generator.generateSquareCover(null, null);
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1200);
         }
 
         @Test
@@ -146,7 +170,9 @@ class CoverImageGeneratorTest {
             String longAuthor = "Author ".repeat(40);
             byte[] jpeg = generator.generateSquareCover(longTitle, longAuthor);
 
-            decode(jpeg);
+            assertThat(decode(jpeg))
+                    .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+                    .containsExactly(1200, 1200);
         }
     }
 

@@ -665,8 +665,9 @@ public class CbxMetadataExtractor implements FileMetadataExtractor {
                     possibleCoverImages.add(entryNames.get(index - 1));
                 }
             }
-        } catch (Exception _) {
-            // Do nothing
+        } catch (Exception e) {
+            // A malformed ComicInfo page entry must not stop the cover search
+            log.debug("Skipping unreadable ComicInfo page entry while looking for a cover: {}", e.getMessage());
         }
     }
 

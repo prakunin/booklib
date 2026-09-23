@@ -11,10 +11,12 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
 @RestController
+@PreAuthorize("isAuthenticated()")
 @RequestMapping("/api/v1/book-notes")
 @AllArgsConstructor
 @Tag(name = "Book Notes", description = "Endpoints for managing notes attached to books")

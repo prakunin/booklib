@@ -11,11 +11,13 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.Set;
 
 @AllArgsConstructor
 @RestController
+@PreAuthorize("isAuthenticated()")
 @RequestMapping("/api/v1/app/notebook")
 @Tag(name = "App Notebook", description = "Endpoints for notebook browsing and editing in the app experience")
 public class AppNotebookController {

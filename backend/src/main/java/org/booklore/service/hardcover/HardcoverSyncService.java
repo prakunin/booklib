@@ -6,7 +6,6 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.BookMetadataEntity;
 import org.booklore.repository.BookRepository;
 import org.booklore.service.metadata.parser.hardcover.GraphQLRequest;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
@@ -51,7 +50,6 @@ public class HardcoverSyncService {
     // Thread-local to hold the current API token for GraphQL requests
     private final ThreadLocal<String> currentApiToken = new ThreadLocal<>();
 
-    @Autowired
     public HardcoverSyncService(
             HardcoverSyncSettingsService hardcoverSyncSettingsService,
             BookRepository bookRepository,
@@ -71,7 +69,7 @@ public class HardcoverSyncService {
      * @param progressPercent The reading progress as a percentage (0-100)
      * @param userId The user ID whose reading progress is being synced
      */
-    @Async
+    @Async("taskExecutor")
     @Transactional(readOnly = true)
     public void syncProgressToHardcover(Long bookId, Float progressPercent, Long userId) {
         try {
