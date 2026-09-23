@@ -112,7 +112,17 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     @Query("SELECT DISTINCT b FROM BookEntity b JOIN b.bookFiles bf WHERE b.libraryPath.id = :libraryPathId AND (bf.fileSubPath = :fileSubPathPrefix OR bf.fileSubPath LIKE CONCAT(:fileSubPathPrefix, '/%')) AND bf.isBookFormat = true AND (b.deleted IS NULL OR b.deleted = false)")
     List<BookEntity> findAllByLibraryPathIdAndFileSubPathStartingWith(@Param("libraryPathId") Long libraryPathId, @Param("fileSubPathPrefix") String fileSubPathPrefix);
 
-    @Query("SELECT DISTINCT b FROM BookEntity b JOIN b.bookFiles bf WHERE b.libraryPath.id = :libraryPathId AND bf.fileSubPath = :fileSubPath AND bf.isBookFormat = true AND (b.deleted IS NULL OR b.deleted = false)")
+    // Fetches every file of each matching book (the EXISTS keeps the filter off the fetched
+    // collection) because rescan grouping reads them without a session.
+    @Query("""
+            SELECT DISTINCT b FROM BookEntity b
+            LEFT JOIN FETCH b.bookFiles
+            LEFT JOIN FETCH b.library
+            WHERE b.libraryPath.id = :libraryPathId
+              AND EXISTS (SELECT 1 FROM BookFileEntity bf
+                          WHERE bf.book = b AND bf.fileSubPath = :fileSubPath AND bf.isBookFormat = true)
+              AND (b.deleted IS NULL OR b.deleted = false)
+            """)
     List<BookEntity> findAllByLibraryPathIdAndFileSubPath(@Param("libraryPathId") Long libraryPathId, @Param("fileSubPath") String fileSubPath);
 
     @Query("SELECT b FROM BookEntity b JOIN b.bookFiles bf WHERE b.libraryPath.id = :libraryPathId AND bf.fileSubPath = :fileSubPath AND bf.fileName = :fileName AND bf.isBookFormat = true AND (b.deleted IS NULL OR b.deleted = false)")
@@ -157,7 +167,8 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     @Query("SELECT b FROM BookEntity b WHERE b.library.id = :libraryId AND (b.deleted IS NULL OR b.deleted = false)")
     List<BookEntity> findAllByLibraryIdWithFiles(@Param("libraryId") Long libraryId);
 
-    @EntityGraph(attributePaths = {"bookFiles", "libraryPath"})
+    // Scans use these books outside a session: getPrimaryBookFile() reads the library's format priority.
+    @EntityGraph(attributePaths = {"bookFiles", "libraryPath", "library"})
     @Query("SELECT b FROM BookEntity b WHERE b.library.id = :libraryId")
     List<BookEntity> findAllByLibraryIdForRescan(@Param("libraryId") Long libraryId);
 
@@ -297,13 +308,14 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
     @Query("SELECT COUNT(b) FROM BookEntity b WHERE b.library.id = :libraryId AND (b.deleted IS NULL OR b.deleted = false)")
     long countByLibraryId(@Param("libraryId") Long libraryId);
 
+    // Rescan grouping matches files against these books' titles without a session.
     @Query("""
             SELECT b FROM BookEntity b
-            LEFT JOIN b.bookFiles bf
+            LEFT JOIN FETCH b.metadata
+            LEFT JOIN FETCH b.libraryPath
             WHERE b.library.id = :libraryId
             AND (b.deleted IS NULL OR b.deleted = false)
-            GROUP BY b
-            HAVING COUNT(bf) = 0
+            AND NOT EXISTS (SELECT 1 FROM BookFileEntity bf WHERE bf.book = b)
             """)
     List<BookEntity> findFilelessBooksByLibraryId(@Param("libraryId") Long libraryId);
 
