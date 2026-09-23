@@ -40,7 +40,7 @@ public class AppUserController {
                 maxUploadSizeMb = configured;
             }
         } catch (Exception e) {
-            log.debug("Could not read the max upload size for user {}, using the default: {}", user.getId(), e.getMessage());
+            log.warn("Could not read the max upload size for user {}, using the default: {}", user.getId(), e.getMessage());
         }
 
         AppUserInfo info = AppUserInfo.builder()
