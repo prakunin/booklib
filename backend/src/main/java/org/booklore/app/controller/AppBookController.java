@@ -14,12 +14,14 @@ import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 import java.util.Set;
 
 @AllArgsConstructor
 @RestController
+@PreAuthorize("isAuthenticated()")
 @Validated
 @RequestMapping("/api/v1/app/books")
 @Tag(name = "App Books", description = "Endpoints for browsing and updating books in the app experience")
