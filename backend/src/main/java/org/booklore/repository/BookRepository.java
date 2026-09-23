@@ -9,6 +9,7 @@ import org.booklore.model.entity.BookEntity;
 import org.booklore.model.entity.LibraryPathEntity;
 import org.booklore.model.enums.BookFileType;
 import org.booklore.repository.projection.BookCoverUpdateProjection;
+import org.booklore.repository.projection.LibraryBookCountProjection;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
@@ -296,6 +297,13 @@ public interface BookRepository extends JpaRepository<BookEntity, Long>, JpaSpec
 
     @Query("SELECT COUNT(b) FROM BookEntity b WHERE b.library.id = :libraryId AND (b.deleted IS NULL OR b.deleted = false)")
     long countByLibraryId(@Param("libraryId") Long libraryId);
+
+    @Query("""
+            SELECT b.library.id AS libraryId, COUNT(b) AS bookCount FROM BookEntity b
+            WHERE b.library.id IN :libraryIds AND (b.deleted IS NULL OR b.deleted = false)
+            GROUP BY b.library.id
+            """)
+    List<LibraryBookCountProjection> countByLibraryIds(@Param("libraryIds") Collection<Long> libraryIds);
 
     @Query("""
             SELECT b FROM BookEntity b
